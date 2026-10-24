@@ -545,8 +545,8 @@ public class LevelMasterLocation : BaseLocation
             // Raise one level
             int newLevel = currentPlayer.Level + 1;
 
-            // Apply class-based stat increases
-            ApplyClassBasedStatIncreases();
+            // Apply class-based stat increases (1.3.7: for the level reached, as Level is raised below)
+            ApplyClassBasedStatIncreases(newLevel);
 
             // Apply hidden master bonuses
             ApplyMasterBonuses();
@@ -848,16 +848,24 @@ public class LevelMasterLocation : BaseLocation
     /// Apply class-based stat increases based on character class type.
     /// Instance wrapper for the static method.
     /// </summary>
-    private void ApplyClassBasedStatIncreases()
+    private void ApplyClassBasedStatIncreases(int levelReached)
     {
-        ApplyClassStatIncreases(currentPlayer);
+        ApplyClassStatIncreases(currentPlayer, levelReached);
     }
 
     /// <summary>
     /// Apply class-based stat increases for a level-up. Public static so it can be
     /// called from auto-level-up (BaseLocation) and grouped combat (CombatEngine).
+    /// 1.3.7: this form is for a caller that has raised Level already (the NPC, teammate and
+    /// starting level ups), so Level is the level reached.
     /// </summary>
-    public static void ApplyClassStatIncreases(Character player)
+    public static void ApplyClassStatIncreases(Character player) => ApplyClassStatIncreases(player, player.Level);
+
+    /// <summary>
+    /// 1.3.7: the level up that reaches <paramref name="levelReached"/>. The Level Master and the
+    /// auto level up call this before RaiseLevel, so they pass the level reached.
+    /// </summary>
+    public static void ApplyClassStatIncreases(Character player, int levelReached)
     {
         // Base stats that everyone gets
         player.BaseMaxHP += 5;
@@ -1014,6 +1022,7 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseDexterity += 3;     // Reduced from 4
                 player.BaseAgility += 3;
                 player.BaseStamina += 2;
+                player.BaseConstitution += VoidreaverConstitutionGain(levelReached);   // 1.3.7: 2 on an even level, 1 on an odd one
                 player.BaseMaxHP += 5;         // Reduced from 6 — glass cannon should be glassy
                 player.BaseMaxMana += 10;      // Reduced from 12
                 break;
@@ -1194,7 +1203,7 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
                 player.BaseAgility = Math.Max(1, player.BaseAgility - 4);
                 player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
-                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 3);
                 player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 8);
                 player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
                 break;
@@ -1204,6 +1213,8 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseDexterity = Math.Max(1, player.BaseDexterity - 3);
                 player.BaseAgility = Math.Max(1, player.BaseAgility - 3);
                 player.BaseStamina = Math.Max(1, player.BaseStamina - 2);
+                // 1.3.7: called before Level is lowered, so Level is the level lost, the one its level up reached
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - VoidreaverConstitutionGain(player.Level));
                 player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 5);
                 player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
                 break;
@@ -1246,6 +1257,43 @@ public class LevelMasterLocation : BaseLocation
     }
 
     /// <summary>
+    /// 1.3.7: the Constitution a Voidreaver gains on the level up that reaches
+    /// <paramref name="levelReached"/>: 2 on an even level, 1 on an odd one (1.5 a level).
+    /// The one source for the level up, the level loss, the NPC floor, the top-up and the admin edit.
+    /// </summary>
+    public static int VoidreaverConstitutionGain(int levelReached) => levelReached % 2 == 0 ? 2 : 1;
+
+    /// <summary>
+    /// 1.3.7: the Constitution the level ups that reach levels 2 to <paramref name="level"/> give,
+    /// the sum of VoidreaverConstitutionGain over them: (level - 1) + level / 2 (119 at level 80).
+    /// </summary>
+    public static long VoidreaverConstitutionThrough(int level)
+    {
+        long total = 0;
+        for (int l = 2; l <= level; l++) total += VoidreaverConstitutionGain(l);
+        return total;
+    }
+
+    /// <summary>
+    /// 1.3.7: once per character, on load: a Voidreaver gets the Constitution its levels so far would
+    /// have given under the lift (VoidreaverConstitutionThrough), into BaseConstitution, then the game's
+    /// own recalculation. A player gets it added. An NPC gets it as a floor, 10 + the total (the floor
+    /// EnsureClassStatsForLevel uses), as NPCSpawnSystem gave every NPC about 10 + 2 Constitution a level
+    /// whatever its class. The saved marker VoidreaverConstitutionApplied guards it: false only in a save
+    /// from before 1.3.7, set here for every class, so a second load adds none. Returns the amount.
+    /// </summary>
+    public static long ApplyVoidreaverConstitutionTopUp(Character character, bool isNpc)
+    {
+        if (character == null || character.VoidreaverConstitutionApplied) return 0;
+        character.VoidreaverConstitutionApplied = true;
+        if (character.Class != CharacterClass.Voidreaver) return 0;
+        long amount = VoidreaverConstitutionThrough(character.Level);
+        if (isNpc) amount = Math.Max(0, 10 + amount - character.BaseConstitution);
+        if (amount > 0) character.GrantPermanentStats((StatKind.Constitution, amount));
+        return amount;
+    }
+
+    /// <summary>
     /// Ensures an NPC/companion Character has class-appropriate stats for their level.
     /// Computes the expected minimum stat values from level-up scaling and applies
     /// Math.Max(current, expected) — never a nerf, only a buff for under-scaled characters.
@@ -1254,6 +1302,10 @@ public class LevelMasterLocation : BaseLocation
     public static void EnsureClassStatsForLevel(Character npc)
     {
         if (npc == null || npc.Level <= 1) return;
+
+        // 1.3.7: the guarded one-time top-up first (a no-op once the marker is set), so this floor,
+        // a Max, never adds the lifted Voidreaver Constitution a second time on top of it
+        ApplyVoidreaverConstitutionTopUp(npc, isNpc: true);
 
         int levelsGained = npc.Level - 1; // number of level-up applications
 
@@ -1387,7 +1439,7 @@ public class LevelMasterLocation : BaseLocation
                 expStr  += levelsGained * 4;
                 expAgi  += levelsGained * 4;
                 expInt  += levelsGained * 3;
-                expCon  += levelsGained * 2;
+                expCon  += levelsGained * 3;
                 expHP   += levelsGained * 8;
                 expMana += levelsGained * 10;
                 break;
@@ -1397,6 +1449,7 @@ public class LevelMasterLocation : BaseLocation
                 expDex  += levelsGained * 3;
                 expAgi  += levelsGained * 3;
                 expSta  += levelsGained * 2;
+                expCon  += VoidreaverConstitutionThrough(npc.Level);   // 1.3.7
                 expHP   += levelsGained * 5;
                 expMana += levelsGained * 10;
                 break;
@@ -1522,8 +1575,8 @@ public class LevelMasterLocation : BaseLocation
         {
             int newLevel = player.Level + 1;
 
-            // Apply proper class-based stat increases
-            ApplyClassStatIncreases(player);
+            // Apply proper class-based stat increases (1.3.7: for the level reached, as Level is raised below)
+            ApplyClassStatIncreases(player, newLevel);
 
             // Apply alignment-based bonus stats
             ApplyAlignmentBonuses(player);

@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | Power Hat heals at least 20 percent of maximum HP, rising after level 75 to 50 percent at level 100, Unmaking costs 10 percent of current HP instead of 25, and the spell menu wraps a long description so no row passes 79 columns.
 history: 1.3.6 | Frost Touch and Ice Storm slow a boss at most 1 round, Steal Life and Energy Drain heal half of the damage dealt, Purifying Surge cures an ally's poison and disease, Cycle Rewind and Blood Pact act only on the caster, Summon Angel and Summon Demon ask for no target and give their attack bonus, and Death Kiss and Power Word: Kill no longer kill mini bosses outright.
 history: 1.3.5 | Cycle Rewind heals exactly 30 percent of the caster's maximum HP, as its text says, with no level, Wisdom or proficiency scaling.
 history: 1.3.4 | Probability Shift makes 30 percent of the target's hits miss and stops its critical hits in place of confusing and slowing it, Echo of Tomorrow ignores half the target's armor, and Paradox Collapse's text names its bonus damage.
@@ -50,7 +51,7 @@ Spells do not use the ability scaling, and a spell does not make the [hit roll](
 
 - Damage: the base damage times 1 plus 3 percent per character level, times your casting stat multiplier. The casting stat is Intelligence; Wavecallers use Charisma. The multiplier is 1 plus 5 percent per point above 10 up to 85, then 1.5 percent per point above 85, and never more than 8 times. Clerics and Sages also gain 1 percent per point of Wisdom above 10, and lose 1 percent per point below 10. Magicians deal 15 percent more spell damage (Arcane Mastery). Damage varies by up to 10 percent either way.
 - Spell critical hits, for damage only: the chance is half of your casting stat above 10, in percent, up to 50 percent. A critical spell does 50 percent more damage.
-- Healing: the base healing times 1 plus 2.5 percent per character level, times 1 plus 1.5 percent per point of Wisdom above 10, at most 3 times. Healing varies by up to 5 percent either way. Clerics heal 25 percent more with spells (Divine Grace). Cycle Rewind is the exception: it heals exactly 30 percent of your maximum HP, with no level, Wisdom or proficiency scaling.
+- Healing: the base healing times 1 plus 2.5 percent per character level, times 1 plus 1.5 percent per point of Wisdom above 10, at most 3 times. Healing varies by up to 5 percent either way. Clerics heal 25 percent more with spells (Divine Grace). Cycle Rewind is the exception: it heals exactly 30 percent of your maximum HP, with no level, Wisdom or proficiency scaling. Power Hat, the Magician's level 8 spell, heals at least 20 percent of your maximum HP, plus 1.2 percent for each level above 75 (50 percent at level 100), whichever is more than the formula gives; its protection is unchanged.
 - Protection: the base protection times 1 plus 2 percent per character level, times 1 plus 1.5 percent per point of Intelligence above 10 up to 60, then 0.5 percent per point, at most 2.5 times. Wavecallers use Charisma here too.
 
 Frost Touch slows its target, and Ice Storm every enemy still standing, for 2 rounds. A boss or champion shrugs the slow off {{balance:BossSoftControlResistPercent}} percent of the time and is otherwise slowed 1 round. The slow counts down once a round, and a slowed enemy loses its action half the time.

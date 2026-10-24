@@ -1,8 +1,9 @@
 ---
 title: The Outskirts settlement
 path: /wiki/en/world/settlement/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/SettlementLocation.cs, Scripts/Systems/SettlementSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -36,7 +37,7 @@ A service opens when its building reaches the tier below. You can hold only one 
 - **Market Stall (Built):** says trading will come later; it sells nothing.
 - **Council Hall (Built):** once a day, 10 percent of (the treasury x your share of all player contributions), at least 50 gold and at most the treasury; with no contribution of yours, 50 gold. Terran's boon can add to it.
 - **Shrine (Upgraded):** once a day, heals 30 percent of your maximum HP.
-- **Palisade (Upgraded):** +5 percent defence.
+- **Palisade (Upgraded):** +5 percent defense.
 - **Workshop (Upgraded):** once a day, sharpens your weapon for 10 fights: +20 percent damage on your basic attacks, not on spells or class abilities.
 - **Watchtower (Upgraded):** scouts any dungeon floor from 1 to 100 room by room, showing each room's monsters, traps, treasure, events, stairs and special rooms, with a sample monster.
 

@@ -243,8 +243,11 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply class-based stat increases to raw PlayerSaveData for admin level edits.
         /// Mirrors LevelMasterLocation.ApplyClassStatIncreases() but works on save data directly.
+        /// 1.3.7: a copy kept on PlayerData Base* fields (supervisor ruling 2026-10-23T23:28:10Z); its
+        /// drift guard is Tests/FR137FoundRows.cs, which compares every class against the live level up.
         /// </summary>
-        private static void ApplyClassStatIncreasesToSaveData(PlayerData player, int levelsGained)
+        /// 1.3.7: <paramref name="oldLevel"/> is the level before the edit, so iteration i reaches oldLevel + i + 1.
+        private static void ApplyClassStatIncreasesToSaveData(PlayerData player, int levelsGained, int oldLevel)
         {
             for (int i = 0; i < levelsGained; i++)
             {
@@ -264,7 +267,7 @@ namespace UsurperRemake.Systems
                         player.BaseMaxHP += 6; player.BaseStrength += 2; player.BaseConstitution += 2;
                         break;
                     case CharacterClass.Sage:
-                        player.BaseIntelligence += 5; player.BaseWisdom += 4; player.BaseMaxMana += 18;
+                        player.BaseIntelligence += 5; player.BaseWisdom += 4; player.BaseMaxMana += 14;
                         player.BaseMaxHP += 5; player.BaseStrength += 1; player.BaseDefence += 1; player.BaseConstitution += 1;
                         break;
                     case CharacterClass.Alchemist:
@@ -276,8 +279,8 @@ namespace UsurperRemake.Systems
                         player.BaseDexterity += 2; player.BaseDefence += 2;
                         break;
                     case CharacterClass.Barbarian:
-                        player.BaseStrength += 4; player.BaseConstitution += 4; player.BaseMaxHP += 12;
-                        player.BaseStamina += 2;
+                        player.BaseStrength += 3; player.BaseConstitution += 4; player.BaseMaxHP += 12;
+                        player.BaseStamina += 3;
                         break;
                     case CharacterClass.Paladin:
                         player.BaseStrength += 3; player.BaseConstitution += 3; player.BaseWisdom += 2;
@@ -289,10 +292,10 @@ namespace UsurperRemake.Systems
                         break;
                     case CharacterClass.Ranger:
                         player.BaseDexterity += 3; player.BaseAgility += 3; player.BaseStrength += 2;
-                        player.BaseMaxHP += 8; player.BaseStamina += 2; player.BaseConstitution += 2;
+                        player.BaseWisdom += 1; player.BaseMaxHP += 8; player.BaseStamina += 2;
                         break;
                     case CharacterClass.Jester:
-                        player.BaseCharisma += 4; player.BaseDexterity += 3; player.BaseAgility += 3;
+                        player.BaseCharisma += 3; player.BaseDexterity += 3; player.BaseAgility += 3;
                         player.BaseMaxHP += 5; player.BaseStamina += 2;
                         break;
                     case CharacterClass.Bard:
@@ -314,19 +317,42 @@ namespace UsurperRemake.Systems
                         break;
                     case CharacterClass.Abysswarden:
                         player.BaseDexterity += 5; player.BaseStrength += 4; player.BaseAgility += 4;
-                        player.BaseIntelligence += 3; player.BaseConstitution += 2; player.BaseMaxHP += 8; player.BaseMaxMana += 10;
+                        player.BaseIntelligence += 3; player.BaseConstitution += 3; player.BaseMaxHP += 8; player.BaseMaxMana += 10;
                         break;
                     case CharacterClass.Voidreaver:
-                        player.BaseStrength += 5; player.BaseIntelligence += 5; player.BaseDexterity += 4;
-                        player.BaseAgility += 3; player.BaseStamina += 2; player.BaseMaxHP += 6; player.BaseMaxMana += 12;
+                        player.BaseStrength += 4; player.BaseIntelligence += 3; player.BaseDexterity += 3;
+                        player.BaseAgility += 3; player.BaseStamina += 2; player.BaseMaxHP += 5; player.BaseMaxMana += 10;
+                        // 1.3.7: the lifted Constitution of the level reached, from the level up's own function; a save
+                        // without the marker gains none here, as its next load tops up every level at once
+                        if (player.VoidreaverConstitutionApplied)
+                            player.BaseConstitution += LevelMasterLocation.VoidreaverConstitutionGain(oldLevel + i + 1);
                         break;
                     case CharacterClass.MysticShaman:
-                        player.BaseStrength += 3; player.BaseDefence += 2; player.BaseIntelligence += 3;
-                        player.BaseConstitution += 2; player.BaseStamina += 2; player.BaseAgility += 1; player.BaseMaxMana += 8;
+                        player.BaseStrength += 2; player.BaseDefence += 1; player.BaseIntelligence += 3;
+                        player.BaseConstitution += 2; player.BaseStamina += 2; player.BaseAgility += 1;
+                        player.BaseMaxHP += 6; player.BaseMaxMana += 8;
                         break;
                     default:
                         player.BaseStrength += 2; player.BaseConstitution += 2; player.BaseMaxHP += 8;
                         break;
+                }
+
+                // 1.3.7: the specialization growth the live level up adds; the save keeps the
+                // ClassSpecialization as its int (SaveSystem writes it, the load casts it back)
+                var spec = UsurperRemake.Data.SpecializationData.GetSpec((ClassSpecialization)player.Specialization);
+                if (spec != null)
+                {
+                    player.BaseStrength += spec.BonusStrength;
+                    player.BaseConstitution += spec.BonusConstitution;
+                    player.BaseMaxHP += spec.BonusMaxHP;
+                    player.BaseDefence += spec.BonusDefence;
+                    player.BaseIntelligence += spec.BonusIntelligence;
+                    player.BaseWisdom += spec.BonusWisdom;
+                    player.BaseCharisma += spec.BonusCharisma;
+                    player.BaseMaxMana += spec.BonusMaxMana;
+                    player.BaseDexterity += spec.BonusDexterity;
+                    player.BaseAgility += spec.BonusAgility;
+                    player.BaseStamina += spec.BonusStamina;
                 }
             }
 
@@ -796,7 +822,7 @@ namespace UsurperRemake.Systems
                             int levelsGained = player.Level - oldLevel;
                             if (levelsGained > 0)
                             {
-                                ApplyClassStatIncreasesToSaveData(player, levelsGained);
+                                ApplyClassStatIncreasesToSaveData(player, levelsGained, oldLevel);
                                 terminal.WriteLine($"  Applied {levelsGained} levels of {GetClassName((int)player.Class)} stat increases.", "bright_green");
                             }
                             else

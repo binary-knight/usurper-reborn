@@ -1357,6 +1357,7 @@ internal static class PlayerSaveEditor
                 $"Timed stat buffs ({p.TimedStatBuffs?.Count ?? 0} active, Groggo DEX={p.GroggoShadowBlessingDex}): list and clear",
                 $"Artifact stats restored at login (ArtifactStatsApplied={p.ArtifactStatsApplied}): toggle",
                 $"NG+ cycle stat bonus backfilled at login (CycleStatBonusApplied={p.CycleStatBonusApplied}): toggle",
+                $"Voidreaver CON topped up (VoidreaverConstitutionApplied={p.VoidreaverConstitutionApplied}): toggle",
             });
             if (choice == 0) return;
             switch (choice)
@@ -1416,6 +1417,12 @@ internal static class PlayerSaveEditor
                     // 1.2.0: false makes the next login grant the NG+ cycle stat bonus once from the cycle number
                     p.CycleStatBonusApplied = !p.CycleStatBonusApplied;
                     EditorIO.Success($"CycleStatBonusApplied = {p.CycleStatBonusApplied}.");
+                    EditorIO.Pause();
+                    break;
+                case 12:
+                    // 1.3.7: false makes the next login add every level's Voidreaver Constitution once
+                    p.VoidreaverConstitutionApplied = !p.VoidreaverConstitutionApplied;
+                    EditorIO.Success($"VoidreaverConstitutionApplied = {p.VoidreaverConstitutionApplied}.");
                     EditorIO.Pause();
                     break;
             }

@@ -1,8 +1,9 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | none
 history: 1.3.6 | Weapon enchants and life steal now work in bounty hunting and gang war fights, and magic resistance cuts a spell's damage there by up to half.
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -37,7 +38,7 @@ You need level {{balance:GauntletMinLevel}}, one of your daily player fights and
 
 ### Gauntlet waves
 
-There are {{balance:GauntletWaveCount}} waves. Waves 1 to 3 are a single monster of your level - 3 + the wave number. Waves 4 to 10 are the seven champions in order, each a monster of your level + its level bonus (at most 100) with its own HP, Strength and Defence multipliers and abilities, fighting as a boss. You fight alone.
+There are {{balance:GauntletWaveCount}} waves. Waves 1 to 3 are a single monster of your level - 3 + the wave number. Waves 4 to 10 are the seven champions in order, each a monster of your level + its level bonus (at most 100) with its own HP, Strength and Defense multipliers and abilities, fighting as a boss. You fight alone.
 
 {{table:gauntlet-champions}}
 
@@ -49,7 +50,7 @@ Each wave won pays {{balance:GauntletGoldPerWavePerLevel}} x your level gold and
 
 {{table:gauntlet-tiers}}
 
-A Grand Champion keeps +{{percent:GrandChampionDamageBonus}} percent damage and +{{percent:GrandChampionDefenseBonus}} percent defence for good. The Gauntlet has its own achievements.
+A Grand Champion keeps +{{percent:GrandChampionDamageBonus}} percent damage and +{{percent:GrandChampionDefenseBonus}} percent defense for good. The Gauntlet has its own achievements.
 
 ### Gauntlet champion loot
 

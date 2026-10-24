@@ -1,8 +1,9 @@
 ---
 title: Immortals, player-gods and the Pantheon
 path: /wiki/en/gods/player-gods/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDomainPicker.cs, Scripts/Systems/DivineBoonRegistry.cs, Scripts/Systems/ImmortalDeedSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WeeklyGodSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/LocationManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/GameEngine.cs, Scripts/Server/MudChatSystem.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -88,7 +89,7 @@ These values change with the live world. The wiki does not export player names, 
 Each deed costs one of the day's deeds, which refill at the daily reset.
 
 - **Recruit Believer.** Try to convert a mortal. A pagan, or an NPC only loosely devoted to its god, converts {{percent:GodRecruitPaganChance}} percent of the time for {{balance:GodRecruitPaganExp}} experience; a believer of another god converts 25 percent of the time for {{balance:GodRecruitStealExp}}. A player is harder to convert and pays more: the chance is {{balance:GodRecruitPlayerMultiplier}} times as high (24.75 and 18.75 percent) and the experience {{balance:GodRecruitPlayerExpMultiplier}} times (300 and 100). A failed try still uses the deed.
-- **Bless Follower.** One of your followers gains a combat blessing for {{balance:GodBlessCombatDuration}} fights: {{percent:GodBlessBonusFollower}} percent more attack and defence for a Follower, {{percent:GodBlessBonusDevout}} for a Devout, {{percent:GodBlessBonusZealot}} for a Zealot or Chosen and {{percent:GodBlessBonusNpc}} for an NPC. A stronger blessing still running keeps its bonus. A player follower also gains {{balance:GodBlessFavorGain}} [Favor](/wiki/en/gods/favor/), at most {{balance:GodBlessFavorDailyCap}} a day. The bless gives you {{balance:GodBlessExp}} experience, {{balance:GodBlessPlayerExpMultiplier}} times as much (30) for a player.
+- **Bless Follower.** One of your followers gains a combat blessing for {{balance:GodBlessCombatDuration}} fights: {{percent:GodBlessBonusFollower}} percent more attack and defense for a Follower, {{percent:GodBlessBonusDevout}} for a Devout, {{percent:GodBlessBonusZealot}} for a Zealot or Chosen and {{percent:GodBlessBonusNpc}} for an NPC. A stronger blessing still running keeps its bonus. A player follower also gains {{balance:GodBlessFavorGain}} [Favor](/wiki/en/gods/favor/), at most {{balance:GodBlessFavorDailyCap}} a day. The bless gives you {{balance:GodBlessExp}} experience, {{balance:GodBlessPlayerExpMultiplier}} times as much (30) for a player.
 - **Smite Mortal.** Strike a mortal who does not follow you for a random {{percent:GodSmiteMinPercent}} to {{percent:GodSmiteMaxPercent}} percent of their maximum HP, for {{balance:GodSmiteExp}} experience, {{balance:GodSmitePlayerExpMultiplier}} times as much (50) for a player. A smite never kills: the target keeps at least 1 HP. You cannot smite your own followers, and the same player can be smitten again only after {{balance:GodSmitePlayerCooldownMinutes}} minutes.
 - **Poison Relations.** Worsen the relationship between two NPCs. It works {{percent:GodPoisonRelationshipChance}} percent of the time, for {{balance:GodPoisonRelationshipExp}} experience.
 - **Free Prisoner.** Release an imprisoned NPC, for {{balance:GodFreePrisonerExp}} experience.
@@ -111,7 +112,7 @@ Favors (F) adds extra boons on top of the domain boon. There are 13 Favors in th
 
 {{table:divine-boons}}
 
-A prayer at your altar doubles the larger of a follower's damage and defence Favor for a blessing of {{balance:GodPrayerBlessingCombats}} fights; see [the daily prayer blessing](/wiki/en/gods/favor/#the-daily-prayer-blessing).
+A prayer at your altar doubles the larger of a follower's damage and defense Favor for a blessing of {{balance:GodPrayerBlessingCombats}} fights; see [the daily prayer blessing](/wiki/en/gods/favor/#the-daily-prayer-blessing).
 
 ## Online and single-player
 

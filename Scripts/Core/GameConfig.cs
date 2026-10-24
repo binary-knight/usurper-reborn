@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.3.6";
+    public const string Version = "1.3.7";
     public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -68,6 +68,8 @@ public static partial class GameConfig
     public const int TurnsPerDay = 325;          // turns_per_day
     public const int MaxChildren = 8;            // maxchildren
     public const int MaxKingEdicts = 5;          // max_kingedicts
+    public const double PowerHatMinHealFraction = 0.20;       // Magician Power Hat: heal floor as a fraction of max HP
+    public const double PowerHatHealPerLevelAbove75 = 0.012;  // added to that floor for each caster level above 75 (0.50 at L100)
     public const int MaxHeals = 15;              // max healing potions
     
     // Combat constants
@@ -2305,8 +2307,9 @@ public static partial class GameConfig
     public static readonly (int Level, double Factor)[] DeepMonsterHpRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (100, 1.66) };
 
     /// <summary>1.3.3: deep monster Strength, punch and weapon power by level, waypoints as DeepMonsterHpRamp;
-    /// it climbs further than HP so the risk of dying grows with depth.</summary>
-    public static readonly (int Level, double Factor)[] DeepMonsterDamageRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (75, 1.715), (100, 2.1) };
+    /// it climbs further than HP so the risk of dying grows with depth. 1.3.7: after level 75 it rises faster,
+    /// to 10 percent more damage than the old line by level 80 (1.97) and 2.31 at level 100.</summary>
+    public static readonly (int Level, double Factor)[] DeepMonsterDamageRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (75, 1.715), (80, 1.97), (100, 2.31) };
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses
@@ -2335,6 +2338,7 @@ public static partial class GameConfig
     public const double AurelionDivineShield = 0.25;           // 25% divine armor cut, lifted only by the god's counter
     public const double TerravokStoneSkin = 0.35;              // 35% divine armor cut, lifted only by the god's counter
     public const double ManweCreatorsWard = 0.50;              // 50% divine armor cut, lifted only by the god's counter
+    public const double ManweWardOnRiders = 0.55;              // 1.3.7: the share of each enchant rider the Creator's Ward still stops on Manwe, counter held or not
     public const double ArtifactBossDamageBonus = 0.03;        // +3% player damage per artifact collected
 
     public class CraftingMaterialDef

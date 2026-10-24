@@ -1,10 +1,11 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.7 | The Alchemist's Philosopher's Bomb, Corrosive Cloud and Cataclysm Bomb deal more damage, Boss Slayer adds 4.5 percent to a class ability against Manwe, and a long quickbar row in screen reader mode or in the combat box continues on the next row.
 history: 1.3.6 | Attack and defense bonuses from different sources no longer add together, so the highest applies and the next returns when it ends, area abilities ask for no target and give no off-hand swing, Boss Slayer adds to class abilities against a boss or mini boss, and the stamina shown for abilities of level 50 and above is the cost charged.
-history: 1.3.5 | Holy Avenger, Purifying Flame, Searing Totem and Corrupting Touch no longer roll to hit, magical class abilities no longer trigger weapon procs or life steal, class abilities are cut by an Old God's divine armor and phase immunity, and armor piercing on gear also lowers the Defence a monster sets against abilities.
+history: 1.3.5 | Holy Avenger, Purifying Flame, Searing Totem and Corrupting Touch no longer roll to hit, magical class abilities no longer trigger weapon procs or life steal, class abilities are cut by an Old God's divine armor and phase immunity, and armor piercing on gear also lowers the Defense a monster sets against abilities.
 history: 1.3.4 | Shield Wall Formation, Divine Mandate and Death's Embrace now also work against Manwe's named abilities.
 history: 1.3.3 | none
 history: 1.3.2 | Backstab and Smite are shown on the combat menus of the classes that can use them, Smite spends one of the day's charges, and a Ranger's bow abilities deal 4 more damage.
@@ -42,7 +43,7 @@ Which stats count depends on the ability's type, shown on each ability page:
 
 Damage and healing use both multipliers. A damaging ability also adds a quarter of your weapon power to its base damage before scaling. When you dual wield, that weapon power counts the main-hand weapon in full and the off-hand weapon at half. An attack bonus uses both multipliers only on a Buff ability; on any other type it uses the level scale alone. A defense bonus uses both multipliers only on a Defense ability, where an equipped shield also raises it by the shield's block chance in percent; on any other type it uses the level scale alone.
 
-Damage and healing then vary by up to 10 percent either way, and your training proficiency in the ability multiplies them. Against a boss or mini boss Boss Slayer gear adds 10 percent to a class ability's hit, as it does to your swing; it never adds to a spell. Alchemists heal 50 percent more with abilities; Clerics, Tidesworn and Wavecallers heal 25 percent more.
+Damage and healing then vary by up to 10 percent either way, and your training proficiency in the ability multiplies them. Against a boss or mini boss Boss Slayer gear adds 10 percent to a class ability's hit, as it does to your swing (4.5 percent against Manwe); it never adds to a spell. Alchemists heal 50 percent more with abilities; Clerics, Tidesworn and Wavecallers heal 25 percent more.
 
 ## The hit roll
 

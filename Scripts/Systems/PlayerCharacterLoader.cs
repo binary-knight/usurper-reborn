@@ -58,6 +58,7 @@ public static class PlayerCharacterLoader
             GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex,
             ArtifactStatsApplied = playerData.ArtifactStatsApplied,
             CycleStatBonusApplied = playerData.CycleStatBonusApplied,
+            VoidreaverConstitutionApplied = playerData.VoidreaverConstitutionApplied,   // 1.3.7: the saved marker; a combat copy is not topped up
             AI = CharacterAI.Computer,
             IsEcho = isEcho,
             IsLoadedPlayer = !isEcho,   // v1.1.11: a player's own save, so a bounty on them can be paid

@@ -1,8 +1,9 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/DungeonLocation.cs
+history: 1.3.7 | Against Manwe a poison weapon has a 9 percent chance to poison, Godbane held or not.
 history: 1.3.6 | Weapon poison now poisons for 4 rounds in place of one hit, a Weakened monster takes more damage from every hit, a Poisoned monster no longer hits harder, a boss's physical immunity and divine armor cut each Poisoned tick, and fear, confusion and frost slows on a boss follow the hold and soft control rules.
 history: 1.3.5 | A slow on a monster counts down once a round even when the monster acts more than once, and a boss or mini boss now resists the Frostbite and Frostbrand slows as it resists other slows.
 history: 1.3.4 | Probability Shift now keeps the monster from scoring critical hits and makes 30 percent of its normal attacks that would hit you or an ally miss, in place of confusing and slowing it.
@@ -47,7 +48,7 @@ Statuses do not stack. Getting the same status again replaces the rounds left wi
 - **Weakened:** your basic swing and Power Attack lose 4 + level / 10 power.
 - **Cursed:** damage each round only.
 - **Feared:** no effect on what you can do.
-- **Blessed:** + level / 5 + 2 attack power, +2 defence, and 2 less armor class for your hit roll against a monster more than 5 levels above you.
+- **Blessed:** + level / 5 + 2 attack power, +2 defense, and 2 less armor class for your hit roll against a monster more than 5 levels above you.
 - **Vulnerable, Exhausted, Berserk, Empowered, Shielded and Protected** change nothing in a monster fight.
 
 A dungeon monster never puts Paralyzed, Sleeping, Confused, Slow or Diseased on you; those come from world bosses or other players, and Charmed only from other players.
@@ -78,7 +79,7 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
 - **Feared:** the monster loses every action while the fear lasts.
-- **Weakened:** the monster's attack is 0.70 times, and the Defence and armor it sets against every hit you deal it are 0.80 times.
+- **Weakened:** the monster's attack is 0.70 times, and the Defense and armor it sets against every hit you deal it are 0.80 times.
 - **Probability Shift:** a Cyclebreaker spell. For 3 rounds the monster never scores a critical hit, and 30 percent of its normal attacks that would hit you or an ally miss. Its special abilities are not affected.
 
 ### Stuns and holds on monsters
@@ -95,6 +96,6 @@ A boss or champion resists soft control {{balance:BossSoftControlResistPercent}}
 
 ### Weapon poison
 
-A hit with a poison weapon has a 20 percent chance to poison its target for 4 rounds. Each round, at the target's first action, it loses the larger of 5 percent of that hit and a quarter of the weapon's poison value (raised by your team's Armory, as your hits are), at least 1. A new poisoning before the 4 rounds end starts them again and keeps the larger of the two amounts; it never stacks. Physical immunity and divine armor cut each tick as they cut a hit. Weapon poison is separate from Poisoned: a target can have both, and both tick. In a player fight and on the world boss weapon poison is one hit instead: 10 percent of the hit, or the weapon's poison value raised by the Armory.
+A hit with a poison weapon has a 20 percent chance (9 percent against Manwe) to poison its target for 4 rounds. Each round, at the target's first action, it loses the larger of 5 percent of that hit and a quarter of the weapon's poison value (raised by your team's Armory, as your hits are), at least 1. A new poisoning before the 4 rounds end starts them again and keeps the larger of the two amounts; it never stacks. Physical immunity and divine armor cut each tick as they cut a hit. Weapon poison is separate from Poisoned: a target can have both, and both tick. In a player fight and on the world boss weapon poison is one hit instead: 10 percent of the hit, or the weapon's poison value raised by the Armory.
 
 Before another expedition, treat the condition itself and restock supplies. See [Mental](/wiki/en/characters/mental/) and [combat](/wiki/en/combat/).

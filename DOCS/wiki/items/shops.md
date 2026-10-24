@@ -1,8 +1,9 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Core/King.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/MarketplaceSystem.cs
+history: 1.3.7 | The Magic Shop says when an item's name is too long to carry the enchant's tag; the enchant is applied all the same.
 history: 1.3.6 | none
 history: 1.3.5 | Enchant removal lists enchanted items in your backpack, a failed 4th or 5th enchant destroys one random enchant whole, and items sold at the auction keep their loot effects, such as fire, frost and life steal.
 history: 1.3.4 | none
@@ -74,7 +75,7 @@ Enchant costs, limits, failure chances and the materials each enchant needs are 
 ### Magic Shop prices
 
 - Identification (I) costs 100 + level x 50 gold. New dungeon drops are always identified, so this is for older items.
-- Curse removal (C) costs twice the item's value plus 100 gold for every point of negative Strength, Defence, Dexterity and Wisdom, at least 500 gold, plus tax.
+- Curse removal (C) costs twice the item's value plus 100 gold for every point of negative Strength, Defense, Dexterity and Wisdom, at least 500 gold, plus tax.
 - Purifying a worn item, or a weapon or any armor piece in your backpack (body, shield, helm, arms, hands, legs, feet, waist, face or cloak), leaves it 80 percent of the power it had before the curse, which is 64 percent of its cursed power.
 - Scrying (G) costs 1,000 + level x 50 gold before the Magic Shop's modifiers.
 - A dungeon reset scroll (D) costs 1,000 + 5 x level squared gold plus tax: 3,000 at level 20 and 13,500 at level 50, before tax.

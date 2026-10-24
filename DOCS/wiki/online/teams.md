@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Systems/TeamHQBonus.cs, Scripts/Server/GroupSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Server/MudChatSystem.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | Items kept in the guild bank keep their loot effects, such as fire, frost and life steal.
 history: 1.3.4 | none
@@ -46,7 +47,7 @@ Team Corner raises a fallen NPC of your team for 1,000 gold per level of the NPC
 Online, a team can upgrade its headquarters at Team Corner. Each facility goes up to level {{balance:MaxTeamFacilityLevel}}, and the next level costs the facility's base cost times the next level squared. Base costs: Armory 5,000 gold, Barracks 5,000, Training 8,000, Vault 3,000, Infirmary 4,000. Each level gives every player on the team:
 
 - Armory: 5 percent more damage dealt.
-- Barracks: 5 percent more defence; the damage you take is divided by 1 plus 5 percent per level.
+- Barracks: 5 percent more defense; the damage you take is divided by 1 plus 5 percent per level.
 - Training: 5 percent more combat experience on your own share.
 - Infirmary: 10 percent more healing from a healing potion.
 

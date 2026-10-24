@@ -1,8 +1,9 @@
 ---
 title: Crafting materials
 path: /wiki/en/items/materials/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/MetaProgressionSystem.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | The new counter enchants Sunbane, Stonebane and Godbane spend Withered Heart Petal and Iron Judgment Link, which had no use before, along with other materials.
 history: 1.3.4 | none
@@ -74,5 +75,5 @@ The Master Trainer at the Inn (W) sells +1 to an attribute 5 times per attribute
 {{table:old-god-rewards}}
 
 :::spoiler Spoiler: how artifacts work
-Each Old God you defeat or save hands over one artifact, except Manwe, who gives none, and an alliance with Noctura hands over hers as well; the seventh artifact appears once you hold the other six. An artifact's grants are permanent and come once. An Intelligence bonus on an artifact is granted as half Wisdom and half Dexterity, and an all-stats bonus raises Strength, Defence, Stamina, Agility, Charisma, Dexterity and Wisdom; the table shows what you receive. The Artifact Hunter bonus of a later life multiplies every grant by 1.5.
+Each Old God you defeat or save hands over one artifact, except Manwe, who gives none, and an alliance with Noctura hands over hers as well; the seventh artifact appears once you hold the other six. An artifact's grants are permanent and come once. An Intelligence bonus on an artifact is granted as half Wisdom and half Dexterity, and an all-stats bonus raises Strength, Defense, Stamina, Agility, Charisma, Dexterity and Wisdom; the table shows what you receive. The Artifact Hunter bonus of a later life multiplies every grant by 1.5.
 :::

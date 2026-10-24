@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -32,7 +33,7 @@ The guardian floors are the Old God floors: Maelketh on floor 25, Veloura on 40,
 
 An Old God appears in its boss room only when your level is at least its floor minus 10 (15, 30, 45, 60, 75, 85 and 90) and enough other gods are resolved: none for Maelketh, 1 for Veloura and Thorgrim, 2 for Noctura, 3 for Aurelion, 4 for Terravok and 6 for Manwe. Until then the boss room holds an ordinary floor boss, and beating it does not open the way down.
 
-On the 5 floors before each Old God floor, ordinary monsters gain HP and damage but not Defence: 5% five floors out, then 10%, 15%, 20% and 25% on the floor just before the god. The god's own floor and the floors after it are back to normal. Floor bosses are not scaled this way.
+On the 5 floors before each Old God floor, ordinary monsters gain HP and damage but not Defense: 5% five floors out, then 10%, 15%, 20% and 25% on the floor just before the god. The god's own floor and the floors after it are back to normal. Floor bosses are not scaled this way.
 :::
 
 ## Floor layout

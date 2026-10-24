@@ -165,7 +165,7 @@ public static class SpellSystem
             [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Two doubled turns; a recast refreshes them.", 25, 7, "Quicksilvarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Journeyman Sorcery ---
-            [8] = new SpellInfo(8, "Power Hat", "Regenerate health and bolster defenses. Effect: 50-75 hp + protection. Duration: whole fight.", 30, 8, "Excadammarie", false, "Heal"),
+            [8] = new SpellInfo(8, "Power Hat", "Regenerate health and bolster defenses. Effect: 50-75 hp, at least 20% of max HP (+1.2% a level above 75, 50% at L100) + protection. Duration: whole fight.", 30, 8, "Excadammarie", false, "Heal"),
             [9] = new SpellInfo(9, "Fireball", "A sphere of flame engulfs your enemy. Damage: 55-75. Duration: 1 turn.", 35, 9, "Exammmarie", false, "Attack"),
             [10] = new SpellInfo(10, "Fear", "Project terror into your enemy's mind. Effect: it loses its turns (a boss resists half the time, held 1 round). Duration: varies.", 40, 10, "Examasumarie", false, "Debuff"),
             [11] = new SpellInfo(11, "Lightning Bolt", "A crackling bolt of electricity. Damage: 60-80. Duration: 1 turn.", 45, 11, "Exmasesaexmarie", false, "Attack"),
@@ -291,7 +291,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Blood Pact", "Sacrifice 20% of max HP. Gain +50 attack for the fight and guaranteed critical strike on next hit. Cannot be dispelled.", 30, 5, "Bloodpactarie", false, "Buff"),
             [3] = new SpellInfo(3, "Void Bolt", "Fire a bolt of annihilating nothingness. Damage: 90-120. Ignores all defense. Duration: 1 turn.", 55, 10, "Voidboltarie", false, "Attack"),
             [4] = new SpellInfo(4, "Consume the Fallen", "Devour residual energy from the fallen. Heals 25% of max HP (min 100). Duration: 1 turn.", 80, 16, "Consumfallarie", false, "Heal"),
-            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 200-280. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
+            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 200-280. Costs 10% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
         }
     };
     
@@ -1215,6 +1215,10 @@ public static class SpellSystem
             case 8: // Power Hat - Base: 50-75 hp + protection
                 int baseHeal8 = 50 + random.Next(26);
                 result.Healing = ScaleHealingEffect(baseHeal8, caster, random, profMult);
+                // 1.3.7 MG: the heal is at least PowerHatMinHealFraction of max HP, plus PowerHatHealPerLevelAbove75 a level above L75
+                // (50 percent at L100). The same case serves the player, a teammate and a companion (one CastSpell path).
+                result.Healing = Math.Max(result.Healing, (int)(caster.MaxHP * (GameConfig.PowerHatMinHealFraction
+                    + GameConfig.PowerHatHealPerLevelAbove75 * Math.Max(0, caster.Level - 75))));
                 result.ProtectionBonus = ScaleProtectionEffect(12 + (caster.Level / 8), caster, profMult);
                 result.Duration = 999;
                 result.Message += $" {Loc.Get("combat.spell_power_hat_cast", caster.Name2, result.Healing, result.ProtectionBonus)}";
@@ -1796,7 +1800,7 @@ public static class SpellSystem
                 result.Healing = Math.Max(100, (int)(caster.MaxHP * 0.25));
                 result.Message += $" {Loc.Get("combat.spell_consume_fallen_cast", caster.Name2, result.Healing)}";
                 break;
-            case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)
+            case 5: // Unmaking - 200-280 damage, costs 10% current HP (1.3.7: was 25%; damage reduced from 350-450)
                 // 1-round cooldown — can't spam the most powerful spell every round
                 if (caster.UnmakingCooldown > 0)
                 {
@@ -1808,7 +1812,7 @@ public static class SpellSystem
                     caster.Mana += result.ManaCost;
                     break;
                 }
-                int unmakeCost = (int)(caster.HP * 0.25);
+                int unmakeCost = (int)(caster.HP * 0.10);   // 1.3.7: was 0.25
                 caster.HP = Math.Max(1, caster.HP - unmakeCost);
                 int vrDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(vrDmg5, caster, random, profMult);

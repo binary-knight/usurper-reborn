@@ -1447,7 +1447,7 @@ public static class ClassAbilitySystem
             StaminaCost = 60,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 65,  // AoE — full damage to each target, scales with INT+DEX
+            BaseDamage = 260,  // 1.3.7: was 65. AoE, full damage to each target, scales with INT+DEX
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1555,7 +1555,7 @@ public static class ClassAbilitySystem
             StaminaCost = 55,
             Cooldown = 5,
             Type = AbilityType.Attack,
-            BaseDamage = 50,  // AoE — full damage to each target + corrode
+            BaseDamage = 150,  // 1.3.7: was 50. AoE, full damage to each target + corrode
             SpecialEffect = "aoe_corrode",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },
@@ -1597,7 +1597,7 @@ public static class ClassAbilitySystem
             StaminaCost = 80,
             Cooldown = 6,
             Type = AbilityType.Attack,
-            BaseDamage = 85,  // AoE — full damage to each target, capstone
+            BaseDamage = 340,  // 1.3.7: was 85. AoE, full damage to each target, capstone
             SpecialEffect = "aoe",
             AvailableToClasses = new[] { CharacterClass.Alchemist }
         },

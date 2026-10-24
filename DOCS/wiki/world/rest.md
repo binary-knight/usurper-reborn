@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -29,7 +30,7 @@ The 4th training of an attribute also takes 1 Heart of the Ocean, and the 5th ta
 
 Online, a room at the Inn (N) costs level x {{balance:InnRoomCostPerLevel}} gold, 1,500 at level 20, paid from gold on hand and then your bank account. It saves and logs you out.
 
-With a room you can hire up to {{balance:MaxSleepGuards}} guards to fight anyone who attacks you in your sleep. Base price and HP: rookie 100 and 80, hound 150 and 60, veteran 300 and 150, troll 500 and 200, elite 600 and 250, drake 1,000 and 300. Both are multiplied by (1 + level / 10), and each guard already hired adds 50 percent to the next one's price. A sleeper at the Inn also fights with 50 percent more Strength and Defence.
+With a room you can hire up to {{balance:MaxSleepGuards}} guards to fight anyone who attacks you in your sleep. Base price and HP: rookie 100 and 80, hound 150 and 60, veteran 300 and 150, troll 500 and 200, elite 600 and 250, drake 1,000 and 300. Both are multiplied by (1 + level / 10), and each guard already hired adds 50 percent to the next one's price. A sleeper at the Inn also fights with 50 percent more Strength and Defense.
 
 ## Attacked while sleeping
 

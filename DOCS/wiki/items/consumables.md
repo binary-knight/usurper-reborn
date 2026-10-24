@@ -1,8 +1,9 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none

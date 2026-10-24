@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | The Warrior and Barbarian attack bonus from a room feature lasts into the next fight.
 history: 1.3.6 | none
 history: 1.3.5 | A living companion now takes 75 percent of the experience from a room feature you examine, as an NPC teammate does.
 history: 1.3.4 | none
@@ -63,7 +64,7 @@ A chest trap you open first gives you the room trap evade roll (below). If it hi
 
 ### Mimic
 
-A mimic is a champion fight. Its HP, Strength, Defence, punch and weapon power are 1.5 times the plain monster formulas of the floor's level, without the monster difficulty scale of {{balance:BaseMonsterDifficultyScale}} or the early floor softening that ordinary monsters get.
+A mimic is a champion fight. Its HP, Strength, Defense, punch and weapon power are 1.5 times the plain monster formulas of the floor's level, without the monster difficulty scale of {{balance:BaseMonsterDifficultyScale}} or the early floor softening that ordinary monsters get.
 
 ## Room traps
 
@@ -121,7 +122,7 @@ A skill check rolls a twenty-sided die plus the stat / 10 (at most +40) against 
 
 ### Feature class bonus
 
-Warriors and Barbarians gain 5 + floor / 10 attack for the trip, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate, Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
+Warriors and Barbarians gain 5 + floor / 10 attack for the next fight, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate, Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
 
 ### Risk and reward features
 

@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.6; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.7; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.6. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.7. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -210,7 +210,7 @@ Standalone class (not extending Character). Combat-relevant fields only: `Level`
 
 ### 17 Total Classes (12 base + 5 prestige)
 
-Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`.
+Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`. The Voidreaver's Constitution gain alternates by level, 2 on an even level and 1 on an odd one (`LevelMasterLocation.VoidreaverConstitutionGain`, 1.3.7). A player Voidreaver saved before then gets the Constitution its levels would have gained once on load, and an NPC Voidreaver is raised once to the floor of 10 plus that total (`ApplyVoidreaverConstitutionTopUp`), guarded by the saved marker `VoidreaverConstitutionApplied` in the player and NPC save data; the admin console level edit (`OnlineAdminConsole.ApplyClassStatIncreasesToSaveData`) gives the same class and specialization gains as a level up.
 
 **Base classes (12)**: Alchemist, Assassin, Barbarian, Bard, Cleric, Jester, Magician, Paladin, Ranger, Sage, Warrior, Mystic Shaman.
 
@@ -369,9 +369,9 @@ Floors with `LastVisitedAt > 1 hour ago` repopulate non-boss monster rooms on ne
 ### Old God Boss Mechanics
 **File**: `Scripts/Systems/OldGodBossSystem.cs`, `Scripts/Data/OldGodsData.cs`
 
-Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor, enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Any single hit on a companion or NPC teammate is capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage AND -20% player damage (preserves the 1v1 tension while staying winnable). NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
+Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor, enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Any single hit on a companion or NPC teammate is capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage, then the -20% comes off the damage the player takes from that hit, so a hit lands at 0.92 times its base (`OldGodSoloDamageBonus` and `OldGodSoloPlayerDamageReduction` in `GameConfig`, applied one after the other to each hit on the player in `CombatEngine`), which keeps the 1v1 tension while staying winnable. NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
 
-Divine armor (1.3.5): Aurelion, Terravok and Manwe cut every hit the player deals them, spells and class abilities included, by 25%, 35% and 50% (`AurelionDivineShield`, `TerravokStoneSkin`, `ManweCreatorsWard`). Only the god's own counter enchant on the main or off hand removes the cut: Sunbane, Stonebane and Godbane, Magic Shop tiers 15 to 17 (`MagicShopLocation.CounterTiers`), weapon only, one per weapon. Other enchants and artifact weapons no longer lower it. A held counter also takes two of that god's abilities out of its turns (`OldGodBossSystem.CounterBlockedAbilities`). Maelketh's fight HP scales with the living fighters counted when the fight is built (`OldGodBossSystem.PartyHpScale`, step `MaelkethPartyHpScaleK = 0.25`): x0.25 with 2, x0.5 with 3, x0.75 with 4, unchanged alone or with 5 or more.
+Divine armor (1.3.5): Aurelion, Terravok and Manwe cut every hit the player deals them, spells and class abilities included, by 25%, 35% and 50% (`AurelionDivineShield`, `TerravokStoneSkin`, `ManweCreatorsWard`). Only the god's own counter enchant on the main or off hand removes the cut: Sunbane, Stonebane and Godbane, Magic Shop tiers 15 to 17 (`MagicShopLocation.CounterTiers`), weapon only, one per weapon. Other enchants and artifact weapons no longer lower it. A held counter also takes two of that god's abilities out of its turns (`OldGodBossSystem.CounterBlockedAbilities`). On Manwe the Creator's Ward also stops `ManweWardOnRiders` (55%) of each enchant item rider after a hit, counter held or not (1.3.7, `OldGodBossSystem.ManweRiderShare`: 0.45 on Manwe, 1.0 on every other foe and his summons): the weapon proc chances in `CheckElementalEnchantProcs`, the Lifedrinker and Siphon amounts, Boss Slayer's 10% (`ApplyBossSlayer` and both swing paths) and equipment Thorns on the player and on a companion. Class passives and abilities, boons, pets, artifacts and the PvP step are not touched. Maelketh's fight HP scales with the living fighters counted when the fight is built (`OldGodBossSystem.PartyHpScale`, step `MaelkethPartyHpScaleK = 0.25`): x0.25 with 2, x0.5 with 3, x0.75 with 4, unchanged alone or with 5 or more.
 
 ### Floor Locking
 Special floors lock the player until cleared:
@@ -485,14 +485,14 @@ Per-class threat weight (Paladin=180, Barbarian=170, Warrior=160 ... Magician=60
 ~10 abilities per class spread levels 1-100, costing Combat Stamina. Each carries `RequiredWeaponTypes`, `RequiresShield`, cooldown, mana / stamina cost, target type, and tier-scaled stamina cost (L50+ +25%, L75+ +40%).
 
 **Notable kits:**
-- **Warrior**: Power Strike -> Shield Wall -> Battle Cry -> Shield Wall Formation (level 40 AoE taunt) -> Shield Bash (L16) -> Iron Fortress -> Champion's Strike
+- **Warrior**: Power Strike -> Shield Wall -> Battle Cry -> Shield Bash (L16) -> Shield Wall Formation (level 40 AoE taunt) -> Iron Fortress -> Champion's Strike
 - **Paladin**: Lay on Hands -> Divine Smite -> Aura of Protection -> Holy Shield Slam (L28) -> Divine Mandate (L40 AoE thorn taunt) -> Avatar of Light
-- **Barbarian**: Berserker Rage -> Reckless Attack -> Intimidating Roar -> Rage Challenge (L40 AoE taunt + regen) -> Bloodlust -> Avatar of Destruction
+- **Barbarian**: Berserker Rage -> Reckless Attack -> Intimidating Roar -> Bloodlust -> Rage Challenge (L40 AoE taunt + regen) -> Avatar of Destruction
 - **Assassin**: Backstab -> Poison Blade -> Biaxin (L35 poison + corrosion) -> Assassinate -> Blade Dance -> Death Blossom (passive: Lethal Precision)
 - **Tidesworn**: Undertow Stance -> Breakwater -> Abyssal Anchor (AoE taunt) -> Eternal Vigil (invuln-with-forced-aggro)
 - **Mystic Shaman**: 4 enchantments (fire/frost/earth/storm) + 5 totems (healing/earthbind/searing/windfury/spirit link) + Lightning Bolt + Chain Lightning + Ancestral Guidance
 
-Universal abilities (available to most classes): Second Wind, Focus, Rally. Spellcasters can equip these too (v0.50.5).
+Universal abilities (all 17 classes, spellcasters included): Second Wind, Focus, Rally, Desperate Strike, Iron Will.
 
 ### Class Passives (selection)
 - Bard Bardic Inspiration: 15% proc +20 ATK to teammate
@@ -1696,7 +1696,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.6"
+Version = "1.3.7"
 VersionName = "Reckoning"
 ```
 

@@ -33,7 +33,7 @@ test("beasts table: the region's level opens a beast whose own level is lower", 
     "Region",
     "Level to meet it",
     "Taming difficulty",
-    "Base HP / attack / defence",
+    "Base HP / attack / defense",
   ]);
   assert.deepEqual(row(html, "Marsh Toad"), [
     "Amphibian",

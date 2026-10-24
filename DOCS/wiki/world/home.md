@@ -1,8 +1,9 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Core/Child.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -27,7 +28,7 @@ Your Home is a private base with rest, storage, upgrades and family life. Online
 
 ## Home rest
 
-A Home rest (E) heals a share of your maximum HP and mana set by your Living Quarters: 25 percent with none, up to 100 percent at level 5, with 1 to 5 rests a day. It also heals your whole party to full. With a Hearth, the rest gives a Well-Rested bonus to your attack and defence for your next few fights. The tables below give every level.
+A Home rest (E) heals a share of your maximum HP and mana set by your Living Quarters: 25 percent with none, up to 100 percent at level 5, with 1 to 5 rests a day. It also heals your whole party to full. With a Hearth, the rest gives a Well-Rested bonus to your attack and defense for your next few fights. The tables below give every level.
 
 ## Home upgrades and prices
 
@@ -43,7 +44,7 @@ A Bed level multiplies the chance of a child: 15 percent each time with a spouse
 - Study, 750,000 gold: {{percent:StudyXPBonus}} percent more combat experience.
 - Servants' Quarters, 500,000 gold: {{balance:ServantsDailyGoldBase}} + level x {{balance:ServantsDailyGoldPerLevel}} gold each day.
 - Reinforced Door, 250,000 gold: online, lets you sleep at Home safely.
-- Legendary Armory, 2,500,000 gold: +5 permanent damage and +5 permanent defence.
+- Legendary Armory, 2,500,000 gold: +5 permanent damage and +5 permanent defense.
 - Vitality Fountain, 5,000,000 gold: bonus maximum HP equal to 10 percent of your maximum HP when you buy it.
 
 ## Marriage

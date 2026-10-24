@@ -93,8 +93,8 @@ public class DeepCurve133Tests
     [InlineData(50, 14949, 688, 173, 276, 486, 63)]
     [InlineData(51, 15282, 704, 175, 281, 499, 65)]
     [InlineData(60, 18328, 852, 207, 339, 603, 76)]
-    [InlineData(80, 25362, 1244, 276, 495, 882, 103)]
-    [InlineData(100, 32744, 1831, 346, 726, 1298, 128)]
+    [InlineData(80, 25362, 1368, 276, 544, 969, 103)]    // 1.3.7: was str 1244, punch 495, weapon 882
+    [InlineData(100, 32744, 2016, 346, 798, 1428, 128)]  // 1.3.7: was str 1831, punch 726, weapon 1298
     public void MonsterStats_PastFloor50_GrowAtAFullFloorAFloor(int level, long hp, long str, long def, long punch, long wp, long ap)
     {
         MonsterGenerator.MonsterLevelSlopePast50.Should().Be(1.0);

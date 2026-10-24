@@ -1,8 +1,9 @@
 ---
 title: Death and resurrection
 path: /wiki/en/combat/death/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.7 | Losing levels at death takes from an Abysswarden or a Voidreaver the Constitution those levels gave.
 history: 1.3.6 | Last Stand and Death's Door now keep you fighting at 1 HP, each once per fight, in place of ending the fight, and they come before Divine Favor.
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -46,7 +47,7 @@ In single-player you choose how to come back from a menu:
 
 - **Divine Intervention:** shown while you have resurrections left. It spends one and you come back where you fell with half your maximum HP. A new character has 3 resurrections, and in single-player you never get more.
 - **Temple Resurrection:** half of the gold you carry. You wake at the Temple with three quarters of your maximum HP. Each character can use it 3 times in all, ever; it is offered even with no gold.
-- **Deal with Death:** from level 5 with 500 Darkness or more. It costs 500 Darkness and permanently takes 2 to 5 points from one random stat among Strength, Defence, Stamina, Agility and Charisma, or 10 to 25 maximum HP. You come back where you fell with a quarter of your maximum HP.
+- **Deal with Death:** from level 5 with 500 Darkness or more. It costs 500 Darkness and permanently takes 2 to 5 points from one random stat among Strength, Defense, Stamina, Agility and Charisma, or 10 to 25 maximum HP. You come back where you fell with a quarter of your maximum HP.
 - **Accept Fate:** always offered. You lose up to 5 levels (never below level 1) and the stats those levels gave, your experience is set to the start of your new level, you lose 75 percent of the gold you carry (Mortis's boon lowers this), one random equipped item is destroyed, and gear above your new level moves to your pack. You wake at the Temple with a tenth of your maximum HP.
 
 Gold in the bank is never touched. The menu counts your deaths out of 5; a single-player character is never erased for dying, except on Nightmare.

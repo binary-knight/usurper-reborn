@@ -1,8 +1,9 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -67,11 +68,11 @@ For each point of Mental you are missing, Talk Therapy at the Healer costs {{bal
 
 ## Fear and performance
 
-Low bands can reduce damage and defence and cause fear at the beginning of a monster fight. Fear costs the first action; it is not an enemy spawning or a permanent attribute loss. Harmless hallucination lines are flavor, not extra enemies.
+Low bands can reduce damage and defense and cause fear at the beginning of a monster fight. Fear costs the first action; it is not an enemy spawning or a permanent attribute loss. Harmless hallucination lines are flavor, not extra enemies.
 
 ### What Shaken and Breaking do
 
-- Shaken: {{percent:MentalShakenCombatPenalty}} percent less damage with basic attacks and {{percent:MentalShakenCombatPenalty}} percent less Defence against monster hits, and a {{balance:MentalShakenFearPct}} percent chance of fear at the start of a monster fight.
+- Shaken: {{percent:MentalShakenCombatPenalty}} percent less damage with basic attacks and {{percent:MentalShakenCombatPenalty}} percent less Defense against monster hits, and a {{balance:MentalShakenFearPct}} percent chance of fear at the start of a monster fight.
 - Breaking: {{percent:MentalBreakingCombatPenalty}} percent less of both, and a {{balance:MentalBreakingFearPct}} percent chance of fear.
 
 Stable and Strained carry no penalty. In single-player the Mental and Fatigue penalties together never cost more than {{percent:MentalFatigueCombatCap}} percent; online play has no Fatigue.
@@ -105,7 +106,7 @@ From Devout onward, your [god's ward](/wiki/en/gods/favor/) reduces a particular
 Grief begins when a story companion, an NPC teammate, a spouse or a lover dies. It passes through stages, and each stage changes your fights until the next one begins:
 
 - Denial, 3 days: 20 percent less damage with basic attacks.
-- Anger, 5 days: 30 percent more damage with basic attacks and 20 percent less Defence against monster hits.
+- Anger, 5 days: 30 percent more damage with basic attacks and 20 percent less Defense against monster hits.
 - Bargaining, 3 days: 10 percent less damage with basic attacks.
 - Depression, 7 days: 30 percent less of both.
 - Acceptance: the grief is over and no penalty remains.
@@ -121,5 +122,5 @@ The death of a story companion costs {{balance:MentalCompanionGriefLoss}} Mental
 :::spoiler Exact hidden effects and collapse boundary
 The deeper-collapse boundary is dungeon floor {{balance:MentalCollapseDeathFloor}}. Rescue sets Mental to {{balance:MentalCollapseRescueMental}} and takes {{balance:MentalCollapseGoldFeePct}} percent of carried gold.
 
-Broken reduces damage, defence and experience gained by {{balance:MentalBrokenPenaltyPct}} percent. This replaces the band penalty and is outside the single-player fatigue cap. Exact band fear and hallucination odds are in the [balance reference](/wiki/en/reference/balance/).
+Broken reduces damage, defense and experience gained by {{balance:MentalBrokenPenaltyPct}} percent. This replaces the band penalty and is outside the single-player fatigue cap. Exact band fear and hallucination odds are in the [balance reference](/wiki/en/reference/balance/).
 :::

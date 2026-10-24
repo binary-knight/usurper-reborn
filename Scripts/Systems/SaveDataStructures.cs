@@ -729,6 +729,7 @@ namespace UsurperRemake.Systems
         public List<TimedStatBuffData> TimedStatBuffs { get; set; } = new();   // 1.2.0
         public bool ArtifactStatsApplied { get; set; }   // 1.2.0: false in older saves, so the login restore runs once
         public bool CycleStatBonusApplied { get; set; }  // 1.2.0: false in older saves, so the NG+ backfill runs once
+        public bool VoidreaverConstitutionApplied { get; set; }  // 1.3.7: false in older saves, so the Voidreaver top-up runs once
         public int SteroidShopPurchases { get; set; }
         public int AlchemistINTBoosts { get; set; }
         public int GamblingRoundsToday { get; set; }
@@ -1096,6 +1097,9 @@ namespace UsurperRemake.Systems
         // cohort grows organically. Pre-v0.64.0 saves restore as false (legacy
         // behavior preserved). Round-trips via the 5-site NPC save path.
         public bool IsAIDriven { get; set; } = false;
+
+        // 1.3.7: the one-time Voidreaver Constitution top-up has run; false in older saves, so it runs once on load
+        public bool VoidreaverConstitutionApplied { get; set; }
     }
 
     /// <summary>

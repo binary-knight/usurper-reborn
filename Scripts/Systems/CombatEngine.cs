@@ -1160,7 +1160,7 @@ public partial class CombatEngine
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
         player.IsRaging = false;
-        player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+        player.ClearSlotBonusesForFightStart();   // 1.3.7: keeps the room feature attack entry for this fight
         player.ClearPrestigeCombatState();   // 1.3.6 G11
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
         player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
@@ -1583,6 +1583,7 @@ public partial class CombatEngine
 
         // Combat continues as long as ANY party member is alive (not just leader)
         bool anyGroupedAlive() => result.Teammates?.Any(t => t.IsGroupedPlayer && t.IsAlive) == true;
+        var voidFed = new HashSet<Monster>();   // the foes Void Hunger has fed on this fight
         while ((player.IsAlive || anyGroupedAlive()) && monsters.Any(m => m.IsAlive) && !globalEscape)
         {
             roundNumber++;
@@ -1937,6 +1938,8 @@ public partial class CombatEngine
                 }
             }
 
+            FeedVoidHunger(player, monsters, voidFed);   // Void Hunger and Soul Eater at the kill
+
             // Check if all monsters defeated
             if (!monsters.Any(m => m.IsAlive))
                 break;
@@ -1978,6 +1981,8 @@ public partial class CombatEngine
                     }
                 }
             }
+
+            FeedVoidHunger(player, monsters, voidFed);   // Void Hunger and Soul Eater at the kill
 
             // Check if all monsters defeated
             if (!monsters.Any(m => m.IsAlive))
@@ -2267,6 +2272,8 @@ public partial class CombatEngine
                 if (result.IsPermadeath)
                     runVictory = false;
             }
+            // Foes that fell after the last in-round check (end of round effects) are fed once here, never twice
+            FeedVoidHunger(player, monsters, voidFed);
             if (runVictory)
                 await HandleVictoryMultiMonster(result, offerMonkEncounter);
         }
@@ -2284,6 +2291,7 @@ public partial class CombatEngine
                     if (!m.IsAlive && !result.DefeatedMonsters.Contains(m))
                         result.DefeatedMonsters.Add(m);
                 }
+                FeedVoidHunger(player, monsters, voidFed);
                 await HandleVictoryMultiMonster(result, offerMonkEncounter);
             }
             else
@@ -2792,10 +2800,9 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.menu_quickbar"));
             foreach (var (qKey, slotId, displayName, available) in quickbarActions)
             {
-                if (available)
-                    terminal.WriteLine($"  {qKey} - {displayName}");
-                else
-                    terminal.WriteLine($"  {qKey} - {displayName} {Loc.Get("combat.menu_unavailable")}");
+                // 1.3.7: a long row (a requirement, the not-available note) continues on an indented row
+                foreach (var row in QuickbarScreenReaderRows(qKey, displayName, available ? null : Loc.Get("combat.menu_unavailable")))
+                    terminal.WriteLine(row);
             }
             terminal.SetColor("darkgray");
             terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_hint")}");
@@ -3107,20 +3114,9 @@ public partial class CombatEngine
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // === BASIC ACTIONS ===
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[A] ");
-        terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("combat.attack"),-34}");
-        terminal.WriteLine("║");
+        WriteBoxRow("[A] ", "green", Loc.Get("combat.attack"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[D] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.defend"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[D] ", "cyan", Loc.Get("combat.defend"));
 
         // === QUICKBAR SLOTS [1]-[9] ===
         var quickbarActions = GetQuickbarActions(player);
@@ -3129,189 +3125,80 @@ public partial class CombatEngine
             terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (qKey, slotId, displayName, available) in quickbarActions)
-            {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"[{qKey}] ");
-                if (available)
-                {
-                    terminal.SetColor("yellow");
-                }
-                else
-                {
-                    terminal.SetColor("darkgray");
-                }
-                terminal.Write($"{displayName,-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
-            }
+                WriteQuickbarBoxRows(qKey, displayName, available);
         }
 
         // === HEALING OPTIONS ===
         if (player.Healing > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[H] ");
-            terminal.SetColor("magenta");
             string healDesc = Loc.Get("combat.heal_potions_short", player.Healing, player.MaxPotions);
-            terminal.Write($"{healDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[H] ", "magenta", healDesc);
         }
         else
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[H] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.heal_none_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[H] ", "darkgray", Loc.Get("combat.heal_none_short"));
         }
 
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[J] ");
-            terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
-            terminal.Write($"{herbDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
 
         // === CLASS-SPECIFIC ABILITIES ===
         if (player.Class == CharacterClass.Barbarian && !player.IsRaging)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[G] ");
-            terminal.SetColor("red");
-            terminal.Write($"{Loc.Get("combat.rage_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[G] ", "red", Loc.Get("combat.rage_short"));
         }
 
         if (player.Class == CharacterClass.Ranger)
         {
             var bowEquipped = player.GetEquipment(EquipmentSlot.MainHand)?.WeaponType == WeaponType.Bow;
-            terminal.Write("║ ");
-            terminal.SetColor(bowEquipped ? "bright_yellow" : "darkgray");
-            terminal.Write("[V] ");
-            terminal.SetColor(bowEquipped ? "yellow" : "darkgray");
-            terminal.Write(bowEquipped ? $"{Loc.Get("combat.ranged_short"),-34}" : $"{Loc.Get("combat.ranged_need_bow_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[V] ", bowEquipped ? "yellow" : "darkgray",
+                bowEquipped ? Loc.Get("combat.ranged_short") : Loc.Get("combat.ranged_need_bow_short"),
+                bowEquipped ? "bright_yellow" : "darkgray");
         }
 
         // === TACTICAL OPTIONS (monster combat only) ===
         if (monster != null)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[P] ");
-            terminal.SetColor("yellow");
-            terminal.Write($"{Loc.Get("combat.power_attack"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[P] ", "yellow", Loc.Get("combat.power_attack"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[E] ");
-            terminal.SetColor("yellow");
-            terminal.Write($"{Loc.Get("combat.precise_strike"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[E] ", "yellow", Loc.Get("combat.precise_strike"));
         }
 
         // Tactical options for both combat types
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[I] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.disarm"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[I] ", "cyan", Loc.Get("combat.disarm"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[T] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.taunt"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[T] ", "cyan", Loc.Get("combat.taunt"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[L] ");
-        terminal.SetColor("darkgray");
-        terminal.Write($"{Loc.Get("combat.hide"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[L] ", "darkgray", Loc.Get("combat.hide"));
 
         // === COAT BLADE (poison vials) ===
         if (player.PoisonVials > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[B] ");
-            terminal.SetColor("dark_green");
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            terminal.Write($"{coatDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
         // === RETREAT/FLEE OPTIONS ===
         if (monster != null)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[R] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("combat.flee"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[R] ", "white", Loc.Get("combat.flee"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[M] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.mercy_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[M] ", "darkgray", Loc.Get("combat.mercy_short"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[F] ");
-            terminal.SetColor("red");
-            terminal.Write($"{Loc.Get("combat.fight_death_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[F] ", "red", Loc.Get("combat.fight_death_short"));
         }
         else if (isPvP)
         {
             // PvP-specific: Flee instead of retreat
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[R] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("combat.flee_pvp_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[R] ", "white", Loc.Get("combat.flee_pvp_short"));
         }
 
         // === UTILITY ===
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[S] ");
-        terminal.SetColor("darkgray");
-        terminal.Write($"{Loc.Get("combat.view_status_short"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[S] ", "darkgray", Loc.Get("combat.view_status_short"));
 
         // Combat speed option
         string speedLabel = player.CombatSpeed switch
@@ -3320,14 +3207,8 @@ public partial class CombatEngine
             CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
             _ => Loc.Get("combat.speed_normal")
         };
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
-        terminal.SetColor("darkgray");
         string spdDesc = Loc.Get("combat.speed_label", speedLabel);
-        terminal.Write($"{spdDesc,-31}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc);
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
@@ -3378,10 +3259,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.menu_quickbar"));
             foreach (var (key, name, available) in classInfo)
             {
-                if (available)
-                    terminal.WriteLine($"  {key} - {name}");
-                else
-                    terminal.WriteLine($"  {key} - {name} ({Loc.Get("combat.menu_unavailable")})");
+                foreach (var row in QuickbarScreenReaderRows(key, name, available ? null : Loc.Get("combat.menu_unavailable")))
+                    terminal.WriteLine(row);
             }
         }
 
@@ -3440,54 +3319,25 @@ public partial class CombatEngine
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // Basic actions
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[A] ");
-        terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("combat.attack"),-34}");
-        terminal.WriteLine("║");
+        WriteBoxRow("[A] ", "green", Loc.Get("combat.attack"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[D] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.defend"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[D] ", "cyan", Loc.Get("combat.defend"));
 
         // Item option (show potion count)
         if (player.Healing > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[I] ");
-            terminal.SetColor("magenta");
             string itemDesc = Loc.Get("combat.use_item_potions_short", player.Healing, player.MaxPotions);
-            terminal.Write($"{itemDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[I] ", "magenta", itemDesc);
         }
         else
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[I] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.use_item_none_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[I] ", "darkgray", Loc.Get("combat.use_item_none_short"));
         }
 
         // 1.3.3 party survival: Rescue a Downed ally
         if (!isFollower && RescueOffered(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[U] ");
-            terminal.SetColor("bright_red");
-            terminal.Write($"{Loc.Get("combat.rescue_menu"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[U] ", "bright_red", Loc.Get("combat.rescue_menu"));
         }
 
         // Aid Ally option
@@ -3495,22 +3345,11 @@ public partial class CombatEngine
         {
             if (canHealAlly)
             {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("[H] ");
-                terminal.SetColor("green");
-                terminal.Write($"{Loc.Get("combat.aid_ally_short"),-34}");
-                terminal.WriteLine("║");
+                WriteBoxRow("[H] ", "green", Loc.Get("combat.aid_ally_short"));
             }
             else
             {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("[H] ");
-                terminal.SetColor("darkgray");
-                terminal.Write($"{Loc.Get("combat.aid_ally_none_short"),-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
+                WriteBoxRow("[H] ", "darkgray", Loc.Get("combat.aid_ally_none_short"));
             }
         }
 
@@ -3520,114 +3359,51 @@ public partial class CombatEngine
             terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (key, name, available) in classInfo)
-            {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"[{key}] ");
-                if (available)
-                {
-                    terminal.SetColor("yellow");
-                }
-                else
-                {
-                    terminal.SetColor("darkgray");
-                }
-                terminal.Write($"{name,-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
-            }
+                WriteQuickbarBoxRows(key, name, available);
         }
 
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[B] ");
-            terminal.SetColor("dark_green");
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            terminal.Write($"{coatDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[J] ");
-            terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
-            terminal.Write($"{herbDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
 
         // 1.3.2: the class keys (a group follower's input has neither)
         if (!isFollower && CanBackstab(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[K] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.backstab_label"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[K] ", "darkgray", Loc.Get("combat.backstab_label"));
         }
         if (!isFollower && CanSmite(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[Z] ");
-            terminal.SetColor("bright_white");
-            terminal.Write($"{Loc.Get("combat.smite_label", player.SmiteChargesRemaining),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[Z] ", "bright_white", Loc.Get("combat.smite_label", player.SmiteChargesRemaining));
         }
 
         // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
         if (miracle != GodDomain.None)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[M] ");
-            terminal.SetColor("bright_magenta");
-            terminal.Write($"{MiracleSystem.MenuLabel(miracle),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[M] ", "bright_magenta", MiracleSystem.MenuLabel(miracle));
         }
 
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[V] ");
-            terminal.SetColor("magenta");
-            terminal.Write($"{Loc.Get("combat.save_boss_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[V] ", "magenta", Loc.Get("combat.save_boss_short"));
         }
 
         // Retreat and auto
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[R] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("combat.flee"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[R] ", "white", Loc.Get("combat.flee"));
 
         if (!isFollower)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write(Loc.Get("combat.bbs_auto_key") + " ");
-            terminal.SetColor("cyan");
-            terminal.Write($"{Loc.Get("combat.auto_short"),-31}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow(Loc.Get("combat.bbs_auto_key") + " ", "cyan", Loc.Get("combat.auto_short"));
 
             // Combat speed option
             string speedLabel = player.CombatSpeed switch
@@ -3636,14 +3412,8 @@ public partial class CombatEngine
                 CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
                 _ => Loc.Get("combat.speed_normal")
             };
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
-            terminal.SetColor("darkgray");
             string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
-            terminal.Write($"{spdDesc2,-31}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc2);
         }
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
@@ -4189,7 +3959,7 @@ public partial class CombatEngine
         {
             if (WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer))
             {
-                attackPower += (long)(attackPower * 0.10);
+                attackPower += (long)(attackPower * 0.10 * OldGodBossSystem.ManweRiderShare(monsterTarget));   // 1.3.7: the Creator's Ward stops a share on Manwe
             }
         }
 
@@ -6166,7 +5936,10 @@ public partial class CombatEngine
         int thornsPct = player.GetEquipmentThorns();
         if (thornsPct > 0 && actualDamage > 0 && monster.IsAlive)
         {
-            long thornsDamage = Math.Max(1, actualDamage * thornsPct / 100);
+            long thornsDamage = actualDamage * thornsPct / 100;
+            double thornsShare = OldGodBossSystem.ManweRiderShare(monster);   // 1.3.7: the Creator's Ward stops a share on Manwe
+            if (thornsShare != 1.0) thornsDamage = (long)(thornsDamage * thornsShare);
+            thornsDamage = Math.Max(1, thornsDamage);
             monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
             EvHit(player, thornsDamage, CombatEventKind.Basic);   // 1.2.6
             terminal.SetColor("yellow");
@@ -8009,29 +7782,10 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.you_slain", MonsterNames.Display(result.Monster)));
         terminal.WriteLine("");
 
-        // Abysswarden Corruption Harvest: heal 15% max HP on killing a poisoned enemy
-        if (result.Player.Class == CharacterClass.Abysswarden && result.Monster.Poisoned)
-        {
-            long corruptHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
-            result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + corruptHeal);
-            UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal), "dark_red");
-        }
-
-        // Voidreaver Void Hunger: heal 10% max HP on every kill
-        if (result.Player.Class == CharacterClass.Voidreaver)
-        {
-            long voidHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
-            result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + voidHeal);
-            UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal), "dark_red");
-
-            // Soul Eater: restore 15% max mana on killing blow
-            if (result.Player.IsManaClass)
-            {
-                int manaRestore = Math.Max(1, (int)(result.Player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
-                result.Player.Mana = Math.Min(result.Player.MaxMana, result.Player.Mana + manaRestore);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore), "dark_magenta");
-            }
-        }
+        // Void Hunger, Soul Eater and Corruption Harvest (GameConfig.VoidreaverVoidHungerPercent, VoidreaverSoulEaterManaPercent): a single monster fight
+        // ends at its one kill, so this point is the kill; the same helper as the group fight keeps one rule. This method is
+        // dead code (DetermineCombatOutcome has no callers; PlayerVsMonster delegates to the multi monster path), so no double heal
+        FeedVoidHunger(result.Player, new List<Monster> { result.Monster }, new HashSet<Monster>());
 
         // MUD mode: broadcast boss kills only (regular kills too spammy).
         // Rendered per-recipient so each player in the room reads it in their own language.
@@ -9346,7 +9100,7 @@ public partial class CombatEngine
     {
         if (attacker == null || target == null || damage <= 0 || !(target.IsBoss || target.IsMiniBoss)) return damage;
         if (!WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer)) return damage;
-        return damage + (long)(damage * 0.10);
+        return damage + (long)(damage * 0.10 * OldGodBossSystem.ManweRiderShare(target));   // 1.3.7: the Creator's Ward stops a share on Manwe
     }
 
     /// <summary>
@@ -9591,6 +9345,8 @@ public partial class CombatEngine
             if (equipLifeSteal > 0)
             {
                 long requested = Math.Max(1, damage * equipLifeSteal / 100);
+                double riderShare = OldGodBossSystem.ManweRiderShare(target);   // 1.3.7: the Creator's Ward stops a share on Manwe
+                if (riderShare != 1.0) requested = (long)(requested * riderShare);
                 long applied = ApplyLifestealSlice(requested);
                 if (applied > 0)
                 {
@@ -10434,7 +10190,7 @@ public partial class CombatEngine
         // attacker-side resource gain that's still useful when the target dies.
         bool targetAlive = target.HP > 0 && target.IsAlive;
 
-        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
+        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon) * OldGodBossSystem.ManweRiderShare(target))   // 1.3.6: Phoenix Fire or loot fire; 1.3.7: a share on Manwe
         {
             long fireDamage = Math.Max(1, (long)(damage * WeaponFireShare(weapon)));
             target.HP = Math.Max(0, target.HP - fireDamage); // hq-armory: out (post-hit rider)
@@ -10447,7 +10203,7 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
-        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon))   // 1.3.6: Frostbite or loot frost
+        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon) * OldGodBossSystem.ManweRiderShare(target))   // 1.3.6: Frostbite or loot frost; 1.3.7: a share on Manwe
         {
             // v0.60.10 (Coosh Lv.83 Warrior report): "Frostbite says chance to apply slow
             // but instead it just decreases defences, and by a small amount." Pre-fix this
@@ -10475,7 +10231,7 @@ public partial class CombatEngine
             }
         }
 
-        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - lightningDamage); // hq-armory: out (post-hit rider)
@@ -10501,7 +10257,7 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
         }
 
-        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // 1.3.6: the proc poisons over time and deals nothing now; the monster's status step takes each tick.
             long poisonTick = ApplyEnchantPoison(attacker, target, weapon, damage);
@@ -10512,7 +10268,7 @@ public partial class CombatEngine
                 : Loc.Get("combat.enchant_venom_tm", name, EnchantPoisonDotRounds, poisonTick), "green");
         }
 
-        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // v0.60.0, issue #91: angels are immune to holy damage. The proc rolls
             // and the player is told the attempt was made and absorbed.
@@ -10548,7 +10304,7 @@ public partial class CombatEngine
             }
         }
 
-        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // v0.60.0, issue #91: demons are immune to shadow damage. They are creatures
             // of darkness; shadow magic slides off them.
@@ -10602,11 +10358,16 @@ public partial class CombatEngine
             if (!IsAngelMonster(target))
             {
                 long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-                terminal.SetColor("blue");
-                terminal.WriteLine(isPlayer
-                    ? Loc.Get("combat.enchant_siphon", manaRestored)
-                    : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
+                double siphonShare = OldGodBossSystem.ManweRiderShare(target);   // 1.3.7: the Creator's Ward stops a share on Manwe
+                if (siphonShare != 1.0) manaRestored = (long)(manaRestored * siphonShare);
+                if (manaRestored > 0)
+                {
+                    attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+                    terminal.SetColor("blue");
+                    terminal.WriteLine(isPlayer
+                        ? Loc.Get("combat.enchant_siphon", manaRestored)
+                        : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
+                }
             }
         }
     }
@@ -15224,7 +14985,7 @@ public partial class CombatEngine
                         // 1.3.2: BossSlayer (world boss loot) +10 percent against a boss or mini-boss, as on the old path
                         if ((target.IsBoss || target.IsMiniBoss)
                             && WorldBossSystem.HasSpecialEffect(player, LootGenerator.SpecialEffect.BossSlayer))
-                            attackPower += (long)(attackPower * 0.10);
+                            attackPower += (long)(attackPower * 0.10 * OldGodBossSystem.ManweRiderShare(target));   // 1.3.7: the Creator's Ward stops a share on Manwe
 
                         // Divine boon damage bonus (multi-monster path)
                         var mmBoons = player.CachedBoonEffects;
@@ -16519,7 +16280,7 @@ public partial class CombatEngine
             // Execute the ability
             var abilityResult = ClassAbilitySystem.UseAbility(player, action.AbilityId, random);
 
-            // Voidreaver Pain Threshold: +20% ability damage when below 50% HP
+            // Voidreaver Pain Threshold: GameConfig.VoidreaverPainThresholdBonus more ability damage when below 50% HP
             if (player.Class == CharacterClass.Voidreaver && player.HP < player.MaxHP / 2 && abilityResult.Damage > 0)
             {
                 abilityResult.Damage = (int)(abilityResult.Damage * (1.0 + GameConfig.VoidreaverPainThresholdBonus));
@@ -16829,7 +16590,7 @@ public partial class CombatEngine
                 // the heal on `target.IsAlive`. At Lv.66 the base hit usually killed orcs/goblins
                 // in one shot, so neither the redundant damage nor the heal fired — heal-on-kill
                 // skipped, heal-on-survive worked, which read to the player as a "flip flop."
-                // Inlined here so the heal scales with actualDamage (after Pain Threshold +20%,
+                // Inlined here so the heal scales with actualDamage (after the Pain Threshold bonus, GameConfig.VoidreaverPainThresholdBonus,
                 // crits, marked +30%) and fires regardless of whether the base hit killed.
                 // Always emit feedback (even when MaxHP clamp swallows the heal) so the player
                 // sees consistent visible confirmation that the ability fired.
@@ -22582,7 +22343,10 @@ public partial class CombatEngine
     {
         int thornsPct = companion.GetEquipmentThorns();
         if (thornsPct <= 0 || damage <= 0 || !monster.IsAlive) return;
-        long thornsDamage = Math.Max(1, damage * thornsPct / 100);
+        long thornsDamage = damage * thornsPct / 100;
+        double thornsShare = OldGodBossSystem.ManweRiderShare(monster);   // 1.3.7: the Creator's Ward stops a share on Manwe
+        if (thornsShare != 1.0) thornsDamage = (long)(thornsDamage * thornsShare);
+        thornsDamage = Math.Max(1, thornsDamage);
         monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
         EvHit(companion, thornsDamage, CombatEventKind.Basic);
         UIHelper.WriteRow(terminal, Loc.Get("combat.thorns_reflect", thornsDamage, MonsterNames.Display(monster)), "yellow");
@@ -23490,6 +23254,42 @@ public partial class CombatEngine
         DebugLogger.Instance.LogInfo("COMBAT", $"Mercenary DIED: {mercenary.DisplayName} killed by {killerName}");
     }
 
+    /// <summary>The Voidreaver's Void Hunger (heal GameConfig.VoidreaverVoidHungerPercent of max HP) and Soul Eater (restore VoidreaverSoulEaterManaPercent of max
+    /// mana) for each foe fallen since the last check, once a foe, inside the fight; the victory pipeline no longer repeats
+    /// them. The Abysswarden's Corruption Harvest (heal AbysswardenCorruptionHealPercent of max HP) shares the sweep for each
+    /// fallen foe that is poisoned; one helper keeps one rule for when a kill pays. Called after the player's action and after the teammates' turns.</summary>
+    private void FeedVoidHunger(Character player, List<Monster> monsters, HashSet<Monster> fed)
+    {
+        if (player == null || !player.IsAlive) return;
+        bool reaver = player.Class == CharacterClass.Voidreaver;
+        bool warden = player.Class == CharacterClass.Abysswarden;
+        if (!reaver && !warden) return;
+        foreach (var monster in monsters)
+        {
+            if (monster.IsAlive || !fed.Add(monster)) continue;
+            if (warden)
+            {
+                // Abysswarden Corruption Harvest: heal AbysswardenCorruptionHealPercent of max HP at the kill of a poisoned foe
+                if (monster.Poisoned)
+                {
+                    long corruptHeal = Math.Max(1, (long)(player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
+                    player.HP = Math.Min(player.MaxHP, player.HP + corruptHeal);
+                    UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
+                }
+                continue;
+            }
+            long voidHeal = Math.Max(1, (long)(player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
+            player.HP = Math.Min(player.MaxHP, player.HP + voidHeal);
+            UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
+            if (player.IsManaClass)
+            {
+                int manaRestore = Math.Max(1, (int)(player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
+                player.Mana = Math.Min(player.MaxMana, player.Mana + manaRestore);
+                UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore, MonsterNames.Display(monster)), "dark_magenta");
+            }
+        }
+    }
+
     /// <summary>
     /// Handle victory over multiple monsters
     /// </summary>
@@ -23583,29 +23383,7 @@ public partial class CombatEngine
             totalExp += expReward;
             totalGold += goldReward;
 
-            // Abysswarden Corruption Harvest: heal 15% max HP on killing a poisoned enemy
-            if (result.Player.Class == CharacterClass.Abysswarden && monster.Poisoned)
-            {
-                long corruptHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
-                result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + corruptHeal);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
-            }
-
-            // Voidreaver Void Hunger: heal 10% max HP on every kill
-            if (result.Player.Class == CharacterClass.Voidreaver)
-            {
-                long voidHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
-                result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + voidHeal);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
-
-                // Soul Eater: restore 15% max mana on killing blow
-                if (result.Player.IsManaClass)
-                {
-                    int manaRestore = Math.Max(1, (int)(result.Player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
-                    result.Player.Mana = Math.Min(result.Player.MaxMana, result.Player.Mana + manaRestore);
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore, MonsterNames.Display(monster)), "dark_magenta");
-                }
-            }
+            // Void Hunger, Soul Eater and Corruption Harvest act at the kill, inside the fight (FeedVoidHunger), not again here
 
             // Track monster kill stats
             result.Player.MKills++;
@@ -26030,7 +25808,7 @@ public partial class CombatEngine
         // Execute the ability
         var abilityResult = ClassAbilitySystem.UseAbility(player, selectedAbility.Id, random);
 
-        // Voidreaver Pain Threshold: +20% ability damage when below 50% HP
+        // Voidreaver Pain Threshold: GameConfig.VoidreaverPainThresholdBonus more ability damage when below 50% HP
         if (player.Class == CharacterClass.Voidreaver && player.HP < player.MaxHP / 2 && abilityResult.Damage > 0)
         {
             abilityResult.Damage = (int)(abilityResult.Damage * (1.0 + GameConfig.VoidreaverPainThresholdBonus));
@@ -31870,6 +31648,90 @@ public partial class CombatEngine
         terminal.WriteLine($"  {desc}");
         terminal.SetColor("white");
         return true;
+    }
+
+    /// <summary>1.3.7: word-wrap quickbar text to width columns; a word wider than that is cut.</summary>
+    internal static List<string> WrapQuickbarText(string text, int width)
+    {
+        var result = new List<string>();
+        foreach (var line in UIHelper.WordWrap(text, width))
+        {
+            var l = line;
+            while (UIHelper.VisibleLength(l) > width) { result.Add(l.Substring(0, width)); l = l.Substring(width); }
+            result.Add(l);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 1.3.7: the screen reader rows of one quickbar slot, each at most 79 columns. The name carries its requirement;
+    /// the note (not available) joins the last row when it fits and takes its own row when it does not. A row that
+    /// continues is indented under the name.
+    /// </summary>
+    internal static List<string> QuickbarScreenReaderRows(string key, string name, string? note)
+    {
+        string first = $"  {key} - ";
+        string pad = new string(' ', first.Length);
+        int width = UIHelper.WrapWidth - first.Length;
+        var parts = WrapQuickbarText(name, width);
+        if (!string.IsNullOrEmpty(note))
+        {
+            if (UIHelper.VisibleLength(parts[^1]) + 1 + UIHelper.VisibleLength(note) <= width)
+                parts[^1] = parts[^1] + " " + note;
+            else
+                parts.AddRange(WrapQuickbarText(note, width));
+        }
+        return parts.Select((p, i) => (i == 0 ? first : pad) + p).ToList();
+    }
+
+    /// <summary>1.3.7: one fixed row of a 41 column combat box; a text wider than the box continues on rows inside it.</summary>
+    private void WriteBoxRow(string keyText, string color, string text, string keyColor = "bright_yellow")
+    {
+        int width = 38 - keyText.Length;
+        var parts = WrapQuickbarText(text, width);
+        if (parts.Count == 0) parts.Add("");
+        for (int i = 0; i < parts.Count; i++)
+        {
+            terminal.SetColor("green");
+            terminal.Write("║ ");
+            if (i == 0)
+            {
+                terminal.SetColor(keyColor);
+                terminal.Write(keyText);
+            }
+            else
+            {
+                terminal.Write(new string(' ', keyText.Length));
+            }
+            terminal.SetColor(color);
+            terminal.Write(parts[i].PadRight(width));
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+    }
+
+    /// <summary>1.3.7: one quickbar slot inside the 41 column combat box; a long name continues on rows inside the box.</summary>
+    private void WriteQuickbarBoxRows(string key, string name, bool available)
+    {
+        var parts = WrapQuickbarText(name, 34);
+        for (int i = 0; i < parts.Count; i++)
+        {
+            terminal.SetColor("green");
+            terminal.Write("║ ");
+            if (i == 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"[{key}] ");
+            }
+            else
+            {
+                terminal.Write("    ");
+            }
+            terminal.SetColor(available ? "yellow" : "darkgray");
+            terminal.Write($"{parts[i],-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
     }
 
     private List<(string key, string slotId, string displayName, bool available)> GetQuickbarActions(Character player)

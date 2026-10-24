@@ -1,8 +1,9 @@
 ---
 title: Leveling and training
 path: /wiki/en/characters/leveling/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/LevelMasterLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Core/GameConfig.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | A Voidreaver gains Constitution on each level, 2 on an even level and 1 on an odd one, and an existing Voidreaver received what its levels would have given.
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
@@ -22,7 +23,7 @@ The Level Master is still where you arrange your abilities and spells, spend tra
 
 ## What a level gives
 
-Gaining a level restores your HP and mana to full. Every class gains 5 maximum HP, 1 Defence and 1 Stamina per level before its own growth; the [class table](/wiki/en/characters/classes/) shows the totals. You also gain training points and an [alignment bonus](/wiki/en/characters/stats/#alignment).
+Gaining a level restores your HP and mana to full. Every class gains 5 maximum HP, 1 Defense and 1 Stamina per level before its own growth; the [class table](/wiki/en/characters/classes/) shows the totals. You also gain training points and an [alignment bonus](/wiki/en/characters/stats/#alignment).
 
 ## Experience for each level
 

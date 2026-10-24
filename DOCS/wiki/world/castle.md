@@ -1,8 +1,9 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | An NPC that a player hires before its throne challenge comes due stays on that team and does not carry out the challenge.
 history: 1.3.4 | none
@@ -34,7 +35,7 @@ The Castle's reputation for you is (Chivalry + Fame) / 2. An audience needs 25. 
 
 ### How do I get knighted
 
-Knighthood needs 200 Chivalry, 150 Fame, level 15, and Darkness below your Chivalry or a Balanced alignment. A knight is called Sir or Dame and deals {{percent:KnightDamageBonus}} percent more damage and has {{percent:KnightDefenseBonus}} percent more defence for good.
+Knighthood needs 200 Chivalry, 150 Fame, level 15, and Darkness below your Chivalry or a Balanced alignment. A knight is called Sir or Dame and deals {{percent:KnightDamageBonus}} percent more damage and has {{percent:KnightDefenseBonus}} percent more defense for good.
 
 ### How much is a royal pardon
 
@@ -46,14 +47,14 @@ A royal loan is at most the lower of half the treasury and reputation x 10 x you
 
 ### What does the royal blessing do
 
-The royal blessing costs 500 gold x your level, half at reputation 200 and nothing at 300. It restores up to 25 HP and 25 mana at once and lasts {{balance:RoyalBlessingDuration}} combat rounds, counted across fights: 10 percent more attack, 10 percent more defence and a hit roll that treats a monster's armor class as 2 lower.
+The royal blessing costs 500 gold x your level, half at reputation 200 and nothing at 300. It restores up to 25 HP and 25 mana at once and lasts {{balance:RoyalBlessingDuration}} combat rounds, counted across fights: 10 percent more attack, 10 percent more defense and a hit roll that treats a monster's armor class as 2 lower.
 
 ## How to become king
 
 Both ways to the throne need level {{balance:MinLevelKing}}.
 
 - **Claim an empty throne.** When no one rules, the menu offers C to claim it. You start a fresh court with a treasury of {{balance:DefaultRoyalTreasury}} gold.
-- **Challenge the ruler.** When someone rules, press I to infiltrate the castle. You fight the monster guards, then the hired guards, then the ruler, who fights with {{balance:KingDefenderHPBonus}} times the HP and {{balance:KingDefenderDefBonus}} times the defence. You can try once a day, not within 24 real hours of a coronation, and not when the ruler is more than {{balance:KingChallengeLevelRange}} levels above you.
+- **Challenge the ruler.** When someone rules, press I to infiltrate the castle. You fight the monster guards, then the hired guards, then the ruler, who fights with {{balance:KingDefenderHPBonus}} times the HP and {{balance:KingDefenderDefBonus}} times the defense. You can try once a day, not within 24 real hours of a coronation, and not when the ruler is more than {{balance:KingChallengeLevelRange}} levels above you.
 
 In a challenge fight a hired guard with loyalty below 30 flees 30 percent of the time, and one below 15 may instead turn on its ruler 20 percent of the time. Player guards defend in person, not in that fight.
 
@@ -65,7 +66,7 @@ Yes. An NPC challenges a player ruler only if it is level {{balance:NPCMinLevelT
 
 ## What do I get for being king
 
-A player ruler gets a daily stipend of {{balance:KingDailyStipend}} + {{balance:KingStipendPerLevel}} x level gold, {{balance:KingCombatStrengthBonus}} times the attack damage, {{balance:KingCombatDefenseBonus}} times the defence and {{balance:KingCombatHPBonus}} times the maximum HP. At level 40 the stipend is 4,500 gold a day.
+A player ruler gets a daily stipend of {{balance:KingDailyStipend}} + {{balance:KingStipendPerLevel}} x level gold, {{balance:KingCombatStrengthBonus}} times the attack damage, {{balance:KingCombatDefenseBonus}} times the defense and {{balance:KingCombatHPBonus}} times the maximum HP. At level 40 the stipend is 4,500 gold a day.
 
 ## Powers and duties of the ruler
 

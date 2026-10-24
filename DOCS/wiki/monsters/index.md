@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.7 | Deep monster Strength, punch and weapon power rise faster after level 75, to 1.97 times at level 80 and 2.31 times at level 100.
 history: 1.3.6 | A monster's breath and spell damage is now magical and cut by your gear's magic resistance, except an Old God's, a monster you poison no longer hits harder, and Thorns no longer reflects the Alchemist's thrown bombs or the Bard's Cutting Words.
 history: 1.3.5 | The Multiattack and Time Stop messages announce the one strike these abilities make.
 history: 1.3.4 | none
@@ -18,23 +19,23 @@ A sample is not a fixed stat line for every encounter. Difficulty, NG+, server m
 
 The Orc has 90 percent of the power it had before 1.3.0; as a floor boss it keeps its full power.
 
-## How monster HP, Strength and Defence are worked out
+## How monster HP, Strength and Defense are worked out
 
 A monster's stats follow its level L, at every level from 1 to 100:
 
 - HP = 50 x L + 15 x L^1.2
 - Strength = 2 x L + 1.5 x L^1.05
-- Defence = L + 0.5 x L^1.02
+- Defense = L + 0.5 x L^1.02
 
-Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficultyScale}}. A level 20 monster of power 1.0 has 3,478 HP, 166 Strength and 67 Defence.
+Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficultyScale}}. A level 20 monster of power 1.0 has 3,478 HP, 166 Strength and 67 Defense.
 
-A floor boss is built from its tier's boss power where the tier has one (the Orc's is 1.0 against its 0.9), then has 2.8 times the HP, 1.25 times the Strength, punch and weapon power and 1.2 times the Defence and armor of a monster of its level and tier; the deep factors below multiply on top.
+A floor boss is built from its tier's boss power where the tier has one (the Orc's is 1.0 against its 0.9), then has 2.8 times the HP, 1.25 times the Strength, punch and weapon power and 1.2 times the Defense and armor of a monster of its level and tier; the deep factors below multiply on top.
 
-The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.44 at 35, 1.605 at 50 and 1.66 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.44 at 35, 1.605 at 50, 1.715 at 75 and 2.1 at 100. Defence and armor are not. A level 60 monster of power 1.0 has 18,328 HP and 852 Strength.
+The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.44 at 35, 1.605 at 50 and 1.66 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.44 at 35, 1.605 at 50, 1.715 at 75, 1.97 at 80 and 2.31 at 100. Defense and armor are not. A level 60 monster of power 1.0 has 18,328 HP and 852 Strength.
 
 ### Monsters on the first floors
 
-Monsters of level 1 to 6 are softened: their HP, Strength, Defence, punch and weapon power are multiplied by {{balance:Floor1MonsterStatMultiplier}} at level 1, {{balance:Floor2MonsterStatMultiplier}} at level 2, {{balance:Floor3MonsterStatMultiplier}} at level 3, {{balance:Floor4MonsterStatMultiplier}} at level 4, {{balance:Floor5MonsterStatMultiplier}} at level 5 and {{balance:Floor6MonsterStatMultiplier}} at level 6. From level 7 they are at full strength.
+Monsters of level 1 to 6 are softened: their HP, Strength, Defense, punch and weapon power are multiplied by {{balance:Floor1MonsterStatMultiplier}} at level 1, {{balance:Floor2MonsterStatMultiplier}} at level 2, {{balance:Floor3MonsterStatMultiplier}} at level 3, {{balance:Floor4MonsterStatMultiplier}} at level 4, {{balance:Floor5MonsterStatMultiplier}} at level 5 and {{balance:Floor6MonsterStatMultiplier}} at level 6. From level 7 they are at full strength.
 
 ## Difficulty and monster HP
 
@@ -50,13 +51,13 @@ On dungeon floors 4 to 10 a regular encounter holds one monster 35 percent of th
 
 ## Champions
 
-10 percent of ordinary dungeon room fights, on every floor, are a single champion in place of a group. A champion has 2.2 times the HP, 1.3 times the Strength, punch and weapon power and 1.2 times the Defence and armor of an ordinary monster of the same tier and level. A champion encounter never holds an elite. A won fight with a champion has a {{percent:MaterialDropChanceMiniBoss}} percent chance of a [crafting material](/wiki/en/items/materials/).
+10 percent of ordinary dungeon room fights, on every floor, are a single champion in place of a group. A champion has 2.2 times the HP, 1.3 times the Strength, punch and weapon power and 1.2 times the Defense and armor of an ordinary monster of the same tier and level. A champion encounter never holds an elite. A won fight with a champion has a {{percent:MaterialDropChanceMiniBoss}} percent chance of a [crafting material](/wiki/en/items/materials/).
 
 A champion's name adds a word by family: Champion (Goblinoid), Revenant (Undead), Warchief (Orcish), Elder before the name (Draconic), Overlord (Demonic), Titan (Giant), Alpha before the name (Beast), Prime before the name (Elemental), Abomination (Aberration), Hive Lord (Insectoid), Prime (Construct), Archfey (Fey), Leviathan (Aquatic), Seraph (Celestial) and Nightlord (Shadow), for example "Zombie Revenant" or "Elder Drake". A tier whose name already holds King, Lord, Chieftain, Warlord, Champion, Berserker or Elder becomes "Alpha" plus its name.
 
 ## Elites
 
-From dungeon floor 3 a regular encounter can hold one elite: {{percent:EliteChanceFloors3To10}} percent of regular encounters on floors 3 to 10, {{percent:EliteChanceFloors11To30}} percent on floors 11 to 30 and {{percent:EliteChanceFloors31Plus}} percent from floor 31. An elite has {{balance:EliteHpMultiplier}} times the HP, {{balance:EliteDamageMultiplier}} times the Strength, punch and weapon power and {{balance:EliteDefenceMultiplier}} times the Defence and armor of the monster it was, and gives {{balance:EliteExperienceMultiplier}} times the experience and {{balance:EliteGoldMultiplier}} times the gold. A group of three or more has one monster fewer when it holds an elite. The elite's trait is part of its name and is announced when the fight starts. From floor {{balance:EliteSecondAffixFloor}} an elite has two different traits.
+From dungeon floor 3 a regular encounter can hold one elite: {{percent:EliteChanceFloors3To10}} percent of regular encounters on floors 3 to 10, {{percent:EliteChanceFloors11To30}} percent on floors 11 to 30 and {{percent:EliteChanceFloors31Plus}} percent from floor 31. An elite has {{balance:EliteHpMultiplier}} times the HP, {{balance:EliteDamageMultiplier}} times the Strength, punch and weapon power and {{balance:EliteDefenceMultiplier}} times the Defense and armor of the monster it was, and gives {{balance:EliteExperienceMultiplier}} times the experience and {{balance:EliteGoldMultiplier}} times the gold. A group of three or more has one monster fewer when it holds an elite. The elite's trait is part of its name and is announced when the fight starts. From floor {{balance:EliteSecondAffixFloor}} an elite has two different traits.
 
 ### Elite traits
 
@@ -76,7 +77,7 @@ On floor {{balance:StragglerMinFloor}} and deeper, {{percent:StragglerEncounterC
 
 ## Monster special abilities
 
-A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. It picks evenly among its abilities that would not be wasted; the full rule and how ability damage meets your defence are on [combat](/wiki/en/combat/#monster-special-abilities).
+A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. It picks evenly among its abilities that would not be wasted; the full rule and how ability damage meets your defense are on [combat](/wiki/en/combat/#monster-special-abilities).
 
 An ability that hits, drains or ends the monster's turn replaces its normal attack; one that does none of these (an evasion buff, a heal over time) is followed by the normal attack. A hit multiplies the monster's attack power (Strength + weapon power + punch, 1.3 times for a boss); a multiplier of 1 is a normal strength hit, so a status ability with x1 also hits. A fixed direct damage replaces the hit. Most direct damage is (the monster's level x 3 + its Strength / 2) times the ability's own factor, plus 5 to 14; that damage is magical, so your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) cuts it, except an Old God's. A status lands at the chance shown unless you resist it. Summoned minions join the fight only up to 5 living monsters in all; a minion has 40 + 3 x the summoner's level HP and is 8 levels lower.
 
@@ -102,7 +103,7 @@ From monster level {{balance:SignatureMinLevel}}, five early monsters have a sig
 
 ## Experience and gold from a kill
 
-An ordinary monster's kill is worth 15 x level^1.5 experience plus (Strength + Defence + weapon power + armor power) / 8, at least 15. The level part alone is 474 at level 10, 1,875 at level 25, 5,303 at level 50 and 15,000 at level 100.
+An ordinary monster's kill is worth 15 x level^1.5 experience plus (Strength + Defense + weapon power + armor power) / 8, at least 15. The level part alone is 474 at level 10, 1,875 at level 25, 5,303 at level 50 and 15,000 at level 100.
 
 The experience then changes with the level gap: +5 percent per level the monster is above you, at most +25 percent, and -15 percent per level it is below you, never under 25 percent of the base. A kill is never worth less than 10 experience.
 

@@ -1,8 +1,9 @@
 ---
 title: Enchanting
 path: /wiki/en/items/enchanting/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs
+history: 1.3.7 | Against Manwe the Creator's Ward stops 55 percent of what gear enchantments add after a hit, Godbane held or not, and the Magic Shop says when an item's name is too long to carry the enchant's tag.
 history: 1.3.6 | Magic resistance now cuts monster breaths and spells, and spells in player fights, by up to half, except Old God attacks, Phoenix Fire and Frostbite add 30 weapon power with new chances and go on weapons only, one of each element, weapon effects and life steal work in player fights and on the world boss, and Boss Slayer adds to Power Attack and class abilities.
 history: 1.3.5 | Sunbane, Stonebane and Godbane are new counter enchants for weapons, Lifedrinker gives 6 percent life steal, a higher stat tier replaces the lower one on the same stat, and a failed 4th or 5th enchant destroys one random enchant whole.
 history: 1.3.4 | none
@@ -19,15 +20,15 @@ The cost is the base price plus the per-level price times your level, and then t
 
 ## Stat enchants
 
-Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add their bonus to one stat you choose: weapon power, Strength, Dexterity, Defence, Wisdom, armor class, Constitution, Intelligence, Charisma, Agility or Stamina. Mythic, Legendary and Godforged also take crafting materials.
+Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add their bonus to one stat you choose: weapon power, Strength, Dexterity, Defense, Wisdom, armor class, Constitution, Intelligence, Charisma, Agility or Stamina. Mythic, Legendary and Godforged also take crafting materials.
 
 ## Named enchants
 
-Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
+Divine Blessing adds +3 to Strength, Dexterity, Defense and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defense. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
 
 ### Magic resistance
 
-Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defence and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
+Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defense and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
 
 The magical attacks are the monster breaths and spells: Fire Breath, Frost Breath, Poison Cloud, Poison Gas, Spellcasting, Ancient Magic, Hellfire, Immolate, Fireball, Inferno, Lightning, Holy Smite, Divine Judgment, Madness, Terror, Nightmare, Reality Break, Overload, Whirlpool and Tidal Wave, and also Boulder, Earthquake and Root Entangle. A monster's normal blows and its other abilities, Crushing Blow and Life Drain among them, are not magical. Old God attacks are excluded: magic resistance does nothing against an Old God, whatever the attack. A world boss's attacks are not magical either. In a fight between players, magic resistance cuts the damage of every spell that hits you the same way, after the Team HQ Barracks.
 
@@ -44,11 +45,11 @@ The fire, frost, lightning, poison, holy and shadow effects of a weapon and the 
 - **Weapon poison** is one hit in both: 10 percent of the hit, or the weapon's poison value raised by your team's Armory, not 4 rounds of poison.
 - **Holy** does not do the double damage it does to undead monsters there, and Aurelion's attunement still adds its bonus.
 
-Thorns on a companion's or an ally's own gear return their percent of a monster's normal attack on it, as yours do. Boss Slayer gear (world boss loot) adds 10 percent against a boss or mini boss to your swings, Power Attack and class abilities, never to spells.
+Thorns on a companion's or an ally's own gear return their percent of a monster's normal attack on it, as yours do. Boss Slayer gear (world boss loot) adds 10 percent against a boss or mini boss to your swings, Power Attack and class abilities, never to spells; on Manwe it adds 4.5 percent (see Godbane below).
 
 ## Sunbane, Stonebane and Godbane
 
-Sunbane, Stonebane and Godbane are counter enchants: Sunbane against Aurelion, Stonebane against Terravok and Godbane against Manwe. A counter adds no stat. Carried on your main hand or off hand into the fight it counters, it holds back two named abilities and lifts the divine armor that cuts your damage: Sunbane holds back Aurelion's Light's Embrace and Sacrifice, Stonebane holds back Terravok's Stone Skin and Entomb, and Godbane holds back Manwe's Word of Creation and Time Stop. In any other fight a counter does nothing.
+Sunbane, Stonebane and Godbane are counter enchants: Sunbane against Aurelion, Stonebane against Terravok and Godbane against Manwe. A counter adds no stat. Carried on your main hand or off hand into the fight it counters, it holds back two named abilities and lifts the divine armor that cuts your damage: Sunbane holds back Aurelion's Light's Embrace and Sacrifice, Stonebane holds back Terravok's Stone Skin and Entomb, and Godbane holds back Manwe's Word of Creation and Time Stop. In any other fight a counter does nothing. Against Manwe, Godbane lifts the cut from your strikes only: the Creator's Ward still stops 55 percent of what your gear's enchantments add after a hit, Godbane held or not, so a weapon proc has 45 percent of its chance, Lifedrinker, Siphon and equipment Thorns give 45 percent of their amount, and Boss Slayer adds 4.5 percent. Manwe's summons take them in full.
 
 Sunbane costs 300,000 + 3,000 per level and needs level 80. Stonebane costs 400,000 + 4,000 per level and needs level 88. Godbane costs 500,000 + 5,000 per level and needs level 95. Sunbane takes 2 Fading Starlight Dust and 2 Withered Heart Petal. Stonebane takes 2 Terravok's Heartstone and 2 Iron Judgment Link. Godbane takes 2 Eye of Manwe, 1 Heart of the Ocean, 1 Withered Heart Petal and 1 Iron Judgment Link.
 

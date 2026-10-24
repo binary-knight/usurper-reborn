@@ -311,11 +311,13 @@ public class BonusSlots136Tests
     {
         // The world boss fight needs the online backend; its clear and tick are read from the source.
         var src = Src(Path.Combine("Scripts", "Systems", "WorldBossSystem.cs"));
-        int clear = src.IndexOf("player.ClearSlotBonuses();", StringComparison.Ordinal);
+        int clear = src.IndexOf("player.ClearSlotBonusesForFightStart();", StringComparison.Ordinal);
         int tick = src.IndexOf("player.TickSlotBonuses();", StringComparison.Ordinal);
-        clear.Should().BeGreaterThan(0, "the world boss fight clears the entries as it starts");
+        clear.Should().BeGreaterThan(0, "the world boss fight clears the entries as it starts (1.3.7: keeping the room feature entry)");
         tick.Should().BeGreaterThan(clear, "and ticks them at each round end of the fight");
         src.IndexOf("Reset transient combat buffs", StringComparison.Ordinal).Should().BeLessThan(clear);
+        int end = src.IndexOf("player.ClearSlotBonuses();", tick, StringComparison.Ordinal);
+        end.Should().BeGreaterThan(tick, "and clears them for good when the session ends (1.3.7)");
     }
 
     // ---------------------------------------------------------------- the writers through the entries

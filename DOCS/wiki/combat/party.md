@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | An NPC ally's party heals, buffs and songs now reach you and give the ally its share only once, its ally heal can pick you, Death's Embrace now leaves an ally standing at 15 percent of its maximum HP, and Rescue lifts each Downed ally once per fight, so an ally finished after its rescue no longer counts as left to die.
 history: 1.3.5 | A living companion now takes the NPC teammate's 75 percent share of the experience from room features and shared rewards.
 history: 1.3.4 | none
@@ -79,7 +80,7 @@ At Team Corner, N hires an NPC who is not on a team onto your own team. You need
 
 ### Hire price
 
-- The per-level part is the lower of {{balance:NpcRecruitmentCostPerLevel}} gold per level and {{balance:NpcRecruitmentCostPerLevelSquared}} gold times the level squared: lower below level 25, the same from level 25 up. The NPC's Strength, Defence and Agility added together, times 20 gold, are added.
+- The per-level part is the lower of {{balance:NpcRecruitmentCostPerLevel}} gold per level and {{balance:NpcRecruitmentCostPerLevelSquared}} gold times the level squared: lower below level 25, the same from level 25 up. The NPC's Strength, Defense and Agility added together, times 20 gold, are added.
 - An NPC above your level costs {{balance:RecruitAboveLevelPercentPerLevel}} percent more for each level above you, up to {{balance:RecruitAboveLevelMaxPercent}} percent of the price at 10 levels above. An NPC more than 5 levels below you costs 30 percent less.
 - Your relationship with the NPC then multiplies the price: Friendship {{percent:RecruitPriceFriendship}} percent, Trust {{percent:RecruitPriceTrust}}, Respect {{percent:RecruitPriceRespect}}, Normal {{percent:RecruitPriceNormal}}, Suspicious {{percent:RecruitPriceSuspicious}}, Anger {{percent:RecruitPriceAnger}}. An NPC at Enemy or Hate is listed but will not join.
 - Your own grown child joins at {{percent:AdultChildRecruitmentDiscount}} percent of the price, whatever your relationship.

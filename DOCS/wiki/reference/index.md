@@ -1,8 +1,9 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/WikiDataExporter.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | The generated enchant table names the god each counter enchant answers and the abilities it holds back, and the Old God table gives the divine armor cut on every hit.
 history: 1.3.2 | Guides gain generated tables from new character, party, economy, combat, world and realm exports.

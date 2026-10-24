@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.6; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
+<!-- doc: checked 1.3.7; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
 # Usurper Reborn - Online Server Deployment Guide
 
 ## Overview
