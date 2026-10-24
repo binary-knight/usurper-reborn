@@ -513,10 +513,25 @@ public class W140Withdraw
     [Fact]
     public async Task ABalancedFight_IsByteEqualToTheBase_OnAFixedSeed()
     {
-        string first = await BalancedSignature();
-        string second = await BalancedSignature();
-        second.Should().Be(first, "the fight is deterministic on its seed");
-        first.Should().Be(BalancedOnTheBase);
+        // The base was written with no artifact collected. The story's collected artifacts outlive a test (the fallback
+        // StoryProgressionSystem when no session is set): OldGodPayoutTests runs HandleBossDefeated on Maelketh, which
+        // collects the Creator's Eye, and its crit bonus made the hero's first swing a precision strike in this fight.
+        // So the fight runs on an empty set, and the set is put back after it.
+        var artifacts = StoryProgressionSystem.Instance.CollectedArtifacts;
+        var held = artifacts.ToList();
+        artifacts.Clear();
+        try
+        {
+            string first = await BalancedSignature();
+            string second = await BalancedSignature();
+            second.Should().Be(first, "the fight is deterministic on its seed");
+            first.Should().Be(BalancedOnTheBase);
+        }
+        finally
+        {
+            artifacts.Clear();
+            foreach (var a in held) artifacts.Add(a);
+        }
     }
 
     // ---------------------------------------------------------------- texts
