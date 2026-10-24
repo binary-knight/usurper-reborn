@@ -27,6 +27,9 @@ namespace UsurperRemake.Tests
     {
         private const string ErrReason = "Invalid username or password.";
 
+        /// <summary>Only a stop for a hung relay; a result never depends on it.</summary>
+        private static readonly TimeSpan SafetyStop = TimeSpan.FromSeconds(60);
+
         [Fact]
         public async Task HumanPath_ErrReply_ShowsRedMessage_NotRawErrLine()
         {
@@ -88,37 +91,75 @@ namespace UsurperRemake.Tests
                 conn.Close();
             });
 
-            var captured = new MemoryStream();
+            var captured = new SeamStream();
             var saved = RelayClient.OpenStdout;
             RelayClient.OpenStdout = () => captured;
+            // 1.3.7: no wall clock budget decides a result. On a loaded runner (the localization scans run beside
+            // this class) the relay's continuations can run seconds late; a 10 s token then cancelled the relay
+            // before it sent AUTH or before it read the reply (release run 40058954803, twice). The token is only a
+            // safety stop now, cancelled when the test ends.
+            using var cts = new CancellationTokenSource(SafetyStop);
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 var method = typeof(RelayClient).GetMethod("ConnectAndBridge", BindingFlags.NonPublic | BindingFlags.Static);
                 method.Should().NotBeNull();
                 var task = (Task<bool>)method!.Invoke(null, new object[]
                 {
                     "tester", "secret", port, "Test", cts.Token, false, rawTerminal, "en"
                 })!;
-                // The server task ends after it sent the reply and closed, so the relay had its answer.
+                // The server task ends after it sent the reply and closed, so the relay had its answer. Bounded by
+                // the safety stop: a relay that never connects fails here instead of hanging the test run.
+                (await Task.WhenAny(server, Task.Delay(SafetyStop))).Should().BeSameAs(server, "the relay connects and sends AUTH");
                 await server;
                 authSeen.Should().StartWith("AUTH:tester:secret:Test");
-                // The reply lines are written before the bridge starts. After OK the bridge reads stdin,
-                // which cannot be cancelled; if the test host's stdin never reaches end of file the bridge
-                // stays open, so the assertions are on the captured output, not on the relay finishing.
-                var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
-                if (finished == task)
-                    (await task).Should().Be(expectConnected);
+                if (!expectConnected)
+                {
+                    // After ERR the relay writes its lines, flushes and returns false, so wait for it to finish.
+                    var ended = await Task.WhenAny(task, Task.Delay(SafetyStop));
+                    ended.Should().BeSameAs(task, "the relay returns after an ERR reply");
+                    (await task).Should().BeFalse();
+                }
                 else
-                    Console.Error.WriteLine("[RelayEcho128Tests] relay bridge did not wind down; stdin gave no end of file");
+                {
+                    // After OK the passthrough writes the OK line before the bridge starts; wait for that write.
+                    if (!rawTerminal)
+                        (await Task.WhenAny(captured.FirstWrite, Task.Delay(SafetyStop))).Should().BeSameAs(captured.FirstWrite);
+                    // The bridge then reads stdin, which cannot be cancelled; if the test host's stdin never
+                    // reaches end of file the bridge stays open, so the assertions are on the captured output.
+                    var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
+                    if (finished == task)
+                        (await task).Should().BeTrue();
+                    else
+                        Console.Error.WriteLine("[RelayEcho128Tests] relay bridge did not wind down; stdin gave no end of file");
+                }
             }
             finally
             {
+                cts.Cancel();
                 RelayClient.OpenStdout = saved;
                 listener.Stop();
             }
 
             return Encoding.UTF8.GetString(captured.ToArray());
+        }
+
+        /// <summary>The seam stream; FirstWrite completes when the relay first writes to it.</summary>
+        private sealed class SeamStream : MemoryStream
+        {
+            private readonly TaskCompletionSource _firstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public Task FirstWrite => _firstWrite.Task;
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                base.Write(buffer, offset, count);
+                _firstWrite.TrySetResult();
+            }
+
+            public override void Write(ReadOnlySpan<byte> buffer)
+            {
+                base.Write(buffer);
+                _firstWrite.TrySetResult();
+            }
         }
     }
 }
