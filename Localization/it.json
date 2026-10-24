@@ -23243,6 +23243,7 @@
   "inn.memory_murdered_sleep": "Assassinato nel sonno alla Locanda da {0}",
   "inn.memory_witnessed_murder": "Ho visto {0} assassinare {1} alla Locanda",
   "combat.memory_saw_ally_finished": "Ho visto {0} cadere contro {1} al mio fianco",
+  "combat.memory_saw_ally_left": "Ho visto {0} lasciar cadere {1} quando poteva aiutare",
   "inn.news_murdered_sleep": "{0} ha assassinato {1} nel sonno alla Locanda!",
   "// Inn - localized bartender name": "",
   "inn.bartender_name": "X-bit",

@@ -23254,6 +23254,7 @@
   "inn.memory_murdered_sleep": "Asesinado mientras dormía en la Posada por {0}",
   "inn.memory_witnessed_murder": "Presenció cómo {0} asesinó a {1} en la Posada",
   "combat.memory_saw_ally_finished": "Vi a {0} caer ante {1} a mi lado",
+  "combat.memory_saw_ally_left": "Vi a {0} dejar caer a {1} cuando podía ayudar",
   "inn.news_murdered_sleep": "¡{0} asesinó a {1} mientras dormía en la Posada!",
   "// Inn - localized bartender name": "",
   "inn.bartender_name": "X-bit",

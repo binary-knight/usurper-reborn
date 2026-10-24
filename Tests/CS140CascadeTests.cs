@@ -16,9 +16,10 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.4.0 cascade (design CS-140 v2; his picks 5, C1 and C2): when a monster finishes an ally, every other ally
 /// in scope in the fight, Downed ones included, saw it. An NPC witness's live world twin records one SawDeath
-/// memory naming the fallen ally, with no change to its impression of the fallen ally. When the player could
-/// have rescued the fallen ally (the left-to-die test), each NPC witness thinks 0.15 less of the player, with
-/// no memory naming the player, and each companion witness loses 15 loyalty with a line in its history. A
+/// memory whose description names the fallen ally and whose InvolvedCharacter is empty, so no impression moves,
+/// live or on a replay at load. When the player could have rescued the fallen ally (the left-to-die test), each
+/// NPC witness also records a SawCombat memory naming the player (-0.1, replayed at load, never a grudge memory),
+/// and each companion witness loses 15 loyalty with a line in its history. A
 /// non-permanent NPC fall writes one death news line, and the permadeath line is unchanged.
 /// Every case runs through the game: a Downed ally, the owner's turn, the announce and the finish.
 /// </summary>
@@ -215,27 +216,52 @@ public class CS140CascadeTests
         });
     }
 
-    // ---------- 2. blame (C1): 0.15 off the impression of the player, only when the player could have rescued ----------
+    // ---------- 2. blame (C1): a SawCombat memory naming the player (-0.1), only when the player could have rescued ----------
+
+    private static List<MemoryEvent> Blame(MemorySystem m, string player) =>
+        m.GetMemoriesOfType(MemoryType.SawCombat).Where(e => e.InvolvedCharacter == player).ToList();
 
     [Theory]
-    [InlineData(3L, -0.15f)]
-    [InlineData(0L, 0f)]
-    public async Task AWitnessesImpressionOfThePlayer_DropsBy015_OnlyWhenThePlayerCouldHaveRescued(long potions, float expected)
+    [InlineData(3L, -0.1f, 1)]
+    [InlineData(0L, 0f, 0)]
+    public async Task AWitness_RecordsASawCombatNamingThePlayer_OnlyWhenThePlayerCouldHaveRescued(long potions, float expected, int blameMemories)
     {
         var twin = WorldNpc("cs140_w4", "Cascade Witness Four");
         await InWorld(new[] { twin }, async _ =>
         {
             var r = await FinishFight(Ally("Mira"), new[] { Copy(twin) }, potions);
             Mem(twin).GetCharacterImpression(r.Owner.Name2).Should().BeApproximately(expected, 0.0001f);
-            SawDeaths(twin).Should().ContainSingle("the memory is written either way");
+            SawDeaths(twin).Should().ContainSingle("the memory of the fall is written either way");
+            var blame = Blame(Mem(twin), r.Owner.Name2);
+            blame.Should().HaveCount(blameMemories);
+            if (blameMemories > 0)
+            {
+                blame[0].Description.Should().Be(Loc.GetIn("en", "combat.memory_saw_ally_left", r.Owner.Name2, "Mira"), "stored in English");
+                MemorySystem.ImpressionChangeFor(MemoryType.SawCombat).Should().Be(-0.1f);
+            }
+            Mem(twin).AllMemories.Where(m => m.InvolvedCharacter == r.Owner.Name2).Should().OnlyContain(m => m.Type == MemoryType.SawCombat,
+                "the only memory naming the player is the SawCombat");
         });
-        (typeof(GameConfig).GetField("CascadeWitnessImpressionDrop")?.GetValue(null)).Should().Be(0.15f, "the GameConfig const");
+    }
+
+    [Fact]
+    public async Task TheBlameSurvivesASaveAndALoad_ThePlayersImpressionIsMinus01AfterTheReplay()
+    {
+        var twin = WorldNpc("cs140_w8", "Cascade Witness Eight");
+        await InWorld(new[] { twin }, async _ =>
+        {
+            var r = await FinishFight(Ally("Mira"), new[] { Copy(twin) }, potions: 3);
+            var loaded = Replay(twin);
+            loaded.GetCharacterImpression(r.Owner.Name2).Should().BeApproximately(-0.1f, 0.0001f, "a load replays the SawCombat naming the player");
+            Blame(loaded, r.Owner.Name2).Should().ContainSingle("the memory itself is saved");
+            loaded.GetCharacterImpression("Mira").Should().Be(0f, "the fall still moves no impression of the fallen ally");
+        });
     }
 
     [Theory]
-    [InlineData(-0.30f, -0.45f)]
-    [InlineData(-0.40f, -0.55f)]
-    public async Task NoMemoryNamesThePlayer_SoAWitnessAfterTheDropIsNeverARevengeCandidate(float before, float after)
+    [InlineData(-0.35f, -0.45f)]
+    [InlineData(-0.45f, -0.55f)]
+    public async Task NoGrudgeMemoryNamesThePlayer_SoAWitnessAfterTheDropIsNeverARevengeCandidate(float before, float after)
     {
         var twin = WorldNpc("cs140_w5", "Cascade Witness Five", level: 10);
         await InWorld(new[] { twin }, async _ =>
@@ -247,7 +273,10 @@ public class CS140CascadeTests
                 Mem(twin).CharacterImpressions[r.Owner.Name2] = before;
             });
             Mem(twin).GetCharacterImpression(owner.Name2).Should().BeApproximately(after, 0.0001f);
-            Mem(twin).AllMemories.Should().NotContain(m => m.InvolvedCharacter == owner.Name2, "this piece writes no memory naming the player");
+            Mem(twin).AllMemories.Should().NotContain(m => m.InvolvedCharacter == owner.Name2 && m.Type != MemoryType.SawCombat,
+                "the only memory naming the player is the SawCombat, which no grudge attack reads");
+            foreach (var t in new[] { MemoryType.SawDeath, MemoryType.Defeated, MemoryType.Murdered })
+                Mem(twin).HasMemoryOfEvent(t, owner.Name2, hoursAgo: 720).Should().BeFalse($"no {t} names the player");
             var street = StreetEncounterSystem.Instance;
             typeof(StreetEncounterSystem).GetMethod("FindGrudgeNPC", NPI)!.Invoke(street, new object[] { owner, new List<NPC> { twin } })
                 .Should().BeNull("the grudge attacks need a SawDeath, Defeated or Murdered memory naming the player");
@@ -365,7 +394,7 @@ public class CS140CascadeTests
         {
             var r = await FinishFight(Ally("Mira"), new Character[] { staleCopy }, potions: 3);
             SawDeaths(twin).Should().ContainSingle("the live twin is the one the saves carry");
-            Mem(twin).GetCharacterImpression(r.Owner.Name2).Should().BeApproximately(-0.15f, 0.0001f);
+            Mem(twin).GetCharacterImpression(r.Owner.Name2).Should().BeApproximately(-0.1f, 0.0001f);
             Mem(staleCopy).AllMemories.Should().BeEmpty("the party copy is not written");
             Mem(staleCopy).CharacterImpressions.Should().BeEmpty();
         });

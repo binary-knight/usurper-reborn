@@ -113,15 +113,6 @@ public partial class MemorySystem
         };
     }
     
-    /// <summary>1.4.0: moves the impression of a character by delta, held to -1..1, with no memory
-    /// behind it (as gossip moves it).</summary>
-    public void AdjustImpression(string characterId, float delta)
-    {
-        if (string.IsNullOrEmpty(characterId)) return;
-        float now = characterImpressions.GetValueOrDefault(characterId, 0.0f);
-        characterImpressions[characterId] = Math.Max(-1.0f, Math.Min(1.0f, now + delta));
-    }
-
     public float GetCharacterImpression(string characterId)
     {
         return characterImpressions.GetValueOrDefault(characterId, 0.0f);

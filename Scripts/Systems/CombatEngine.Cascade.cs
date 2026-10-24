@@ -7,10 +7,12 @@ using UsurperRemake.Utils;
 /// talks ... no new state"). When a monster finishes an ally, every other ally in scope in the fight, Downed
 /// ones included, saw it. An NPC witness's live world twin records a SawDeath memory whose English description
 /// names the fallen ally and whose InvolvedCharacter is empty: RecordEvent moves no impression for an empty
-/// name, so neither the fallen ally nor the player is touched, live or when the memory is replayed at a load,
-/// and the street revenge (a SawDeath naming the player) never keys on it. When the player could have rescued the fallen ally and did not (CouldHaveHelped, the left-to-die
-/// test), each NPC witness thinks CascadeWitnessImpressionDrop less of the player, with no memory naming the
-/// player, and each companion witness loses the left-to-die loyalty step with a line in its history.
+/// name, so the fall itself moves no impression, live or when the memory is replayed at a load.
+/// When the player could have rescued the fallen ally and did not (CouldHaveHelped, the left-to-die test), each
+/// NPC witness also records a SawCombat memory naming the player: its impression of the player drops by 0.1
+/// (MemorySystem.ImpressionChangeFor), and a load replays it, so it lasts until newer memories push it out. A
+/// SawCombat is no grudge memory: the street revenge needs a SawDeath, Defeated or Murdered naming the player.
+/// Each companion witness loses the left-to-die loyalty step with a line in its history.
 /// </summary>
 public partial class CombatEngine
 {
@@ -50,7 +52,15 @@ public partial class CombatEngine
                 Location = player?.CurrentLocation ?? "",
             });
             if (blamed)
-                memory.AdjustImpression(player!.Name2, -GameConfig.CascadeWitnessImpressionDrop);
+                memory.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.SawCombat,
+                    Description = Loc.GetIn("en", "combat.memory_saw_ally_left", player!.Name2, fallenName),   // stored English
+                    InvolvedCharacter = player.Name2,
+                    Importance = 0.6f,
+                    EmotionalImpact = -0.4f,
+                    Location = player.CurrentLocation ?? "",
+                });
         }
     }
 }

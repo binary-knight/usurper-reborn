@@ -23243,6 +23243,7 @@
   "inn.memory_murdered_sleep": "Assassiné dans mon sommeil à l'Auberge par {0}",
   "inn.memory_witnessed_murder": "A vu {0} assassiner {1} à l'Auberge",
   "combat.memory_saw_ally_finished": "J'ai vu {0} tomber face à {1} à mes côtés",
+  "combat.memory_saw_ally_left": "J'ai vu {0} laisser tomber {1} sans l'aider, alors que c'était possible",
   "inn.news_murdered_sleep": "{0} a assassiné {1} dans son sommeil à l'Auberge !",
   "// Inn - localized bartender name": "",
   "inn.bartender_name": "X-bit",

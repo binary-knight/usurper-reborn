@@ -23559,6 +23559,7 @@
   "inn.memory_murdered_sleep": "Álmomban meggyilkolt a Fogadóban {0}",
   "inn.memory_witnessed_murder": "Látta, ahogy {0} meggyilkolja {1}-t a Fogadóban",
   "combat.memory_saw_ally_finished": "Láttam, ahogy {0} elesik {1} ellen mellettem",
+  "combat.memory_saw_ally_left": "Láttam, hogy {0} nem segített, és {1} elesett, pedig segíthetett volna",
   "inn.news_murdered_sleep": "{0} meggyilkolta {1}-t álmában a Fogadóban!",
   "// Inn - localized bartender name": "",
   "inn.bartender_name": "X-bit",

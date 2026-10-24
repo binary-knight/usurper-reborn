@@ -23790,6 +23790,7 @@
   "inn.memory_murdered_sleep": "Murdered in my sleep at the Inn by {0}",
   "inn.memory_witnessed_murder": "Witnessed {0} murder {1} at the Inn",
   "combat.memory_saw_ally_finished": "Saw {0} fall to {1} beside me",
+  "combat.memory_saw_ally_left": "Saw {0} leave {1} to fall when they could have helped",
   "inn.news_murdered_sleep": "{0} murdered {1} in their sleep at the Inn!",
   "// Inn - localized bartender name": "",
   "inn.bartender_name": "X-bit",

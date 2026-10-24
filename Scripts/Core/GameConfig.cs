@@ -2499,8 +2499,6 @@ public static partial class GameConfig
     // v1.2 (design item G): an NPC left to die while the player could have helped
     public const int AbandonPenaltySteps = 2;
     public const int AbandonCompanionLoyaltyPenalty = 15;
-    // 1.4.0: an NPC ally who saw a teammate finished that the player could have rescued thinks this much less of the player
-    public const float CascadeWitnessImpressionDrop = 0.15f;
     // 1.2.8: team betrayal. Each murder a companion witnesses and each companion left to die adds
     // the points once per event; a loyalty gain of the minimum or more (raw, before difficulty)
     // takes off its amount and counts as a kindness. At the warning a companion grows cold; at the
