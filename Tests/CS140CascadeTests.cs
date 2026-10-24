@@ -124,12 +124,52 @@ public class CS140CascadeTests
             var r = await FinishFight(Ally("Mira"), new[] { Copy(twin) }, potions: 0);
             var seen = SawDeaths(twin);
             seen.Should().ContainSingle("one memory of the fall");
-            seen[0].InvolvedCharacter.Should().Be("Mira", "the memory names the fallen ally");
+            seen[0].InvolvedCharacter.Should().BeEmpty("the name is in the description only, so no impression moves, now or on a replay");
             seen[0].Description.Should().Be(Loc.GetIn("en", MemoryKey, "Mira", "Wolf"), "stored in English");
             seen[0].Importance.Should().Be(0.8f);
             seen[0].EmotionalImpact.Should().Be(-0.6f);
             Mem(twin).GetCharacterImpression("Mira").Should().Be(0.3f, "the witness grieves the fallen ally, it does not blame it");
             Mem(twin).GetCharacterImpression(r.Owner.Name2).Should().Be(0f, "no rescue was possible, so no blame");
+        });
+    }
+
+    /// <summary>A witness's memories saved as the online save writes them (OnlineStateManager.SerializeMemoriesStatic)
+    /// and replayed as a load replays them (GameEngine.RestoreNPCsLocked: RecordEvent with keepTimestamp true) into a
+    /// fresh brain.</summary>
+    private static MemorySystem Replay(NPC npc)
+    {
+        var saved = (List<MemoryData>)typeof(OnlineStateManager).GetMethod("SerializeMemoriesStatic", SNP)!
+            .Invoke(null, new object?[] { Mem(npc) })!;
+        var fresh = WorldNpc(npc.ID + "_loaded", npc.Name2);
+        foreach (var memData in saved)
+        {
+            if (!Enum.TryParse<MemoryType>(memData.Type, out var memType)) continue;
+            Mem(fresh).RecordEvent(new MemoryEvent
+            {
+                Type = memType, Description = memData.Description, InvolvedCharacter = memData.InvolvedCharacter,
+                Timestamp = MemorySystem.RestoredTimestamp(memData.Timestamp, true, DateTime.Now),
+                Importance = memData.Importance, EmotionalImpact = memData.EmotionalImpact,
+            }, keepTimestamp: true);
+        }
+        return Mem(fresh);
+    }
+
+    [Fact]
+    public async Task AWitnessesSavedMemories_ReplayedAsALoadReplaysThem_LeaveEveryImpressionUnchanged()
+    {
+        var twin = WorldNpc("cs140_w7", "Cascade Witness Seven");
+        // an impression of the fallen ally that a memory backs, so a load rebuilds it
+        Mem(twin).RecordEvent(new MemoryEvent { Type = MemoryType.Helped, Description = "Mira helped me", InvolvedCharacter = "Mira", Importance = 0.5f });
+        var before = Replay(twin).CharacterImpressions.ToDictionary(kv => kv.Key, kv => kv.Value);
+        before.Should().ContainKey("Mira");
+        await InWorld(new[] { twin }, async _ =>
+        {
+            await FinishFight(Ally("Mira"), new[] { Copy(twin) }, potions: 0);
+            SawDeaths(twin).Should().ContainSingle();
+            var live = Mem(twin).CharacterImpressions;
+            live.Should().Equal(before, "the fall moved no impression in the session");
+            Replay(twin).CharacterImpressions.Should().Equal(before, "the replayed SawDeath names no one, so a load moves no impression");
+            Replay(twin).GetMemoriesOfType(MemoryType.SawDeath).Should().ContainSingle("the memory itself survives the save");
         });
     }
 
@@ -147,7 +187,7 @@ public class CS140CascadeTests
                 downedWitness.IsDowned.Should().BeTrue();
             });
             downedWitness.IsDowned.Should().BeTrue("the second ally is still Downed when the first is finished");
-            SawDeaths(twin).Should().ContainSingle(m => m.InvolvedCharacter == "Mira", "a Downed ally was there and saw it");
+            SawDeaths(twin).Should().ContainSingle(m => m.Description == Loc.GetIn("en", MemoryKey, "Mira", "Wolf"), "a Downed ally was there and saw it");
         });
     }
 

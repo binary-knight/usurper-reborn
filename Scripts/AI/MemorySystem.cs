@@ -20,9 +20,7 @@ public partial class MemorySystem
     public Dictionary<string, float> CharacterImpressions => characterImpressions;
 
     /// <param name="keepTimestamp">v1.1.13: a memory restored from a save keeps the time it was recorded.</param>
-    /// <param name="moveImpression">1.4.0: false records the memory and leaves the impression of
-    /// InvolvedCharacter as it was (an ally who saw a teammate finished grieves it, not blames it).</param>
-    public void RecordEvent(MemoryEvent memoryEvent, bool keepTimestamp = false, bool moveImpression = true)
+    public void RecordEvent(MemoryEvent memoryEvent, bool keepTimestamp = false)
     {
         if (!keepTimestamp) memoryEvent.Timestamp = DateTime.Now;
         memories.Add(memoryEvent);
@@ -49,7 +47,7 @@ public partial class MemorySystem
         }
         
         // Update character impressions if this involves another character
-        if (moveImpression && !string.IsNullOrEmpty(memoryEvent.InvolvedCharacter))
+        if (!string.IsNullOrEmpty(memoryEvent.InvolvedCharacter))
         {
             UpdateCharacterImpression(memoryEvent);
         }
