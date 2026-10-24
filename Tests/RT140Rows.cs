@@ -22,8 +22,9 @@ public class RT140Rows
         return dir!.FullName;
     }
 
-    /// <summary>The wiki armor page quotes this value and three wiki tests pin "Defence" in it (1.3.7 spelling test).</summary>
-    private const string PinnedByWikiTests = "item.set.bonus.defence";
+    /// <summary>Values that existing tests pin with the old spelling: the wiki armor page quotes the first (three wiki tests),
+    /// TownBase125Tests the second (the auction details label), TownMagic125Tests the third (the enchant menu text).</summary>
+    private static readonly string[] PinnedByTests = { "item.set.bonus.defence", "combat.status_defence_label", "magic_shop.tier_desc_ward" };
 
     private static readonly string[] KeysKept =
     {
@@ -38,9 +39,9 @@ public class RT140Rows
     }
 
     [Fact]
-    public void RT140_NoEnglishValueSaysDefence_ExceptTheOnePinnedByWikiTests()
+    public void RT140_NoEnglishValueSaysDefence_ExceptTheThreePinnedByExistingTests()
     {
-        var bad = En().Where(kv => kv.Key != PinnedByWikiTests
+        var bad = En().Where(kv => !PinnedByTests.Contains(kv.Key)
             && kv.Value.IndexOf("defence", StringComparison.OrdinalIgnoreCase) >= 0).Select(kv => kv.Key).ToList();
         bad.Should().BeEmpty("the English text spells it Defense");
     }
