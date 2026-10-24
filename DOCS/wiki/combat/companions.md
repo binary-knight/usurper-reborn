@@ -70,6 +70,8 @@ Loyalty runs from 0 to 100 and starts at 50. Each level a companion gains adds 1
 
 Difficulty scales loyalty gains only: Easy gives 1.5 times, Hard 0.75 times and Nightmare half, never less than 1. Losses are not scaled.
 
+A companion in a fight that sees another ally finished when you could have rescued it (the test in [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies)) loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty, with a line in its history.
+
 ### Romance with Lyris or Melodia
 
 Lyris and Melodia are the two companions open to romance. At the Inn, P, the companion's number, then R, once a day: with loyalty 60 or more the bond grows by one step with a chance of 30 plus your Charisma, at most 80 percent. The bond runs up to 10.
@@ -93,8 +95,6 @@ Before the quest, each companion has two story scenes, in order, on any floor at
 A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it stands up again with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
 
 If a companion was Downed at the start of your turn, had not already been rescued in that fight, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
-
-A companion in the fight who sees another ally finished, a companion or an NPC ally, that you could have rescued by the same test loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty too, with a line in its history. This adds nothing to the resentment below.
 
 ### A companion who dies for you
 
