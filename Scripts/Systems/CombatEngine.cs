@@ -129,6 +129,7 @@ public partial class CombatEngine
         public long HpLost;
         public int Downs, Rescues;   // 1.3.3 party survival
         public bool Finished;
+        public bool Withdrew;   // 1.4.0 W: pulled back from the fight
     }
     private readonly Dictionary<Character, AllyFightStats> _allyStats = new();
     internal AllyFightStats StatsFor(Character ally)
@@ -2172,6 +2173,7 @@ public partial class CombatEngine
         // 1.3.3 party survival: every ally still Downed gets up at half HP, before the outcome branch, so
         // victory, escape, Death's Door and the player's death all see it standing. A fight's end never finishes.
         ResolveDownedAtFightEnd(result);
+        ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: a withdrawn ally is back in its place for the outcome and the split
 
         EndFightEvents(player);   // 1.2.6: the HP the fight left, before any outcome handling
 
@@ -2511,6 +2513,7 @@ public partial class CombatEngine
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
             player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
             ResolveDownedAtFightEnd(result);   // 1.3.3: no-op after the normal end; a fight left by a throw leaves no ally Downed
+            ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: no-op after the normal end; a throw leaves no ally withdrawn
             EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
             _eventTally = null;
         }
@@ -20597,6 +20600,13 @@ public partial class CombatEngine
             return;
         }
 
+        // 1.4.0 W: a Cautious ally losing the fight with no heal left tries to pull back, before any other choice
+        if (WantsToWithdraw(teammate, result))
+        {
+            await TryWithdraw(teammate, result);
+            return;
+        }
+
         // Build list of all party members (player + teammates) for healing decisions
         var allPartyMembers = new List<Character> { currentPlayer };
         if (currentTeammates != null)
@@ -21544,19 +21554,19 @@ public partial class CombatEngine
         return true;
     }
 
-    /// <summary>
-    /// NPC teammate attempts to use a class ability via the full ClassAbilitySystem.
-    /// Uses the same ApplyAbilityEffectsMultiMonster as the player, so all 30+ ability
-    /// effects (stun, poison, execute, frenzy, holy, rage, etc.) work for teammates too.
-    /// </summary>
-    private async Task<bool> TryTeammateClassAbility(Character teammate, List<Monster> monsters, CombatResult result)
-    {
-        var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
-        if (livingMonsters.Count == 0) return false;
+    /// <summary>1.4.0 W: the abilities a teammate could use this turn, after the class ability step's own filters
+    /// (escape and an Empathic Link with no ally left out, the player's toggles, the NPC spec rules, stamina, mana,
+    /// cooldown and CanUseAbility); null when none. Moved here unchanged from TryTeammateClassAbility, which calls it,
+    /// so the withdrawal's heal check (HasHealLeft) reads the same list.</summary>
+    internal List<ClassAbilitySystem.ClassAbility>? AffordableTeammateAbilities(Character teammate, CombatResult result) =>
+        AffordableTeammateAbilitiesAndSpec(teammate, result).Abilities;
 
+    private (List<ClassAbilitySystem.ClassAbility>? Abilities, UsurperRemake.Data.SpecDefinition? Spec, Dictionary<string, int>? Cooldowns) AffordableTeammateAbilitiesAndSpec(
+        Character teammate, CombatResult result)
+    {
         // Get all abilities available to this teammate's class and level
         var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(teammate);
-        if (availableAbilities == null || availableAbilities.Count == 0) return false;
+        if (availableAbilities == null || availableAbilities.Count == 0) return (null, null, null);
 
         // 1.3.6 G5 (B F6): a teammate never takes an escape ability (Disappearing Act); it would spend the turn, the
         // stamina and the cooldown and leave the fight as it was
@@ -21564,7 +21574,7 @@ public partial class CombatEngine
         // 1.3.6 G11 (rule 2): nor Empathic Link with no living ally to link
         if (EmpathicLinkAllies(teammate, result).Count == 0)
             availableAbilities = availableAbilities.Where(a => a.SpecialEffect != "empathic_link").ToList();
-        if (availableAbilities.Count == 0) return false;
+        if (availableAbilities.Count == 0) return (null, null, null);
 
         // Filter out abilities the player has disabled for this companion
         if (teammate.IsCompanion && teammate.CompanionId.HasValue)
@@ -21575,7 +21585,7 @@ public partial class CombatEngine
                 availableAbilities = availableAbilities
                     .Where(a => !companion.DisabledAbilities.Contains(a.Id))
                     .ToList();
-                if (availableAbilities.Count == 0) return false;
+                if (availableAbilities.Count == 0) return (null, null, null);
             }
         }
         // v0.65.1: non-companion teammates (Team Corner NPCs / spouses / echoes) read the
@@ -21587,7 +21597,7 @@ public partial class CombatEngine
             availableAbilities = availableAbilities
                 .Where(a => !disabledTeammateAbilities.Contains(a.Id))
                 .ToList();
-            if (availableAbilities.Count == 0) return false;
+            if (availableAbilities.Count == 0) return (null, null, null);
         }
 
         // Apply specialization-based ability filtering (NPC teammates only)
@@ -21603,7 +21613,7 @@ public partial class CombatEngine
                     availableAbilities = availableAbilities
                         .Where(a => !activeSpec.RestrictedAbilityTypes.Contains(a.Type))
                         .ToList();
-                    if (availableAbilities.Count == 0) return false;
+                    if (availableAbilities.Count == 0) return (null, null, null);
                 }
 
                 // Remove specifically disabled ability IDs
@@ -21612,7 +21622,7 @@ public partial class CombatEngine
                     availableAbilities = availableAbilities
                         .Where(a => !activeSpec.DisabledAbilityIds.Contains(a.Id))
                         .ToList();
-                    if (availableAbilities.Count == 0) return false;
+                    if (availableAbilities.Count == 0) return (null, null, null);
                 }
             }
         }
@@ -21633,7 +21643,21 @@ public partial class CombatEngine
                      && (!myCooldowns.TryGetValue(a.Id, out int cd) || cd <= 0)
                      && ClassAbilitySystem.CanUseAbility(teammate, a.Id, myCooldowns))
             .ToList();
-        if (affordableAbilities.Count == 0) return false;
+        return (affordableAbilities, activeSpec, myCooldowns);
+    }
+
+    /// <summary>
+    /// NPC teammate attempts to use a class ability via the full ClassAbilitySystem.
+    /// Uses the same ApplyAbilityEffectsMultiMonster as the player, so all 30+ ability
+    /// effects (stun, poison, execute, frenzy, holy, rage, etc.) work for teammates too.
+    /// </summary>
+    private async Task<bool> TryTeammateClassAbility(Character teammate, List<Monster> monsters, CombatResult result)
+    {
+        var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
+        if (livingMonsters.Count == 0) return false;
+
+        var (affordableAbilities, activeSpec, myCooldowns) = AffordableTeammateAbilitiesAndSpec(teammate, result);   // 1.4.0 W: the filters, moved unchanged
+        if (affordableAbilities == null || affordableAbilities.Count == 0 || myCooldowns == null) return false;
 
         // Don't pick heal abilities unless someone in the party actually needs healing
         // (TryTeammateHealAction already handles heal spells/potions with proper thresholds)

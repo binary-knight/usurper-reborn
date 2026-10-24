@@ -26,6 +26,13 @@ public partial class CombatEngine
     private bool _finishGateReached;
     // 1.3.6: each Downed ally is lifted once per fight; a second down of the same ally cannot be rescued
     private readonly HashSet<Character> _rescuedThisFight = new(ReferenceEqualityComparer.Instance);
+    // 1.4.0 W: allies that pulled back from this fight, each with the members that came after it in the fight's
+    // list when it left (its place at the put back); and the round of each ally's last try
+    private readonly List<(Character Ally, List<Character> After)> _withdrawn = new();
+    private readonly Dictionary<Character, int> _withdrawTryRound = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>1.4.0 W, tests only: the d100 roll of a withdrawal in place of the fight's random.</summary>
+    internal Func<int>? WithdrawRollOverride { get; set; }
 
     private void ResetPartySurvival()
     {
@@ -35,6 +42,8 @@ public partial class CombatEngine
         _ownerRescuedThisTurn = false;
         _finishGateReached = false;
         _rescuedThisFight.Clear();
+        _withdrawn.Clear();
+        _withdrawTryRound.Clear();
     }
 
     /// <summary>Who can be Downed: a story companion or an NPC ally (spouse, lover, team member, pet: every
@@ -290,6 +299,99 @@ public partial class CombatEngine
             catch (Exception ex) { DebugLogger.Instance.LogError("COMBAT", $"recovery line failed: {ex.Message}"); }
             if (ally.IsCompanion && ally.CompanionId.HasValue) CompanionSystem.Instance.SyncCompanionHP(ally);
         }
+    }
+
+    /// <summary>
+    /// 1.4.0 W: an ally has a heal left when it holds a healing potion, may borrow one from the owner's shared
+    /// belt, can cast a heal spell on itself or can use a heal ability this turn. The same checks the heal step
+    /// makes (TryTeammateHealAction: Healing, CanBorrowFromBelt, GetBestHealSpell with the spec rule) and the
+    /// ability step's own filter (AffordableTeammateAbilities, a heal type or a healing amount).
+    /// </summary>
+    internal bool HasHealLeft(Character ally, CombatResult result)
+    {
+        if (ally.Healing > 0) return true;
+        var beltOwner = _combatOwner ?? currentPlayer;
+        if (beltOwner != null && CanBorrowFromBelt(beltOwner, ally)) return true;
+        bool spellsAllowed = true;
+        if (ally is NPC npc && npc.Specialization != ClassSpecialization.None)
+        {
+            var spec = UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization);
+            if (spec != null && spec.RestrictedAbilityTypes.Contains(ClassAbilitySystem.AbilityType.Heal)) spellsAllowed = false;
+        }
+        if (spellsAllowed && ally.Mana > 10 && GetBestHealSpell(ally, ally) != null) return true;
+        var abilities = AffordableTeammateAbilities(ally, result);
+        return abilities != null && abilities.Any(a => a.Type == ClassAbilitySystem.AbilityType.Heal || a.BaseHealing > 0);
+    }
+
+    /// <summary>1.4.0 W: the trigger, read on the ally's own turn before any other choice. An ally that takes orders
+    /// and can be Downed, standing, with a Withdraw share from its stance (Cautious), below that share of its max HP,
+    /// with no heal left, where fleeing is allowed (not on Nightmare), and not yet tried in this round.</summary>
+    internal bool WantsToWithdraw(Character ally, CombatResult result)
+    {
+        if (!TeammateStances.TakesOrders(ally) || !IsDownable(ally) || !ally.IsAlive || ally.IsDowned) return false;
+        double share = PolicyFor(ally).Withdraw;
+        if (share <= 0 || ally.MaxHP <= 0 || (double)ally.HP / ally.MaxHP >= share) return false;
+        if (!DifficultySystem.CanFlee()) return false;
+        if (_withdrawTryRound.TryGetValue(ally, out int r) && r == result.CurrentRound) return false;
+        if (result.Teammates == null || !result.Teammates.Contains(ally)) return false;
+        return !HasHealLeft(ally, result);
+    }
+
+    /// <summary>
+    /// 1.4.0 W: the announced try. It rolls the flee chance a player's R rolls (CalculateFleeChance, with the boss
+    /// chance while an Old God or a betrayal fight is on, as R and a follower's R pass it). A failure spends the
+    /// turn. A success takes the ally out of this fight's list, as a follower's R does; the fight's end puts it back.
+    /// Always the ally's whole turn.
+    /// </summary>
+    internal async Task TryWithdraw(Character ally, CombatResult result)
+    {
+        _withdrawTryRound[ally] = result.CurrentRound;
+        UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.ally_withdraw_try", ally.DisplayName)}", "yellow");
+        BroadcastPartyLine(result, "\u001b[33m", "combat.ally_withdraw_try", ally.DisplayName);
+        int chance = CalculateFleeChance(ally, BossContext != null);
+        int roll = WithdrawRollOverride?.Invoke() ?? random.Next(1, 101);
+        if (roll <= chance && result.Teammates != null)
+        {
+            int at = result.Teammates.IndexOf(ally);
+            var after = at >= 0 ? result.Teammates.Skip(at + 1).ToList() : new List<Character>();
+            result.Teammates.Remove(ally);
+            _withdrawn.Add((ally, after));
+            StatsFor(ally).Withdrew = true;
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.ally_withdraw_done", ally.DisplayName)}", "yellow");
+            BroadcastPartyLine(result, "\u001b[33m", "combat.ally_withdraw_done", ally.DisplayName);
+            result.CombatLog.Add($"{ally.DisplayName} pulls back from the fight");
+        }
+        else
+        {
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.ally_withdraw_fail", ally.DisplayName)}", "red");
+            BroadcastPartyLine(result, "\u001b[31m", "combat.ally_withdraw_fail", ally.DisplayName);
+        }
+        await Pacing.Wait(GetCombatDelay(800));
+    }
+
+    /// <summary>
+    /// 1.4.0 W: at the fight's end every withdrawn ally goes back into the fight's list at its own place (ahead of
+    /// the first member that came after it when it left, the latest to leave first), with the HP it left with and
+    /// never above its max, Active. Runs beside ResolveDownedAtFightEnd before the outcome branch, so the
+    /// experience split and every step after the fight see it, and once more in the finally (a no-op after the
+    /// normal end).
+    /// </summary>
+    internal void ReturnWithdrawnAtFightEnd(CombatResult? result)
+    {
+        if (_withdrawn.Count == 0) return;
+        var team = result?.Teammates ?? currentTeammates;
+        for (int i = _withdrawn.Count - 1; i >= 0; i--)
+        {
+            var (ally, after) = _withdrawn[i];
+            if (ally == null) continue;
+            ally.HP = Math.Min(ally.HP, ally.MaxHP);
+            ally.Lifecycle = AllyLifecycle.Active;
+            if (team == null || team.Contains(ally)) continue;
+            int at = team.FindIndex(m => after.Contains(m));
+            if (at < 0) team.Add(ally); else team.Insert(at, ally);
+            if (ally.IsCompanion && ally.CompanionId.HasValue) CompanionSystem.Instance.SyncCompanionHP(ally);
+        }
+        _withdrawn.Clear();
     }
 
     /// <summary>The fall of a teammate for teammates_lost: once per ally per fight, at a permanent loss.</summary>

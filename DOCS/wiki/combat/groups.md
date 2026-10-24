@@ -27,7 +27,7 @@ A teammate or companion makes the same [hit roll](/wiki/en/combat/#the-hit-roll)
 
 ## Who monsters attack
 
-With allies alive, each monster picks its target at random, weighted: the chance to be picked is your weight divided by the sum of every party member's weight. A Paladin weighs 180 and a Magician 60, so with only those two the Paladin is picked 3 times in 4. A taunt comes first: a taunted monster attacks the taunter while the taunt lasts, every time for a hard taunt such as Taunt (T) and some of the time for a soft one. Alone, you are always the target.
+With allies alive, each monster picks its target at random, weighted: the chance to be picked is your weight divided by the sum of every party member's weight. An ally that has [pulled back from the fight](/wiki/en/combat/party/#pulling-back-from-a-fight) is never picked. A Paladin weighs 180 and a Magician 60, so with only those two the Paladin is picked 3 times in 4. A taunt comes first: a taunted monster attacks the taunter while the taunt lasts, every time for a hard taunt such as Taunt (T) and some of the time for a soft one. Alone, you are always the target.
 
 The weight starts from the class:
 
@@ -55,7 +55,7 @@ An invulnerable teammate, companion or grouped player (Divine Shield, Avatar of 
 
 ## Teammates regenerate stamina, mana and gear regeneration
 
-At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own regeneration gear, as a share of its maximum. HP regeneration from race and alignment is yours alone.
+At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own regeneration gear, as a share of its maximum. An ally that has pulled back from the fight regains nothing until the fight ends. HP regeneration from race and alignment is yours alone.
 
 ## Curing poison and disease
 

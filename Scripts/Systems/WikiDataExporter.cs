@@ -436,7 +436,8 @@ public static class WikiDataExporter
             {
                 id = s,
                 p.EmergencySelfPotion, p.PotionMostInjured, p.DefensiveFirst, p.Brace,
-                p.MayTaunt, p.TargetWeightMultiplier
+                p.MayTaunt, p.TargetWeightMultiplier,
+                p.Withdraw   // 1.4.0: below this share with no heal left an ally tries to pull back (0: never)
             };
         }).ToArray(),
         constants = PartyConstants()

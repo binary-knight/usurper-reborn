@@ -59,3 +59,7 @@ See [Favor and Miracles](/wiki/en/gods/favor/) and [Mental](/wiki/en/characters/
 ## Escape abilities
 
 The Jester's Disappearing Act and the Sage's Escape spell work by the flee rules on this page. On Nightmare they do not get you out and the turn is spent. In an Old God fight, or while a floor boss is among the living monsters, they succeed at the Old God chance from Fleeing an Old God; a failure is your turn, with the same failure message, and it does not halve the hits on you that round. Against other monsters they always get you out.
+
+## Allies pulling back
+
+Your R takes the whole party out. A Cautious ally close to death with no heal left can also try to leave a fight on its own turn, rolling the flee chance on its own stats; it rejoins you when the fight ends. See [pulling back from a fight](/wiki/en/combat/party/#pulling-back-from-a-fight).
