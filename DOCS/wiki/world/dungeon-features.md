@@ -158,7 +158,7 @@ Puzzle difficulty is 1 + floor / 15, at most 5. A solved puzzle pays floor x 30 
 
 **Make camp and recover** restores a quarter of your maximum HP, mana and stamina and a quarter of each teammate's, recovers {{balance:MentalDungeonCampGain}} Mental and, in single-player, takes two hours of game time and removes {{balance:FatigueReductionDungeonRest}} Fatigue. You can camp once per floor, in a cleared room. A Blood Price weight of 3 or more gives you 75% of the amount and 6 or more 50%; teammates always get the full quarter.
 
-A safe haven or resting place event restores a third of maximum HP, mana and stamina to you and each teammate, cures poison, recovers {{balance:MentalSafeHavenGain}} Mental and in single-player removes {{balance:FatigueReductionDungeonRest}} Fatigue. It uses the same once per floor rest as camping, so after a camp on the floor it gives nothing. Plan where you spend it.
+A safe haven or resting place event restores a third of maximum HP, mana and stamina to you and each teammate, cures poison, recovers {{balance:MentalSafeHavenGain}} Mental and in single-player removes {{balance:FatigueReductionDungeonRest}} Fatigue. It uses the same once per floor rest as camping, so after a camp on the floor it gives nothing. Plan where you spend it. An ally told to wait (see [party and allies](/wiki/en/combat/party/#telling-an-ally-to-wait)) gets nothing from a camp or a safe haven.
 
 ## Strangers
 

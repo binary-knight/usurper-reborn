@@ -1146,7 +1146,7 @@ public partial class CombatEngine
             });
             // Seed initial party state so MUD clients can render party panes
             // without waiting for the first round-end update.
-            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates);
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.4.0 H: as the fight's list, no waiting ally
         }
 
         // Store teammates for healing/support actions.
@@ -1157,6 +1157,7 @@ public partial class CombatEngine
         // the fight. Membership changes now take effect at the next combat; a follower
         // [R]-retreat removes from this combat-local list only (they stay in the group).
         currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
+        currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.4.0 H: an ally told to wait is in no fight
 
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
