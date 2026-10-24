@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.6; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.7; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.6. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.7. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -210,7 +210,7 @@ Standalone class (not extending Character). Combat-relevant fields only: `Level`
 
 ### 17 Total Classes (12 base + 5 prestige)
 
-Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`.
+Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`. The Voidreaver's Constitution gain alternates by level, 2 on an even level and 1 on an odd one (`LevelMasterLocation.VoidreaverConstitutionGain`, 1.3.7). A Voidreaver or NPC saved before then gets the Constitution its levels would have gained once on load (`ApplyVoidreaverConstitutionTopUp`), guarded by the saved marker `VoidreaverConstitutionApplied` in the player and NPC save data; the admin console level edit (`OnlineAdminConsole.ApplyClassStatIncreasesToSaveData`) gives the same class and specialization gains as a level up.
 
 **Base classes (12)**: Alchemist, Assassin, Barbarian, Bard, Cleric, Jester, Magician, Paladin, Ranger, Sage, Warrior, Mystic Shaman.
 
@@ -1696,7 +1696,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.6"
+Version = "1.3.7"
 VersionName = "Reckoning"
 ```
 
