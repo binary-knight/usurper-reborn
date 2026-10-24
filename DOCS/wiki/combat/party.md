@@ -38,7 +38,7 @@ Your experience from a fight is cut when the highest level living ally who is no
 
 ### Experience split
 
-By default the fight's experience is split evenly between you and every living ally below level 100 in the party, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone.
+By default the fight's experience is split evenly between you and every living ally below level 100 in the fight, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone. An ally told to wait is not in the fight and takes no share; in that fight the allies after it in the party fill the places one earlier.
 
 ### Catch-up for allies below your level
 
@@ -50,7 +50,7 @@ At the Level Master, H (help a team member) gives an active companion, an NPC on
 
 ## Gold in a party
 
-Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share.
+Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share. An ally told to wait gets no share.
 
 ## Ally stances
 
@@ -65,6 +65,12 @@ When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a
 An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alchemist's brew, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem cuts the monsters' attack as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
 
 A Wavecaller's Empathic Link links one ally for 4 rounds: you pick the ally from the target list (Enter takes the most hurt ally), and an ally casting it links the most hurt living member, you included. While the link holds, half of each monster hit on the linked member goes to the Wavecaller instead, never taking the Wavecaller below 1 HP, and the linked member has 30 more defense; the Wavecaller gets no defense from it. With no living ally the ability is refused before it costs anything.
+
+## Telling an ally to wait
+
+In a cleared dungeon room, Y (party), then W tells an ally that takes orders to wait there; a fighting beast can wait too. Grouped players, player echoes and royal mercenaries take no such order, and only the leader of a group has it. A waiting ally keeps its place in the party, so it still counts toward the 4 allies, but it is in no fight, ambushes included, and it takes no experience or gold share, no potion, no camp or rest and no effect of a room feature. In the party menu it shows as waiting in place of its stance.
+
+It rejoins when you walk into its room, with a line, or when you call it back with Y, then C, anywhere on the floor. It catches up with you, with a line, when you take the stairs or change floor in any other way, when you leave the dungeon by any exit, and when your session ends: a wait is never saved. An ally that leaves the party while it waits is no longer waiting. Online, a grouped follower's party view shows it as waiting.
 
 ## Potions and rest for allies
 
