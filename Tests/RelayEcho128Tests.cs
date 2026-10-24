@@ -30,6 +30,13 @@ namespace UsurperRemake.Tests
         /// <summary>Only a stop for a hung relay; a result never depends on it.</summary>
         private static readonly TimeSpan SafetyStop = TimeSpan.FromSeconds(60);
 
+        /// <summary>
+        /// 1.4.0: the human OK path writes nothing of its own, so the fake MUD sends this line right after OK. The
+        /// relay bridges it to stdout only after it has read and handled the OK reply, so seeing it is the positive
+        /// sign that the absence of a bare OK line is a result and not a relay that has not run yet. It holds no "OK".
+        /// </summary>
+        private const string HandledMarker = "RELAY-HANDLED-MARKER";
+
         [Fact]
         public async Task HumanPath_ErrReply_ShowsRedMessage_NotRawErrLine()
         {
@@ -42,6 +49,7 @@ namespace UsurperRemake.Tests
         public async Task HumanPath_OkReply_NoBareOkLine()
         {
             var output = await RunRelay("OK", rawTerminal: true, expectConnected: true);
+            output.Should().Contain(HandledMarker, "the relay handled the OK reply before the absence is checked");
             output.Should().NotContain("OK\r\n");
             output.Should().NotContain("OK");
         }
@@ -73,6 +81,7 @@ namespace UsurperRemake.Tests
             listener.Start();
             int port = ((IPEndPoint)listener.LocalEndpoint).Port;
             string? authSeen = null;
+            bool sendMarker = rawTerminal && expectConnected;
 
             var server = Task.Run(async () =>
             {
@@ -85,7 +94,7 @@ namespace UsurperRemake.Tests
                 {
                     if (line.StartsWith("AUTH:", StringComparison.Ordinal)) { authSeen = line; break; }
                 }
-                var bytes = Encoding.UTF8.GetBytes(reply + "\n");
+                var bytes = Encoding.UTF8.GetBytes(reply + "\n" + (sendMarker ? HandledMarker + "\n" : ""));
                 await stream.WriteAsync(bytes, 0, bytes.Length);
                 await stream.FlushAsync();
                 conn.Close();
@@ -124,6 +133,15 @@ namespace UsurperRemake.Tests
                     // After OK the passthrough writes the OK line before the bridge starts; wait for that write.
                     if (!rawTerminal)
                         (await Task.WhenAny(captured.FirstWrite, Task.Delay(SafetyStop))).Should().BeSameAs(captured.FirstWrite);
+                    // Human path: the relay prints no OK line, so wait (bounded) for the line the fake MUD sent after OK
+                    // to be bridged to stdout; only then is a missing OK line a result.
+                    if (sendMarker)
+                    {
+                        var deadline = DateTime.UtcNow + SafetyStop;
+                        while (!captured.Contains(HandledMarker) && DateTime.UtcNow < deadline)
+                            await Task.Delay(20);
+                        captured.Contains(HandledMarker).Should().BeTrue("the relay handled the OK reply and bridged the next line");
+                    }
                     // The bridge then reads stdin, which cannot be cancelled; if the test host's stdin never
                     // reaches end of file the bridge stays open, so the assertions are on the captured output.
                     var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
@@ -140,7 +158,7 @@ namespace UsurperRemake.Tests
                 listener.Stop();
             }
 
-            return Encoding.UTF8.GetString(captured.ToArray());
+            return captured.Text();
         }
 
         /// <summary>The seam stream; FirstWrite completes when the relay first writes to it.</summary>
@@ -149,17 +167,27 @@ namespace UsurperRemake.Tests
             private readonly TaskCompletionSource _firstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
             public Task FirstWrite => _firstWrite.Task;
 
+            private readonly object _gate = new();
+
             public override void Write(byte[] buffer, int offset, int count)
             {
-                base.Write(buffer, offset, count);
+                lock (_gate) base.Write(buffer, offset, count);
                 _firstWrite.TrySetResult();
             }
 
             public override void Write(ReadOnlySpan<byte> buffer)
             {
-                base.Write(buffer);
+                lock (_gate) base.Write(buffer);
                 _firstWrite.TrySetResult();
             }
+
+            /// <summary>Everything written so far, read under the write lock (the bridge writes from another thread).</summary>
+            public string Text()
+            {
+                lock (_gate) return Encoding.UTF8.GetString(ToArray());
+            }
+
+            public bool Contains(string s) => Text().Contains(s, StringComparison.Ordinal);
         }
     }
 }
