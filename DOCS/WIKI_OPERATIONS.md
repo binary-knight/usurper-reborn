@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.6; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
+<!-- doc: checked 1.3.7; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
 # Wiki build and review
 
 The launch wiki has English prose in `DOCS/wiki/`, generated references and a
@@ -174,7 +174,7 @@ use the King's own formulas, and the world boss pay is the game's own reward
 math for one player. The races table also shows the NPC lifespan. The realm
 constants print like the party constants and may not reuse a name either.
 
-Other balance constants use their exact exported keys. Unknown entities,
+Other balance constants use their exact exported keys. Labels and table headings spell the stat "defense", as the game text does; the exact keys, constant names and the game's own gear set bonus row keep "Defence". The export gives a class's growth per level as the average of its level 2 and level 3 gains, so a gain that alternates by level shows a half step (the Voidreaver's Constitution is 1.5). Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.
 Dataset schema and game versions must agree. Item and class references are
 checked against exported classes. HTML in Markdown is not executed; exported
