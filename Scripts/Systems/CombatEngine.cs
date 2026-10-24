@@ -20601,7 +20601,8 @@ public partial class CombatEngine
             return;
         }
 
-        // 1.4.0 W: a Cautious ally losing the fight with no heal left tries to pull back, before any other choice
+        // 1.4.0 W: a Cautious ally losing the fight tries to pull back, before any other choice (1.4.0 W2: before a
+        // potion or a heal too, whatever heals it has left)
         if (WantsToWithdraw(teammate, result))
         {
             await TryWithdraw(teammate, result);
@@ -21557,11 +21558,8 @@ public partial class CombatEngine
 
     /// <summary>1.4.0 W: the abilities a teammate could use this turn, after the class ability step's own filters
     /// (escape and an Empathic Link with no ally left out, the player's toggles, the NPC spec rules, stamina, mana,
-    /// cooldown and CanUseAbility); null when none. Moved here unchanged from TryTeammateClassAbility, which calls it,
-    /// so the withdrawal's heal check (HasHealLeft) reads the same list.</summary>
-    internal List<ClassAbilitySystem.ClassAbility>? AffordableTeammateAbilities(Character teammate, CombatResult result) =>
-        AffordableTeammateAbilitiesAndSpec(teammate, result).Abilities;
-
+    /// cooldown and CanUseAbility), with the spec and the cooldowns; null abilities when none. Moved here unchanged
+    /// from TryTeammateClassAbility, which calls it.</summary>
     private (List<ClassAbilitySystem.ClassAbility>? Abilities, UsurperRemake.Data.SpecDefinition? Spec, Dictionary<string, int>? Cooldowns) AffordableTeammateAbilitiesAndSpec(
         Character teammate, CombatResult result)
     {

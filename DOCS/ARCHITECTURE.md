@@ -407,7 +407,7 @@ NPC-built community in the Outskirts, a town location beyond the city gates. 7 b
    b. Get player action (interactive or quickbar)
    c. Process player action (with ability cooldown, stamina, mana checks)
    d. Each surviving monster: select target -> roll attack -> apply damage
-   e. Each NPC teammate: process status -> CanAct -> (1.4.0: a Cautious ally below 20% HP with no heal left tries to withdraw) -> AI ability/spell/attack
+   e. Each NPC teammate: process status -> CanAct -> (1.4.0: a Cautious ally below 20% HP tries to withdraw, before the heal step, whatever heals it has left) -> AI ability/spell/attack
    f. Decrement durations (status effects, taunt rounds, buff timers)
    g. Check end conditions (HP / monster count / fled flag / arrest combat)
 3. Stand Downed allies up, put withdrawn allies back in their place in the fight's list, then determine outcome and route rewards / death

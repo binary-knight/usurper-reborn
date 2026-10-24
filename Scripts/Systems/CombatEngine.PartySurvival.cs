@@ -301,31 +301,10 @@ public partial class CombatEngine
         }
     }
 
-    /// <summary>
-    /// 1.4.0 W: an ally has a heal left when it holds a healing potion, may borrow one from the owner's shared
-    /// belt, can cast a heal spell on itself or can use a heal ability this turn. The same checks the heal step
-    /// makes (TryTeammateHealAction: Healing, CanBorrowFromBelt, GetBestHealSpell with the spec rule) and the
-    /// ability step's own filter (AffordableTeammateAbilities, a heal type or a healing amount).
-    /// </summary>
-    internal bool HasHealLeft(Character ally, CombatResult result)
-    {
-        if (ally.Healing > 0) return true;
-        var beltOwner = _combatOwner ?? currentPlayer;
-        if (beltOwner != null && CanBorrowFromBelt(beltOwner, ally)) return true;
-        bool spellsAllowed = true;
-        if (ally is NPC npc && npc.Specialization != ClassSpecialization.None)
-        {
-            var spec = UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization);
-            if (spec != null && spec.RestrictedAbilityTypes.Contains(ClassAbilitySystem.AbilityType.Heal)) spellsAllowed = false;
-        }
-        if (spellsAllowed && ally.Mana > 10 && GetBestHealSpell(ally, ally) != null) return true;
-        var abilities = AffordableTeammateAbilities(ally, result);
-        return abilities != null && abilities.Any(a => a.Type == ClassAbilitySystem.AbilityType.Heal || a.BaseHealing > 0);
-    }
-
-    /// <summary>1.4.0 W: the trigger, read on the ally's own turn before any other choice. An ally that takes orders
-    /// and can be Downed, standing, with a Withdraw share from its stance (Cautious), below that share of its max HP,
-    /// with no heal left, where fleeing is allowed (not on Nightmare), and not yet tried in this round.</summary>
+    /// <summary>1.4.0 W: the trigger, read on the ally's own turn before any other choice, so it comes before a potion,
+    /// a heal spell or a heal ability (1.4.0 W2: a heal left no longer keeps it in). An ally that takes orders and can
+    /// be Downed, standing, with a Withdraw share from its stance (Cautious), below that share of its max HP, where
+    /// fleeing is allowed (not on Nightmare), and not yet tried in this round.</summary>
     internal bool WantsToWithdraw(Character ally, CombatResult result)
     {
         if (!TeammateStances.TakesOrders(ally) || !IsDownable(ally) || !ally.IsAlive || ally.IsDowned) return false;
@@ -334,7 +313,7 @@ public partial class CombatEngine
         if (!DifficultySystem.CanFlee()) return false;
         if (_withdrawTryRound.TryGetValue(ally, out int r) && r == result.CurrentRound) return false;
         if (result.Teammates == null || !result.Teammates.Contains(ally)) return false;
-        return !HasHealLeft(ally, result);
+        return true;
     }
 
     /// <summary>

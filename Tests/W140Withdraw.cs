@@ -17,9 +17,9 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// 1.4.0 W: a Cautious ally withdraws from a fight it is losing. On its own turn, before any other choice, an ally
-/// that takes orders and can be Downed, with stance Cautious, below 20 percent of its max HP and with no heal left
-/// (no potion of its own, none it may borrow from the belt, no heal spell or heal ability it can use) announces a
-/// try and rolls the flee chance a player's R rolls (the boss chance in a boss fight). Nightmare blocks it. A
+/// that takes orders and can be Downed, with stance Cautious and below 20 percent of its max HP announces a try,
+/// before a potion or a heal: 1.4.0 W2 took out the "no heal left" rule, so a potion of its own, one it may borrow
+/// from the belt, a heal spell or a heal ability no longer keeps it in. It rolls the flee chance a player's R rolls (the boss chance in a boss fight). Nightmare blocks it. A
 /// failure spends the turn. A success takes it out of this fight's list; every fight end puts it back at its own
 /// place with the HP it left with, before the outcome branch, so it keeps its experience share.
 /// New members are reached by name, so this file builds and runs on the code before the piece (release-1.4.0
@@ -83,7 +83,7 @@ public class W140Withdraw
     }
 
     /// <summary>The owner sets the ally Cautious and, for a Barbarian, switches its Second Wind off (the skill
-    /// toggle), so it has no heal left without a potion.</summary>
+    /// toggle), so a turn the rule does not take (a second turn in a round) shows no heal ability.</summary>
     private static Character Cautious(Character owner, Character ally)
     {
         TeammateStances.Set(owner, TeammateStances.KeyFor(ally), TeammateStance.Cautious);
@@ -173,19 +173,8 @@ public class W140Withdraw
     }
 
     [Fact]
-    public async Task WithAPotion_OrAboveTwenty_OrABeltToBorrowFrom_ItDoesNotTry()
+    public async Task AboveTwenty_OrAtTwenty_ItDoesNotTry()
     {
-        // its own potion: it drinks it (the Cautious emergency potion is at 40 percent)
-        var owner = Hero();
-        var withPotion = Cautious(owner, Low("Mira", 15));
-        withPotion.Healing = 1;
-        var r = TurnRig(withPotion, owner);
-        ForceRoll(r.Engine, 1);
-        await Turn(r, withPotion);
-        r.Text.Should().NotContain(TryLine(withPotion));
-        withPotion.Healing.Should().Be(0, "it drank its potion");
-        r.Result.Teammates.Should().Contain(withPotion);
-
         // at 25 percent with no heal: above the threshold, it fights on
         var owner2 = Hero();
         var above = Cautious(owner2, Low("Kade", 25));
@@ -203,21 +192,60 @@ public class W140Withdraw
         await Turn(r3, at);
         r3.Text.Should().NotContain(TryLine(at));
 
-        // no potion of its own, but the owner's shared belt lends one
+        // at 25 percent with a potion of its own: it drinks it (the Cautious emergency potion is at 40 percent)
+        var owner5 = Hero();
+        var drinker = Cautious(owner5, Low("Lio", 25));
+        drinker.Healing = 1;
+        var r5 = TurnRig(drinker, owner5);
+        ForceRoll(r5.Engine, 1);
+        await Turn(r5, drinker);
+        r5.Text.Should().NotContain(TryLine(drinker));
+        drinker.Healing.Should().Be(0, "above 20 percent it drank its potion: {0}", r5.Text);
+    }
+
+    [Fact]
+    public async Task WithAPotion_OrABeltToBorrowFrom_BelowTwenty_ItTriesInsteadOfDrinking()
+    {
+        // 1.4.0 W2: its own potion no longer keeps it in; it tries and does not drink that turn
+        var owner = Hero();
+        var withPotion = Cautious(owner, Low("Mira", 15));
+        withPotion.Healing = 1;
+        var r = TurnRig(withPotion, owner);
+        ForceRoll(r.Engine, 1);
+        await Turn(r, withPotion);
+        r.Text.Should().Contain(TryLine(withPotion)).And.Contain(DoneLine(withPotion));
+        withPotion.Healing.Should().Be(1, "it pulled back instead of drinking: {0}", r.Text);
+        withPotion.HP.Should().Be(15);
+        r.Result.Teammates.Should().NotContain(withPotion);
+
+        // a failed try is the whole turn: still no potion
+        var owner2 = Hero();
+        var failing = Cautious(owner2, Low("Kade", 15));
+        failing.Healing = 1;
+        var r2 = TurnRig(failing, owner2);
+        ForceRoll(r2.Engine, 100);
+        await Turn(r2, failing);
+        r2.Text.Should().Contain(TryLine(failing)).And.Contain(FailLine(failing));
+        failing.Healing.Should().Be(1, "a failed try spends the turn, so no potion: {0}", r2.Text);
+        failing.HP.Should().Be(15);
+        r2.Result.Teammates.Should().Contain(failing);
+
+        // no potion of its own, but the owner's shared belt would lend one: it tries and borrows none
         var owner4 = Hero(potions: 10);
         owner4.SharedPotionBelt = true;
         var borrower = Cautious(owner4, Low("Tam", 15));
         var r4 = TurnRig(borrower, owner4);
         ForceRoll(r4.Engine, 1);
         await Turn(r4, borrower);
-        r4.Text.Should().NotContain(TryLine(borrower));
-        owner4.Healing.Should().Be(9, "it borrowed from the belt");
+        r4.Text.Should().Contain(TryLine(borrower));
+        owner4.Healing.Should().Be(10, "it borrowed nothing from the belt: {0}", r4.Text);
+        borrower.HP.Should().Be(15);
     }
 
     [Fact]
-    public async Task AHealSpellOrAHealAbilityItCanUse_IsAHealLeft()
+    public async Task AHealSpellOrAHealAbilityItCanUse_NoLongerKeepsItIn()
     {
-        // a Cleric with the mana for a heal spell heals
+        // a Cleric with the mana for a heal spell tries and casts nothing
         var owner = Hero();
         var cleric = Cautious(owner, Low("Mira", 15));
         cleric.Class = CharacterClass.Cleric;
@@ -226,12 +254,13 @@ public class W140Withdraw
         cleric.Wisdom = cleric.BaseWisdom = 60;
         cleric.Intelligence = cleric.BaseIntelligence = 60;
         var r = TurnRig(cleric, owner);
-        ForceRoll(r.Engine, 1);
+        ForceRoll(r.Engine, 100);
         await Turn(r, cleric);
-        r.Text.Should().NotContain(TryLine(cleric), "{0}", r.Text);
-        r.Result.Teammates.Should().Contain(cleric);
+        r.Text.Should().Contain(TryLine(cleric), "{0}", r.Text);
+        cleric.Mana.Should().Be(500, "no heal spell that turn: {0}", r.Text);
+        cleric.HP.Should().Be(15);
 
-        // a Paladin with no mana but the stamina for Lay on Hands
+        // a Paladin with no mana but the stamina for Lay on Hands tries and uses no ability
         var owner2 = Hero();
         var paladin = Cautious(owner2, Ally("Kade", 15, 100));
         paladin.Class = CharacterClass.Paladin;
@@ -240,25 +269,24 @@ public class W140Withdraw
         paladin.CurrentCombatStamina = 500;
         ClassAbilitySystem.GetAbility("lay_on_hands").Should().NotBeNull();
         var r2 = TurnRig(paladin, owner2);
-        ForceRoll(r2.Engine, 1);
+        ForceRoll(r2.Engine, 100);
         await Turn(r2, paladin);
-        r2.Text.Should().NotContain(TryLine(paladin), "{0}", r2.Text);
-        r2.Result.Teammates.Should().Contain(paladin);
+        r2.Text.Should().Contain(TryLine(paladin), "{0}", r2.Text);
+        paladin.CurrentCombatStamina.Should().Be(500, "no Lay on Hands that turn: {0}", r2.Text);
+        paladin.HP.Should().Be(15);
 
-        // a Warrior with the stamina for Second Wind; with none left it tries
+        // a Warrior with the stamina for Second Wind and a potion of its own: it tries, and neither drinks nor heals
         var owner3 = Hero();
         var warrior = Cautious(owner3, Ally("Pip", 15, 100));
         warrior.CurrentCombatStamina = 500;
+        warrior.Healing = 1;
         var r3 = TurnRig(warrior, owner3);
         ForceRoll(r3.Engine, 100);
-        ((bool)Call(r3.Engine, "HasHealLeft", warrior, r3.Result)!).Should().BeTrue("Second Wind is a heal it can use");
-        await Turn(r3, warrior);
-        r3.Text.Should().NotContain(TryLine(warrior), "{0}", r3.Text);
-        warrior.CurrentCombatStamina = 0;
-        r3.Result.CurrentRound = 2;
-        ((bool)Call(r3.Engine, "HasHealLeft", warrior, r3.Result)!).Should().BeFalse("no stamina, no Second Wind");
         await Turn(r3, warrior);
         r3.Text.Should().Contain(TryLine(warrior), "{0}", r3.Text);
+        warrior.Healing.Should().Be(1, "{0}", r3.Text);
+        warrior.CurrentCombatStamina.Should().Be(500, "no Second Wind that turn: {0}", r3.Text);
+        warrior.HP.Should().Be(15);
     }
 
     [Theory]
@@ -493,7 +521,7 @@ public class W140Withdraw
     private static async Task<string> BalancedSignature()
     {
         var hero = Hero();
-        var a = Ally("Mira", 15, 100);   // Balanced: would withdraw if Cautious and out of heals
+        var a = Ally("Mira", 15, 100);   // Balanced: would withdraw if Cautious
         var b = Ally("Kade", 100, 100);
         var mob = Mob("Rat", "Goblinoid", hp: 600, str: 30);
         var output = new MemoryStream();
@@ -561,5 +589,7 @@ public class W140Withdraw
         if (lang == "en" || lang == "hu")
             cautious.Length.Should().BeLessThanOrEqualTo(79, cautious);
         Loc.GetIn(lang, "party.stance.cautious.desc").Should().Contain("20", "{0}: the stance line says it pulls back below 20 percent", lang);
+        // 1.4.0 W2: it pulls back whatever heals it has left, so the en line no longer names heals
+        if (lang == "en") Loc.GetIn(lang, "party.stance.cautious.desc").Should().NotContainEquivalentOf("heal");
     }
 }
