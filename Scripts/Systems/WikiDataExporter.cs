@@ -436,8 +436,7 @@ public static class WikiDataExporter
             {
                 id = s,
                 p.EmergencySelfPotion, p.PotionMostInjured, p.DefensiveFirst, p.Brace,
-                p.MayTaunt, p.TargetWeightMultiplier,
-                p.Withdraw   // 1.4.0: below this share an ally tries to pull back, before a potion or a heal (0: never)
+                p.MayTaunt, p.TargetWeightMultiplier
             };
         }).ToArray(),
         constants = PartyConstants()

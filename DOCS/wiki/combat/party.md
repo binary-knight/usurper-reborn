@@ -66,10 +66,6 @@ An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alch
 
 A Wavecaller's Empathic Link links one ally for 4 rounds: you pick the ally from the target list (Enter takes the most hurt ally), and an ally casting it links the most hurt living member, you included. While the link holds, half of each monster hit on the linked member goes to the Wavecaller instead, never taking the Wavecaller below 1 HP, and the linked member has 30 more defense; the Wavecaller gets no defense from it. With no living ally the ability is refused before it costs anything.
 
-### Pulling back from a fight
-
-A Cautious ally below 20 percent of its maximum HP spends its turn trying to pull back from the fight. It tries before it drinks a potion or heals, even with a healing potion of its own, one it may take from your shared belt, or a heal spell or healing ability, Second Wind included, that it could use that turn. It rolls the [flee chance](/wiki/en/combat/fleeing/#flee-chance) on its own Dexterity, level and class, or the Old God flee chance in an Old God or betrayal fight; on Nightmare it never tries. A failed try is its turn, and it tries at most once a round. After a success it is out of the fight: no monster can pick it, it takes no turn and the allies box no longer shows it. When the fight ends, won, fled or lost, it is back in its place in the party with the HP it left with, and it keeps its share of the experience. Balanced and Aggressive allies, grouped players, player echoes and royal mercenaries never pull back.
-
 ## Telling an ally to wait
 
 In a cleared dungeon room, Y (party), then W tells an ally that takes orders to wait there; a fighting beast can wait too. Grouped players, player echoes and royal mercenaries take no such order, and only the leader of a group has it. A waiting ally keeps its place in the party, so it still counts toward the 4 allies, but it is in no fight, ambushes included, and it takes no experience or gold share, no potion, no camp or rest and no effect of a room feature. In the party menu it shows as waiting in place of its stance.

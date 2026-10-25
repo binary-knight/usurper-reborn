@@ -16871,7 +16871,7 @@
   "party.stance.balanced": "Equilibrada",
   "party.stance.balanced.desc": "Lucha como hasta ahora: se cura y se protege cuando está herido.",
   "party.stance.cautious": "Cautelosa",
-  "party.stance.cautious.desc": "Bebe pronto, nunca provoca; se retira por debajo del 20%.",
+  "party.stance.cautious.desc": "Bebe y se cubre pronto, nunca provoca, recibe menos golpes.",
   "dungeon.skills_none": "{0} aún no tiene habilidades de combate que configurar.",
   "dungeon.skills_header": "HABILIDADES DE COMBATE: {0}",
   "dungeon.skills_hint": "Desactiva una habilidad para que no la usen en combate.",

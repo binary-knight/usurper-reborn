@@ -16871,7 +16871,7 @@
   "party.stance.balanced": "Equilibrato",
   "party.stance.balanced.desc": "Combatte come prima: si cura e si protegge quando è ferito.",
   "party.stance.cautious": "Prudente",
-  "party.stance.cautious.desc": "Beve presto, non provoca mai; si ritira sotto il 20%.",
+  "party.stance.cautious.desc": "Beve e si copre presto, non provoca mai, attira meno colpi.",
   "dungeon.skills_none": "{0} non ha ancora abilità di combattimento da configurare.",
   "dungeon.skills_header": "ABILITÀ DI COMBATTIMENTO: {0}",
   "dungeon.skills_hint": "Disattiva un'abilità per impedirne l'uso in combattimento.",

@@ -17111,7 +17111,7 @@
   "party.stance.balanced": "Balanced",
   "party.stance.balanced.desc": "Fights as before: heals and shields up when hurt.",
   "party.stance.cautious": "Cautious",
-  "party.stance.cautious.desc": "Drinks early, never taunts; pulls back under 20%.",
+  "party.stance.cautious.desc": "Drinks and braces early, never taunts, draws fewer hits.",
   "dungeon.skills_none": "{0} has no combat skills to configure yet.",
   "dungeon.skills_header": "COMBAT SKILLS: {0}",
   "dungeon.skills_hint": "Toggle a skill OFF to stop them using it in combat.",

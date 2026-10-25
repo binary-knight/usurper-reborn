@@ -24,6 +24,8 @@ namespace UsurperReborn.Tests;
 /// place with the HP it left with, before the outcome branch, so it keeps its experience share.
 /// New members are reached by name, so this file builds and runs on the code before the piece (release-1.4.0
 /// at 54f1c3cd), where it is red.
+/// 1.4.0 WX: no stance pulls back in 1.4. Every stance's Withdraw share is 0, so the rows below pin that no ally
+/// tries and none withdraws; the withdraw code is kept and inert.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class W140Withdraw
@@ -106,9 +108,9 @@ public class W140Withdraw
     // ---------------------------------------------------------------- the stance rule
 
     [Fact]
-    public void TheThreshold_IsCautiousOnly()
+    public void TheThreshold_IsZeroForEveryStance()
     {
-        PolicyWithdraw(TeammateStance.Cautious).Should().Be(0.20);
+        PolicyWithdraw(TeammateStance.Cautious).Should().Be(0, "no stance pulls back in 1.4");
         PolicyWithdraw(TeammateStance.Balanced).Should().Be(0);
         PolicyWithdraw(TeammateStance.Aggressive).Should().Be(0);
         // Balanced is unchanged in every other column (the default every ally has)
@@ -120,56 +122,40 @@ public class W140Withdraw
     // ---------------------------------------------------------------- the try
 
     [Fact]
-    public async Task ACautiousAllyBelowTwentyWithNoHeal_TriesAndOnASuccessLeavesTheFight()
+    public async Task ACautiousAllyAtTenWithNoHeal_DoesNotTry()
     {
         var owner = Hero();
-        var ally = Cautious(owner, Low("Mira", 15));
+        var ally = Cautious(owner, Low("Mira", 10));
         var r = TurnRig(ally, owner);
-        long mobHp = r.Result.Monsters[0].HP;
         ForceRoll(r.Engine, 1);
         await Turn(r, ally);
-        r.Text.Should().Contain(TryLine(ally)).And.Contain(DoneLine(ally));
-        r.Result.Teammates.Should().NotContain(ally, "a withdrawn ally is out of this fight's list");
+        r.Text.Should().NotContain(TryLine(ally), "no stance pulls back in 1.4: {0}", r.Text);
+        r.Text.Should().NotContain(DoneLine(ally));
+        r.Result.Teammates.Should().Contain(ally);
         r.Team.Should().BeSameAs(r.Result.Teammates);
-        WithdrawnList(r.Engine).Count.Should().Be(1);
-        Withdrew(r.Engine, ally).Should().BeTrue();
-        r.Result.Monsters[0].HP.Should().Be(mobHp, "the withdrawal is the ally's action");
-        ally.HP.Should().Be(15);
+        WithdrawnList(r.Engine).Count.Should().Be(0);
+        Withdrew(r.Engine, ally).Should().BeFalse();
         ally.IsDowned.Should().BeFalse();
     }
 
     [Fact]
-    public async Task AForcedFailure_SpendsTheTurn_AndOnlyOneTryARound()
+    public async Task AForcedRoll_ReadsNoWithdrawal_InAnyRound()
     {
         var owner = Hero();
         var ally = Cautious(owner, Low("Mira", 15));
         var r = TurnRig(ally, owner);
-        long mobHp = r.Result.Monsters[0].HP;
-        long stamina = ally.CurrentCombatStamina = 500;
         ForceRoll(r.Engine, 100);
         await Turn(r, ally);
-        r.Text.Should().Contain(TryLine(ally)).And.Contain(FailLine(ally));
-        string shown = System.Text.RegularExpressions.Regex.Replace(r.Text, "\u001b\\[[0-9;]*[A-Za-z]", "");
-        shown.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Should()
-            .Equal(new[] { TryLine(ally), FailLine(ally) }, "the try is the whole turn: {0}", shown);
-        ally.CurrentCombatStamina.Should().Be(stamina, "no ability that turn");
-        r.Text.Should().NotContain(DoneLine(ally));
-        r.Result.Teammates.Should().Contain(ally);
-        r.Result.Monsters[0].HP.Should().Be(mobHp, "a failed try spends the turn");
-        ally.IsDefending.Should().BeFalse("nothing else that turn, not even a brace: {0}", r.Text);
-        r.Text.Should().NotContain(Loc.Get("combat.teammate_defends", ally.DisplayName));
-        Withdrew(r.Engine, ally).Should().BeFalse();
-        ally.HP.Should().Be(15, "a failure has no other cost");
-
-        // a second turn in the same round does not try again: the ally acts as it would without the rule
         await Turn(r, ally);
-        Count(r.Text, TryLine(ally)).Should().Be(1, "at most one try per ally per round: {0}", r.Text);
-        Count(r.Text, FailLine(ally)).Should().Be(1);
-
-        // the next round it tries again
         r.Result.CurrentRound = 2;
+        ForceRoll(r.Engine, 1);
         await Turn(r, ally);
-        Count(r.Text, TryLine(ally)).Should().Be(2);
+        Count(r.Text, TryLine(ally)).Should().Be(0, "no stance pulls back in 1.4: {0}", r.Text);
+        Count(r.Text, FailLine(ally)).Should().Be(0);
+        Count(r.Text, DoneLine(ally)).Should().Be(0);
+        r.Result.Teammates.Should().Contain(ally);
+        WithdrawnList(r.Engine).Count.Should().Be(0, "0 withdrawals");
+        Withdrew(r.Engine, ally).Should().BeFalse();
     }
 
     [Fact]
@@ -204,48 +190,42 @@ public class W140Withdraw
     }
 
     [Fact]
-    public async Task WithAPotion_OrABeltToBorrowFrom_BelowTwenty_ItTriesInsteadOfDrinking()
+    public async Task WithAPotion_OrABeltToBorrowFrom_BelowTwenty_ItDoesNotTry()
     {
-        // 1.4.0 W2: its own potion no longer keeps it in; it tries and does not drink that turn
+        // no stance pulls back in 1.4: with its own potion it does not try, whatever the roll
         var owner = Hero();
         var withPotion = Cautious(owner, Low("Mira", 15));
         withPotion.Healing = 1;
         var r = TurnRig(withPotion, owner);
         ForceRoll(r.Engine, 1);
         await Turn(r, withPotion);
-        r.Text.Should().Contain(TryLine(withPotion)).And.Contain(DoneLine(withPotion));
-        withPotion.Healing.Should().Be(1, "it pulled back instead of drinking: {0}", r.Text);
-        withPotion.HP.Should().Be(15);
-        r.Result.Teammates.Should().NotContain(withPotion);
+        r.Text.Should().NotContain(TryLine(withPotion), "{0}", r.Text);
+        r.Result.Teammates.Should().Contain(withPotion);
 
-        // a failed try is the whole turn: still no potion
         var owner2 = Hero();
         var failing = Cautious(owner2, Low("Kade", 15));
         failing.Healing = 1;
         var r2 = TurnRig(failing, owner2);
         ForceRoll(r2.Engine, 100);
         await Turn(r2, failing);
-        r2.Text.Should().Contain(TryLine(failing)).And.Contain(FailLine(failing));
-        failing.Healing.Should().Be(1, "a failed try spends the turn, so no potion: {0}", r2.Text);
-        failing.HP.Should().Be(15);
+        r2.Text.Should().NotContain(TryLine(failing), "{0}", r2.Text);
         r2.Result.Teammates.Should().Contain(failing);
 
-        // no potion of its own, but the owner's shared belt would lend one: it tries and borrows none
+        // no potion of its own, but the owner's shared belt would lend one: it does not try
         var owner4 = Hero(potions: 10);
         owner4.SharedPotionBelt = true;
         var borrower = Cautious(owner4, Low("Tam", 15));
         var r4 = TurnRig(borrower, owner4);
         ForceRoll(r4.Engine, 1);
         await Turn(r4, borrower);
-        r4.Text.Should().Contain(TryLine(borrower));
-        owner4.Healing.Should().Be(10, "it borrowed nothing from the belt: {0}", r4.Text);
-        borrower.HP.Should().Be(15);
+        r4.Text.Should().NotContain(TryLine(borrower), "{0}", r4.Text);
+        r4.Result.Teammates.Should().Contain(borrower);
     }
 
     [Fact]
-    public async Task AHealSpellOrAHealAbilityItCanUse_NoLongerKeepsItIn()
+    public async Task AHealSpellOrAHealAbilityItCanUse_ItDoesNotTry()
     {
-        // a Cleric with the mana for a heal spell tries and casts nothing
+        // no stance pulls back in 1.4: a Cleric with the mana for a heal spell does not try
         var owner = Hero();
         var cleric = Cautious(owner, Low("Mira", 15));
         cleric.Class = CharacterClass.Cleric;
@@ -256,11 +236,10 @@ public class W140Withdraw
         var r = TurnRig(cleric, owner);
         ForceRoll(r.Engine, 100);
         await Turn(r, cleric);
-        r.Text.Should().Contain(TryLine(cleric), "{0}", r.Text);
-        cleric.Mana.Should().Be(500, "no heal spell that turn: {0}", r.Text);
-        cleric.HP.Should().Be(15);
+        r.Text.Should().NotContain(TryLine(cleric), "{0}", r.Text);
+        r.Result.Teammates.Should().Contain(cleric);
 
-        // a Paladin with no mana but the stamina for Lay on Hands tries and uses no ability
+        // a Paladin with no mana but the stamina for Lay on Hands does not try
         var owner2 = Hero();
         var paladin = Cautious(owner2, Ally("Kade", 15, 100));
         paladin.Class = CharacterClass.Paladin;
@@ -271,11 +250,10 @@ public class W140Withdraw
         var r2 = TurnRig(paladin, owner2);
         ForceRoll(r2.Engine, 100);
         await Turn(r2, paladin);
-        r2.Text.Should().Contain(TryLine(paladin), "{0}", r2.Text);
-        paladin.CurrentCombatStamina.Should().Be(500, "no Lay on Hands that turn: {0}", r2.Text);
-        paladin.HP.Should().Be(15);
+        r2.Text.Should().NotContain(TryLine(paladin), "{0}", r2.Text);
+        r2.Result.Teammates.Should().Contain(paladin);
 
-        // a Warrior with the stamina for Second Wind and a potion of its own: it tries, and neither drinks nor heals
+        // a Warrior with the stamina for Second Wind and a potion of its own does not try
         var owner3 = Hero();
         var warrior = Cautious(owner3, Ally("Pip", 15, 100));
         warrior.CurrentCombatStamina = 500;
@@ -283,10 +261,8 @@ public class W140Withdraw
         var r3 = TurnRig(warrior, owner3);
         ForceRoll(r3.Engine, 100);
         await Turn(r3, warrior);
-        r3.Text.Should().Contain(TryLine(warrior), "{0}", r3.Text);
-        warrior.Healing.Should().Be(1, "{0}", r3.Text);
-        warrior.CurrentCombatStamina.Should().Be(500, "no Second Wind that turn: {0}", r3.Text);
-        warrior.HP.Should().Be(15);
+        r3.Text.Should().NotContain(TryLine(warrior), "{0}", r3.Text);
+        r3.Result.Teammates.Should().Contain(warrior);
     }
 
     [Theory]
@@ -326,10 +302,10 @@ public class W140Withdraw
     }
 
     [Fact]
-    public async Task ABossFight_RollsTheBossChance()
+    public async Task ABossFight_NoTry()
     {
         // BossContext set: the chance is CalculateFleeChance with the boss flag (20, up to 60 below half HP);
-        // at 15 percent HP it is 20 + min(40, 35 * 1.75) = 60, so a roll of 60 lands and 61 fails
+        // at 15 percent HP it is 20 + min(40, 35 * 1.75) = 60; no stance pulls back in 1.4, so no roll lands a try
         var owner = Hero();
         var ally = Cautious(owner, Low("Mira", 15));
         int chance = (int)Call(new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream())), "CalculateFleeChance", ally, true)!;
@@ -340,12 +316,11 @@ public class W140Withdraw
         {
             ForceRoll(r.Engine, 61);
             await Turn(r, ally);
-            r.Text.Should().Contain(FailLine(ally), "{0}", r.Text);
             r.Result.CurrentRound = 2;
             ForceRoll(r.Engine, 60);
             await Turn(r, ally);
-            r.Text.Should().Contain(DoneLine(ally), "{0}", r.Text);
-            r.Result.Teammates.Should().NotContain(ally);
+            r.Text.Should().NotContain(TryLine(ally), "{0}", r.Text);
+            r.Result.Teammates.Should().Contain(ally);
         }
         finally { r.Engine.BossContext = null; }
     }
@@ -401,7 +376,7 @@ public class W140Withdraw
     private static string Attacks(int n = 40) => string.Concat(Enumerable.Repeat("A\n\n", n)) + string.Concat(Enumerable.Repeat("P\n", 20));
 
     [Fact]
-    public async Task AWonFight_PutsItBackInItsPlace_WithItsHp_AndItsExperienceShare()
+    public async Task AWonFight_NoWithdrawal_KeepsItsPlace_AndItsExperienceShare()
     {
         var hero = Hero();
         hero.TeamXPPercent = new[] { 40, 50, 10, 0, 0 };   // custom: place 1 takes 50, place 2 takes 10
@@ -415,20 +390,19 @@ public class W140Withdraw
         var f = await RunFight(hero, new List<Monster> { mob }, new List<Character> { a, b }, Attacks());
         f.Error.Should().BeNull("{0}", f.Text);
         f.Result!.Outcome.Should().Be(CombatOutcome.Victory, "{0}", f.Text);
-        f.Text.Should().Contain(DoneLine(a), "{0}", f.Text);
-        Withdrew(f.Engine, a).Should().BeTrue();
-        f.Result.Teammates.Should().Equal(new[] { a, b }, "it is back in its own place, ahead of Kade");
-        a.HP.Should().Be(15, "it comes back with the HP it left with");
+        f.Text.Should().NotContain(TryLine(a), "no stance pulls back in 1.4: {0}", f.Text);
+        Withdrew(f.Engine, a).Should().BeFalse();
+        f.Result.Teammates.Should().Equal(new[] { a, b }, "it keeps its own place, ahead of Kade");
         a.IsDowned.Should().BeFalse();
         a.Lifecycle.Should().Be(AllyLifecycle.Active);
         WithdrawnList(f.Engine).Count.Should().Be(0);
         long aGain = a.Experience - aXp, bGain = b.Experience - bXp;
-        aGain.Should().BeGreaterThan(0, "the split ran after the put back: {0}", f.Text);
+        aGain.Should().BeGreaterThan(0, "{0}", f.Text);
         aGain.Should().BeGreaterThan(bGain * 3, "place 1 (50) is still Mira's, place 2 (10) Kade's: {0} against {1}", aGain, bGain);
     }
 
     [Fact]
-    public async Task AFledFight_PutsItBack_BeforeThePartialShare()
+    public async Task AFledFight_NoWithdrawal_AndThePartialShare()
     {
         var hero = Hero();
         hero.SmokeBombs = 1;   // R with a smoke bomb out of a fight with no boss is a certain escape
@@ -437,20 +411,20 @@ public class W140Withdraw
         rat.Experience = 2000;
         var wolf = Mob("Wolf", "Goblinoid", hp: 5000, str: 1);
         long aXp = a.Experience;
-        // round 1: attack the rat (kills it), the ally withdraws; round 2: R
+        // round 1: attack the rat (kills it), the ally does not withdraw; round 2: R
         string script = "A\n1\n\n" + string.Concat(Enumerable.Repeat("R\n\n", 10));
         var f = await RunFight(hero, new List<Monster> { rat, wolf }, new List<Character> { a }, script);
         f.Error.Should().BeNull("{0}", f.Text);
         f.Result!.Outcome.Should().Be(CombatOutcome.PlayerEscaped, "{0}", f.Text);
-        f.Text.Should().Contain(DoneLine(a), "{0}", f.Text);
+        f.Text.Should().NotContain(TryLine(a), "no stance pulls back in 1.4: {0}", f.Text);
+        Withdrew(f.Engine, a).Should().BeFalse();
         rat.IsAlive.Should().BeFalse("{0}", f.Text);
         f.Result.Teammates.Should().Equal(new[] { a });
-        a.HP.Should().Be(15);
-        (a.Experience - aXp).Should().BeGreaterThan(0, "the partial share is paid after the put back: {0}", f.Text);
+        (a.Experience - aXp).Should().BeGreaterThan(0, "the partial share is paid: {0}", f.Text);
     }
 
     [Fact]
-    public async Task EveryActiveFighterDown_WhileOneIsWithdrawn_IsALoss_AndPutsItBack()
+    public async Task EveryFighterDown_IsALoss_NoWithdrawal()
     {
         var hero = Hero(30);
         hero.MaxHP = hero.BaseMaxHP = 600;
@@ -465,13 +439,12 @@ public class W140Withdraw
         };
         var f = await RunFight(hero, new List<Monster> { crusher }, new List<Character> { a, b }, Attacks() + string.Concat(Enumerable.Repeat("P\n", 10)));
         f.Error.Should().BeNull("{0}", f.Text);
-        f.Text.Should().Contain(DoneLine(a), "{0}", f.Text);
+        f.Text.Should().NotContain(TryLine(a), "no stance pulls back in 1.4: {0}", f.Text);
+        Withdrew(f.Engine, a).Should().BeFalse();
         b.IsDowned.Should().BeFalse("Kade went down and stood up at the end");
         f.Engine.StatsFor(b).Downs.Should().BeGreaterThan(0, "every Active ally fell: {0}", f.Text);
-        f.Result!.Outcome.Should().Be(CombatOutcome.PlayerDied, "a withdrawn ally is no living fighter: {0}", f.Text);
-        f.Result.Teammates.Should().Contain(a, "the loss puts it back");
-        a.HP.Should().Be(15);
-        a.IsDowned.Should().BeFalse();
+        f.Result!.Outcome.Should().Be(CombatOutcome.PlayerDied, "{0}", f.Text);
+        f.Result.Teammates.Should().Contain(a);
         WithdrawnList(f.Engine).Count.Should().Be(0);
     }
 
@@ -494,21 +467,20 @@ public class W140Withdraw
     }
 
     [Fact]
-    public async Task AFightLeftByAThrow_PutsItBackInTheFinally()
+    public async Task AFightLeftByAThrow_LeavesNoAllyWithdrawn()
     {
         var hero = Hero();
         var a = Cautious(hero, Low("Mira", 15));
         var mob = Mob("Rat", "Goblinoid", hp: 5000, str: 1);
         var team = new List<Character> { a };
-        var output = new ThrowAfter(DoneLine(a));
+        var output = new ThrowAfter(Loc.Get("combat.teammate_defends", a.DisplayName));
         var f = await RunFight(hero, new List<Monster> { mob }, team, Attacks(), output: output);
-        f.Error.Should().NotBeNull("the stream throws after the withdrawal line: {0}", f.Text);
+        f.Error.Should().NotBeNull("the stream throws after the ally's first brace line: {0}", f.Text);
         f.Error.Should().BeOfType<InvalidOperationException>();
-        f.Text.Should().Contain(DoneLine(a));
-        WithdrawnList(f.Engine).Count.Should().Be(0, "the finally put it back and cleared the list");
+        f.Text.Should().NotContain(TryLine(a), "no stance pulls back in 1.4: {0}", f.Text);
+        WithdrawnList(f.Engine).Count.Should().Be(0);
         var list = (List<Character>)typeof(CombatEngine).GetField("currentTeammates", NPI)!.GetValue(f.Engine)!;
-        list.Should().Contain(a, "the fight's list holds it again");
-        a.HP.Should().Be(15);
+        list.Should().Contain(a, "the fight's list still holds it");
     }
 
     // ---------------------------------------------------------------- Balanced is unchanged
@@ -521,7 +493,7 @@ public class W140Withdraw
     private static async Task<string> BalancedSignature()
     {
         var hero = Hero();
-        var a = Ally("Mira", 15, 100);   // Balanced: would withdraw if Cautious
+        var a = Ally("Mira", 15, 100);   // Balanced
         var b = Ally("Kade", 100, 100);
         var mob = Mob("Rat", "Goblinoid", hp: 600, str: 30);
         var output = new MemoryStream();
@@ -588,8 +560,17 @@ public class W140Withdraw
         string cautious = $"  [3] {Loc.GetIn(lang, "party.stance.cautious")}  {Loc.GetIn(lang, "party.stance.cautious.desc")}";
         if (lang == "en" || lang == "hu")
             cautious.Length.Should().BeLessThanOrEqualTo(79, cautious);
-        Loc.GetIn(lang, "party.stance.cautious.desc").Should().Contain("20", "{0}: the stance line says it pulls back below 20 percent", lang);
-        // 1.4.0 W2: it pulls back whatever heals it has left, so the en line no longer names heals
-        if (lang == "en") Loc.GetIn(lang, "party.stance.cautious.desc").Should().NotContainEquivalentOf("heal");
+        // 1.4.0 WX: no stance pulls back in 1.4, so the stance line is the 1.3.7 line again
+        Loc.GetIn(lang, "party.stance.cautious.desc").Should().Be(CautiousDesc137[lang]);
     }
+
+    /// <summary>party.stance.cautious.desc as 1.3.7 (54f1c3cd) shipped it.</summary>
+    private static readonly Dictionary<string, string> CautiousDesc137 = new()
+    {
+        ["en"] = "Drinks and braces early, never taunts, draws fewer hits.",
+        ["es"] = "Bebe y se cubre pronto, nunca provoca, recibe menos golpes.",
+        ["fr"] = "Boit et se couvre tôt, ne provoque jamais, attire moins de coups.",
+        ["hu"] = "Korán iszik és fedezi magát, sosem provokál, kevesebb ütést kap.",
+        ["it"] = "Beve e si copre presto, non provoca mai, attira meno colpi.",
+    };
 }
