@@ -2128,6 +2128,8 @@ namespace UsurperRemake.Systems
                     Agility = c.Agility,
                     EquippedItemsSave = c.EquippedItemsSave,
                     DisabledAbilities = c.DisabledAbilities,
+                    DisabledSpells = c.DisabledSpells ?? new List<string>(),   // 1.3.8
+                    RecruitedDate = c.RecruitedDate,   // 1.3.8
                     SkillProficiencies = c.SkillProficiencies ?? new(),
                     SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
                     Inventory = c.Inventory ?? new List<InventoryItemData>()
@@ -2677,6 +2679,9 @@ namespace UsurperRemake.Systems
                             Agility = c.Agility,
                             EquippedItemsSave = c.EquippedItemsSave ?? new Dictionary<int, int>(),
                             DisabledAbilities = c.DisabledAbilities ?? new List<string>(),
+                            // 1.3.8: a save without these loads as before (no spell off; the date is stamped by Deserialize)
+                            DisabledSpells = c.DisabledSpells ?? new List<string>(),
+                            RecruitedDate = c.RecruitedDate,
                             SkillProficiencies = c.SkillProficiencies ?? new(),
                             SkillTrainingProgress = c.SkillTrainingProgress ?? new(),
                             Inventory = c.Inventory ?? new List<InventoryItemData>()
