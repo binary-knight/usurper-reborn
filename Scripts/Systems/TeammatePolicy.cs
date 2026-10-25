@@ -8,8 +8,8 @@ namespace UsurperRemake.Systems;
 /// shipped, read from the same GameConfig constants; Aggressive and Cautious bracket it.
 /// Thresholds are fractions of max HP and are compared strictly below. In every column
 /// EmergencySelfPotion &lt; Brace &lt; DefensiveFirst &lt; PotionMostInjured.
-/// 1.4.0: Withdraw is the share below which an ally with no heal left tries to pull back from the
-/// fight (CombatEngine.PartySurvival); 0 means never. Only Cautious sets it.
+/// 1.4.0: Withdraw is the share below which an ally tries to pull back from the fight, before a
+/// potion or a heal (CombatEngine.PartySurvival); 0 means never. Only Cautious sets it.
 /// </summary>
 public enum TeammateStance
 {

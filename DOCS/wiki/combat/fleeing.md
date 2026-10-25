@@ -62,4 +62,4 @@ The Jester's Disappearing Act and the Sage's Escape spell work by the flee rules
 
 ## Allies pulling back
 
-Your R takes the whole party out. A Cautious ally close to death with no heal left can also try to leave a fight on its own turn, rolling the flee chance on its own stats; it rejoins you when the fight ends. See [pulling back from a fight](/wiki/en/combat/party/#pulling-back-from-a-fight).
+Your R takes the whole party out. A Cautious ally close to death can also try to leave a fight on its own turn, before it drinks a potion or heals, rolling the flee chance on its own stats; it rejoins you when the fight ends. See [pulling back from a fight](/wiki/en/combat/party/#pulling-back-from-a-fight).

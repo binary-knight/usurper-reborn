@@ -16871,7 +16871,7 @@
   "party.stance.balanced": "Équilibrée",
   "party.stance.balanced.desc": "Combat comme avant : se soigne et se protège une fois blessé.",
   "party.stance.cautious": "Prudente",
-  "party.stance.cautious.desc": "Boit tôt, ne provoque jamais ; sans soins, se retire sous 20 %.",
+  "party.stance.cautious.desc": "Boit tôt, ne provoque jamais ; se retire sous 20 %.",
   "dungeon.skills_none": "{0} n'a pas encore de compétences de combat à configurer.",
   "dungeon.skills_header": "COMPÉTENCES DE COMBAT : {0}",
   "dungeon.skills_hint": "Désactive une compétence pour qu'ils ne l'utilisent pas au combat.",

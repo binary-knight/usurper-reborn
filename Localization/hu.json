@@ -16879,7 +16879,7 @@
   "party.stance.balanced": "Kiegyensúlyozott",
   "party.stance.balanced.desc": "Úgy harcol, mint eddig: gyógyít és védekezik, ha megsérül.",
   "party.stance.cautious": "Óvatos",
-  "party.stance.cautious.desc": "Korán iszik, sosem provokál; gyógyítás nélkül 20% alatt kihátrál.",
+  "party.stance.cautious.desc": "Korán iszik, sosem provokál; 20% alatt kihátrál.",
   "dungeon.skills_none": "{0} még nem rendelkezik beállítható harci képességgel.",
   "dungeon.skills_header": "HARCI KÉPESSÉGEK: {0}",
   "dungeon.skills_hint": "Kapcsolj ki egy képességet, hogy ne használják harcban.",
