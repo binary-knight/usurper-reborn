@@ -1887,18 +1887,19 @@ namespace UsurperRemake.Systems
         /// 1.3.8: the read side of the saved Relationships, run by every NPC load right after the memories
         /// are replayed (GameEngine.RestoreNPCsLocked, WorldSimService.RestoreNPCsFromData). The saved
         /// opinions replace what the replay added: each saved key is set to its saved value back on the
-        /// -1..1 scale, and a key the replay made that the save does not hold is removed (the writer keeps
-        /// the strongest, so a key it left out was weaker than every key it kept, or had decayed away).
-        /// A record written before 1.1.13 (MemoryTimesKept false) with no saved opinions keeps the replay.
+        /// -1..1 scale. cap is the count the record's writer keeps. A record below it dropped nothing, so a
+        /// key the replay made that the record lacks had decayed away and is removed; a full record had no
+        /// room for it, so it keeps its replayed value. A record written before 1.1.13 (MemoryTimesKept
+        /// false) with no saved opinions keeps the replay; a later one with none means no opinions.
         /// </summary>
-        internal static void RestoreNPCRelationships(MemorySystem? memory, NPCData data)
+        internal static void RestoreNPCRelationships(MemorySystem? memory, NPCData data, int cap)
         {
             if (memory == null || data == null) return;
             var saved = data.Relationships;
             bool any = saved != null && saved.Count > 0;
             if (!any && !data.MemoryTimesKept) return;
             var impressions = memory.CharacterImpressions;
-            impressions.Clear();
+            if (!any || saved!.Count < cap) impressions.Clear();
             if (!any) return;
             foreach (var kvp in saved!)
             {

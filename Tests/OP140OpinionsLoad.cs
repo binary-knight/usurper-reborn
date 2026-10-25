@@ -110,7 +110,7 @@ public class OP140OpinionsLoad : IDisposable
     private static async Task LoadShared(List<NPCData> data)
     {
         NPCSpawnSystem.Instance.ActiveNPCs.Clear();
-        await GameEngine.Instance.RestoreNPCs(data, 7);
+        await GameEngine.Instance.RestoreNPCs(data, 7, OnlineStateManager.MaxSharedRelationshipsPerNpc);   // as the online login passes it
     }
 
     private Task LoadWorldSim(List<NPCData> data)
@@ -210,19 +210,100 @@ public class OP140OpinionsLoad : IDisposable
         }
     }
 
-    [Fact]
-    public async Task WorldSim_KeyBeyondTheWritersCap_DoesNotComeBack()
+    // ---------- the writer's cap: a full record keeps a key it had no room for ----------
+
+    /// <summary>strong keys filled to count, then one weak key: live (memory-backed, at its replay value) or decayed away.</summary>
+    private static NPC CapSeed(string name, int strong, bool weakLive)
     {
-        var npc = Npc("OP140 Fay");
-        for (int i = 0; i < 20; i++) npc.Brain.Memory.CharacterImpressions[$"OP140 Strong {i}"] = 0.9f - i * 0.01f;
-        Remember(npc, MemoryType.SharedDrink, Faded);   // the weakest key, memory-backed: the shared writer keeps 20
-        var data = SharedNpcs();
-        data.Single(d => d.Name == "OP140 Fay").Relationships.Should().HaveCount(20).And.NotContainKey(Faded);
+        var npc = Npc(name);
+        for (int i = 0; i < strong; i++) npc.Brain.Memory.CharacterImpressions[$"OP140 Strong {i}"] = 0.9f - i * 0.001f;
+        Remember(npc, MemoryType.SharedDrink, Faded);
+        if (!weakLive) npc.Brain.Memory.CharacterImpressions.Remove(Faded);   // as a decay below 0.05 removes it
+        return npc;
+    }
 
-        await LoadWorldSim(data);
+    [Fact]
+    public async Task OnlineLoads_FullRecord_KeepsTheOverflowKeyAtItsReplay()
+    {
+        int cap = OnlineStateManager.MaxSharedRelationshipsPerNpc;
+        cap.Should().Be(20);
+        var replay = MemorySystem.ImpressionChangeFor(MemoryType.SharedDrink);
+        foreach (var load in new Func<List<NPCData>, Task>[] { LoadShared, LoadWorldSim })
+        {
+            NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+            CapSeed("OP140 Fay", cap, weakLive: true);
+            var data = SharedNpcs();
+            data.Single(d => d.Name == "OP140 Fay").Relationships.Should().HaveCount(cap).And.NotContainKey(Faded, "the writer had no room for it");
 
-        var loaded = Opinions(Find("OP140 Fay"));
-        loaded.Should().HaveCount(20).And.NotContainKey(Faded, "a key the save dropped does not come back");
+            await load(data);
+
+            var loaded = Opinions(Find("OP140 Fay"));
+            loaded.Should().HaveCount(cap + 1);
+            loaded[Faded].Should().BeApproximately(replay, Bound, "a key a full record had no room for keeps its replayed value");
+            loaded["OP140 Strong 0"].Should().BeApproximately(0.9f, Bound, "a saved key is the saved value");
+        }
+    }
+
+    [Fact]
+    public async Task OnlineLoads_ShortRecord_RemovesTheKeyItLacks()
+    {
+        int cap = OnlineStateManager.MaxSharedRelationshipsPerNpc;
+        foreach (var load in new Func<List<NPCData>, Task>[] { LoadShared, LoadWorldSim })
+        {
+            NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+            CapSeed("OP140 Flo", cap - 1, weakLive: false);
+            var data = SharedNpcs();
+            data.Single(d => d.Name == "OP140 Flo").Relationships.Should().HaveCount(cap - 1);
+
+            await load(data);
+
+            var loaded = Opinions(Find("OP140 Flo"));
+            loaded.Should().HaveCount(cap - 1).And.NotContainKey(Faded, "a record below the cap dropped nothing, so the key had decayed away");
+        }
+    }
+
+    [Fact]
+    public async Task PlayerSave_FullRecord_KeepsTheOverflowKey_ShortRecord_RemovesIt()
+    {
+        int cap = GameConfig.MaxSerializedRelationshipsPerNpc;
+        cap.Should().Be(100);
+        var replay = MemorySystem.ImpressionChangeFor(MemoryType.SharedDrink);
+
+        CapSeed("OP140 Gil", cap, weakLive: true);
+        var full = PlayerSaveNpcs();
+        full.Single(d => d.Name == "OP140 Gil").Relationships.Should().HaveCount(cap).And.NotContainKey(Faded);
+        await LoadPlayerSave(full);
+        var kept = Opinions(Find("OP140 Gil"));
+        kept.Should().HaveCount(cap + 1);
+        kept[Faded].Should().BeApproximately(replay, Bound, "the player save had no room for it");
+
+        NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+        CapSeed("OP140 Gil", cap - 1, weakLive: false);
+        var shortRec = PlayerSaveNpcs();
+        shortRec.Single(d => d.Name == "OP140 Gil").Relationships.Should().HaveCount(cap - 1);
+        await LoadPlayerSave(shortRec);
+        Opinions(Find("OP140 Gil")).Should().HaveCount(cap - 1).And.NotContainKey(Faded);
+    }
+
+    [Fact]
+    public void EveryRosterLoad_PassesItsWritersCap()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
+        var scripts = Path.Combine(dir!.FullName, "Scripts");
+        var engine = File.ReadAllText(Path.Combine(scripts, "Core", "GameEngine.cs"));
+        var online = File.ReadAllText(Path.Combine(scripts, "Systems", "OnlineStateManager.cs"));
+        var sim = File.ReadAllText(Path.Combine(scripts, "Systems", "WorldSimService.cs"));
+
+        // the player save: the default cap (GameConfig.MaxSerializedRelationshipsPerNpc)
+        engine.Split("await RestoreNPCs(saveData.NPCs);").Length.Should().Be(3);
+        // the shared roster online and the conflict reloads: the world_state writer's cap
+        engine.Split("await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion, OnlineStateManager.MaxSharedRelationshipsPerNpc);").Length.Should().Be(3);
+        online.Split("GameEngine.Instance.RestoreNPCs(stored, version, MaxSharedRelationshipsPerNpc);").Length.Should().Be(3);
+        System.Text.RegularExpressions.Regex.Matches(engine + online, @"\bRestoreNPCs\(").Count.Should().Be(7, "the declaration, the two player-save calls and the four world_state calls, nothing else");
+        sim.Should().Contain("SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data, OnlineStateManager.MaxSharedRelationshipsPerNpc);");
+        // the writer and the loaders share one constant
+        online.Should().Contain(".Take(MaxSharedRelationshipsPerNpc)").And.NotContain(".Take(20)");
     }
 
     [Fact]
@@ -314,7 +395,7 @@ public class OP140OpinionsLoad : IDisposable
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Scripts"))) dir = dir.Parent;
         var scripts = Path.Combine(dir!.FullName, "Scripts");
-        const string call = "SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data);";
+        const string call = "SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data, ";
         const string replay = "npc.Brain.Memory?.RecordEvent(memory, keepTimestamp: true);";
 
         foreach (var (file, method) in new[] { ("Core/GameEngine.cs", "private void RestoreNPCsLocked("),

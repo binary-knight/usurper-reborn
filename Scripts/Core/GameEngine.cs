@@ -2743,7 +2743,7 @@ public partial class GameEngine
                 var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
                 if (sharedNpcs != null && sharedNpcs.Count > 0)
                 {
-                    await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                    await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion, OnlineStateManager.MaxSharedRelationshipsPerNpc);   // v1.1.13: the version it was loaded at
                     OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
@@ -4723,7 +4723,7 @@ public partial class GameEngine
             var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
             if (sharedNpcs != null && sharedNpcs.Count > 0)
             {
-                await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion, OnlineStateManager.MaxSharedRelationshipsPerNpc);   // v1.1.13: the version it was loaded at
                 OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
@@ -6725,7 +6725,10 @@ public partial class GameEngine
     /// roster). The rebuild holds OnlineStateManager.RosterLock, so a purge's clean-up and serialize on
     /// another task never see it half done. The rebuild has no await inside.
     /// </summary>
-    internal Task RestoreNPCs(List<NPCData> npcData, long? storedVersion = null)   // v1.1.13: internal for the purge's reload
+    /// <param name="relationshipsCap">1.3.8: the opinions per NPC the record's writer keeps (GameConfig.MaxSerializedRelationshipsPerNpc
+    /// for a player save, OnlineStateManager.MaxSharedRelationshipsPerNpc for world_state).</param>
+    internal Task RestoreNPCs(List<NPCData> npcData, long? storedVersion = null,
+        int relationshipsCap = GameConfig.MaxSerializedRelationshipsPerNpc)   // v1.1.13: internal for the purge's reload
     {
         if (npcData == null || npcData.Count == 0)
         {
@@ -6738,7 +6741,7 @@ public partial class GameEngine
             lock (OnlineStateManager.RosterLock)
             {
                 bool whole = false;
-                try { RestoreNPCsLocked(npcData); whole = true; }
+                try { RestoreNPCsLocked(npcData, relationshipsCap); whole = true; }
                 finally { OnlineStateManager.NoteRosterRestored(whole ? storedVersion : null); }   // v1.1.13: a failed rebuild is no stored roster
             }
             return Task.CompletedTask;
@@ -6746,7 +6749,7 @@ public partial class GameEngine
         catch (Exception ex) { return Task.FromException(ex); }
     }
 
-    private void RestoreNPCsLocked(List<NPCData> npcData)
+    private void RestoreNPCsLocked(List<NPCData> npcData, int relationshipsCap)
     {
 
         // v1.0.2: mark the roster as in-flight for the whole teardown-and-rebuild.
@@ -7012,7 +7015,7 @@ public partial class GameEngine
                     }
                     // GD.Print($"[GameEngine] Restored {data.Memories.Count} memories for {npc.Name}");
                 }
-                SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data);   // 1.3.8: the saved opinions replace the replay
+                SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data, relationshipsCap);   // 1.3.8: the saved opinions replace the replay
 
                 // Restore goals
                 if (data.CurrentGoals != null && data.CurrentGoals.Count > 0)
