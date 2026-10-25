@@ -407,13 +407,11 @@ NPC-built community in the Outskirts, a town location beyond the city gates. 7 b
    b. Get player action (interactive or quickbar)
    c. Process player action (with ability cooldown, stamina, mana checks)
    d. Each surviving monster: select target -> roll attack -> apply damage
-   e. Each NPC teammate: process status -> CanAct -> (1.4.0: the withdraw check; no stance pulls back in 1.4, the code is kept, inert) -> AI ability/spell/attack
+   e. Each NPC teammate: process status -> CanAct -> AI ability/spell/attack
    f. Decrement durations (status effects, taunt rounds, buff timers)
    g. Check end conditions (HP / monster count / fled flag / arrest combat)
-3. Stand Downed allies up, put any withdrawn ally back in its place in the fight's list (none in 1.4), then determine outcome and route rewards / death
+3. Stand Downed allies up, then determine outcome and route rewards / death
 ```
-
-A withdrawn ally (1.4.0; no stance pulls back in 1.4, so the path is kept and inert) is taken out of the fight's list (`result.Teammates`, the fight-local copy `currentTeammates`) as a grouped follower's own retreat is, and kept in `_withdrawn` (`CombatEngine.PartySurvival.cs`); `ReturnWithdrawnAtFightEnd` puts it back beside `ResolveDownedAtFightEnd`, at the fight's end and in the finally, before the outcome branch and the experience split. `AllyLifecycle` stays `Active` or `Downed`; there is no Withdrawn value.
 
 ### Combat Actions
 Attack, Defend (+50% defense), Heal (potion), CastSpell, UseAbility, Backstab, Retreat (flee), PowerAttack (1.75x dmg, 15 STA, off-hand follow-up, enchant procs), PreciseStrike, Rage (Barbarian), Smite, Disarm, Taunt (single-target hard), Hide, RangedAttack, AidAlly (heal-or-mana-potion), BegForMercy, Status, UseHerb (J).

@@ -8,9 +8,6 @@ namespace UsurperRemake.Systems;
 /// shipped, read from the same GameConfig constants; Aggressive and Cautious bracket it.
 /// Thresholds are fractions of max HP and are compared strictly below. In every column
 /// EmergencySelfPotion &lt; Brace &lt; DefensiveFirst &lt; PotionMostInjured.
-/// 1.4.0: Withdraw is the share below which an ally tries to pull back from the fight, before a
-/// potion or a heal (CombatEngine.PartySurvival); 0 means never. No stance sets it in 1.4, so no
-/// ally pulls back; the path is kept and inert.
 /// </summary>
 public enum TeammateStance
 {
@@ -25,8 +22,7 @@ public readonly record struct TeammatePolicy(
     double DefensiveFirst,
     double Brace,
     bool MayTaunt,
-    double TargetWeightMultiplier,
-    double Withdraw = 0);
+    double TargetWeightMultiplier);
 
 public static class TeammateStances
 {

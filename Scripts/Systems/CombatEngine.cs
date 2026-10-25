@@ -129,7 +129,6 @@ public partial class CombatEngine
         public long HpLost;
         public int Downs, Rescues;   // 1.3.3 party survival
         public bool Finished;
-        public bool Withdrew;   // 1.4.0 W: pulled back from the fight
     }
     private readonly Dictionary<Character, AllyFightStats> _allyStats = new();
     internal AllyFightStats StatsFor(Character ally)
@@ -2174,7 +2173,6 @@ public partial class CombatEngine
         // 1.3.3 party survival: every ally still Downed gets up at half HP, before the outcome branch, so
         // victory, escape, Death's Door and the player's death all see it standing. A fight's end never finishes.
         ResolveDownedAtFightEnd(result);
-        ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: a withdrawn ally is back in its place for the outcome and the split
 
         EndFightEvents(player);   // 1.2.6: the HP the fight left, before any outcome handling
 
@@ -2514,7 +2512,6 @@ public partial class CombatEngine
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
             player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
             ResolveDownedAtFightEnd(result);   // 1.3.3: no-op after the normal end; a fight left by a throw leaves no ally Downed
-            ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: no-op after the normal end; a throw leaves no ally withdrawn
             EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
             _eventTally = null;
         }
@@ -20598,14 +20595,6 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
             await Pacing.Wait(GetCombatDelay(800));
-            return;
-        }
-
-        // 1.4.0 W: a Cautious ally losing the fight tries to pull back, before any other choice (1.4.0 W2: before a
-        // potion or a heal too, whatever heals it has left)
-        if (WantsToWithdraw(teammate, result))
-        {
-            await TryWithdraw(teammate, result);
             return;
         }
 
