@@ -31,10 +31,11 @@ public static class RelayClient
 
     /// <summary>
     /// 1.4.0: after stdin ends, the longest the bridge goes on reading the server before it ends anyway. Output the
-    /// server sent before it saw the end arrives over loopback at once; the bound leaves room for a late scheduled read
-    /// on a loaded host, and keeps short the time a server write still succeeds where a closed relay made it fail.
+    /// server sent before it saw the end arrives over loopback at once; the bound only leaves room for a late scheduled
+    /// read on a loaded host. It is kept short because a server write still succeeds during it where a closed relay
+    /// made it fail, so a session that writes without reading (auto-combat) runs on that much longer.
     /// </summary>
-    internal static readonly TimeSpan StdinEndDrain = TimeSpan.FromSeconds(3);
+    internal static readonly TimeSpan StdinEndDrain = TimeSpan.FromSeconds(1);
 
     /// <summary>1.4.0: shut the socket's send side (a TCP half close); false when the socket is already gone.</summary>
     private static bool ShutdownSend(Socket socket)
