@@ -4810,12 +4810,23 @@ public partial class GameEngine
     /// the story (seals, artifacts, flags, endings, Old God states, cycle) and the narrative systems a
     /// new character starts without. Both load paths call it before any restore step. An online
     /// session has its own systems on its SessionContext and is left alone. Returns true when it ran.
+    /// The companions, the dungeon party, the faction, archetype and memory state and the god worship
+    /// entry of the character played before the load start clean too. The world shared with NPCs is not
+    /// touched here.
     /// </summary>
     internal static bool ResetStoryForSinglePlayerLoad()
     {
         if (UsurperRemake.Server.SessionContext.Current != null) return false;
         UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         ResetNarrativeSystemsForNewGame();
+        UsurperRemake.Systems.CompanionSystem.Instance.ResetAllCompanions();
+        UsurperRemake.Systems.FactionSystem.Instance.Reset();
+        UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
+        UsurperRemake.Systems.AmnesiaSystem.Instance.Reset();
+        var engine = InstanceIfAny;
+        engine?.ClearDungeonParty();
+        // the previous character's entry, by the same key the load restores (a fresh process has none)
+        ClearGodEntryOf(GodRestoreFilterFor(engine?.CurrentPlayer), "LOAD");
         return true;
     }
 
@@ -4856,11 +4867,21 @@ public partial class GameEngine
         return change != 0;
     }
 
+    /// <summary>
+    /// The god worship entry of one character name, in any letter case: a new character's leftover, and
+    /// on a single player load the entry of the character played before it. Nothing for a blank name.
+    /// </summary>
+    internal static void ClearGodEntryOf(string? name2, string area)
+    {
+        if (string.IsNullOrWhiteSpace(name2)) return;
+        try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(name2); }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning(area, $"Leftover god clear failed for '{name2}': {ex.Message}"); }
+    }
+
     public static int ClearLeftoversForNewCharacter(string? name2)
     {
         if (string.IsNullOrWhiteSpace(name2)) return 0;
-        try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(name2); }
-        catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover god clear failed for '{name2}': {ex.Message}"); }
+        ClearGodEntryOf(name2, "CREATE");
         int removed = QuestSystem.RemovePlayerQuests(name2) + QuestSystem.RemoveBountiesOnPlayer(name2);
         try { RelationshipSystem.Instance?.ResetPlayerRelationships(name2); }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover relationship clear failed for '{name2}': {ex.Message}"); }

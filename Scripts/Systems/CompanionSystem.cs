@@ -1758,6 +1758,11 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void ResetAllCompanions()
         {
+            // 1.4.0: rebuilt from the definitions first, so what the list below does not name (base stats
+            // grown by level ups, secondary stats, potions, skills, an unlocked personal quest) is also
+            // what a new system holds
+            companions.Clear();
+            InitializeCompanions();
             foreach (var companion in companions.Values)
             {
                 companion.IsRecruited = false;
