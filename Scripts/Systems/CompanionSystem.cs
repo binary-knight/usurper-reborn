@@ -1138,6 +1138,8 @@ namespace UsurperRemake.Systems
             }
             for (int level = 1; level <= 10; level++)
                 if (stored == Loc.GetIn("en", RomanceMilestoneKey(level))) return Loc.Get(RomanceMilestoneKey(level));
+            // 1.3.8: saw an ally finished that the player could have rescued (stored English with the ally's name)
+            if (Between(stored, "companion.history_saw_ally_left") is string fallen) return Loc.Get("companion.history_saw_ally_left", fallen);
             return StoredText(stored);
         }
 
@@ -1748,6 +1750,20 @@ namespace UsurperRemake.Systems
             {
                 companion.RomancedToday = false;
             }
+        }
+
+        /// <summary>
+        /// 1.3.8: the companions a single player load starts from, as a new system holds them: rebuilt from
+        /// the definitions (so what ResetAllCompanions does not name, such as base stats grown by level ups,
+        /// secondary stats, potions, skills and an unlocked personal quest, goes too), then ResetAllCompanions.
+        /// Only GameEngine.ResetStoryForSinglePlayerLoad calls it; a new game, NG+ and a restore keep
+        /// ResetAllCompanions alone.
+        /// </summary>
+        internal void RebuildForSinglePlayerLoad()
+        {
+            companions.Clear();
+            InitializeCompanions();
+            ResetAllCompanions();
         }
 
         /// <summary>

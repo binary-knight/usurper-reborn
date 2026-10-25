@@ -1134,9 +1134,10 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>1.3.5 (B1): the living fighters at a fight's start: the player and every living teammate
-        /// (companions and NPC allies alike). Read once, when the fight is built.</summary>
+        /// (companions and NPC allies alike). Read once, when the fight is built. 1.3.8: an ally told to wait
+        /// is not in the fight (CombatEngine.PlayerVsMonsters) and is not counted.</summary>
         internal static int CountLivingFighters(Character player, IEnumerable<Character>? teammates) =>
-            (player.IsAlive ? 1 : 0) + (teammates?.Count(t => t != null && t.IsAlive) ?? 0);
+            (player.IsAlive ? 1 : 0) + (teammates?.Count(t => t != null && t.IsAlive && !t.IsWaiting) ?? 0);
 
         /// <summary>1.3.5 (B1): BuildBossFight with the living fighters n; the god's fight HP is scaled by
         /// PartyHpScale(n) before the dialogue's adjustments. n is not read again during the fight.</summary>

@@ -229,6 +229,10 @@ namespace UsurperRemake.Systems
         // Disabled ability IDs
         public List<string> DisabledAbilities { get; set; } = new();
 
+        // 1.3.8: disabled spell names and the recruit time (MinValue when a save has none)
+        public List<string> DisabledSpells { get; set; } = new();
+        public DateTime RecruitedDate { get; set; } = DateTime.MinValue;
+
         // Skill proficiency (stored as int values of TrainingSystem.ProficiencyLevel)
         public Dictionary<string, int> SkillProficiencies { get; set; } = new();
         public Dictionary<string, int> SkillTrainingProgress { get; set; } = new();

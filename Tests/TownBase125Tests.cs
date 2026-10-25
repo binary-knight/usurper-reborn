@@ -488,7 +488,7 @@ public class TownBase125Tests : IDisposable
         foreach (var key in new[] { "ui.stat_attack", "dungeon.armor_label", "ui.stat_strength", "combat.status_defence_label", "ui.stat_stamina", "ui.stat_agility", "ui.stat_dexterity", "ui.stat_wisdom", "ui.stat_charisma", "ui.stat_mana" })
             shown.Should().Contain($"  {L(lang, key),-12} +", key);
         shown.Should().Contain(L(lang, "base.auction_type", L(lang, "base.item_type_weapon"), "0"));
-        if (lang == "en") shown.Should().Contain("  Defence      +999", "the English label is unchanged");
+        if (lang == "en") shown.Should().Contain("  Defense      +999", "the English label is unchanged");
         else shown.Should().NotContain("Seller:").And.NotContain("Price:").And.NotContain("Strength").And.NotContain("Defence").And.NotContain("Weapon");
     }
 

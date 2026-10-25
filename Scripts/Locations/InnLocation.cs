@@ -2986,9 +2986,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.stance_prompt", c.Name), "white");
         foreach (var (key, stance) in new[] { ("1", TeammateStance.Aggressive), ("2", TeammateStance.Balanced), ("3", TeammateStance.Cautious) })
         {
-            terminal.SetColor("bright_yellow"); terminal.Write($"  [{key}] ");
-            terminal.SetColor("white"); terminal.Write(Loc.Get(TeammateStances.NameKey(stance)));
-            terminal.SetColor("gray"); terminal.WriteLine($"  {Loc.Get(TeammateStances.NameKey(stance) + ".desc")}");
+            DungeonLocation.WriteStanceRow(terminal, key, stance);
         }
         var pick = (await terminal.GetInput(Loc.Get("ui.choice"))).Trim();
         TeammateStance? chosen = pick switch { "1" => TeammateStance.Aggressive, "2" => TeammateStance.Balanced, "3" => TeammateStance.Cautious, _ => null };

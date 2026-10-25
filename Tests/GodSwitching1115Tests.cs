@@ -298,7 +298,7 @@ public class GodSwitching1115Tests
             ["Scripts/Server/MudServer.cs|SetPlayerGod"] = 1,
             ["Scripts/Server/MudServer.cs|ClearPlayerGodAnyCase"] = 1,
             ["Scripts/Core/GameEngine.cs|SetPlayerGod"] = 1,
-            ["Scripts/Core/GameEngine.cs|ClearPlayerGodAnyCase"] = 1,
+            ["Scripts/Core/GameEngine.cs|ClearPlayerGodAnyCase"] = 1,   // one helper: a new character; a single player load (the previous character's entry)
             // The offline recruit by a player-god (another player's act; the definition and the one call)
             ["Scripts/Systems/IOnlineSaveBackend.cs|SetPlayerWorshippedGod"] = 1,
             ["Scripts/Systems/SqlSaveBackend.cs|SetPlayerWorshippedGod"] = 1,

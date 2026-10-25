@@ -298,13 +298,13 @@ public class TownMagic125Tests
     public async Task EnchantMenu_English_KeepsItsWords()
     {
         string shown = await Enchant("en", 100, 5, "Steel Helm");
-        foreach (var w in new[] { "Divine Blessing", "+3 str/dex/def/wis, weapon+armor power", "Ocean's Touch", "+6 intelligence, +4 wisdom", "+20 magic resist, +2 defence",
+        foreach (var w in new[] { "Divine Blessing", "+3 str/dex/def/wis, weapon+armor power", "Ocean's Touch", "+6 intelligence, +4 wisdom", "+20 magic resist, +2 defense",
                      "Phoenix Fire", "+30 weapon power, 25% chance to slow on hit", "Weapon  ",   // 1.3.6 E3-T1: the new Frostbite description "L.Ring", "Bag", "Enchanting: Steel Helm",
                      "  Enchant Steel Helm with Divine Blessing (+3 str/dex/def/wis, weapon+armor", "  power)", "  WARNING: this item already carries 3 enchantments.",
                      "  On failure: gold and materials are consumed, AND one of the", "  [0] Cancel" })
             shown.Should().Contain(w);
         string stat = await Enchant("en", 100, 2, "Steel Helm");
-        foreach (var w in new[] { "  [1] Weapon Power", "  [4] Defence", "  [6] Armor Power", "  [11] Stamina", "  Enchant Steel Helm with Standard (+4 Dexterity)" })
+        foreach (var w in new[] { "  [1] Weapon Power", "  [4] Defense", "  [6] Armor Power", "  [11] Stamina", "  Enchant Steel Helm with Standard (+4 Dexterity)" })
             stat.Should().Contain(w);
     }
 

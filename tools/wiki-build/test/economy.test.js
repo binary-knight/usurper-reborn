@@ -119,7 +119,7 @@ test("gear sets, loot rarity, herbs and home upgrades", () => {
   const sets = render("table:gear-sets");
   assert.equal(
     row(sets, "Silk")[0],
-    "2 pieces: +15 Max Mana; 4 pieces: +3 Intelligence, +3 Wisdom; 5 pieces: +40 Max Mana, +2 Defence",
+    "2 pieces: +15 Max Mana; 4 pieces: +3 Intelligence, +3 Wisdom; 5 pieces: +40 Max Mana, +2 Defense",
   );
   const rarity = render("table:loot-rarity");
   assert.deepEqual(row(rarity, "Legendary"), ["Legendary", "3", "20", "2 to 3", "10"]);

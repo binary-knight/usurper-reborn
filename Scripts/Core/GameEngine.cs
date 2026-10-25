@@ -2653,6 +2653,9 @@ public partial class GameEngine
     {
         try
         {
+            // 1.3.8: a single player load starts from a clean story, before any restore step
+            ResetStoryForSinglePlayerLoad();
+
             // v0.60.0 beta-launch Rage event: short-circuit BEFORE any save
             // restore happens. The cinematic plays for ~25 seconds, and any
             // restore step that fires a fire-and-forget save would race with
@@ -2711,49 +2714,9 @@ public partial class GameEngine
             // Process daily login streak rewards
             await ProcessLoginStreak(currentPlayer);
 
-            // Show weekly rank change on login
-            if (currentPlayer.WeeklyRank > 0 && currentPlayer.PreviousWeeklyRank > 0)
-            {
-                int change = currentPlayer.PreviousWeeklyRank - currentPlayer.WeeklyRank; // positive = moved up
-                if (change != 0)
-                {
-                    terminal.WriteLine("");
-                    if (change > 0)
-                    {
-                        terminal.SetColor("bright_green");
-                        string upKey = change == 1 ? "engine.rank_moved_up_one" : "engine.rank_moved_up_many";
-                        terminal.WriteLine($"  {Loc.Get(upKey, change, currentPlayer.WeeklyRank)}");
-                    }
-                    else
-                    {
-                        terminal.SetColor("yellow");
-                        int dropped = Math.Abs(change);
-                        string downKey = dropped == 1 ? "engine.rank_dropped_one" : "engine.rank_dropped_many";
-                        terminal.WriteLine($"  {Loc.Get(downKey, dropped, currentPlayer.WeeklyRank)}");
-                    }
-
-                    // v0.57.10 (player report — "Every single time I have logged
-                    // in recently, it says you have moved up 28 ranks and are
-                    // now in 14th place. It always says the same place."):
-                    // the display fired whenever `WeeklyRank != PreviousWeeklyRank`,
-                    // but the only code that touches `PreviousWeeklyRank` is the
-                    // Monday daily-reset in `DailySystemManager.UpdateWeeklyRankings`.
-                    // Between Mondays the delta stayed constant, so every login
-                    // re-printed the same message. Consume the delta after
-                    // showing it — next week's Monday update will re-snapshot
-                    // the current rank into `PreviousWeeklyRank` before
-                    // recomputing, so the week-over-week comparison stays
-                    // intact.
-                    currentPlayer.PreviousWeeklyRank = currentPlayer.WeeklyRank;
-                    _ = SaveCurrentGame();
-                }
-                if (!string.IsNullOrEmpty(currentPlayer.RivalName))
-                {
-                    terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {Loc.Get("engine.rival_level", currentPlayer.RivalName, currentPlayer.RivalLevel)}");
-                }
-                terminal.WriteLine("");
-            }
+            // Show weekly rank change on login. 1.3.8: no save here, the story is not restored yet;
+            // the next save writes the consumed rank.
+            ShowWeeklyRankChange(terminal, currentPlayer);
 
             // Load daily system state
             if (dailyManager != null)
@@ -2780,7 +2743,7 @@ public partial class GameEngine
                 var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
                 if (sharedNpcs != null && sharedNpcs.Count > 0)
                 {
-                    await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                    await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion, OnlineStateManager.MaxSharedRelationshipsPerNpc);   // v1.1.13: the version it was loaded at
                     OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                     DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
                 }
@@ -4724,6 +4687,9 @@ public partial class GameEngine
     /// </summary>
     private async Task LoadExistingGame(string playerName)
     {
+        // 1.3.8: a single player load starts from a clean story, before any restore step
+        ResetStoryForSinglePlayerLoad();
+
         terminal.WriteLine(Loc.Get("save.loading"), "yellow");
 
         // Clear dungeon party before loading to prevent state leak between saves
@@ -4757,7 +4723,7 @@ public partial class GameEngine
             var sharedNpcs = await OnlineStateManager.Instance.LoadSharedNPCs();
             if (sharedNpcs != null && sharedNpcs.Count > 0)
             {
-                await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion);   // v1.1.13: the version it was loaded at
+                await RestoreNPCs(sharedNpcs, OnlineStateManager.Instance.NpcsVersion, OnlineStateManager.MaxSharedRelationshipsPerNpc);   // v1.1.13: the version it was loaded at
                 OnlineStateManager.Instance.NoteNpcBaseline();   // v1.1.13: what this session's save compares against
                 DebugLogger.Instance.LogInfo("ONLINE", $"NPCs overridden from world_state: {sharedNpcs.Count} NPCs loaded");
             }
@@ -4839,11 +4805,85 @@ public partial class GameEngine
         UsurperRemake.Systems.BetrayalSystem.Instance.Reset();
     }
 
+    /// <summary>
+    /// 1.3.8: a single player load starts from a clean story, the state a fresh process starts with:
+    /// the story (seals, artifacts, flags, endings, Old God states, cycle) and the narrative systems a
+    /// new character starts without. Both load paths call it before any restore step. An online
+    /// session has its own systems on its SessionContext and is left alone. Returns true when it ran.
+    /// The companions, the dungeon party, the faction, archetype and memory state and the god worship
+    /// entry of the character played before the load start clean too, and no character is current until
+    /// the load restores one (a fresh process has none, so a load that fails leaves nothing to save).
+    /// The world shared with NPCs is not touched here.
+    /// </summary>
+    internal static bool ResetStoryForSinglePlayerLoad()
+    {
+        if (UsurperRemake.Server.SessionContext.Current != null) return false;
+        UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+        ResetNarrativeSystemsForNewGame();
+        UsurperRemake.Systems.CompanionSystem.Instance.RebuildForSinglePlayerLoad();
+        UsurperRemake.Systems.FactionSystem.Instance.Reset();
+        UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
+        UsurperRemake.Systems.AmnesiaSystem.Instance.Reset();
+        var engine = InstanceIfAny;
+        engine?.ClearDungeonParty();
+        // the previous character's entry, by the same key the load restores (a fresh process has none)
+        ClearGodEntryOf(GodRestoreFilterFor(engine?.CurrentPlayer), "LOAD");
+        if (engine != null) engine.CurrentPlayer = null;
+        return true;
+    }
+
+    /// <summary>
+    /// The weekly rank change shown at login, then the rival line. v0.57.10: the change is consumed once
+    /// shown (PreviousWeeklyRank takes the current rank), so it shows once per Monday update. 1.3.8: it
+    /// never saves; a login runs it before the story is restored, and the next save writes the consumed
+    /// rank. Returns true when a change was shown.
+    /// </summary>
+    internal static bool ShowWeeklyRankChange(TerminalEmulator terminal, Character player)
+    {
+        if (player.WeeklyRank <= 0 || player.PreviousWeeklyRank <= 0) return false;
+        int change = player.PreviousWeeklyRank - player.WeeklyRank; // positive = moved up
+        if (change != 0)
+        {
+            terminal.WriteLine("");
+            if (change > 0)
+            {
+                terminal.SetColor("bright_green");
+                string upKey = change == 1 ? "engine.rank_moved_up_one" : "engine.rank_moved_up_many";
+                terminal.WriteLine($"  {Loc.Get(upKey, change, player.WeeklyRank)}");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                int dropped = Math.Abs(change);
+                string downKey = dropped == 1 ? "engine.rank_dropped_one" : "engine.rank_dropped_many";
+                terminal.WriteLine($"  {Loc.Get(downKey, dropped, player.WeeklyRank)}");
+            }
+            player.PreviousWeeklyRank = player.WeeklyRank;
+        }
+        if (!string.IsNullOrEmpty(player.RivalName))
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {Loc.Get("engine.rival_level", player.RivalName, player.RivalLevel)}");
+        }
+        terminal.WriteLine("");
+        return change != 0;
+    }
+
+    /// <summary>
+    /// The god worship entry of one character name, in any letter case: a new character's leftover, and
+    /// on a single player load the entry of the character played before it. Nothing for a blank name.
+    /// </summary>
+    internal static void ClearGodEntryOf(string? name2, string area)
+    {
+        if (string.IsNullOrWhiteSpace(name2)) return;
+        try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(name2); }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning(area, $"Leftover god clear failed for '{name2}': {ex.Message}"); }
+    }
+
     public static int ClearLeftoversForNewCharacter(string? name2)
     {
         if (string.IsNullOrWhiteSpace(name2)) return 0;
-        try { UsurperRemake.GodSystemSingleton.Instance?.ClearPlayerGodAnyCase(name2); }
-        catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover god clear failed for '{name2}': {ex.Message}"); }
+        ClearGodEntryOf(name2, "CREATE");
         int removed = QuestSystem.RemovePlayerQuests(name2) + QuestSystem.RemoveBountiesOnPlayer(name2);
         try { RelationshipSystem.Instance?.ResetPlayerRelationships(name2); }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("CREATE", $"Leftover relationship clear failed for '{name2}': {ex.Message}"); }
@@ -4971,6 +5011,8 @@ public partial class GameEngine
         {
             Console.Error.WriteLine($"[NG+] NOT NG+ — calling FullReset");
             UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+            // 1.3.8: a new character starts with no recovered memories; NG+ keeps them across the cycle
+            UsurperRemake.Systems.AmnesiaSystem.Instance.Reset();
         }
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
@@ -6685,7 +6727,10 @@ public partial class GameEngine
     /// roster). The rebuild holds OnlineStateManager.RosterLock, so a purge's clean-up and serialize on
     /// another task never see it half done. The rebuild has no await inside.
     /// </summary>
-    internal Task RestoreNPCs(List<NPCData> npcData, long? storedVersion = null)   // v1.1.13: internal for the purge's reload
+    /// <param name="relationshipsCap">1.3.8: the opinions per NPC the record's writer keeps (GameConfig.MaxSerializedRelationshipsPerNpc
+    /// for a player save, OnlineStateManager.MaxSharedRelationshipsPerNpc for world_state).</param>
+    internal Task RestoreNPCs(List<NPCData> npcData, long? storedVersion = null,
+        int relationshipsCap = GameConfig.MaxSerializedRelationshipsPerNpc)   // v1.1.13: internal for the purge's reload
     {
         if (npcData == null || npcData.Count == 0)
         {
@@ -6698,7 +6743,7 @@ public partial class GameEngine
             lock (OnlineStateManager.RosterLock)
             {
                 bool whole = false;
-                try { RestoreNPCsLocked(npcData); whole = true; }
+                try { RestoreNPCsLocked(npcData, relationshipsCap); whole = true; }
                 finally { OnlineStateManager.NoteRosterRestored(whole ? storedVersion : null); }   // v1.1.13: a failed rebuild is no stored roster
             }
             return Task.CompletedTask;
@@ -6706,7 +6751,7 @@ public partial class GameEngine
         catch (Exception ex) { return Task.FromException(ex); }
     }
 
-    private void RestoreNPCsLocked(List<NPCData> npcData)
+    private void RestoreNPCsLocked(List<NPCData> npcData, int relationshipsCap)
     {
 
         // v1.0.2: mark the roster as in-flight for the whole teardown-and-rebuild.
@@ -6972,6 +7017,7 @@ public partial class GameEngine
                     }
                     // GD.Print($"[GameEngine] Restored {data.Memories.Count} memories for {npc.Name}");
                 }
+                SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data, relationshipsCap);   // 1.3.8: the saved opinions replace the replay
 
                 // Restore goals
                 if (data.CurrentGoals != null && data.CurrentGoals.Count > 0)

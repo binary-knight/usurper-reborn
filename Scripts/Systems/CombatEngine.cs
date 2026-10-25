@@ -1145,7 +1145,7 @@ public partial class CombatEngine
             });
             // Seed initial party state so MUD clients can render party panes
             // without waiting for the first round-end update.
-            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates);
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.3.8 H: as the fight's list, no waiting ally
         }
 
         // Store teammates for healing/support actions.
@@ -1156,6 +1156,7 @@ public partial class CombatEngine
         // the fight. Membership changes now take effect at the next combat; a follower
         // [R]-retreat removes from this combat-local list only (they stay in the group).
         currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
+        currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.3.8 H: an ally told to wait is in no fight
 
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
@@ -7460,118 +7461,6 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Process teammate action (AI-controlled)
-    /// </summary>
-    private async Task ProcessTeammateAction(Character teammate, Monster monster, CombatResult result)
-    {
-        if (!teammate.IsAlive || !monster.IsAlive) return;
-
-        // v0.60.0: tick teammate status durations and skip the action if a control effect
-        // (Stun / Paralyze / Sleep / Freeze) is preventing them from acting. Player report:
-        // "Stun only works on enemies. A party member afflicted with stun can act next round
-        // as though nothing happened." Pre-fix the only IsAlive guard above let stunned
-        // teammates act normally, and ActiveStatuses never decremented for teammates either,
-        // so a stun would have lasted the whole fight if anything had been checking it.
-        // Now mirrors the player path at line 1654-1676 (ProcessStatusEffects, then CanAct
-        // guard, then HasStatus(Stunned) message). ProcessStatusEffects also applies poison/bleed ticks
-        // so DoTs land on stunned teammates the same way they do on a stunned player.
-        foreach (var (msg, color) in teammate.ProcessStatusEffects())
-        {
-            terminal.WriteLine(msg, color);
-        }
-        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
-        if (!teammate.IsAlive) return; // DoT could have killed the teammate
-        if (!teammate.CanAct())
-        {
-            var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
-            await Pacing.Wait(GetCombatDelay(800));
-            return;
-        }
-
-        // Build party list for healing decisions
-        var allPartyMembers = new List<Character> { currentPlayer };
-        if (currentTeammates != null)
-            allPartyMembers.AddRange(currentTeammates.Where(t => t.IsAlive));
-
-        // === BOSS PARTY MECHANICS: Priority actions before normal AI ===
-        if (BossContext != null && teammate.IsAlive)
-        {
-            // Priority 1: Healer classes try to dispel Doom or cleanse Corruption
-            if (IsHealerClass(teammate) && TryHealerCleanse(teammate, currentPlayer, result))
-                return;
-
-            // Priority 2: Fast characters try to interrupt boss channeling
-            if (monster.IsChanneling && TryInterruptBossChannel(monster, teammate))
-                return;
-        }
-
-        // Wrap single monster in a list for the multi-monster ability/spell methods
-        var monsterList = new List<Monster> { monster };
-
-        // Check if teammate should heal instead of attack
-        var healAction = await TryTeammateHealAction(teammate, allPartyMembers, result);
-        if (healAction) return;
-
-        // v1.2: wounded, a teammate looks for a shield before it casts an attack spell
-        if (IsWoundedForDefense(teammate, PolicyFor(teammate)) && await TryTeammateClassAbility(teammate, monsterList, result)) return;
-        // Check if teammate should cast an offensive spell
-        var spellAction = await TryTeammateOffensiveSpell(teammate, monsterList, result);
-        if (spellAction) return;
-
-        // Check if teammate should use a class ability
-        var abilityAction = await TryTeammateClassAbility(teammate, monsterList, result);
-        if (abilityAction) return;
-        // v1.2: nothing left to heal or shield with and badly hurt: brace instead of swinging
-        if (TryTeammateDefend(teammate))
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("combat.teammate_defends", teammate.DisplayName));
-            result.CombatLog.Add($"{teammate.DisplayName} braces for the next attack.");
-            await Pacing.Wait(GetCombatDelay(600));
-            return;
-        }
-
-        // Otherwise, basic attack
-        var (swings, windfuryProc) = GetAttackCount(teammate);
-        int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks + (windfuryProc ? 1 : 0);
-
-        for (int s = 0; s < swings && monster.IsAlive; s++)
-        {
-            bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
-
-            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
-            attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
-            double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
-            attackPower = (long)(attackPower * damageModifier);
-
-            long defense = monster.GetDefensePower();
-            long damage = Math.Max(1, attackPower - defense);
-
-            monster.HP = Math.Max(0, monster.HP - damage);
-
-            if (isOffHandAttack)
-                UIHelper.WriteRow(terminal, Loc.Get("combat.tm_offhand_strike", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
-            else
-                UIHelper.WriteRow(terminal, Loc.Get("combat.companion_hits", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
-            result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
-
-            // Apply post-hit enchantment effects
-            ApplyPostHitEnchantments(teammate, monster, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
-
-            if (s < swings - 1 && monster.IsAlive)
-                await Pacing.Wait(GetCombatDelay(500));
-        }
-
-        // Teammate can improve basic attack proficiency through combat use (silent — no message)
-        int profCap = TrainingSystem.GetProficiencyCapForCharacter(teammate);
-        TrainingSystem.TryImproveFromUse(teammate, "basic_attack", random, profCap);
-
-        await Pacing.Wait(GetCombatDelay(1000));
-    }
-
-    /// <summary>
     /// Determine combat outcome and apply rewards/penalties
     /// </summary>
     /// <summary>
@@ -8717,7 +8606,7 @@ public partial class CombatEngine
     /// <summary>
     /// Class abilities whose SpecialEffect represents pure magical/divine damage.
     /// These should NOT trigger weapon-based enchants (lifedrinker, mana siphon, elemental procs, poison coating)
-    /// because the damage doesn't actually come from the weapon — it's channeled magic/divine power.
+    /// because the damage doesn't actually come from the weapon: it's channeled magic/divine power.
     /// Physical/melee abilities (backstab, power_strike, execute, last_stand, etc.) are NOT in this set
     /// because they DO use the weapon and SHOULD proc weapon enchants.
     /// </summary>
@@ -20572,8 +20461,8 @@ public partial class CombatEngine
         if (!teammate.IsAlive) return;
         using var evKind = ActAs(CombatEventKind.Basic);   // 1.2.6: a teammate's swing; its spells and abilities set their own
 
-        // v0.60.0: tick statuses + skip turn for control effects (see ProcessTeammateAction
-        // for the full rationale (the "Stun only works on enemies" player report).
+        // v0.60.0: tick the teammate's status durations (and poison or bleed), then skip the turn when a control
+        // effect (Stun, Paralyze, Sleep, Freeze) prevents acting, as the player's turn does.
         foreach (var (msg, color) in teammate.ProcessStatusEffects())
         {
             terminal.WriteLine(msg, color);
@@ -21544,19 +21433,16 @@ public partial class CombatEngine
         return true;
     }
 
-    /// <summary>
-    /// NPC teammate attempts to use a class ability via the full ClassAbilitySystem.
-    /// Uses the same ApplyAbilityEffectsMultiMonster as the player, so all 30+ ability
-    /// effects (stun, poison, execute, frenzy, holy, rage, etc.) work for teammates too.
-    /// </summary>
-    private async Task<bool> TryTeammateClassAbility(Character teammate, List<Monster> monsters, CombatResult result)
+    /// <summary>1.3.8 W: the abilities a teammate could use this turn, after the class ability step's own filters
+    /// (escape and an Empathic Link with no ally left out, the player's toggles, the NPC spec rules, stamina, mana,
+    /// cooldown and CanUseAbility), with the spec and the cooldowns; null abilities when none. Moved here unchanged
+    /// from TryTeammateClassAbility, which calls it.</summary>
+    private (List<ClassAbilitySystem.ClassAbility>? Abilities, UsurperRemake.Data.SpecDefinition? Spec, Dictionary<string, int>? Cooldowns) AffordableTeammateAbilitiesAndSpec(
+        Character teammate, CombatResult result)
     {
-        var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
-        if (livingMonsters.Count == 0) return false;
-
         // Get all abilities available to this teammate's class and level
         var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(teammate);
-        if (availableAbilities == null || availableAbilities.Count == 0) return false;
+        if (availableAbilities == null || availableAbilities.Count == 0) return (null, null, null);
 
         // 1.3.6 G5 (B F6): a teammate never takes an escape ability (Disappearing Act); it would spend the turn, the
         // stamina and the cooldown and leave the fight as it was
@@ -21564,7 +21450,7 @@ public partial class CombatEngine
         // 1.3.6 G11 (rule 2): nor Empathic Link with no living ally to link
         if (EmpathicLinkAllies(teammate, result).Count == 0)
             availableAbilities = availableAbilities.Where(a => a.SpecialEffect != "empathic_link").ToList();
-        if (availableAbilities.Count == 0) return false;
+        if (availableAbilities.Count == 0) return (null, null, null);
 
         // Filter out abilities the player has disabled for this companion
         if (teammate.IsCompanion && teammate.CompanionId.HasValue)
@@ -21575,7 +21461,7 @@ public partial class CombatEngine
                 availableAbilities = availableAbilities
                     .Where(a => !companion.DisabledAbilities.Contains(a.Id))
                     .ToList();
-                if (availableAbilities.Count == 0) return false;
+                if (availableAbilities.Count == 0) return (null, null, null);
             }
         }
         // v0.65.1: non-companion teammates (Team Corner NPCs / spouses / echoes) read the
@@ -21587,7 +21473,7 @@ public partial class CombatEngine
             availableAbilities = availableAbilities
                 .Where(a => !disabledTeammateAbilities.Contains(a.Id))
                 .ToList();
-            if (availableAbilities.Count == 0) return false;
+            if (availableAbilities.Count == 0) return (null, null, null);
         }
 
         // Apply specialization-based ability filtering (NPC teammates only)
@@ -21603,7 +21489,7 @@ public partial class CombatEngine
                     availableAbilities = availableAbilities
                         .Where(a => !activeSpec.RestrictedAbilityTypes.Contains(a.Type))
                         .ToList();
-                    if (availableAbilities.Count == 0) return false;
+                    if (availableAbilities.Count == 0) return (null, null, null);
                 }
 
                 // Remove specifically disabled ability IDs
@@ -21612,7 +21498,7 @@ public partial class CombatEngine
                     availableAbilities = availableAbilities
                         .Where(a => !activeSpec.DisabledAbilityIds.Contains(a.Id))
                         .ToList();
-                    if (availableAbilities.Count == 0) return false;
+                    if (availableAbilities.Count == 0) return (null, null, null);
                 }
             }
         }
@@ -21633,7 +21519,21 @@ public partial class CombatEngine
                      && (!myCooldowns.TryGetValue(a.Id, out int cd) || cd <= 0)
                      && ClassAbilitySystem.CanUseAbility(teammate, a.Id, myCooldowns))
             .ToList();
-        if (affordableAbilities.Count == 0) return false;
+        return (affordableAbilities, activeSpec, myCooldowns);
+    }
+
+    /// <summary>
+    /// NPC teammate attempts to use a class ability via the full ClassAbilitySystem.
+    /// Uses the same ApplyAbilityEffectsMultiMonster as the player, so all 30+ ability
+    /// effects (stun, poison, execute, frenzy, holy, rage, etc.) work for teammates too.
+    /// </summary>
+    private async Task<bool> TryTeammateClassAbility(Character teammate, List<Monster> monsters, CombatResult result)
+    {
+        var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
+        if (livingMonsters.Count == 0) return false;
+
+        var (affordableAbilities, activeSpec, myCooldowns) = AffordableTeammateAbilitiesAndSpec(teammate, result);   // 1.3.8 W: the filters, moved unchanged
+        if (affordableAbilities == null || affordableAbilities.Count == 0 || myCooldowns == null) return false;
 
         // Don't pick heal abilities unless someone in the party actually needs healing
         // (TryTeammateHealAction already handles heal spells/potions with proper thresholds)
@@ -23025,6 +22925,7 @@ public partial class CombatEngine
         var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
         bool wasPermadeath = false;
         bool warded = false;   // v1.2.8 (H3)
+        bool fallNewsWritten = false;   // 1.3.8: MarkNPCDead writes the one news line of the fall
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
@@ -23061,6 +22962,7 @@ public partial class CombatEngine
             // the "player killed an NPC" rate (8 percent) this passed since v0.42.
             wasPermadeath = WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChanceDungeonTeam,
                 killerName, deathLocation, atPlayersSide: true) ?? false;
+            fallNewsWritten = WorldSimulator.Instance != null;
             worldNpc.IsInConversation = savedEngaged;
             worldNpc.Team = savedTeam;
 
@@ -23181,9 +23083,13 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Pacing.Wait(1000);
 
-        // Generate death news for the realm
-        string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
-        NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, MonsterNames.Display(killerName), location);
+        // Generate death news for the realm. 1.3.8: only when MarkNPCDead did not run above; it already wrote the
+        // one line of the fall (the death line, or the permadeath "will not return" line)
+        if (!fallNewsWritten)
+        {
+            string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
+            NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, MonsterNames.Display(killerName), location);
+        }
 
         // Ocean Philosophy awakening moment
         if (!OceanPhilosophySystem.Instance.ExperiencedMoments.Contains(AwakeningMoment.FirstCompanionDeath))

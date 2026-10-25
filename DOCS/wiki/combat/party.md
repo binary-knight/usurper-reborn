@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | In a cleared dungeon room an ally can be told to wait, out of every fight, until you walk back, call it back, change floor or leave the dungeon; NPC allies who see a teammate finished remember it, a fall you could have stopped lowers their opinion of you without them bringing it up in talk, and the stance rows wrap at 79 columns.
 history: 1.3.7 | none
 history: 1.3.6 | An NPC ally's party heals, buffs and songs now reach you and give the ally its share only once, its ally heal can pick you, Death's Embrace now leaves an ally standing at 15 percent of its maximum HP, and Rescue lifts each Downed ally once per fight, so an ally finished after its rescue no longer counts as left to die.
 history: 1.3.5 | A living companion now takes the NPC teammate's 75 percent share of the experience from room features and shared rewards.
@@ -38,7 +39,7 @@ Your experience from a fight is cut when the highest level living ally who is no
 
 ### Experience split
 
-By default the fight's experience is split evenly between you and every living ally below level 100 in the party, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone.
+By default the fight's experience is split evenly between you and every living ally below level 100 in the fight, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone. An ally told to wait is not in the fight and takes no share; in that fight the allies after it in the party fill the places one earlier.
 
 ### Catch-up for allies below your level
 
@@ -50,7 +51,7 @@ At the Level Master, H (help a team member) gives an active companion, an NPC on
 
 ## Gold in a party
 
-Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share.
+Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share. An ally told to wait gets no share.
 
 ## Ally stances
 
@@ -65,6 +66,12 @@ When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a
 An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alchemist's brew, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem cuts the monsters' attack as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
 
 A Wavecaller's Empathic Link links one ally for 4 rounds: you pick the ally from the target list (Enter takes the most hurt ally), and an ally casting it links the most hurt living member, you included. While the link holds, half of each monster hit on the linked member goes to the Wavecaller instead, never taking the Wavecaller below 1 HP, and the linked member has 30 more defense; the Wavecaller gets no defense from it. With no living ally the ability is refused before it costs anything.
+
+## Telling an ally to wait
+
+In a cleared dungeon room, Y (party), then W tells an ally that takes orders to wait there; a fighting beast can wait too. Grouped players, player echoes and royal mercenaries take no such order, and only the leader of a group has it. A waiting ally keeps its place in the party, so it still counts toward the 4 allies, but it is in no fight, ambushes included, and it takes no experience or gold share, no potion, no camp or rest and no effect of a room feature. In the party menu it shows as waiting in place of its stance.
+
+It rejoins when you walk into its room, with a line, or when you call it back with Y, then C, anywhere on the floor. It catches up with you, with a line, when you take the stairs or change floor in any other way, when you leave the dungeon by any exit, and when your session ends: a wait is never saved. An ally that leaves the party while it waits is no longer waiting. Online, a grouped follower's party view shows it as waiting.
 
 ## Potions and rest for allies
 
@@ -116,6 +123,8 @@ A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 H
 - **The end of the fight:** every ally still Downed when the fight ends, won, fled or lost, stands up again with half its maximum HP. The end of a fight never finishes anyone.
 
 Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it (it had not already been rescued in that fight) and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
+
+When a monster finishes an ally, every other NPC ally and story companion in the fight saw it, Downed ones included; a royal mercenary, a player echo and a grouped player do not count. Each NPC ally who saw it remembers the fall. If you could have rescued the fallen ally, by the same test, each NPC ally who saw it also remembers that you let it fall: its opinion of you drops by 0.1 (on a scale from -1 to 1), which gossip can carry through town and which lasts until newer memories push that one out, and each story companion who saw it loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty, with a line in its history.
 
 ### Story companion
 

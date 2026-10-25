@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | An ally told to wait gets nothing from a camp, a safe haven or a room feature and takes no share of a feature's reward.
 history: 1.3.7 | The Warrior and Barbarian attack bonus from a room feature lasts into the next fight.
 history: 1.3.6 | none
 history: 1.3.5 | A living companion now takes 75 percent of the experience from a room feature you examine, as an NPC teammate does.
@@ -122,7 +123,7 @@ A skill check rolls a twenty-sided die plus the stat / 10 (at most +40) against 
 
 ### Feature class bonus
 
-Warriors and Barbarians gain 5 + floor / 10 attack for the next fight, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate, Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
+Warriors and Barbarians gain 5 + floor / 10 attack for the next fight, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate with you (not one told to wait), Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
 
 ### Risk and reward features
 
@@ -158,7 +159,7 @@ Puzzle difficulty is 1 + floor / 15, at most 5. A solved puzzle pays floor x 30 
 
 **Make camp and recover** restores a quarter of your maximum HP, mana and stamina and a quarter of each teammate's, recovers {{balance:MentalDungeonCampGain}} Mental and, in single-player, takes two hours of game time and removes {{balance:FatigueReductionDungeonRest}} Fatigue. You can camp once per floor, in a cleared room. A Blood Price weight of 3 or more gives you 75% of the amount and 6 or more 50%; teammates always get the full quarter.
 
-A safe haven or resting place event restores a third of maximum HP, mana and stamina to you and each teammate, cures poison, recovers {{balance:MentalSafeHavenGain}} Mental and in single-player removes {{balance:FatigueReductionDungeonRest}} Fatigue. It uses the same once per floor rest as camping, so after a camp on the floor it gives nothing. Plan where you spend it.
+A safe haven or resting place event restores a third of maximum HP, mana and stamina to you and each teammate, cures poison, recovers {{balance:MentalSafeHavenGain}} Mental and in single-player removes {{balance:FatigueReductionDungeonRest}} Fatigue. It uses the same once per floor rest as camping, so after a camp on the floor it gives nothing. Plan where you spend it. An ally told to wait (see [party and allies](/wiki/en/combat/party/#telling-an-ally-to-wait)) gets nothing from a camp or a safe haven.
 
 ## Strangers
 

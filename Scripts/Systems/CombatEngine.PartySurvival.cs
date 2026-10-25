@@ -167,6 +167,7 @@ public partial class CombatEngine
         BroadcastPartyLine(result, "\u001b[1;31m", "combat.finish_lands", MonsterNames.Display(monster), ally.DisplayName);
         EvFall(ally);
         if (TryMortisMiracleForFollower(ally, result)) return;   // a no-op for an ally in scope; kept as settled
+        RecordFinishWitnesses(ally, monster, result);   // 1.3.8: the allies who saw it remember it (CombatEngine.Cascade.cs)
         BroadcastGroupLocalized(result, lang =>
             $"\u001b[1;31m  ═══ {Loc.GetIn(lang, "combat.npc_fallen_battle_banner", ally.DisplayName)} ═══\u001b[0m");
         if (ally.IsCompanion && ally.CompanionId.HasValue)

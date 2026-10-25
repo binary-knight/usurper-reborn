@@ -30,6 +30,13 @@ namespace UsurperRemake.Tests
         /// <summary>Only a stop for a hung relay; a result never depends on it.</summary>
         private static readonly TimeSpan SafetyStop = TimeSpan.FromSeconds(60);
 
+        /// <summary>
+        /// 1.3.8: the human OK path writes nothing of its own, so the fake MUD sends this line right after OK. The
+        /// relay bridges it to stdout only after it has read and handled the OK reply, so seeing it is the positive
+        /// sign that the absence of a bare OK line is a result and not a relay that has not run yet. It holds no "OK".
+        /// </summary>
+        private const string HandledMarker = "RELAY-HANDLED-MARKER";
+
         [Fact]
         public async Task HumanPath_ErrReply_ShowsRedMessage_NotRawErrLine()
         {
@@ -42,6 +49,7 @@ namespace UsurperRemake.Tests
         public async Task HumanPath_OkReply_NoBareOkLine()
         {
             var output = await RunRelay("OK", rawTerminal: true, expectConnected: true);
+            output.Should().Contain(HandledMarker, "the relay handled the OK reply before the absence is checked");
             output.Should().NotContain("OK\r\n");
             output.Should().NotContain("OK");
         }
@@ -73,6 +81,7 @@ namespace UsurperRemake.Tests
             listener.Start();
             int port = ((IPEndPoint)listener.LocalEndpoint).Port;
             string? authSeen = null;
+            bool sendMarker = rawTerminal && expectConnected;
 
             var server = Task.Run(async () =>
             {
@@ -85,7 +94,7 @@ namespace UsurperRemake.Tests
                 {
                     if (line.StartsWith("AUTH:", StringComparison.Ordinal)) { authSeen = line; break; }
                 }
-                var bytes = Encoding.UTF8.GetBytes(reply + "\n");
+                var bytes = Encoding.UTF8.GetBytes(reply + "\n" + (sendMarker ? HandledMarker + "\n" : ""));
                 await stream.WriteAsync(bytes, 0, bytes.Length);
                 await stream.FlushAsync();
                 conn.Close();
@@ -93,7 +102,13 @@ namespace UsurperRemake.Tests
 
             var captured = new SeamStream();
             var saved = RelayClient.OpenStdout;
+            var savedIn = RelayClient.OpenStdin;
             RelayClient.OpenStdout = () => captured;
+            // 1.3.8: the bridge's stdin side cancels the socket side when stdin ends. With the test host's stdin at end of
+            // file that cancel could land before the socket side read the marker line, so the human OK path saw no marker
+            // in about one run of ten after another class had run first. A stdin that stays open until the bridge is
+            // cancelled leaves the socket side to end the bridge, as an open SSH session does (RelayToken128Tests does it).
+            RelayClient.OpenStdin = () => new HeldStdin();
             // 1.3.7: no wall clock budget decides a result. On a loaded runner (the localization scans run beside
             // this class) the relay's continuations can run seconds late; a 10 s token then cancelled the relay
             // before it sent AUTH or before it read the reply (release run 40058954803, twice). The token is only a
@@ -124,23 +139,53 @@ namespace UsurperRemake.Tests
                     // After OK the passthrough writes the OK line before the bridge starts; wait for that write.
                     if (!rawTerminal)
                         (await Task.WhenAny(captured.FirstWrite, Task.Delay(SafetyStop))).Should().BeSameAs(captured.FirstWrite);
-                    // The bridge then reads stdin, which cannot be cancelled; if the test host's stdin never
-                    // reaches end of file the bridge stays open, so the assertions are on the captured output.
+                    // Human path: the relay prints no OK line, so wait (bounded) for the line the fake MUD sent after OK
+                    // to be bridged to stdout; only then is a missing OK line a result.
+                    if (sendMarker)
+                    {
+                        var deadline = DateTime.UtcNow + SafetyStop;
+                        while (!captured.Contains(HandledMarker) && DateTime.UtcNow < deadline)
+                            await Task.Delay(20);
+                        captured.Contains(HandledMarker).Should().BeTrue("the relay handled the OK reply and bridged the next line");
+                    }
+                    // The fake MUD closed after its reply, so the socket side ends the bridge and cancels the stdin read.
+                    // The assertions stay on the captured output; a bridge that does not end is only logged.
                     var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(5)));
                     if (finished == task)
                         (await task).Should().BeTrue();
                     else
-                        Console.Error.WriteLine("[RelayEcho128Tests] relay bridge did not wind down; stdin gave no end of file");
+                        Console.Error.WriteLine("[RelayEcho128Tests] relay bridge did not wind down after the fake MUD closed");
                 }
             }
             finally
             {
                 cts.Cancel();
                 RelayClient.OpenStdout = saved;
+                RelayClient.OpenStdin = savedIn;
                 listener.Stop();
             }
 
-            return Encoding.UTF8.GetString(captured.ToArray());
+            return captured.Text();
+        }
+
+        /// <summary>A stdin that gives no bytes and no end of file; a read ends only when the bridge cancels it.</summary>
+        private sealed class HeldStdin : Stream
+        {
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => 0;
+            public override long Position { get => 0; set { } }
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count) { Thread.Sleep(Timeout.Infinite); return 0; }
+            public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+                return 0;
+            }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
 
         /// <summary>The seam stream; FirstWrite completes when the relay first writes to it.</summary>
@@ -149,17 +194,27 @@ namespace UsurperRemake.Tests
             private readonly TaskCompletionSource _firstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
             public Task FirstWrite => _firstWrite.Task;
 
+            private readonly object _gate = new();
+
             public override void Write(byte[] buffer, int offset, int count)
             {
-                base.Write(buffer, offset, count);
+                lock (_gate) base.Write(buffer, offset, count);
                 _firstWrite.TrySetResult();
             }
 
             public override void Write(ReadOnlySpan<byte> buffer)
             {
-                base.Write(buffer);
+                lock (_gate) base.Write(buffer);
                 _firstWrite.TrySetResult();
             }
+
+            /// <summary>Everything written so far, read under the write lock (the bridge writes from another thread).</summary>
+            public string Text()
+            {
+                lock (_gate) return Encoding.UTF8.GetString(ToArray());
+            }
+
+            public bool Contains(string s) => Text().Contains(s, StringComparison.Ordinal);
         }
     }
 }
