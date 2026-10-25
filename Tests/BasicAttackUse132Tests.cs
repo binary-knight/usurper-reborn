@@ -273,9 +273,8 @@ public class BasicAttackUse132Tests
         attack.Should().Contain("Loc.Get(\"combat.proficiency_up\"");
 
         var src = Engine();
-        BasicImprove.Matches(src).Count.Should().Be(5, "the dead path's two, the two teammate calls and the new one");
+        BasicImprove.Matches(src).Count.Should().Be(4, "the dead path's two, the teammate call and the new one");
         Count(Method(src, "ExecuteSingleAttack"), "TrainingSystem.TryImproveFromUse(attacker, \"basic_attack\", random)").Should().Be(2);
-        Count(Method(src, "ProcessTeammateAction"), "TrainingSystem.TryImproveFromUse(teammate, \"basic_attack\", random, profCap)").Should().Be(1);
         Count(Method(src, "ProcessTeammateActionMultiMonster"), "TrainingSystem.TryImproveFromUse(teammate, \"basic_attack\", random, profCap)").Should().Be(1);
         Method(src, "ProcessPlayerAction").Should().Contain("DeadCombatPathGuard();");
         // ExecuteSingleAttack is reached only from the dead ExecuteAttack and ExecutePowerAttack

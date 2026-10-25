@@ -322,7 +322,7 @@ public class TeammateHoldRules1114Tests
         // comments stripped, so a commented-out call fails the check as a deleted one does
         var src = string.Join("\n", File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"))
             .Split('\n').Select(l => { int c = l.IndexOf("//", StringComparison.Ordinal); return c >= 0 ? l.Substring(0, c) : l; }));
-        foreach (var method in new[] { "private async Task ProcessTeammateAction(", "private async Task ProcessTeammateActionMultiMonster(", "private async Task ProcessGroupedPlayerTurn(" })
+        foreach (var method in new[] { "private async Task ProcessTeammateActionMultiMonster(", "private async Task ProcessGroupedPlayerTurn(" })
         {
             int start = src.IndexOf(method, StringComparison.Ordinal);
             start.Should().BeGreaterThan(0, method);
