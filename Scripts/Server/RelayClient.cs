@@ -23,10 +23,27 @@ namespace UsurperRemake.Server;
 ///   4. Read response (OK or ERR:reason)
 ///   5. If ERR, show error, disconnect, go back to step 1
 ///   6. If OK, bridge stdin↔socket and socket↔stdout until either side closes
+///      (1.4.0: at stdin end the server's remaining output is still written, up to StdinEndDrain)
 /// </summary>
 public static class RelayClient
 {
     private const int MAX_AUTH_ATTEMPTS = 5;
+
+    /// <summary>
+    /// 1.4.0: after stdin ends, the longest the bridge goes on reading the server before it ends anyway. Output the
+    /// server sent before it saw the end arrives over loopback at once; the bound only leaves room for a late scheduled
+    /// read on a loaded host. It is kept short because a server write still succeeds during it where a closed relay
+    /// made it fail, so a session that writes without reading (auto-combat) runs on that much longer.
+    /// </summary>
+    internal static readonly TimeSpan StdinEndDrain = TimeSpan.FromSeconds(1);
+
+    /// <summary>1.4.0: shut the socket's send side (a TCP half close); false when the socket is already gone.</summary>
+    private static bool ShutdownSend(Socket socket)
+    {
+        try { socket.Shutdown(SocketShutdown.Send); return true; }
+        catch (SocketException) { return false; }
+        catch (ObjectDisposedException) { return false; }
+    }
 
     /// <summary>Test seam: the stream the auth reply lines (and, 1.2.8, the bridged session) go to. Default is the real stdout.</summary>
     internal static Func<Stream> OpenStdout = Console.OpenStandardOutput;
@@ -350,9 +367,11 @@ public static class RelayClient
             Console.Error.WriteLine($"[RELAY] Connected as '{username}', bridging I/O");
 
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var socket = client.Client;
 
             var stdinToSocket = Task.Run(async () =>
             {
+                bool stdinEnded = false;
                 try
                 {
                     var buffer = new byte[4096];
@@ -365,7 +384,7 @@ public static class RelayClient
                     while (!linkedCts.Token.IsCancellationRequested)
                     {
                         int read = await stdin.ReadAsync(buffer, 0, buffer.Length, linkedCts.Token);
-                        if (read == 0) break; // stdin closed (SSH disconnected)
+                        if (read == 0) { stdinEnded = true; break; } // stdin closed (SSH disconnected)
                         await stream.WriteAsync(buffer, 0, read, linkedCts.Token);
                     }
                 }
@@ -373,7 +392,13 @@ public static class RelayClient
                 catch (IOException) { }
                 finally
                 {
-                    linkedCts.Cancel();
+                    // 1.4.0: at stdin end of file the send side is shut, so the server reads 0 as from a close, and the
+                    // socket side goes on writing what the server still sends until it closes, for at most StdinEndDrain.
+                    // A stdin error, a cancel or a failed shutdown ends the bridge at once, as before.
+                    if (stdinEnded && ShutdownSend(socket))
+                        linkedCts.CancelAfter(StdinEndDrain);
+                    else
+                        linkedCts.Cancel();
                 }
             });
 
@@ -399,8 +424,7 @@ public static class RelayClient
                 }
             });
 
-            await Task.WhenAny(stdinToSocket, socketToStdout);
-            linkedCts.Cancel();
+            // Each side cancels the other when it ends (the stdin side after the drain bound at end of file).
             try { await Task.WhenAll(stdinToSocket, socketToStdout); } catch { }
 
             return true; // Session completed
