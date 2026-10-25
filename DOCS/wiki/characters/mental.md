@@ -1,8 +1,9 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs
+history: 1.3.8 | A story companion told to wait in a dungeon room does not ease the strain of new rooms while it waits.
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none

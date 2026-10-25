@@ -23,21 +23,21 @@ namespace UsurperRemake.Server;
 ///   4. Read response (OK or ERR:reason)
 ///   5. If ERR, show error, disconnect, go back to step 1
 ///   6. If OK, bridge stdin↔socket and socket↔stdout until either side closes
-///      (1.4.0: at stdin end the server's remaining output is still written, up to StdinEndDrain)
+///      (1.3.8: at stdin end the server's remaining output is still written, up to StdinEndDrain)
 /// </summary>
 public static class RelayClient
 {
     private const int MAX_AUTH_ATTEMPTS = 5;
 
     /// <summary>
-    /// 1.4.0: after stdin ends, the longest the bridge goes on reading the server before it ends anyway. Output the
+    /// 1.3.8: after stdin ends, the longest the bridge goes on reading the server before it ends anyway. Output the
     /// server sent before it saw the end arrives over loopback at once; the bound only leaves room for a late scheduled
     /// read on a loaded host. It is kept short because a server write still succeeds during it where a closed relay
     /// made it fail, so a session that writes without reading (auto-combat) runs on that much longer.
     /// </summary>
     internal static readonly TimeSpan StdinEndDrain = TimeSpan.FromSeconds(1);
 
-    /// <summary>1.4.0: shut the socket's send side (a TCP half close); false when the socket is already gone.</summary>
+    /// <summary>1.3.8: shut the socket's send side (a TCP half close); false when the socket is already gone.</summary>
     private static bool ShutdownSend(Socket socket)
     {
         try { socket.Shutdown(SocketShutdown.Send); return true; }
@@ -392,7 +392,7 @@ public static class RelayClient
                 catch (IOException) { }
                 finally
                 {
-                    // 1.4.0: at stdin end of file the send side is shut, so the server reads 0 as from a close, and the
+                    // 1.3.8: at stdin end of file the send side is shut, so the server reads 0 as from a close, and the
                     // socket side goes on writing what the server still sends until it closes, for at most StdinEndDrain.
                     // A stdin error, a cancel or a failed shutdown ends the bridge at once, as before.
                     if (stdinEnded && ShutdownSend(socket))

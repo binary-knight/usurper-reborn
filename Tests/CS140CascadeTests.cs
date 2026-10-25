@@ -14,7 +14,7 @@ using static UsurperReborn.Tests.PartySurvival133Harness;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0 cascade (design CS-140 v2; his picks 5, C1 and C2): when a monster finishes an ally, every other ally
+/// 1.3.8 cascade (design CS-140 v2; his picks 5, C1 and C2): when a monster finishes an ally, every other ally
 /// in scope in the fight, Downed ones included, saw it. An NPC witness's live world twin records one SawDeath
 /// memory whose description names the fallen ally and whose InvolvedCharacter is empty, so no impression moves,
 /// live or on a replay at load. When the player could have rescued the fallen ally (the left-to-die test), each

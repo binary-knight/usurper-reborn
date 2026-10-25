@@ -13,7 +13,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0: a single player load starts clean beyond the story too. The companions, the dungeon party, the
+/// 1.3.8: a single player load starts clean beyond the story too. The companions, the dungeon party, the
 /// faction, archetype and memory state and the god worship entry of the character played before the load
 /// equal a fresh process's load of the same save. An online session (SessionContext) is left untouched.
 /// NG+ is a new game, not a load, and keeps its cycle and endings.

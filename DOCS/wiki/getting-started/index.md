@@ -1,8 +1,9 @@
 ---
 title: Getting started
 path: /wiki/en/getting-started/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/CharacterCreationLocation.cs, DOCS/BBS_DOOR_SETUP.md
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.5 | none
 history: 1.3.4 | none

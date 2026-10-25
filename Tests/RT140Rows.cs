@@ -8,7 +8,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0 RT: the English values say "Defense", as the rest of the game does; the six keys that carry the old
+/// 1.3.8 RT: the English values say "Defense", as the rest of the game does; the six keys that carry the old
 /// spelling in their names are unchanged; the NPC Voidreaver Constitution floor is in the NPC guide.
 /// </summary>
 public class RT140Rows

@@ -3,7 +3,7 @@ using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 
 /// <summary>
-/// 1.4.0 cascade (design CS-140 v2, DOCS/PARTY_SURVIVABILITY_PLAN.md: "records the memory ... and the town
+/// 1.3.8 cascade (design CS-140 v2, DOCS/PARTY_SURVIVABILITY_PLAN.md: "records the memory ... and the town
 /// talks ... no new state"). When a monster finishes an ally, every other ally in scope in the fight, Downed
 /// ones included, saw it. An NPC witness's live world twin records a SawDeath memory whose English description
 /// names the fallen ally and whose InvolvedCharacter is empty: RecordEvent moves no impression for an empty

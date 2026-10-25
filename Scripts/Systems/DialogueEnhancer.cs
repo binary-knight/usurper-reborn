@@ -337,7 +337,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// 1.4.0: the SawCombat memory a witness records when the player could have rescued a fallen ally and
+        /// 1.3.8: the SawCombat memory a witness records when the player could have rescued a fallen ally and
         /// did not (CombatEngine.RecordFinishWitnesses). It lowers the witness's impression of the player, but
         /// the memory layer never brings it up. Matched by its stored English description, the text of
         /// combat.memory_saw_ally_left with {0} the player, so it holds after a save and a load.

@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.7; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.8; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.7. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.8. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -80,7 +80,7 @@ Single-instance file-backed multi-user mode (intended for self-hosted BBS sysops
 The canonical multiplayer deployment. One process serves N concurrent player sessions over TCP / SSH-forwarded socket. Backed by SQLite. Hosts `MudServer`, `BotDetectionSystem`, `DiscordBridge`, settings apply-queue poller, idle watchdog, all from the same process.
 
 ### MUD Relay (`--mud-relay --mud-port <port>`)
-Lightweight client process that connects to a MUD server. The SSH gateway (`sshd-usurper`) launches this with `ForceCommand` so SSH players speak text to the relay, the relay speaks AUTH protocol to the MUD server. Web terminal also reaches the MUD via the relay.
+Lightweight client process that connects to a MUD server. The SSH gateway (`sshd-usurper`) launches this with `ForceCommand` so SSH players speak text to the relay, the relay speaks AUTH protocol to the MUD server. Web terminal also reaches the MUD via the relay. When the relay's input ends it shuts its send side (a TCP half close) and goes on writing what the server still sends until the server closes, for at most `RelayClient.StdinEndDrain` (1 second), so the game's last lines are not dropped (1.3.8).
 
 ### World Simulator (`--worldsim`)
 Headless 24/7 NPC simulation (deprecated since v0.60.0; the MUD server has integrated world sim). Kept for legacy single-server deployments.
@@ -379,7 +379,7 @@ Special floors lock the player until cleared:
 - Seal floors require collecting the seal; collection adds floor to `player.ClearedSpecialFloors` AND `StoryProgressionSystem.CollectedSeals`
 
 ### Teammate System
-Companions, spouses, lovers, and team NPCs join the dungeon party; live grouped players also join via the Group System. Team combat grants +15% XP/gold bonus. Party state is canonical in `GameEngine.DungeonPartyNPCIds` and `GameEngine.DungeonPartyPlayerNames`; `SyncNPCTeammatesToGameEngine()` rebuilds both from the live `teammates` collection. Removed echoes do not respawn on dungeon re-entry (v0.57.6).
+Companions, spouses, lovers, and team NPCs join the dungeon party; live grouped players also join via the Group System. Team combat grants +15% XP/gold bonus. Party state is canonical in `GameEngine.DungeonPartyNPCIds` and `GameEngine.DungeonPartyPlayerNames`; `SyncNPCTeammatesToGameEngine()` rebuilds both from the live `teammates` collection. Removed echoes do not respawn on dungeon re-entry (v0.57.6). An ally told to wait in a cleared room (1.3.8) keeps its party slot but is in no fight: `Character.WaitingAt` (a `WaitMark` of floor and room, runtime only, never saved) is cleared when the player walks back, calls it back, changes floor or leaves the dungeon, and `CombatEngine.PlayerVsMonsters` drops waiting allies from the fight's list. When a monster finishes an ally, every other ally in the fight records a `SawDeath` memory on its live world twin (`CombatEngine.RecordFinishWitnesses`, `CombatEngine.Cascade.cs`); an NPC ally that saw the player fail to rescue it also records a `SawCombat` memory naming the player (impression -0.1), and a companion loses loyalty. No stance pulls an ally back from a fight.
 
 ### Floor 5 Dungeon Guardian
 Mini-boss encounter on first floor-5 entry. Tied to the v0.52.0 onboarding hook arc.
@@ -407,7 +407,7 @@ NPC-built community in the Outskirts, a town location beyond the city gates. 7 b
    b. Get player action (interactive or quickbar)
    c. Process player action (with ability cooldown, stamina, mana checks)
    d. Each surviving monster: select target -> roll attack -> apply damage
-   e. Each NPC teammate: process status -> CanAct -> AI ability/spell/attack
+   e. Each NPC teammate (not one told to wait): process status -> CanAct -> AI ability/spell/attack
    f. Decrement durations (status effects, taunt rounds, buff timers)
    g. Check end conditions (HP / monster count / fled flag / arrest combat)
 3. Stand Downed allies up, then determine outcome and route rewards / death
@@ -674,6 +674,8 @@ SaveGameData {
 }
 ```
 
+Since 1.3.8 a single player load (both load paths) first calls `GameEngine.ResetStoryForSinglePlayerLoad()`: the story, narrative systems, companions, dungeon party, faction, archetype, amnesia memories and the previous character's god entry start clean before any restore step. An online session keeps its own systems and is left alone. A new character also starts with no recovered amnesia memories.
+
 ### PlayerData (selection of major fields)
 Identity, stats, attributes, equipment (legacy + modern), inventory, status, daily counters, home upgrades, dungeon progression, preferences, statistics, achievements, login streak, weekly rank/rival, online death state (Resurrections, ResurrectionsUsed, MaxResurrections, TempleResurrectionsUsed, IsArrestCombat), Knighthood/Fame, Blood Moon state, NG+ cycle, child support data, herb pouch, settlement buffs, language/compact mode, mute channels, romantic orientation.
 
@@ -684,7 +686,7 @@ Identity, stats, class/race, lifecycle (Age, BirthDate, IsAgedDeath, PregnancyDu
 Serialization-time caps prevent save inflation on long sessions:
 - Memories: 30 per NPC (`MaxMemoriesToSerialize` in `SaveSystem`, top by Importance desc)
 - `MaxSerializedDialogueIdsPerNpc = 50`
-- `MaxSerializedRelationshipsPerNpc = 100` (by `|strength|` desc)
+- `MaxSerializedRelationshipsPerNpc = 100` (by `|strength|` desc; the `world_state` writer keeps 20, `OnlineStateManager.MaxSharedRelationshipsPerNpc`). Since 1.3.8 every NPC load sets each saved opinion back after the memories are replayed (`SaveSystem.RestoreNPCRelationships`), so an NPC holds the opinion it had when saved
 - `MaxSerializedKnownCharactersPerNpc = 80`
 - `MaxSerializedEnemiesPerNpc = 30`
 - Royal court collections (Prisoners 50, Orphans 100, Monarchs 30, Court 50, Heirs 20, Monster Guards 30)
@@ -1696,7 +1698,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.7"
+Version = "1.3.8"
 VersionName = "Reckoning"
 ```
 

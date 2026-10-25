@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | In a cleared dungeon room an ally can be told to wait, out of every fight, until you walk back, call it back, change floor or leave the dungeon; NPC allies who see a teammate finished remember it, a fall you could have stopped lowers their opinion of you without them bringing it up in talk, and the stance rows wrap at 79 columns.
 history: 1.3.7 | none
 history: 1.3.6 | An NPC ally's party heals, buffs and songs now reach you and give the ally its share only once, its ally heal can pick you, Death's Embrace now leaves an ally standing at 15 percent of its maximum HP, and Rescue lifts each Downed ally once per fight, so an ally finished after its rescue no longer counts as left to die.
 history: 1.3.5 | A living companion now takes the NPC teammate's 75 percent share of the experience from room features and shared rewards.

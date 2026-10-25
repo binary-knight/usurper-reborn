@@ -1,8 +1,9 @@
 ---
 title: Characters
 path: /wiki/en/characters/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Core/GameConfig.cs
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none

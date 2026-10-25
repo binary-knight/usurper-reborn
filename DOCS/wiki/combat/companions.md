@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | A companion can be told to wait in a cleared dungeon room, one that sees an ally finished when you could have rescued it loses loyalty, and a reload now keeps each companion's disabled spells and its recruit time, so Vex's 30 days no longer start over.
 history: 1.3.7 | Against Manwe the thorns on a companion's gear return 45 percent of their amount.
 history: 1.3.6 | A companion's own thorns gear now hurts a monster whose normal attack strikes it, Titan's Resolve on its gear raises its maximum HP by 5 percent, and a companion finished after you rescued it in that fight no longer counts as left to die.
 history: 1.3.5 | A living companion takes the NPC teammate's 75 percent share of the experience from room features and shared rewards, the experience line after a fight shows how close it is to its next level, and its own regeneration gear restores a share of its HP and mana each round.

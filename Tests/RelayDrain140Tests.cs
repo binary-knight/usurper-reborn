@@ -14,7 +14,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0: when the relay's stdin ends (a real end of file, a read of 0 at once), the relay shuts its socket's send
+/// 1.3.8: when the relay's stdin ends (a real end of file, a read of 0 at once), the relay shuts its socket's send
 /// side and goes on writing what the server sends until the server closes, for at most RelayClient.StdinEndDrain.
 /// Each test runs RelayClient.ConnectAndBridge against a fake MUD on a loopback listener (TestLoopback, 127.0.0.1,
 /// an ephemeral port) with stdin and stdout swapped through the relay's seams. The seams are static, so the class

@@ -15,7 +15,7 @@ using static UsurperReborn.Tests.PartySurvival133Harness;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0: no stance pulls back from a fight. The rows that remain pin what the stances play and show: a
+/// 1.3.8: no stance pulls back from a fight. The rows that remain pin what the stances play and show: a
 /// Balanced fight on a fixed seed is byte equal to the base, and the Cautious stance line is the 1.3.7 line
 /// and fits 79 columns.
 /// </summary>
@@ -50,7 +50,7 @@ public class W140Withdraw
         return $"{res.Outcome}|{res.CurrentRound}|{hero.HP}|{a.HP}|{b.HP}|{a.IsDowned}|{b.IsDowned}|{mob.HP}|{rng.Calls.Count}|{Sha(string.Join("\n", rng.Calls))}";
     }
 
-    /// <summary>Written by this test on release-1.4.0 at 54f1c3cd, before the piece.</summary>
+    /// <summary>Written by this test on release-1.3.8 at 54f1c3cd, before the piece.</summary>
     private const string BalancedOnTheBase = "Victory|4|600|50|50|False|False|0|57|E27EDBC212B3BCEF";
 
     [Fact]
@@ -91,7 +91,7 @@ public class W140Withdraw
         string cautious = $"  [3] {Loc.GetIn(lang, "party.stance.cautious")}  {Loc.GetIn(lang, "party.stance.cautious.desc")}";
         if (lang == "en" || lang == "hu")
             cautious.Length.Should().BeLessThanOrEqualTo(79, cautious);
-        // 1.4.0 WX: no stance pulls back in 1.4, so the stance line is the 1.3.7 line again
+        // 1.3.8 WX: no stance pulls back in 1.4, so the stance line is the 1.3.7 line again
         Loc.GetIn(lang, "party.stance.cautious.desc").Should().Be(CautiousDesc137[lang]);
     }
 

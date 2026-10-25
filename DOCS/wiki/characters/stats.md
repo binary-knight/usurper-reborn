@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.8 | none
 history: 1.3.7 | The character creation screen describes Wisdom as mana pool, cheaper spells and healing, which is what it does.
 history: 1.3.6 | Magic resistance on your gear now cuts a monster's breaths and spells by up to half, except an Old God's, and the Mystic Shaman's Lightning Bolt, Chain Lightning and Searing Totem now scale with Intelligence.
 history: 1.3.5 | Critical damage from gear adds on top of the 3 times cap, which now holds only for the Dexterity part.

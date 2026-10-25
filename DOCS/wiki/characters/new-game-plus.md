@@ -1,8 +1,9 @@
 ---
 title: New Game Plus (NG+) and cycles
 path: /wiki/en/characters/new-game-plus/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MetaProgressionSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Core/Items.cs
+history: 1.3.8 | A new character that is not NG+ now starts with no recovered memories, while NG+ keeps them.
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
@@ -39,7 +40,7 @@ In single-player the town, its NPCs and your family also start fresh. Online, th
 
 A few lifetime records do survive: completed sellsword contracts, lifetime charity gold and completed family arcs, which give a starting Charisma bonus.
 
-Your recovered memories also stay with you on the next cycle, with the dreams you have seen and the full truth of who you are once you know it. A new character that is not NG+ starts with none.
+Your recovered memories also stay with you on the next cycle, with the memory dreams you have seen and the full truth of who you are once you know it; your other dreams and dungeon visions start over. A new character that is not NG+ starts with none.
 
 ## Cycle bonuses
 

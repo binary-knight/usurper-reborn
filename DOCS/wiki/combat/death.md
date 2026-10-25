@@ -1,8 +1,9 @@
 ---
 title: Death and resurrection
 path: /wiki/en/combat/death/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.8 | none
 history: 1.3.7 | Losing levels at death takes from an Abysswarden or a Voidreaver the Constitution those levels gave.
 history: 1.3.6 | Last Stand and Death's Door now keep you fighting at 1 HP, each once per fight, in place of ending the fight, and they come before Divine Favor.
 history: 1.3.5 | none

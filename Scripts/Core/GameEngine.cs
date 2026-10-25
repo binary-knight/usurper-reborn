@@ -2653,7 +2653,7 @@ public partial class GameEngine
     {
         try
         {
-            // 1.4.0: a single player load starts from a clean story, before any restore step
+            // 1.3.8: a single player load starts from a clean story, before any restore step
             ResetStoryForSinglePlayerLoad();
 
             // v0.60.0 beta-launch Rage event: short-circuit BEFORE any save
@@ -2714,7 +2714,7 @@ public partial class GameEngine
             // Process daily login streak rewards
             await ProcessLoginStreak(currentPlayer);
 
-            // Show weekly rank change on login. 1.4.0: no save here, the story is not restored yet;
+            // Show weekly rank change on login. 1.3.8: no save here, the story is not restored yet;
             // the next save writes the consumed rank.
             ShowWeeklyRankChange(terminal, currentPlayer);
 
@@ -4687,7 +4687,7 @@ public partial class GameEngine
     /// </summary>
     private async Task LoadExistingGame(string playerName)
     {
-        // 1.4.0: a single player load starts from a clean story, before any restore step
+        // 1.3.8: a single player load starts from a clean story, before any restore step
         ResetStoryForSinglePlayerLoad();
 
         terminal.WriteLine(Loc.Get("save.loading"), "yellow");
@@ -4806,7 +4806,7 @@ public partial class GameEngine
     }
 
     /// <summary>
-    /// 1.4.0: a single player load starts from a clean story, the state a fresh process starts with:
+    /// 1.3.8: a single player load starts from a clean story, the state a fresh process starts with:
     /// the story (seals, artifacts, flags, endings, Old God states, cycle) and the narrative systems a
     /// new character starts without. Both load paths call it before any restore step. An online
     /// session has its own systems on its SessionContext and is left alone. Returns true when it ran.
@@ -4834,7 +4834,7 @@ public partial class GameEngine
 
     /// <summary>
     /// The weekly rank change shown at login, then the rival line. v0.57.10: the change is consumed once
-    /// shown (PreviousWeeklyRank takes the current rank), so it shows once per Monday update. 1.4.0: it
+    /// shown (PreviousWeeklyRank takes the current rank), so it shows once per Monday update. 1.3.8: it
     /// never saves; a login runs it before the story is restored, and the next save writes the consumed
     /// rank. Returns true when a change was shown.
     /// </summary>

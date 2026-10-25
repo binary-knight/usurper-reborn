@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.3.8 | Loading a single-player character now starts clean, with no story, companions, party, faction or memories left from the character played before it, and the SSH relay keeps the game's last lines when its input ends first.
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none

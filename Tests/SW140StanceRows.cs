@@ -13,7 +13,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0 SW: the stance picker rows ("  [N] name  description") fit 79 columns in every language, in the dungeon party
+/// 1.3.8 SW: the stance picker rows ("  [N] name  description") fit 79 columns in every language, in the dungeon party
 /// menu and in the Inn. A description that is too long continues on rows indented under its start; a row that fits is
 /// the one row it always was.
 /// </summary>

@@ -12,7 +12,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0: a single player load starts from a clean story. The story (seals, artifacts, flags, endings,
+/// 1.3.8: a single player load starts from a clean story. The story (seals, artifacts, flags, endings,
 /// Old God states, cycle) and the narrative systems restored with it equal a fresh process's load of the
 /// same save. An online session (SessionContext) keeps its own systems untouched. NG+ is a new game, not a
 /// load, and keeps its cycle and endings.

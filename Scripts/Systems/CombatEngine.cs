@@ -1145,7 +1145,7 @@ public partial class CombatEngine
             });
             // Seed initial party state so MUD clients can render party panes
             // without waiting for the first round-end update.
-            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.4.0 H: as the fight's list, no waiting ally
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.3.8 H: as the fight's list, no waiting ally
         }
 
         // Store teammates for healing/support actions.
@@ -1156,7 +1156,7 @@ public partial class CombatEngine
         // the fight. Membership changes now take effect at the next combat; a follower
         // [R]-retreat removes from this combat-local list only (they stay in the group).
         currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
-        currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.4.0 H: an ally told to wait is in no fight
+        currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.3.8 H: an ally told to wait is in no fight
 
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
@@ -21433,7 +21433,7 @@ public partial class CombatEngine
         return true;
     }
 
-    /// <summary>1.4.0 W: the abilities a teammate could use this turn, after the class ability step's own filters
+    /// <summary>1.3.8 W: the abilities a teammate could use this turn, after the class ability step's own filters
     /// (escape and an Empathic Link with no ally left out, the player's toggles, the NPC spec rules, stamina, mana,
     /// cooldown and CanUseAbility), with the spec and the cooldowns; null abilities when none. Moved here unchanged
     /// from TryTeammateClassAbility, which calls it.</summary>
@@ -21532,7 +21532,7 @@ public partial class CombatEngine
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return false;
 
-        var (affordableAbilities, activeSpec, myCooldowns) = AffordableTeammateAbilitiesAndSpec(teammate, result);   // 1.4.0 W: the filters, moved unchanged
+        var (affordableAbilities, activeSpec, myCooldowns) = AffordableTeammateAbilitiesAndSpec(teammate, result);   // 1.3.8 W: the filters, moved unchanged
         if (affordableAbilities == null || affordableAbilities.Count == 0 || myCooldowns == null) return false;
 
         // Don't pick heal abilities unless someone in the party actually needs healing
@@ -22925,7 +22925,7 @@ public partial class CombatEngine
         var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
         bool wasPermadeath = false;
         bool warded = false;   // v1.2.8 (H3)
-        bool fallNewsWritten = false;   // 1.4.0: MarkNPCDead writes the one news line of the fall
+        bool fallNewsWritten = false;   // 1.3.8: MarkNPCDead writes the one news line of the fall
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
@@ -23083,7 +23083,7 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Pacing.Wait(1000);
 
-        // Generate death news for the realm. 1.4.0: only when MarkNPCDead did not run above; it already wrote the
+        // Generate death news for the realm. 1.3.8: only when MarkNPCDead did not run above; it already wrote the
         // one line of the fall (the death line, or the permadeath "will not return" line)
         if (!fallNewsWritten)
         {

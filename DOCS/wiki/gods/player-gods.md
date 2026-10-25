@@ -1,8 +1,9 @@
 ---
 title: Immortals, player-gods and the Pantheon
 path: /wiki/en/gods/player-gods/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDomainPicker.cs, Scripts/Systems/DivineBoonRegistry.cs, Scripts/Systems/ImmortalDeedSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WeeklyGodSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/LocationManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/GameEngine.cs, Scripts/Server/MudChatSystem.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
