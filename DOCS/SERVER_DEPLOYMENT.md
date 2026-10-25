@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.7; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
+<!-- doc: checked 1.3.8; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
 # Usurper Reborn - Online Server Deployment Guide
 
 ## Overview
@@ -368,7 +368,7 @@ Player's PC                          Your Server
                                      +----------------------------+
 ```
 
-- **sshd-usurper** handles SSH authentication, then relays the connection to the MUD server via TCP
+- **sshd-usurper** handles SSH authentication, then relays the connection to the MUD server via TCP. When the SSH input ends first, the relay shuts its send side and waits up to 1 second for the server to finish writing, so the last lines of the game are not lost (1.3.8)
 - **usurper-mud** is a single persistent process that manages all player sessions and runs the world simulation
 - Much lower memory per player (~5-10 MB vs ~80-120 MB in the simple model)
 - NPCs explore the dungeon, shop, form teams, and interact 24/7

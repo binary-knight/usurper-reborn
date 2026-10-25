@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.7; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.8; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
