@@ -483,7 +483,19 @@ public class SL2140LoadCarry : IDisposable
         start.Should().BePositive();
         var body = src.Substring(start, src.IndexOf("\n    private ", start + 1, StringComparison.Ordinal) - start);
         body.Should().NotContain("ResetStoryForSinglePlayerLoad", "NG+ is a new game, not a load");
-        body.Should().NotContain("AmnesiaSystem", "a new game keeps what it had");
+        // 1.3.8: the memories reset only in the branch that is not NG+; NG+ keeps them
+        int ngPlus = body.IndexOf("if (isNgPlus)", StringComparison.Ordinal);
+        int notNgPlus = body.IndexOf("else", ngPlus, StringComparison.Ordinal);
+        int branchEnd = body.IndexOf('{', notNgPlus);
+        for (int depth = 0; branchEnd < body.Length; branchEnd++)
+        {
+            if (body[branchEnd] == '{') depth++;
+            else if (body[branchEnd] == '}' && --depth == 0) { branchEnd++; break; }
+        }
+        notNgPlus.Should().BeLessThan(body.IndexOf("NOT NG+", StringComparison.Ordinal), "the else is the branch that is not NG+");
+        body.Substring(0, notNgPlus).Should().NotContain("AmnesiaSystem", "NG+ keeps the memories");
+        body.Substring(notNgPlus, branchEnd - notNgPlus).Should().Contain("AmnesiaSystem.Instance.Reset();");
+        body.Substring(branchEnd).Should().NotContain("AmnesiaSystem", "the reset sits in that branch only");
         body.Should().Contain("if (isNgPlus)");
     }
 }

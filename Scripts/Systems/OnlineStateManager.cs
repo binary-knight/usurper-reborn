@@ -888,9 +888,7 @@ namespace UsurperRemake.Systems
                 var quests = SerializeCurrentQuests();
                 await SaveSharedQuests(quests);
 
-                // Story systems
-                var story = SaveSystem.Instance.SerializeStorySystemsPublic();
-                await SaveSharedStorySystems(story);
+                // 1.3.8: the session's story stays in its own save; the shared story_systems key is not written
 
                 DebugLogger.Instance.LogDebug("ONLINE", "All shared state saved");
             }

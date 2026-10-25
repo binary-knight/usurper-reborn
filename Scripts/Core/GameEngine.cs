@@ -5011,6 +5011,8 @@ public partial class GameEngine
         {
             Console.Error.WriteLine($"[NG+] NOT NG+ — calling FullReset");
             UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+            // 1.3.8: a new character starts with no recovered memories; NG+ keeps them across the cycle
+            UsurperRemake.Systems.AmnesiaSystem.Instance.Reset();
         }
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
