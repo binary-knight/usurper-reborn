@@ -1753,6 +1753,20 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.4.0: the companions a single player load starts from, as a new system holds them: rebuilt from
+        /// the definitions (so what ResetAllCompanions does not name, such as base stats grown by level ups,
+        /// secondary stats, potions, skills and an unlocked personal quest, goes too), then ResetAllCompanions.
+        /// Only GameEngine.ResetStoryForSinglePlayerLoad calls it; a new game, NG+ and a restore keep
+        /// ResetAllCompanions alone.
+        /// </summary>
+        internal void RebuildForSinglePlayerLoad()
+        {
+            companions.Clear();
+            InitializeCompanions();
+            ResetAllCompanions();
+        }
+
+        /// <summary>
         /// Reset all companions to their initial state (not recruited, not dead)
         /// Called before loading a save to prevent state bleeding between characters
         /// </summary>
