@@ -2,6 +2,7 @@ using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -146,7 +147,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write(label1.PadRight(18));
+            terminal.Write(TextWidth.PadRight(label1, 18));
         }
 
         if (!string.IsNullOrEmpty(key2))
@@ -158,7 +159,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write(label2.PadRight(18));
+            terminal.Write(TextWidth.PadRight(label2, 18));
         }
 
         if (!string.IsNullOrEmpty(key3))

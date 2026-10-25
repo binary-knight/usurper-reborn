@@ -3,6 +3,7 @@ using UsurperRemake.Systems;
 using UsurperRemake.BBS;
 using UsurperRemake.Data;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -634,7 +635,7 @@ public partial class TempleLocation : BaseLocation
             for (int i = 0; i < ranking.Count; i++)
             {
                 var entry = ranking[i];
-                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)} {entry.Standing.ToString().PadLeft(8)}";
+                string line = $"{(i + 1).ToString().PadLeft(3)}. {TextWidth.PadRight(entry.Name, 25)} {TextWidth.PadRight(entry.Title, 20)} {entry.Followers.ToString().PadLeft(10)} {entry.Standing.ToString().PadLeft(8)}";
                 terminal.WriteLine(line, entry.IsPlayer ? "bright_cyan" : "yellow");
             }
         }

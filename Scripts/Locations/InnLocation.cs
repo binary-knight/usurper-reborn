@@ -417,7 +417,7 @@ public class InnLocation : BaseLocation
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
                 terminal.SetColor("white");
-                terminal.Write(label1.PadRight(col - key1.Length - 4));
+                terminal.Write(TextWidth.PadRight(label1, col - key1.Length - 4));
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
                 terminal.SetColor("bright_yellow");
@@ -5500,9 +5500,9 @@ public class InnLocation : BaseLocation
         terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
         terminal.Write($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]".PadRight(layout.TagWidth + 1));
         terminal.SetColor(isDisabled ? "gray" : "white");
-        terminal.Write(name.PadRight(layout.NameWidth));
+        terminal.Write(TextWidth.PadRight(name, layout.NameWidth));
         terminal.SetColor("darkgray");
-        terminal.Write($" {cost.PadLeft(layout.CostWidth)}  {level.PadRight(layout.LevelWidth)}  ");
+        terminal.Write($" {TextWidth.PadLeft(cost, layout.CostWidth)}  {TextWidth.PadRight(level, layout.LevelWidth)}  ");
         terminal.SetColor(isDisabled ? "darkgray" : "gray");
         if (IsScreenReader)
         {
@@ -5650,7 +5650,7 @@ public class InnLocation : BaseLocation
                 int hp = (int)(opt.baseHp * levelMultiplier);
                 bool canAfford = currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost >= cost;
                 terminal.SetColor(canAfford ? "white" : "dark_red");
-                terminal.WriteLine($"  [{i + 1}] {opt.name.PadRight(guardNameWidth)} {Loc.Get("magic_shop.gold_short", $"{cost,6:N0}")}  {Loc.Get("inn.guard_hp_tag", hp)}");
+                terminal.WriteLine($"  [{i + 1}] {TextWidth.PadRight(opt.name, guardNameWidth)} {Loc.Get("magic_shop.gold_short", $"{cost,6:N0}")}  {Loc.Get("inn.guard_hp_tag", hp)}");
             }
             terminal.SetColor("bright_yellow");
             terminal.Write("  [D]");

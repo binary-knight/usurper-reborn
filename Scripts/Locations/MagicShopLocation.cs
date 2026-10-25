@@ -1352,7 +1352,7 @@ public partial class MagicShopLocation : BaseLocation
     internal static string MenuSectionRow(string leftKey, string rightKey)
     {
         string left = $"  ═══ {Loc.Get(leftKey)} ═══";
-        return left.PadRight(40) + $"═══ {Loc.Get(rightKey)} ═══";
+        return TextWidth.PadRight(left, 40) + $"═══ {Loc.Get(rightKey)} ═══";
     }
 
     /// <summary>v1.2.5: "[K]label" from a whole-word label: "[E]nchant Equipment" when the label starts with the
@@ -1833,7 +1833,7 @@ public partial class MagicShopLocation : BaseLocation
 
             // Slot label -- the bag label for inventory items, the slot name for equipped.
             terminal.SetColor(idx > equippedCount ? "dark_yellow" : "darkgray");
-            terminal.Write(slotLabel.PadRight(slotWidth));
+            terminal.Write(TextWidth.PadRight(slotLabel, slotWidth));
 
             // Item name with enchant/cursed tags
             string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
@@ -3149,14 +3149,14 @@ public partial class MagicShopLocation : BaseLocation
                         int labelWidth = Math.Max(leftLabel.Length, rightLabel.Length) + 1;
                         if (IsScreenReader)
                         {
-                            terminal.WriteLine($"    L. {leftLabel.PadRight(labelWidth)}{lf.Name}");
-                            terminal.WriteLine($"    R. {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    L. {TextWidth.PadRight(leftLabel, labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    R. {TextWidth.PadRight(rightLabel, labelWidth)}{rf.Name}");
                             terminal.WriteLine($"    C. {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         else
                         {
-                            terminal.WriteLine($"    [L] {leftLabel.PadRight(labelWidth)}{lf.Name}");
-                            terminal.WriteLine($"    [R] {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    [L] {TextWidth.PadRight(leftLabel, labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    [R] {TextWidth.PadRight(rightLabel, labelWidth)}{rf.Name}");
                             terminal.WriteLine($"    [C] {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         var fingerChoice = await terminal.GetInput($"  {Loc.Get("magic_shop.replace_which_ring")}");
@@ -3586,7 +3586,7 @@ public partial class MagicShopLocation : BaseLocation
                     terminal.Write($"{npcName,-28}");
 
                     terminal.SetColor("darkgray");
-                    terminal.Write(npc.ClassName.PadRight(classW));
+                    terminal.Write(TextWidth.PadRight(npc.ClassName, classW));
 
                     if (showLevel)
                     {
@@ -4024,9 +4024,9 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.SetColor(canAfford ? "bright_red" : "red");
                 terminal.Write(spellName);
                 terminal.SetColor(canAfford ? "white" : "darkgray");
-                terminal.Write($"{displaySuccess}%".PadLeft(chanceW) + "  ");
+                terminal.Write(TextWidth.PadLeft($"{displaySuccess}%", chanceW) + "  ");
                 terminal.SetColor(canAfford ? "yellow" : "darkgray");
-                terminal.Write($"{cost:N0}".PadLeft(11));
+                terminal.Write(TextWidth.PadLeft($"{cost:N0}", 11));
                 terminal.SetColor(canAfford ? "cyan" : "darkgray");
                 terminal.Write(" " + Loc.Get("base.prompt_mp", spell.manaCost).PadLeft(6));
                 terminal.SetColor("red");

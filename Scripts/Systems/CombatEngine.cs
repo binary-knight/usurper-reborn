@@ -3152,7 +3152,7 @@ public partial class CombatEngine
         terminal.WriteLine("╔═══════════════════════════════════════╗");
         terminal.Write("║");
         terminal.SetColor("bright_white");
-        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(ct.PadLeft(pl).PadRight(39)); }
+        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(TextWidth.PadLeft(ct, pl).PadRight(39)); }
         terminal.SetColor("green");
         terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
@@ -3407,7 +3407,7 @@ public partial class CombatEngine
         terminal.WriteLine("╔═══════════════════════════════════════╗");
         terminal.Write("║");
         terminal.SetColor("bright_white");
-        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(ct.PadLeft(pl).PadRight(39)); }
+        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(TextWidth.PadLeft(ct, pl).PadRight(39)); }
         terminal.SetColor("green");
         terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
@@ -23900,7 +23900,7 @@ public partial class CombatEngine
             terminal.WriteLine($"  ║{("            ★  " + Loc.Get("combat.first_blood_title") + "  ★").PadRight(boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
             terminal.WriteLine($"  ║{("  " + Loc.Get("combat.first_blood_message")).PadRight(boxWidth)}║");
-            terminal.WriteLine($"  ║{bonusLine.PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight(bonusLine, boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
             terminal.WriteLine($"  ║{("  " + Loc.Get("combat.more_challenges")).PadRight(boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");

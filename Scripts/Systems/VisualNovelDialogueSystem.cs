@@ -231,7 +231,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("╔" + new string('═', HeaderInner) + "╗");
                 terminal.SetColor(relColor);
-                terminal.WriteLine("║" + $"  {npc.Name2}{romanticStatus}".PadRight(HeaderInner) + "║");
+                terminal.WriteLine("║" + TextWidth.PadRight($"  {npc.Name2}{romanticStatus}", HeaderInner) + "║");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("╚" + new string('═', HeaderInner) + "╝");
             }

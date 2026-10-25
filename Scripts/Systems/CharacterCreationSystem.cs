@@ -1195,7 +1195,7 @@ public class CharacterCreationSystem
         var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
         string prompt = $" {Loc.Get("creation.preview.be_race", raceDesc)}";
         terminal.Write("║", "gray");
-        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.Write(TextWidth.PadRight(prompt, TOTAL_W - 2), "white");
         terminal.WriteLine("║", "gray");
 
         // ── Row 23: Bottom border ──
@@ -1784,7 +1784,7 @@ public class CharacterCreationSystem
         var article = GameConfig.ArticulateForLanguage(className, capitalize: false);
         string prompt = $" {Loc.Get("creation.preview.be_class", article)}";
         terminal.Write("║", "gray");
-        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.Write(TextWidth.PadRight(prompt, TOTAL_W - 2), "white");
         terminal.WriteLine("║", "gray");
 
         // ── Row 23: Bottom border ──
@@ -3125,7 +3125,7 @@ public class CharacterCreationSystem
         int nameWidth = Math.Max(9, list.Max(e => e.Name.Length)) + 1;
         foreach (var (name, text) in list)
         {
-            string head = name.PadRight(nameWidth) + "- ";
+            string head = TextWidth.PadRight(name, nameWidth) + "- ";
             var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - head.Length);
             yield return head + wrapped[0];
             foreach (var more in wrapped.Skip(1))

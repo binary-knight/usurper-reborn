@@ -3,6 +3,7 @@ using UsurperRemake.Systems;
 using UsurperRemake.Data;
 using UsurperRemake.Locations;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
@@ -1428,7 +1429,7 @@ public partial class GameEngine
             {
                 var s = Loc.Get(key) ?? "";
                 // Translations drift; never let one blow the border apart.
-                return s.Length > BoxInner ? s.Substring(0, BoxInner) : s.PadRight(BoxInner);
+                return s.Length > BoxInner ? s.Substring(0, BoxInner) : TextWidth.PadRight(s, BoxInner);
             }
 
             terminal.SetColor("bright_cyan");
@@ -1450,7 +1451,7 @@ public partial class GameEngine
             terminal.WriteLine(" ║");
             terminal.Write("  ║ ");
             terminal.SetColor("bright_cyan");
-            terminal.Write(GameConfig.DiscordInvite.PadRight(BoxInner));
+            terminal.Write(TextWidth.PadRight(GameConfig.DiscordInvite, BoxInner));
             terminal.WriteLine(" ║");
             terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         }

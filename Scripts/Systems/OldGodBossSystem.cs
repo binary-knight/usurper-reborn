@@ -1914,7 +1914,7 @@ namespace UsurperRemake.Systems
         {
             if (text.Length >= width) return text;
             int padding = (width - text.Length) / 2;
-            return text.PadLeft(padding + text.Length).PadRight(width);
+            return TextWidth.PadLeft(text, padding + text.Length).PadRight(width);
         }
 
         private string RenderHealthBar(double percent, int width)

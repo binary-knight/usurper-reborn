@@ -3302,11 +3302,11 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
-                terminal.Write(cmd.PadRight(10));
+                terminal.Write(TextWidth.PadRight(cmd, 10));
                 terminal.SetColor("gray");
                 terminal.Write($" {or} ");
                 terminal.SetColor("cyan");
-                terminal.Write(alias.PadRight(4));
+                terminal.Write(TextWidth.PadRight(alias, 4));
             }, 1 + Math.Max(10, cmd.Length) + or.Length + 2 + Math.Max(4, alias.Length), desc);
         }
 
@@ -3317,7 +3317,7 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
-                terminal.Write(cmd.PadRight(18));
+                terminal.Write(TextWidth.PadRight(cmd, 18));
             }, 1 + Math.Max(18, cmd.Length), desc);
         }
 
@@ -3362,7 +3362,7 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("bright_yellow");
-                terminal.Write(key.PadRight(2));
+                terminal.Write(TextWidth.PadRight(key, 2));
                 terminal.SetColor("white");
                 terminal.Write($" {desc}");
             }, 2 + 1 + desc.Length + 1);
@@ -3387,7 +3387,7 @@ public abstract class BaseLocation
                 {
                     terminal.Write(" ");
                     terminal.SetColor("bright_green");
-                    terminal.Write(cmd.PadRight(20));
+                    terminal.Write(TextWidth.PadRight(cmd, 20));
                 }, 1 + Math.Max(20, cmd.Length), desc);
             }
 
@@ -10441,7 +10441,7 @@ public abstract class BaseLocation
             terminal.SetColor("cyan");
             terminal.Write($"{stats,-16} ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write(" ");
             terminal.SetColor(isMine ? "cyan" : "gray");
             terminal.Write($"{Truncate(l.Seller, AuctionSellerWidth - 1),-13} ");
@@ -10926,7 +10926,7 @@ public abstract class BaseLocation
             terminal.SetColor("white");
             terminal.Write($"{Truncate(l.ItemName, 23),-24} ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write("  ");
             terminal.SetColor(statusColor);
             terminal.WriteLine($"[{statusText}]");
@@ -11263,7 +11263,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {li + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write(lLabel.PadRight(labelWidth));
+            terminal.Write(TextWidth.PadRight(lLabel, labelWidth));
             if (lItem != null)
             {
                 terminal.SetColor("gray");
@@ -11282,7 +11282,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($" {ri + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write(rLabel.PadRight(labelWidth));
+            terminal.Write(TextWidth.PadRight(rLabel, labelWidth));
             if (rItem != null)
             {
                 terminal.SetColor("gray");

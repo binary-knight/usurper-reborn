@@ -245,16 +245,16 @@ namespace UsurperRemake.UI
             string stats = $"{current}/{max}";
 
             string line = $"  {label}: [{bar}] {stats}";
-            if (line.Length > BoxWidth)
-                line = line.Substring(0, BoxWidth);
-
+            // v1.3.9: measured in columns, not characters, or a Chinese label overflows the border
+            if (TextWidth.Width(line) > BoxWidth)
+                line = TextWidth.Truncate(line, BoxWidth);
             terminal.Write($"{Vertical}  ", borderColor);
             terminal.Write($"{label}: ", labelColor);
             terminal.Write("[", "white");
             terminal.Write(new string('█', Math.Max(0, Math.Min(barWidth, filled))), barColor);
             terminal.Write(new string('░', Math.Max(0, barWidth - filled)), "gray");
             terminal.Write($"] {stats}".PadRight(Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
-            terminal.WriteLine($"{Vertical}", borderColor);
+            terminal.Write(TextWidth.PadRight($"] {stats}", Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
         }
 
         /// <summary>

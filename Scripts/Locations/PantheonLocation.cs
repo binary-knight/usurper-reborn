@@ -83,7 +83,7 @@ public class PantheonLocation : BaseLocation
     {
         int width = Math.Min(cap, Math.Max(4, BoonRowWidth - fixedWidth));
         if (text.Length > width) text = text.Substring(0, width - 3) + "...";
-        return text.PadRight(width);
+        return TextWidth.PadRight(text, width);
     }
 
     // Anti-grief: tracks last smite time per "godName>targetName" pair

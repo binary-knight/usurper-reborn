@@ -2,6 +2,7 @@ using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -248,7 +249,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write(label1.PadRight(25));
+            terminal.Write(TextWidth.PadRight(label1, 25));
         }
 
         if (!string.IsNullOrEmpty(key2))

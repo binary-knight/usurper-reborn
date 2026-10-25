@@ -1,4 +1,5 @@
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -252,7 +253,7 @@ namespace UsurperRemake.Systems
             }
             terminal.SetColor("bright_yellow");
             string townNews = Loc.Get("news.town_news_header");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? townNews : townNews.PadLeft(22 + townNews.Length / 2));
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? townNews : TextWidth.PadLeft(townNews, 22 + townNews.Length / 2));
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("yellow");
