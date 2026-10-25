@@ -466,7 +466,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Wizard Commands"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Wizard Commands"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
@@ -575,7 +575,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Wizards Online"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Wizards Online"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
@@ -770,7 +770,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Player Locations"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Player Locations"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");

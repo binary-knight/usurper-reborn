@@ -389,9 +389,9 @@ namespace UsurperRemake.Systems
             else
             {
                 terminal.SetColor("bright_red");
-                int padLen = Math.Max(0, (76 - title.Length) / 2);
+                int padLen = Math.Max(0, (76 - TextWidth.Width(title)) / 2);
                 string padL = new string('═', padLen);
-                string padR = new string('═', 76 - title.Length - padLen);
+                string padR = new string('═', 76 - TextWidth.Width(title) - padLen);
                 terminal.Write("╔" + padL + " ");
                 terminal.SetColor("bright_white");
                 terminal.Write(title);

@@ -132,7 +132,7 @@ namespace UsurperRemake.Systems
 
         /// <summary>v1.2.5: the events screen title, centred over the 39-column rule as the English one was.</summary>
         internal static string ScreenTitleRow(string title) =>
-            new string(' ', Math.Max(0, 11 + (12 - title.Length) / 2)) + title;
+            new string(' ', Math.Max(0, 11 + (12 - UsurperRemake.UI.TextWidth.Width(title)) / 2)) + title;
 
         /// <summary>
         /// Process daily events - called during daily reset

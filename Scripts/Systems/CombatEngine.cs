@@ -13616,7 +13616,7 @@ public partial class CombatEngine
         else
         {
             string header = Loc.Get("combat.bbs_header");
-            terminal.WriteLine($"{new string('═', 31)} {header} {new string('═', Math.Max(3, 78 - 33 - header.Length))}");
+            terminal.WriteLine($"{new string('═', 31)} {header} {new string('═', Math.Max(3, 78 - 33 - TextWidth.Width(header)))}");
         }
 
         // Lines 2+: Monsters (two per line to save space)
@@ -31810,7 +31810,7 @@ public partial class CombatEngine
     /// <summary>1.3.7: one fixed row of a 41 column combat box; a text wider than the box continues on rows inside it.</summary>
     private void WriteBoxRow(string keyText, string color, string text, string keyColor = "bright_yellow")
     {
-        int width = 38 - keyText.Length;
+        int width = 38 - TextWidth.Width(keyText);
         var parts = WrapQuickbarText(text, width);
         if (parts.Count == 0) parts.Add("");
         for (int i = 0; i < parts.Count; i++)

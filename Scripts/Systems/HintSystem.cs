@@ -211,7 +211,7 @@ namespace UsurperRemake.Systems
         internal static string BoxTop(string label)
         {
             string head = $"\u250c\u2500\u2500\u2500 {label} ";
-            return head + new string('\u2500', Math.Max(0, 77 - head.Length)) + "\u2510";
+            return head + new string('\u2500', Math.Max(0, 77 - UsurperRemake.UI.TextWidth.Width(head))) + "\u2510";
         }
 
         /// <summary>

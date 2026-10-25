@@ -60,7 +60,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("anchor_road.header_title"); int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+            { string t = Loc.Get("anchor_road.header_title"); int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");

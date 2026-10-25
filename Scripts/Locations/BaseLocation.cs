@@ -2677,9 +2677,9 @@ public abstract class BaseLocation
             terminal.WriteLine(title);
             return;
         }
-        int padLen = Math.Max(0, (76 - title.Length) / 2);
+        int padLen = Math.Max(0, (76 - TextWidth.Width(title)) / 2);
         string padL = new string('═', padLen);
-        string padR = new string('═', 76 - title.Length - padLen);
+        string padR = new string('═', 76 - TextWidth.Width(title) - padLen);
         terminal.SetColor("bright_blue");
         terminal.Write("╔" + padL + " ");
         terminal.SetColor("bright_white");
@@ -3285,7 +3285,7 @@ public abstract class BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
         var helpTitle = Loc.Get("base.quick_commands");
-        int helpTitlePad = (78 - helpTitle.Length) / 2;
+        int helpTitlePad = (78 - TextWidth.Width(helpTitle)) / 2;
         WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(new string(' ', helpTitlePad) + helpTitle); }, helpTitlePad + helpTitle.Length);
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");

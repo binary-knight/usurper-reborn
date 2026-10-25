@@ -490,7 +490,7 @@ public class DungeonLocation : BaseLocation
         {
             term.WriteLine("╔══════════════════════════════════════════════════════════╗", "bright_yellow");
             string wtitle = Loc.Get("dungeon.tut.welcome_title");
-            int pad = Math.Max(0, (56 - wtitle.Length) / 2);
+            int pad = Math.Max(0, (56 - TextWidth.Width(wtitle)) / 2);
             term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - wtitle.Length)) + " ║", "bright_yellow");
             term.WriteLine("╚══════════════════════════════════════════════════════════╝", "bright_yellow");
         }
@@ -526,7 +526,7 @@ public class DungeonLocation : BaseLocation
             else
             {
                 string bar = new string('─', Math.Min(title.Length + 4, 60));
-                term.WriteLine($"┌─ {title} ─" + new string('─', Math.Max(0, 56 - title.Length)) + "┐", titleColor);
+                term.WriteLine($"┌─ {title} ─" + new string('─', Math.Max(0, 56 - TextWidth.Width(title))) + "┐", titleColor);
             }
             term.WriteLine("");
             foreach (var (text, color) in lines)
@@ -2209,7 +2209,7 @@ public class DungeonLocation : BaseLocation
         void WriteRows(string text, string color)
         {
             string indent = new string(' ', text.Length - text.TrimStart(' ').Length);
-            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text.TrimStart(' '), 79 - indent.Length))
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text.TrimStart(' '), 79 - TextWidth.Width(indent)))
                 term.WriteLine(indent + row, color);
         }
 

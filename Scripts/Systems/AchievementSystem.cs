@@ -1631,7 +1631,7 @@ public static class AchievementSystem
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             string headerText = Loc.Get("achievement.unlocked_many", achievements.Count);
-            int pad = (58 - headerText.Length) / 2;
+            int pad = (58 - UsurperRemake.UI.TextWidth.Width(headerText)) / 2;
             string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - headerText.Length);
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
