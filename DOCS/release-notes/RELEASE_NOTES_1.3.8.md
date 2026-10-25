@@ -1,0 +1,26 @@
+# Usurper Reborn v1.3.8
+
+## Changelist
+
+### The party
+
+• Added an order to tell an ally to wait in a cleared dungeon room, out of every fight, until you walk back, call it back, change floor or leave the dungeon
+• Added allies who see a teammate finished remember it, and those who saw you fail to rescue it think a little less of you, without bringing it up, until newer memories push it out
+• Fixed an NPC ally's fall writing two death lines in the news
+• Fixed the ally stance menu rows running past 79 columns in some languages
+
+### Saves
+
+• Fixed a single player load so it starts from a clean story
+• Fixed a single player load so companions, party, faction, archetype, memories and the previous god entry start clean
+• Fixed a new character keeping the previous character's memories, and companions forgetting their disabled spells and recruit date on reload
+• Fixed NPC opinions of you changing on a load, so an NPC now holds the opinion it had when the game was saved
+• Fixed a login save that could write the story before it was loaded
+
+### Online play
+
+• Fixed the SSH relay dropping the game's last lines when its input ended first
+
+### Texts
+
+• Fixed English text that still spelled Defense as Defence in 15 places
