@@ -58,7 +58,7 @@ Each ally that takes orders has a stance: Balanced (the default), Aggressive or 
 
 {{table:ally-stances}}
 
-An ally that is about to die drinks its own potion before helping anyone; a Cautious ally below 20 percent first tries to [pull back](#pulling-back-from-a-fight). An ally with only one potion keeps it for itself, unless the most hurt member is you and you are below 30 percent HP. A braced ally takes half damage for the round. Monsters choose a Cautious ally less often, and a braced Aggressive ally draws their attacks.
+An ally that is about to die drinks its own potion before helping anyone. An ally with only one potion keeps it for itself, unless the most hurt member is you and you are below 30 percent HP. A braced ally takes half damage for the round. Monsters choose a Cautious ally less often, and a braced Aggressive ally draws their attacks.
 
 When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a member who is poisoned or diseased: you first, then the member with the lowest share of HP.
 
