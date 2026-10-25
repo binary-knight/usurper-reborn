@@ -16,7 +16,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0 H: tell an ally to wait in a cleared room. The order is in the dungeon party menu, only in a
+/// 1.3.8 H: tell an ally to wait in a cleared room. The order is in the dungeon party menu, only in a
 /// cleared room and only for an ally that takes orders. A waiting ally keeps its party slot but is in no
 /// fight, takes no XP and no potion. Walking into its room or calling it back brings it back; the stairs,
 /// leaving the dungeon and a save and load end the wait. Dismissing it drops its mark; a follower's party

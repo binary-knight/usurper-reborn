@@ -3233,7 +3233,7 @@ public class Character
         ? (!string.IsNullOrEmpty(Name2) ? Name2 : Name1)
         : $"{(!string.IsNullOrEmpty(Name2) ? Name2 : Name1)} {FamilySurname}";
 
-    /// <summary>1.4.0 wait here: the floor and room an ally was told to wait in, null when it is with the
+    /// <summary>1.3.8 wait here: the floor and room an ally was told to wait in, null when it is with the
     /// party. Runtime only, never saved: leaving the floor, leaving the dungeon or ending the session ends it.
     /// A waiting ally keeps its party slot but no fight's list holds it (CombatEngine.PlayerVsMonsters).</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -4046,5 +4046,5 @@ public sealed class SlotBonusEntry
     public int Rounds { get; set; }
 }
 
-/// <summary>1.4.0 wait here: where an ally waits (Character.WaitingAt). Runtime only.</summary>
+/// <summary>1.3.8 wait here: where an ally waits (Character.WaitingAt). Runtime only.</summary>
 public sealed record WaitMark(int Floor, string RoomId);

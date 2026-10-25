@@ -346,7 +346,7 @@ public class DungeonLocation : BaseLocation
 
         // Defensive deduplication after all team restoration methods
         DeduplicateTeammates();
-        ForgetWaitMarks();   // 1.4.0 H: an NPC object kept from an earlier session never brings a mark in
+        ForgetWaitMarks();   // 1.3.8 H: an NPC object kept from an earlier session never brings a mark in
 
         // v0.65.4 companion chains: reset the one-beat-per-companion-per-visit pacing guard
         chainBeatsFiredThisVisit.Clear();
@@ -438,7 +438,7 @@ public class DungeonLocation : BaseLocation
         }
         finally
         {
-            // 1.4.0 H: leaving the dungeon by any exit (town, death, teleport, rescue, log out, disconnect)
+            // 1.3.8 H: leaving the dungeon by any exit (town, death, teleport, rescue, log out, disconnect)
             // brings every waiting ally back, one line each.
             EndVisitWaits();
 
@@ -1639,7 +1639,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private void SyncNPCTeammatesToGameEngine()
     {
-        DropMarksOfLeavers();   // 1.4.0 H: an ally who left the party while waiting loses its mark
+        DropMarksOfLeavers();   // 1.3.8 H: an ally who left the party while waiting loses its mark
         var npcIds = teammates
             .OfType<NPC>()
             .Select(n => n.ID)
@@ -2587,7 +2587,7 @@ public class DungeonLocation : BaseLocation
     protected override void DisplayLocation()
     {
         terminal.ClearScreen();
-        SweepWaitMarks();   // 1.4.0 H: any floor change, whatever moved the player
+        SweepWaitMarks();   // 1.3.8 H: any floor change, whatever moved the player
 
         // Get current room
         var room = currentFloor?.GetCurrentRoom();
@@ -4129,7 +4129,7 @@ public class DungeonLocation : BaseLocation
                 // Enter the dungeon - go to first room
                 inRoomMode = true;
                 currentFloor.CurrentRoomId = currentFloor.EntranceRoomId;
-                RejoinWaitersIn(currentFloor.CurrentRoomId);   // 1.4.0 H
+                RejoinWaitersIn(currentFloor.CurrentRoomId);   // 1.3.8 H
                 var entranceRoom = currentFloor.GetCurrentRoom();
                 if (entranceRoom != null)
                 {
@@ -4833,7 +4833,7 @@ public class DungeonLocation : BaseLocation
     {
         var player = GetCurrentPlayer();
         if (player == null) return;
-        int companions = MentalSystem.CountStoryCompanions(PresentTeammates());   // 1.4.0 H: a waiting companion is not here
+        int companions = MentalSystem.CountStoryCompanions(PresentTeammates());   // 1.3.8 H: a waiting companion is not here
         int before = player.Mental;
         if (MentalSystem.ApplyRoomStrain(player, currentDungeonLevel, companions) > 0)
             MentalUi.AnnounceMentalChange(terminal, player, before);
@@ -4952,7 +4952,7 @@ public class DungeonLocation : BaseLocation
 
         // Update current room
         currentFloor.CurrentRoomId = targetRoomId;
-        // 1.4.0 H: an ally waiting in this room rejoins
+        // 1.3.8 H: an ally waiting in this room rejoins
         if (RejoinWaitersIn(targetRoomId)) await Pacing.Wait(1000);
 
         // v0.60.3: GMCP Room.Info push so MUD client mappers (Mudlet etc.) see the
@@ -5111,7 +5111,7 @@ public class DungeonLocation : BaseLocation
                     t is not NPC && Enum.TryParse<CompanionId>(t.Name2 ?? t.DisplayName, out _)).ToList();
                 if (companionChars.Count == 0)
                 {
-                    // Try by companion system active companions (1.4.0 H: not one waiting elsewhere)
+                    // Try by companion system active companions (1.3.8 H: not one waiting elsewhere)
                     var activeIds = CompanionSystem.Instance?.GetActiveCompanionIds()?
                         .Where(id => !WaitingTeammates().Any(w => w.CompanionId == id)).ToList();
                     if (activeIds != null && activeIds.Count > 0)
@@ -6487,7 +6487,7 @@ public class DungeonLocation : BaseLocation
         var def = string.IsNullOrEmpty(feature.DiscoveryId) ? null : DiscoveryCatalog.ById(feature.DiscoveryId);
         if (def != null)
         {
-            outcome = await DiscoverySystem.Instance.RunDiscovery(def, player!, currentDungeonLevel, terminal, PresentTeammates());   // 1.4.0 H
+            outcome = await DiscoverySystem.Instance.RunDiscovery(def, player!, currentDungeonLevel, terminal, PresentTeammates());   // 1.3.8 H
             // One-time set-pieces are recorded so they never re-trigger for this character.
             if (def.OneTime && player != null)
                 player.DiscoveredFeatureIds.Add(def.Id);
@@ -6502,7 +6502,7 @@ public class DungeonLocation : BaseLocation
                 currentDungeonLevel,
                 theme,
                 terminal,
-                PresentTeammates()   // 1.4.0 H: a waiting ally is not at the feature
+                PresentTeammates()   // 1.3.8 H: a waiting ally is not at the feature
             );
         }
 
@@ -6531,7 +6531,7 @@ public class DungeonLocation : BaseLocation
         // ShareEventRewardsWithGroup's pattern. XP still splits to NPC mates
         // at 0.75x (gives them progression). 1.3.5: a living companion takes the
         // same 0.75x, paid to its own Companion record with its level up check.
-        var party = PresentTeammates();   // 1.4.0 H: a waiting ally takes no share
+        var party = PresentTeammates();   // 1.3.8 H: a waiting ally takes no share
         if (party.Count > 0 && (outcome.GoldGained > 0 || outcome.ExperienceGained > 0))
         {
             var groupedPlayers = party.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer).ToList();
@@ -7309,7 +7309,7 @@ public class DungeonLocation : BaseLocation
         currentFloor = floorResult.Floor;
         currentDungeonLevel = nextLevel;
         if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
-        EndAllWaits();   // 1.4.0 H: the stairs end every wait
+        EndAllWaits();   // 1.3.8 H: the stairs end every wait
         roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
         hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
         consecutiveMonsterRooms = 0;
@@ -7422,7 +7422,7 @@ public class DungeonLocation : BaseLocation
         // Heal grouped followers (+25% HP/MP/ST, no blood price penalty)
         if (teammates.Count > 0)
         {
-            List<Character> teamSnap = PresentTeammates();   // 1.4.0 H: a waiting ally does not rest with you
+            List<Character> teamSnap = PresentTeammates();   // 1.3.8 H: a waiting ally does not rest with you
 
             foreach (var mate in teamSnap)
             {
@@ -7641,7 +7641,7 @@ public class DungeonLocation : BaseLocation
             currentFloor = floorResult.Floor;
             currentDungeonLevel = targetLevel;
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
-            EndAllWaits();   // 1.4.0 H
+            EndAllWaits();   // 1.3.8 H
             roomsExploredThisFloor = floorResult.WasRestored ? currentFloor.Rooms.Count(r => r.IsExplored) : 0;
             hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12
             consecutiveMonsterRooms = 0;
@@ -8433,7 +8433,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
                 currentDungeonLevel = newFloor;
                 if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
-                EndAllWaits();   // 1.4.0 H
+                EndAllWaits();   // 1.3.8 H
             }
             else if (roll < 75)
             {
@@ -8445,7 +8445,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
                 currentDungeonLevel = newFloor;
                 if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
-                EndAllWaits();   // 1.4.0 H
+                EndAllWaits();   // 1.3.8 H
             }
             else if (roll < 90)
             {
@@ -10694,7 +10694,7 @@ public class DungeonLocation : BaseLocation
             currentDungeonLevel = nextLevel;
             hasCampedThisFloor = floorResult.RestedOnThisFloor; // v1.1.12: this path never reset it
             if (player != null) { player.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; player.LastDungeonFloor = currentDungeonLevel; }
-            EndAllWaits();   // 1.4.0 H
+            EndAllWaits();   // 1.3.8 H
             terminal.WriteLine(Loc.Get("dungeon.descend_to", currentDungeonLevel), "yellow");
 
             // Update quest progress for reaching this floor
@@ -10718,7 +10718,7 @@ public class DungeonLocation : BaseLocation
         {
             currentDungeonLevel--;
             terminal.WriteLine(Loc.Get("dungeon.ascend_to", currentDungeonLevel), "green");
-            EndAllWaits();   // 1.4.0 H
+            EndAllWaits();   // 1.3.8 H
 
             // Update quest progress for reaching this floor
             var player = GetCurrentPlayer();
@@ -10783,7 +10783,7 @@ public class DungeonLocation : BaseLocation
             var tm = teammates[i];
             string status = tm.IsAlive ? $"{Loc.Get("combat.bar_hp")}: {tm.HP}/{tm.MaxHP}" : Loc.Get("combat.injured");
             string tag = tm.IsGroupedPlayer ? " " + Loc.Get("dungeon.party_tag_player")
-                : tm.IsWaiting ? " " + Loc.Get("dungeon.wait_tag") : "";   // 1.4.0 H
+                : tm.IsWaiting ? " " + Loc.Get("dungeon.wait_tag") : "";   // 1.3.8 H
             if (tm.IsGroupedPlayer) terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("dungeon.party_line_member", i + 2, tm.DisplayName, tag, tm.Level, tm.ClassName, status));
             if (tm.IsGroupedPlayer) terminal.SetColor("cyan");
@@ -11073,7 +11073,7 @@ public class DungeonLocation : BaseLocation
         await Pacing.Wait(1500);
     }
 
-    // ---------- 1.4.0 H: wait here ----------
+    // ---------- 1.3.8 H: wait here ----------
     // An ally told to wait keeps its party slot (the cap of 4, the saved id lists and the world sim flag all
     // count it) and carries a runtime mark, Character.WaitingAt (never saved). No fight holds it: the fight
     // copies the party without it (CombatEngine.PlayerVsMonsters). It rejoins when the player walks into its
@@ -11281,7 +11281,7 @@ public class DungeonLocation : BaseLocation
                 }
                 if (tm.IsWaiting)
                 {
-                    terminal.SetColor("yellow");   // 1.4.0 H: in the stance's place, so the row keeps its width
+                    terminal.SetColor("yellow");   // 1.3.8 H: in the stance's place, so the row keeps its width
                     terminal.Write($"  {Loc.Get("dungeon.wait_tag")}");
                 }
                 else if (TeammateStances.TakesOrders(tm))
@@ -11316,7 +11316,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine($"  [B] {Loc.Get("dungeon.belt_option", Loc.Get(GetCurrentPlayer().SharedPotionBelt ? "ui.on" : "ui.off"))}");
             terminal.WriteLine($"  [#] {Loc.Get("dungeon.view_equip_member")}  [S] {Loc.Get("dungeon.skills_member_option")}  [T] {Loc.Get("dungeon.tactics_member_option")}  [I] {Loc.Get("party_inv.menu_dungeon")}  [Q] {Loc.Get("dungeon.back")}");
-            // 1.4.0 H: wait here (only in a cleared room, only an ally that takes orders) and call back
+            // 1.3.8 H: wait here (only in a cleared room, only an ally that takes orders) and call back
             var mayWait = AlliesWhoMayWait();
             var waiting = WaitingTeammates();
             if (mayWait.Count > 0)
@@ -11446,7 +11446,7 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// 1.4.0 SW: the rows of one stance choice, "  [N] name  description", each at most 79 columns. A row that fits is one
+    /// 1.3.8 SW: the rows of one stance choice, "  [N] name  description", each at most 79 columns. A row that fits is one
     /// row; a longer description continues on rows indented under its start (the quickbar wrap).
     /// </summary>
     internal static List<string> StanceDescriptionRows(string key, string name, string desc)
@@ -11455,7 +11455,7 @@ public class DungeonLocation : BaseLocation
         return CombatEngine.WrapQuickbarText(desc, UsurperRemake.UI.UIHelper.WrapWidth - lead);
     }
 
-    /// <summary>1.4.0 SW: write one stance choice row (the dungeon party menu and the Inn share it).</summary>
+    /// <summary>1.3.8 SW: write one stance choice row (the dungeon party menu and the Inn share it).</summary>
     internal static void WriteStanceRow(TerminalEmulator terminal, string key, TeammateStance stance)
     {
         string name = Loc.Get(TeammateStances.NameKey(stance));
@@ -12045,7 +12045,7 @@ public class DungeonLocation : BaseLocation
         {
             var tm = teammates[i];
             string tag = tm.IsGroupedPlayer ? " " + Loc.Get("dungeon.party_tag_player")
-                : tm.IsWaiting ? " " + Loc.Get("dungeon.wait_tag") : "";   // 1.4.0 H
+                : tm.IsWaiting ? " " + Loc.Get("dungeon.wait_tag") : "";   // 1.3.8 H
             terminal.WriteLine(Loc.Get("dungeon.party_line_member_short", i + 2, tm.DisplayName, tag, tm.Level, tm.ClassName));
         }
         terminal.SetColor("white");
@@ -12867,7 +12867,7 @@ public class DungeonLocation : BaseLocation
     {
         var result = new List<Character>();
 
-        // Add NPC teammates (includes spouses, team members, etc.); 1.4.0 H: not one told to wait
+        // Add NPC teammates (includes spouses, team members, etc.); 1.3.8 H: not one told to wait
         foreach (var teammate in PresentTeammates())
         {
             if (teammate != null && teammate.IsAlive)
@@ -12882,7 +12882,7 @@ public class DungeonLocation : BaseLocation
         var waitingIds = WaitingTeammates().Where(w => w.CompanionId.HasValue).Select(w => w.CompanionId!.Value).ToList();
         foreach (var companion in companions)
         {
-            if (companion.CompanionId.HasValue && waitingIds.Contains(companion.CompanionId.Value)) continue;   // 1.4.0 H
+            if (companion.CompanionId.HasValue && waitingIds.Contains(companion.CompanionId.Value)) continue;   // 1.3.8 H
             // Avoid duplicates (if somehow an NPC is also tracked as a companion)
             if (!result.Any(r => r.DisplayName == companion.DisplayName))
             {
@@ -14321,7 +14321,7 @@ public class DungeonLocation : BaseLocation
 
         string dir = Loc.Get($"companion.dir.{suggestDir.Value.ToString().ToLower()}");
 
-        // Pick a companion to speak (1.4.0 H: one with the party)
+        // Pick a companion to speak (1.3.8 H: one with the party)
         var present = PresentTeammates();
         if (present.Count == 0) return;
         var speaker = present[_companionCommentRng.Next(present.Count)];
@@ -14351,7 +14351,7 @@ public class DungeonLocation : BaseLocation
         if (teammates.Count == 0) return;
         if (_companionCommentRng.Next(100) >= 30) return; // 30% chance
 
-        var present = PresentTeammates();   // 1.4.0 H: one with the party
+        var present = PresentTeammates();   // 1.3.8 H: one with the party
         if (present.Count == 0) return;
         var speaker = present[_companionCommentRng.Next(present.Count)];
         string name = speaker.DisplayName ?? speaker.Name2 ?? Loc.Get("companion.generic_name");
@@ -15867,7 +15867,7 @@ public class DungeonLocation : BaseLocation
             // at a rest spot. The camp action (RestInRoom) already heals everyone; match it here.
             if (teammates != null)
             {
-                List<Character> teamSnap = PresentTeammates();   // 1.4.0 H: a waiting ally does not rest with you
+                List<Character> teamSnap = PresentTeammates();   // 1.3.8 H: a waiting ally does not rest with you
 
                 bool anyTeammateHealed = false;
                 foreach (var mate in teamSnap)
@@ -16112,7 +16112,7 @@ public class DungeonLocation : BaseLocation
                 await Pacing.Wait(1000);
                 var randomRoom = currentFloor.Rooms[dungeonRandom.Next(currentFloor.Rooms.Count)];
                 currentFloor.CurrentRoomId = randomRoom.Id;
-                RejoinWaitersIn(randomRoom.Id);   // 1.4.0 H
+                RejoinWaitersIn(randomRoom.Id);   // 1.3.8 H
                 randomRoom.IsExplored = true;
                 // Auto-clear rooms without monsters
                 if (!randomRoom.HasMonsters)
@@ -16725,7 +16725,7 @@ public class DungeonLocation : BaseLocation
             currentDungeonLevel = targetLevel;
             if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.steel_nerves", currentDungeonLevel), "magenta");
-            EndAllWaits();   // 1.4.0 H
+            EndAllWaits();   // 1.3.8 H
 
             // Update quest progress for reaching this floor
             if (currentPlayer != null)
@@ -18850,7 +18850,7 @@ public class DungeonLocation : BaseLocation
         var player = GetCurrentPlayer();
         if (player == null) return (totalXP, totalGold);
 
-        // Snapshot teammates for thread safety; 1.4.0 H: a waiting ally takes no share
+        // Snapshot teammates for thread safety; 1.3.8 H: a waiting ally takes no share
         List<Character> teamSnap = PresentTeammates();
 
         int totalMembers = 1 + teamSnap.Count;
@@ -19257,7 +19257,7 @@ public class DungeonLocation : BaseLocation
             string tag = isLeader ? $" {Loc.Get("party.tag_leader")}"
                 : (!c.IsGroupedPlayer ? $" {Loc.Get("party.tag_ally")}" : "");
             if (viewer != null && c == viewer) tag += $" {Loc.Get("party.tag_you")}";
-            if (c.IsWaiting) tag += $" {Loc.Get("dungeon.wait_tag")}";   // 1.4.0 H: not in the fight
+            if (c.IsWaiting) tag += $" {Loc.Get("dungeon.wait_tag")}";   // 1.3.8 H: not in the fight
             term.SetColor("darkgray");
             if (!string.IsNullOrEmpty(tag)) term.Write(tag);
             if (!c.IsAlive)

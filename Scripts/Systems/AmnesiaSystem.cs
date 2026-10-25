@@ -274,7 +274,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// 1.4.0: back to the state a new system starts with (a single player load starts from it).
+        /// 1.3.8: back to the state a new system starts with (a single player load starts from it).
         /// </summary>
         public void Reset()
         {

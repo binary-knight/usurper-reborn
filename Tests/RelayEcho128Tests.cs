@@ -31,7 +31,7 @@ namespace UsurperRemake.Tests
         private static readonly TimeSpan SafetyStop = TimeSpan.FromSeconds(60);
 
         /// <summary>
-        /// 1.4.0: the human OK path writes nothing of its own, so the fake MUD sends this line right after OK. The
+        /// 1.3.8: the human OK path writes nothing of its own, so the fake MUD sends this line right after OK. The
         /// relay bridges it to stdout only after it has read and handled the OK reply, so seeing it is the positive
         /// sign that the absence of a bare OK line is a result and not a relay that has not run yet. It holds no "OK".
         /// </summary>
@@ -104,7 +104,7 @@ namespace UsurperRemake.Tests
             var saved = RelayClient.OpenStdout;
             var savedIn = RelayClient.OpenStdin;
             RelayClient.OpenStdout = () => captured;
-            // 1.4.0: the bridge's stdin side cancels the socket side when stdin ends. With the test host's stdin at end of
+            // 1.3.8: the bridge's stdin side cancels the socket side when stdin ends. With the test host's stdin at end of
             // file that cancel could land before the socket side read the marker line, so the human OK path saw no marker
             // in about one run of ten after another class had run first. A stdin that stays open until the bridge is
             // cancelled leaves the socket side to end the bridge, as an open SSH session does (RelayToken128Tests does it).

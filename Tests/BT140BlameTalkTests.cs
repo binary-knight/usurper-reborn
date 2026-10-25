@@ -11,7 +11,7 @@ using static UsurperReborn.Tests.PartySurvival133Harness;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.4.0: the SawCombat memory a witness records when the player left an ally to fall (combat.memory_saw_ally_left)
+/// 1.3.8: the SawCombat memory a witness records when the player left an ally to fall (combat.memory_saw_ally_left)
 /// still lowers the witness's impression of the player by 0.1, live and after a load, but the dialogue memory layer
 /// (DialogueEnhancer.GetMemoryFlavor) never picks it: it picks among the player's other memories as before, or
 /// says no memory line. Every other SawCombat memory is picked and spoken as before.
