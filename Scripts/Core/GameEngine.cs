@@ -7012,6 +7012,7 @@ public partial class GameEngine
                     }
                     // GD.Print($"[GameEngine] Restored {data.Memories.Count} memories for {npc.Name}");
                 }
+                SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data);   // 1.3.8: the saved opinions replace the replay
 
                 // Restore goals
                 if (data.CurrentGoals != null && data.CurrentGoals.Count > 0)

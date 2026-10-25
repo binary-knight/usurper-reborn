@@ -1631,6 +1631,7 @@ namespace UsurperRemake.Systems
                             }
                         }
                     }
+                    SaveSystem.RestoreNPCRelationships(npc.Brain.Memory, data);   // 1.3.8: the saved opinions replace the replay
 
                     if (data.CurrentGoals != null)
                     {
