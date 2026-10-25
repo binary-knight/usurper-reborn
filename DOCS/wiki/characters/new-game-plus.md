@@ -40,7 +40,7 @@ In single-player the town, its NPCs and your family also start fresh. Online, th
 
 A few lifetime records do survive: completed sellsword contracts, lifetime charity gold and completed family arcs, which give a starting Charisma bonus.
 
-Your recovered memories also stay with you on the next cycle, with which of the six memory dreams you have seen and the full truth of who you are once you know it; your other dreams and dungeon visions start over. A new character that is not NG+ starts with none.
+Your recovered memories also stay with you on the next cycle, with the memory dreams you have seen and the full truth of who you are once you know it; your other dreams and dungeon visions start over. A new character that is not NG+ starts with none.
 
 ## Cycle bonuses
 
