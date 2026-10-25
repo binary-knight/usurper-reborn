@@ -9,7 +9,8 @@ namespace UsurperRemake.Systems;
 /// Thresholds are fractions of max HP and are compared strictly below. In every column
 /// EmergencySelfPotion &lt; Brace &lt; DefensiveFirst &lt; PotionMostInjured.
 /// 1.4.0: Withdraw is the share below which an ally tries to pull back from the fight, before a
-/// potion or a heal (CombatEngine.PartySurvival); 0 means never. Only Cautious sets it.
+/// potion or a heal (CombatEngine.PartySurvival); 0 means never. No stance sets it in 1.4, so no
+/// ally pulls back; the path is kept and inert.
 /// </summary>
 public enum TeammateStance
 {
@@ -32,7 +33,7 @@ public static class TeammateStances
     public static TeammatePolicy PolicyFor(TeammateStance stance) => stance switch
     {
         TeammateStance.Aggressive => new TeammatePolicy(0.25, 0.45, 0.35, 0.30, true, 1.00),
-        TeammateStance.Cautious => new TeammatePolicy(0.40, 0.60, 0.55, 0.50, false, 0.70, Withdraw: 0.20),
+        TeammateStance.Cautious => new TeammatePolicy(0.40, 0.60, 0.55, 0.50, false, 0.70),
         _ => new TeammatePolicy(
             GameConfig.TeammateEmergencySelfHealHpPercent,   // 0.30
             0.50,                                            // the potion-on-most-injured threshold PR #134 kept

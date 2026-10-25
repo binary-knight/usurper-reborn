@@ -304,12 +304,14 @@ public partial class CombatEngine
 
     /// <summary>1.4.0 W: the trigger, read on the ally's own turn before any other choice, so it comes before a potion,
     /// a heal spell or a heal ability (1.4.0 W2: a heal left no longer keeps it in). An ally that takes orders and can
-    /// be Downed, standing, with a Withdraw share from its stance (Cautious), below that share of its max HP, where
+    /// be Downed, standing, with a Withdraw share from its stance (none in 1.4), below that share of its max HP, where
     /// fleeing is allowed (not on Nightmare), and not yet tried in this round.</summary>
     internal bool WantsToWithdraw(Character ally, CombatResult result)
     {
         if (!TeammateStances.TakesOrders(ally) || !IsDownable(ally) || !ally.IsAlive || ally.IsDowned) return false;
         double share = PolicyFor(ally).Withdraw;
+        // 1.4.0: no stance pulls back in 1.4 (Q-W2, 2026-10-25). Every stance's share is 0, so this returns false
+        // here; TryWithdraw and ReturnWithdrawnAtFightEnd are kept and inert.
         if (share <= 0 || ally.MaxHP <= 0 || (double)ally.HP / ally.MaxHP >= share) return false;
         if (!DifficultySystem.CanFlee()) return false;
         if (_withdrawTryRound.TryGetValue(ally, out int r) && r == result.CurrentRound) return false;
