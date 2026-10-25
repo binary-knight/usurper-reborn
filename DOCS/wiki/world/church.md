@@ -1,8 +1,9 @@
 ---
 title: The Old Church
 path: /wiki/en/world/church/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/ChurchLocation.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none

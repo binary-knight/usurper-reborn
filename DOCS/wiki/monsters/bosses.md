@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.8 | An ally told to wait is not in the fight and does not count among Maelketh's fighters.
 history: 1.3.7 | Against Manwe the Creator's Ward stops 55 percent of what gear enchantments add after a hit, Godbane held or not, and the warning before the fight says so.
 history: 1.3.6 | An Old God's divine armor and phase immunity now cut weapon poison, Poisoned, Corrupting Touch and Searing Totem ticks as a hit, fear and confusion on a boss follow the hold and soft control rules, and gear's magic resistance does not reduce any Old God attack.
 history: 1.3.5 | Only an Old God's own counter enchant, Sunbane, Stonebane or Godbane, removes its divine armor and it also holds back two of the god's abilities, Maelketh has less health with two to four fighters, and Manwe has 40 percent less HP.

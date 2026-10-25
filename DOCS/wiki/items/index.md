@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | none
 history: 1.3.7 | The maximum HP from Titan's Resolve shows as soon as the item is put on or taken off, and a loot item keeps its effect line after it has been worn.
 history: 1.3.6 | Titan's Resolve on world boss armor gives 5 percent more maximum HP in place of 5 percent more defense, once however many worn items carry it.
 history: 1.3.5 | Shadowfang, Venomstrike and Serpent's Fang can now deal their poison damage on a hit, the Max HP, Max Mana and all stats loot effects count as shown, and gear regeneration is shown as a percent of the pool.

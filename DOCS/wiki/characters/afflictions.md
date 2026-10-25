@@ -1,8 +1,9 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/DungeonLocation.cs
+history: 1.3.8 | none
 history: 1.3.7 | Against Manwe a poison weapon has a 9 percent chance to poison, Godbane held or not.
 history: 1.3.6 | Weapon poison now poisons for 4 rounds in place of one hit, a Weakened monster takes more damage from every hit, a Poisoned monster no longer hits harder, a boss's physical immunity and divine armor cut each Poisoned tick, and fear, confusion and frost slows on a boss follow the hold and soft control rules.
 history: 1.3.5 | A slow on a monster counts down once a round even when the monster acts more than once, and a boss or mini boss now resists the Frostbite and Frostbrand slows as it resists other slows.

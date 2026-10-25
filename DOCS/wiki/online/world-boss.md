@@ -1,8 +1,9 @@
 ---
 title: The world boss
 path: /wiki/en/online/world-boss/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | Your attack, Power Attack and Precise Strike now set off your main hand weapon's effects on the world boss, your gear's life steal heals you there, and Titan's Resolve on world boss armor gives 5 percent more maximum HP in place of defense.
 history: 1.3.5 | none
