@@ -275,7 +275,8 @@ namespace UsurperRemake.Systems
             var playerKey = player.Name2 ?? player.Name1 ?? "";
             if (string.IsNullOrEmpty(playerKey)) return null;
 
-            var memories = npc.Brain.Memory.GetMemoriesAboutCharacter(playerKey);
+            var memories = npc.Brain.Memory.GetMemoriesAboutCharacter(playerKey)?
+                .Where(m => !IsLeftToFallMemory(m, playerKey)).ToList();
             if (memories == null || memories.Count == 0) return null;
 
             var pick = memories.OrderByDescending(m => m.Importance)
@@ -333,6 +334,25 @@ namespace UsurperRemake.Systems
                 Loc.Get("dialogue.enhance.memory_neu_1", when),
                 Loc.Get("dialogue.enhance.memory_neu_2", when),
                 Loc.Get("dialogue.enhance.memory_neu_3", when));
+        }
+
+        /// <summary>
+        /// 1.4.0: the SawCombat memory a witness records when the player could have rescued a fallen ally and
+        /// did not (CombatEngine.RecordFinishWitnesses). It lowers the witness's impression of the player, but
+        /// the memory layer never brings it up. Matched by its stored English description, the text of
+        /// combat.memory_saw_ally_left with {0} the player, so it holds after a save and a load.
+        /// </summary>
+        private static bool IsLeftToFallMemory(MemoryEvent m, string playerKey)
+        {
+            if (m == null || m.Type != MemoryType.SawCombat || string.IsNullOrEmpty(m.Description)) return false;
+            var template = Loc.GetIn("en", "combat.memory_saw_ally_left");
+            var parts = template.Split("{1}");
+            if (parts.Length != 2 || !parts[0].Contains("{0}")) return false;
+            string head = parts[0].Replace("{0}", playerKey);
+            string tail = parts[1];
+            return m.Description.Length >= head.Length + tail.Length
+                && m.Description.StartsWith(head, StringComparison.Ordinal)
+                && m.Description.EndsWith(tail, StringComparison.Ordinal);
         }
 
         /// <summary>
