@@ -4811,15 +4811,16 @@ public partial class GameEngine
     /// new character starts without. Both load paths call it before any restore step. An online
     /// session has its own systems on its SessionContext and is left alone. Returns true when it ran.
     /// The companions, the dungeon party, the faction, archetype and memory state and the god worship
-    /// entry of the character played before the load start clean too. The world shared with NPCs is not
-    /// touched here.
+    /// entry of the character played before the load start clean too, and no character is current until
+    /// the load restores one (a fresh process has none, so a load that fails leaves nothing to save).
+    /// The world shared with NPCs is not touched here.
     /// </summary>
     internal static bool ResetStoryForSinglePlayerLoad()
     {
         if (UsurperRemake.Server.SessionContext.Current != null) return false;
         UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         ResetNarrativeSystemsForNewGame();
-        UsurperRemake.Systems.CompanionSystem.Instance.ResetAllCompanions();
+        UsurperRemake.Systems.CompanionSystem.Instance.RebuildForSinglePlayerLoad();
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
         UsurperRemake.Systems.ArchetypeTracker.Instance.Reset();
         UsurperRemake.Systems.AmnesiaSystem.Instance.Reset();
@@ -4827,6 +4828,7 @@ public partial class GameEngine
         engine?.ClearDungeonParty();
         // the previous character's entry, by the same key the load restores (a fresh process has none)
         ClearGodEntryOf(GodRestoreFilterFor(engine?.CurrentPlayer), "LOAD");
+        if (engine != null) engine.CurrentPlayer = null;
         return true;
     }
 

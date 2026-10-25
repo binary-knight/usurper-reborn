@@ -378,6 +378,89 @@ public class SL2140LoadCarry : IDisposable
         Views().Should().BeEquivalentTo(fallback, "nothing single player holds is reset from a session, the god entry included");
     }
 
+    // ---------- the companion rebuild runs on a single player load only ----------
+
+    private static string Source(params string[] parts) =>
+        File.ReadAllText(Path.Combine(new[] { UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot() }.Concat(parts).ToArray()));
+
+    private static string Method(string src, string signature)
+    {
+        int start = src.IndexOf(signature, StringComparison.Ordinal);
+        start.Should().BePositive(signature);
+        int brace = src.IndexOf('{', start);
+        int depth = 0;
+        for (int i = brace; i < src.Length; i++)
+        {
+            if (src[i] == '{') depth++;
+            else if (src[i] == '}' && --depth == 0) return src.Substring(start, i - start + 1);
+        }
+        throw new InvalidOperationException(signature);
+    }
+
+    [Fact]
+    public void CompanionRebuild_RunsOnTheLoadOnly()
+    {
+        var root = UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot();
+        var sites = Directory.GetFiles(Path.Combine(root, "Scripts"), "*.cs", SearchOption.AllDirectories)
+            .SelectMany(f => File.ReadAllLines(f).Where(l => l.Contains("RebuildForSinglePlayerLoad(") && !l.TrimStart().StartsWith("//"))
+                .Select(l => $"{Path.GetFileName(f)}|{l.Trim()}"))
+            .ToList();
+        sites.Should().BeEquivalentTo(new[]
+        {
+            "CompanionSystem.cs|internal void RebuildForSinglePlayerLoad()",
+            "GameEngine.cs|UsurperRemake.Systems.CompanionSystem.Instance.RebuildForSinglePlayerLoad();",
+        }, "the definition and the one call");
+
+        var engine = Source("Scripts", "Core", "GameEngine.cs");
+        Method(engine, "internal static bool ResetStoryForSinglePlayerLoad()").Should().Contain("RebuildForSinglePlayerLoad();", "a load runs the rebuild");
+        var create = Method(engine, "private async Task CreateNewGame(");
+        create.Should().NotContain("RebuildForSinglePlayerLoad").And.NotContain("InitializeCompanions");
+        create.Should().Contain("CompanionSystem.Instance?.ResetAllCompanions();", "a new game and NG+ keep the reset they had");
+        Method(Source("Scripts", "Systems", "CompanionSystem.cs"), "public void ResetAllCompanions()")
+            .Should().NotContain("InitializeCompanions", "a new game, NG+, a restore and the SysOp resets do not rebuild");
+    }
+
+    [Fact]
+    public void ResetAllCompanions_Unchanged_RebuildStartsFromTheDefinitions()
+    {
+        FreshProcess();
+        var c = CompanionSystem.Instance;
+        var aldric = c.GetCompanion(CompanionId.Aldric)!;
+        aldric.BaseStats.HP += 500;
+        aldric.PersonalQuestAvailable = true;
+        c.ResetAllCompanions();
+        c.GetCompanion(CompanionId.Aldric)!.BaseStats.HP.Should().Be(850, "ResetAllCompanions does not name base stats, as before");
+        c.GetCompanion(CompanionId.Aldric)!.PersonalQuestAvailable.Should().BeTrue();
+
+        var fresh = new CompanionSystem();
+        fresh.ResetAllCompanions();
+        var expected = string.Join(" | ", fresh.GetAllCompanions().OrderBy(x => x.Id).Select(x => Dump(x, 0, "RecruitedDate")));
+        typeof(CompanionSystem).GetField("_fallbackInstance", SNP)!.SetValue(null, c);
+        c.RebuildForSinglePlayerLoad();
+        string.Join(" | ", c.GetAllCompanions().OrderBy(x => x.Id).Select(x => Dump(x, 0, "RecruitedDate"))).Should().Be(expected);
+    }
+
+    // ---------- a load that fails ----------
+
+    /// <summary>A fresh process has no character, so after the reset none is current until the load restores
+    /// one: a load that fails leaves nothing for the exit save (Program.cs) to write under the previous name.</summary>
+    [Fact]
+    public void FailedLoad_LeavesNoCharacterToSave()
+    {
+        FreshProcess();
+        Load(SaveA(), PlayerA);
+        GameEngine.Instance.CurrentPlayer.Should().BeSameAs(PlayerA);
+        GameEngine.ResetStoryForSinglePlayerLoad().Should().BeTrue();
+        GameEngine.Instance.CurrentPlayer.Should().BeNull("the load has not restored a character yet");
+        GodSystemSingleton.Instance.GetPlayerGod(PlayerA.Name2).Should().BeEmpty("the previous entry is still cleared by its name");
+
+        Source("Console", "Bootstrap", "Program.cs").Should().Contain("var player = GameEngine.Instance?.CurrentPlayer;",
+            "the exit save writes the current character only");
+        var load = Method(Source("Scripts", "Core", "GameEngine.cs"), "private async Task LoadSaveByFileName(string fileName)");
+        load.IndexOf("ResetStoryForSinglePlayerLoad();", StringComparison.Ordinal)
+            .Should().BeLessThan(load.IndexOf("currentPlayer = RestorePlayerFromSaveData(", StringComparison.Ordinal));
+    }
+
     // ---------- NG+ ----------
 
     private static string GameEngineSource() =>
