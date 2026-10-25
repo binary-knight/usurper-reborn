@@ -1,8 +1,9 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none

@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.3.8 | none
 history: 1.3.7 | The maximum HP from Titan's Resolve shows as soon as the item is put on or taken off, and a loot item keeps its effect line after it has been worn.
 history: 1.3.6 | none
 history: 1.3.5 | Life steal, mana steal and a shield's enchanted armor class are kept when an item moves between your equipment and your backpack.

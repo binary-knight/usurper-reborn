@@ -1,8 +1,9 @@
 ---
 title: Crafting materials
 path: /wiki/en/items/materials/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/MetaProgressionSystem.cs
+history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | The new counter enchants Sunbane, Stonebane and Godbane spend Withered Heart Petal and Iron Judgment Link, which had no use before, along with other materials.

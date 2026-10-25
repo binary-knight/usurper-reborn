@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.8 | none
 history: 1.3.7 | Deep monster Strength, punch and weapon power rise faster after level 75, to 1.97 times at level 80 and 2.31 times at level 100.
 history: 1.3.6 | A monster's breath and spell damage is now magical and cut by your gear's magic resistance, except an Old God's, a monster you poison no longer hits harder, and Thorns no longer reflects the Alchemist's thrown bombs or the Bard's Cutting Words.
 history: 1.3.5 | The Multiattack and Time Stop messages announce the one strike these abilities make.

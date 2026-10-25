@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.3.7
+checked: 1.3.8
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/AmnesiaSystem.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MoralParadoxSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodEchoSystem.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.8 | A new character that is not NG+ now starts with no recovered memories, and loading a single-player save starts the story clean, with no seals, artifacts or Old God states left from the character played before it.
 history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | Only an Old God's own counter enchant removes its divine armor, Maelketh has less health with two to four fighters, and Manwe has 40 percent less HP.
