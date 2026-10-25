@@ -31,6 +31,12 @@ public class SL140StoryLoad : IDisposable
         typeof(BetrayalSystem), typeof(AmnesiaSystem),
     };
 
+    // fallback singletons a new SessionContext's InitializeSystems also replaces (their constructors set the fallback)
+    private static readonly Type[] SessionTouched =
+    {
+        typeof(CompanionSystem), typeof(CycleDialogueSystem), typeof(FactionSystem), typeof(IntimacySystem), typeof(RomanceTracker),
+    };
+
     private static readonly FieldInfo MemeField = typeof(CulturalMemeSystem).GetField("_instance", SNP)!;
 
     private readonly List<(FieldInfo Field, object? Value)> _old;
@@ -40,7 +46,7 @@ public class SL140StoryLoad : IDisposable
 
     public SL140StoryLoad()
     {
-        _old = Swapped.Select(t => t.GetField("_fallbackInstance", SNP)!).Select(f => (f, f.GetValue(null))).ToList();
+        _old = Swapped.Concat(SessionTouched).Select(t => t.GetField("_fallbackInstance", SNP)!).Select(f => (f, f.GetValue(null))).ToList();
         _oldMeme = MemeField.GetValue(null);
         _oldSession = SessionContext.Current;
         SessionContext.Current = null;
@@ -336,6 +342,100 @@ public class SL140StoryLoad : IDisposable
             int at = body.IndexOf(step, StringComparison.Ordinal);
             at.Should().BePositive(step);
             reset.Should().BeLessThan(at, $"the reset runs before {step}");
+        }
+    }
+
+    // ---------- no save before the story is restored (SL-A) ----------
+
+    private static readonly string[] PlayerSaves = { "SaveCurrentGame(", ".AutoSave(", "SaveSystem.Instance.SaveGame(" };
+
+    /// <summary>Single player and online sessions share these load paths: no player save runs before the
+    /// story is restored, so a save never writes a story that is not loaded yet.</summary>
+    [Theory]
+    [InlineData("private async Task LoadSaveByFileName(string fileName)")]
+    [InlineData("private async Task LoadExistingGame(string playerName)")]
+    public void LoadPath_NoSaveBeforeTheStoryIsRestored(string signature)
+    {
+        var body = Body(GameEngineSource(), signature);
+        int restore = body.IndexOf("RestoreStorySystems(", StringComparison.Ordinal);
+        restore.Should().BePositive();
+        var before = body.Substring(0, restore);
+        foreach (var save in PlayerSaves)
+            before.Should().NotContain(save, $"no {save} runs before the story is restored");
+    }
+
+    [Fact]
+    public void RankMessage_NeverSaves_AndRunsOnTheLoginPath()
+    {
+        var src = GameEngineSource();
+        int start = src.IndexOf("internal static bool ShowWeeklyRankChange(", StringComparison.Ordinal);
+        start.Should().BePositive();
+        int end = src.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        var method = src.Substring(start, end - start);
+        foreach (var save in PlayerSaves) method.Should().NotContain(save);
+
+        var login = Body(src, "private async Task LoadSaveByFileName(string fileName)");
+        int shown = login.IndexOf("ShowWeeklyRankChange(terminal, currentPlayer);", StringComparison.Ordinal);
+        shown.Should().BePositive("the login still shows the rank change");
+        shown.Should().BeLessThan(login.IndexOf("RestoreStorySystems(", StringComparison.Ordinal));
+    }
+
+    private sealed class Screen
+    {
+        public TerminalEmulator Term = null!;
+        public MemoryStream Output = new();
+        public string Text
+        {
+            get
+            {
+                Term.StreamWriterInternal?.Flush();
+                return System.Text.RegularExpressions.Regex.Replace(System.Text.Encoding.UTF8.GetString(Output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
+            }
+        }
+    }
+
+    private static Screen NewScreen()
+    {
+        var s = new Screen();
+        s.Term = new TerminalEmulator(new LineStream(Enumerable.Repeat("", 10), i =>
+        {
+            if (i >= 5) throw new InvalidOperationException("the rank message asked for input");
+        }), s.Output);
+        return s;
+    }
+
+    /// <summary>The rank change shows once and is consumed, in single player and in an online session.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RankChange_ShowsOnce_AndIsConsumed(bool online)
+    {
+        var language = GameConfig.Language;
+        GameConfig.Language = "en";
+        if (online)
+        {
+            var ctx = new SessionContext { Username = "sl140rank", CharacterKey = "sl140rank" };
+            ctx.InitializeSystems();
+            SessionContext.Current = ctx;
+        }
+        try
+        {
+            var player = new Character { Name1 = "sl140rank", Name2 = "sl140rank", WeeklyRank = 14, PreviousWeeklyRank = 42 };
+            var line = Loc.Get("engine.rank_moved_up_many", 28, 14);
+
+            var first = NewScreen();
+            GameEngine.ShowWeeklyRankChange(first.Term, player).Should().BeTrue();
+            first.Text.Should().Contain(line);
+            player.PreviousWeeklyRank.Should().Be(14, "the change is consumed once shown");
+
+            var second = NewScreen();
+            GameEngine.ShowWeeklyRankChange(second.Term, player).Should().BeFalse();
+            second.Text.Should().NotContain(line, "the same change does not show again");
+        }
+        finally
+        {
+            SessionContext.Current = null;
+            GameConfig.Language = language;
         }
     }
 

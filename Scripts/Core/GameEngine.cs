@@ -2714,49 +2714,9 @@ public partial class GameEngine
             // Process daily login streak rewards
             await ProcessLoginStreak(currentPlayer);
 
-            // Show weekly rank change on login
-            if (currentPlayer.WeeklyRank > 0 && currentPlayer.PreviousWeeklyRank > 0)
-            {
-                int change = currentPlayer.PreviousWeeklyRank - currentPlayer.WeeklyRank; // positive = moved up
-                if (change != 0)
-                {
-                    terminal.WriteLine("");
-                    if (change > 0)
-                    {
-                        terminal.SetColor("bright_green");
-                        string upKey = change == 1 ? "engine.rank_moved_up_one" : "engine.rank_moved_up_many";
-                        terminal.WriteLine($"  {Loc.Get(upKey, change, currentPlayer.WeeklyRank)}");
-                    }
-                    else
-                    {
-                        terminal.SetColor("yellow");
-                        int dropped = Math.Abs(change);
-                        string downKey = dropped == 1 ? "engine.rank_dropped_one" : "engine.rank_dropped_many";
-                        terminal.WriteLine($"  {Loc.Get(downKey, dropped, currentPlayer.WeeklyRank)}");
-                    }
-
-                    // v0.57.10 (player report — "Every single time I have logged
-                    // in recently, it says you have moved up 28 ranks and are
-                    // now in 14th place. It always says the same place."):
-                    // the display fired whenever `WeeklyRank != PreviousWeeklyRank`,
-                    // but the only code that touches `PreviousWeeklyRank` is the
-                    // Monday daily-reset in `DailySystemManager.UpdateWeeklyRankings`.
-                    // Between Mondays the delta stayed constant, so every login
-                    // re-printed the same message. Consume the delta after
-                    // showing it — next week's Monday update will re-snapshot
-                    // the current rank into `PreviousWeeklyRank` before
-                    // recomputing, so the week-over-week comparison stays
-                    // intact.
-                    currentPlayer.PreviousWeeklyRank = currentPlayer.WeeklyRank;
-                    _ = SaveCurrentGame();
-                }
-                if (!string.IsNullOrEmpty(currentPlayer.RivalName))
-                {
-                    terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {Loc.Get("engine.rival_level", currentPlayer.RivalName, currentPlayer.RivalLevel)}");
-                }
-                terminal.WriteLine("");
-            }
+            // Show weekly rank change on login. 1.4.0: no save here, the story is not restored yet;
+            // the next save writes the consumed rank.
+            ShowWeeklyRankChange(terminal, currentPlayer);
 
             // Load daily system state
             if (dailyManager != null)
@@ -4857,6 +4817,43 @@ public partial class GameEngine
         UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
         ResetNarrativeSystemsForNewGame();
         return true;
+    }
+
+    /// <summary>
+    /// The weekly rank change shown at login, then the rival line. v0.57.10: the change is consumed once
+    /// shown (PreviousWeeklyRank takes the current rank), so it shows once per Monday update. 1.4.0: it
+    /// never saves; a login runs it before the story is restored, and the next save writes the consumed
+    /// rank. Returns true when a change was shown.
+    /// </summary>
+    internal static bool ShowWeeklyRankChange(TerminalEmulator terminal, Character player)
+    {
+        if (player.WeeklyRank <= 0 || player.PreviousWeeklyRank <= 0) return false;
+        int change = player.PreviousWeeklyRank - player.WeeklyRank; // positive = moved up
+        if (change != 0)
+        {
+            terminal.WriteLine("");
+            if (change > 0)
+            {
+                terminal.SetColor("bright_green");
+                string upKey = change == 1 ? "engine.rank_moved_up_one" : "engine.rank_moved_up_many";
+                terminal.WriteLine($"  {Loc.Get(upKey, change, player.WeeklyRank)}");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                int dropped = Math.Abs(change);
+                string downKey = dropped == 1 ? "engine.rank_dropped_one" : "engine.rank_dropped_many";
+                terminal.WriteLine($"  {Loc.Get(downKey, dropped, player.WeeklyRank)}");
+            }
+            player.PreviousWeeklyRank = player.WeeklyRank;
+        }
+        if (!string.IsNullOrEmpty(player.RivalName))
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine($"  {Loc.Get("engine.rival_level", player.RivalName, player.RivalLevel)}");
+        }
+        terminal.WriteLine("");
+        return change != 0;
     }
 
     public static int ClearLeftoversForNewCharacter(string? name2)
