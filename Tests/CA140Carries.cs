@@ -119,7 +119,7 @@ public class CA140Carries : IDisposable
         throw new InvalidOperationException(signature);
     }
 
-    /// <summary>CreateNewGame split at its NG+ branch: before the else, the branch that is not NG+, and after it.</summary>
+    /// <summary>CreateNewGame split at its NG+ branch: before the else, the else block (not NG+), and after that block.</summary>
     private static (string NgPlus, string NotNgPlus, string After) CreateNewGameBranches()
     {
         var body = Method(Source("Scripts", "Core", "GameEngine.cs"), "private async Task CreateNewGame(");
@@ -127,9 +127,20 @@ public class CA140Carries : IDisposable
         ngPlus.Should().BePositive();
         int notNgPlus = body.IndexOf("else", ngPlus, StringComparison.Ordinal);
         notNgPlus.Should().BeLessThan(body.IndexOf("NOT NG+", StringComparison.Ordinal), "the else is the branch that is not NG+");
-        int end = body.IndexOf("ArchetypeTracker.Instance.Reset();", notNgPlus, StringComparison.Ordinal);
-        end.Should().BePositive();
+        int end = BlockEnd(body, body.IndexOf('{', notNgPlus));
         return (body.Substring(0, notNgPlus), body.Substring(notNgPlus, end - notNgPlus), body.Substring(end));
+    }
+
+    /// <summary>The index just past the brace that closes the block opened at <paramref name="open"/>.</summary>
+    private static int BlockEnd(string src, int open)
+    {
+        int depth = 0;
+        for (int i = open; i < src.Length; i++)
+        {
+            if (src[i] == '{') depth++;
+            else if (src[i] == '}' && --depth == 0) return i + 1;
+        }
+        throw new InvalidOperationException("no closing brace");
     }
 
     // ---------- 1: memories at a new character ----------
