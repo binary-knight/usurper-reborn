@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.7; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.8; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
@@ -293,7 +293,7 @@ monster fight adds one row of whole numbers with these values and no
 others: the outcome (victory, fled or death); your class, level,
 maximum HP, HP at the end of the fight, strength, dexterity, weapon
 power and armor power; the monster's family, level, maximum HP,
-strength and defence, and whether it was a boss; the number of
+strength and defense, and whether it was a boss; the number of
 monsters and the encounter size; who acted first; the dungeon floor
 and difficulty; whether you had teammates, the party size and
 teammates lost; rounds; total damage dealt and taken; damage to you by
