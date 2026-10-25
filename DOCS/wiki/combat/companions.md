@@ -70,6 +70,8 @@ Loyalty runs from 0 to 100 and starts at 50. Each level a companion gains adds 1
 
 Difficulty scales loyalty gains only: Easy gives 1.5 times, Hard 0.75 times and Nightmare half, never less than 1. Losses are not scaled.
 
+A companion in a fight that sees another ally finished when you could have rescued it (the test in [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies)) loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty, with a line in its history.
+
 ### Romance with Lyris or Melodia
 
 Lyris and Melodia are the two companions open to romance. At the Inn, P, the companion's number, then R, once a day: with loyalty 60 or more the bond grows by one step with a chance of 30 plus your Charisma, at most 80 percent. The bond runs up to 10.
