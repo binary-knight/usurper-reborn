@@ -220,7 +220,7 @@ namespace UsurperRemake.Systems
                 var mine = npcData.Where(d => mineKeys.Contains(NpcKey(d))).GroupBy(NpcKey).ToDictionary(g => g.Key, g => g.First());
                 int kept = OverlaySessionChanges(stored, mine);
                 if (reloadRoster != null) await reloadRoster(stored);
-                else await GameEngine.Instance.RestoreNPCs(stored, version);
+                else await GameEngine.Instance.RestoreNPCs(stored, version, MaxSharedRelationshipsPerNpc);
                 generation = RosterGeneration;
                 WorldEditLog.Apply(sql, edits);
                 npcData = SerializeCurrentNPCs();
@@ -664,7 +664,7 @@ namespace UsurperRemake.Systems
                     if (stored == null || stored.Count == 0) break;
                     var loaded = JsonSerializer.Deserialize<List<NPCData>>(storedJson!, PersistJsonOptions)!;
                     if (session != null) session.OverlaySessionChanges(stored, mine);
-                    await GameEngine.Instance.RestoreNPCs(stored, version);
+                    await GameEngine.Instance.RestoreNPCs(stored, version, MaxSharedRelationshipsPerNpc);
                     session?.NoteRosterReloaded(loaded, version, mine.Keys);
                     int again;
                     lock (RosterLock)
@@ -2113,6 +2113,9 @@ namespace UsurperRemake.Systems
         // Serialization Helpers
         // =====================================================================
 
+        /// <summary>1.3.8: the opinions per NPC the world_state writer keeps (the strongest); its loaders pass it as the cap.</summary>
+        internal const int MaxSharedRelationshipsPerNpc = 20;
+
         public static List<NPCData> SerializeCurrentNPCs()
         {
             var npcData = new List<NPCData>();
@@ -2254,7 +2257,7 @@ namespace UsurperRemake.Systems
                     // Cap at 20 most significant relationships to limit serialization size
                     Relationships = npc.Brain?.Memory?.CharacterImpressions?
                         .OrderByDescending(kvp => Math.Abs(kvp.Value))
-                        .Take(20)
+                        .Take(MaxSharedRelationshipsPerNpc)
                         .ToDictionary(kvp => kvp.Key, kvp => kvp.Value * 100f)
                         ?? new Dictionary<string, float>(),
 
