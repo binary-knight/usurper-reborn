@@ -129,7 +129,6 @@ public partial class CombatEngine
         public long HpLost;
         public int Downs, Rescues;   // 1.3.3 party survival
         public bool Finished;
-        public bool Withdrew;   // 1.4.0 W: pulled back from the fight
     }
     private readonly Dictionary<Character, AllyFightStats> _allyStats = new();
     internal AllyFightStats StatsFor(Character ally)
@@ -2174,7 +2173,6 @@ public partial class CombatEngine
         // 1.3.3 party survival: every ally still Downed gets up at half HP, before the outcome branch, so
         // victory, escape, Death's Door and the player's death all see it standing. A fight's end never finishes.
         ResolveDownedAtFightEnd(result);
-        ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: a withdrawn ally is back in its place for the outcome and the split
 
         EndFightEvents(player);   // 1.2.6: the HP the fight left, before any outcome handling
 
@@ -2514,7 +2512,6 @@ public partial class CombatEngine
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
             player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
             ResolveDownedAtFightEnd(result);   // 1.3.3: no-op after the normal end; a fight left by a throw leaves no ally Downed
-            ReturnWithdrawnAtFightEnd(result);   // 1.4.0 W: no-op after the normal end; a throw leaves no ally withdrawn
             EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
             _eventTally = null;
         }
@@ -7461,118 +7458,6 @@ public partial class CombatEngine
             default:
                 return false;
         }
-    }
-
-    /// <summary>
-    /// Process teammate action (AI-controlled)
-    /// </summary>
-    private async Task ProcessTeammateAction(Character teammate, Monster monster, CombatResult result)
-    {
-        if (!teammate.IsAlive || !monster.IsAlive) return;
-
-        // v0.60.0: tick teammate status durations and skip the action if a control effect
-        // (Stun / Paralyze / Sleep / Freeze) is preventing them from acting. Player report:
-        // "Stun only works on enemies. A party member afflicted with stun can act next round
-        // as though nothing happened." Pre-fix the only IsAlive guard above let stunned
-        // teammates act normally, and ActiveStatuses never decremented for teammates either,
-        // so a stun would have lasted the whole fight if anything had been checking it.
-        // Now mirrors the player path at line 1654-1676 (ProcessStatusEffects, then CanAct
-        // guard, then HasStatus(Stunned) message). ProcessStatusEffects also applies poison/bleed ticks
-        // so DoTs land on stunned teammates the same way they do on a stunned player.
-        foreach (var (msg, color) in teammate.ProcessStatusEffects())
-        {
-            terminal.WriteLine(msg, color);
-        }
-        TickPvPControl(teammate); // v1.1.14: a hold that ended starts the teammate's immunity, as for the player
-        if (!teammate.IsAlive) return; // DoT could have killed the teammate
-        if (!teammate.CanAct())
-        {
-            var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
-            terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
-            await Pacing.Wait(GetCombatDelay(800));
-            return;
-        }
-
-        // Build party list for healing decisions
-        var allPartyMembers = new List<Character> { currentPlayer };
-        if (currentTeammates != null)
-            allPartyMembers.AddRange(currentTeammates.Where(t => t.IsAlive));
-
-        // === BOSS PARTY MECHANICS: Priority actions before normal AI ===
-        if (BossContext != null && teammate.IsAlive)
-        {
-            // Priority 1: Healer classes try to dispel Doom or cleanse Corruption
-            if (IsHealerClass(teammate) && TryHealerCleanse(teammate, currentPlayer, result))
-                return;
-
-            // Priority 2: Fast characters try to interrupt boss channeling
-            if (monster.IsChanneling && TryInterruptBossChannel(monster, teammate))
-                return;
-        }
-
-        // Wrap single monster in a list for the multi-monster ability/spell methods
-        var monsterList = new List<Monster> { monster };
-
-        // Check if teammate should heal instead of attack
-        var healAction = await TryTeammateHealAction(teammate, allPartyMembers, result);
-        if (healAction) return;
-
-        // v1.2: wounded, a teammate looks for a shield before it casts an attack spell
-        if (IsWoundedForDefense(teammate, PolicyFor(teammate)) && await TryTeammateClassAbility(teammate, monsterList, result)) return;
-        // Check if teammate should cast an offensive spell
-        var spellAction = await TryTeammateOffensiveSpell(teammate, monsterList, result);
-        if (spellAction) return;
-
-        // Check if teammate should use a class ability
-        var abilityAction = await TryTeammateClassAbility(teammate, monsterList, result);
-        if (abilityAction) return;
-        // v1.2: nothing left to heal or shield with and badly hurt: brace instead of swinging
-        if (TryTeammateDefend(teammate))
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("combat.teammate_defends", teammate.DisplayName));
-            result.CombatLog.Add($"{teammate.DisplayName} braces for the next attack.");
-            await Pacing.Wait(GetCombatDelay(600));
-            return;
-        }
-
-        // Otherwise, basic attack
-        var (swings, windfuryProc) = GetAttackCount(teammate);
-        int baseSwings = 1 + teammate.GetClassCombatModifiers().ExtraAttacks + (windfuryProc ? 1 : 0);
-
-        for (int s = 0; s < swings && monster.IsAlive; s++)
-        {
-            bool isOffHandAttack = teammate.IsDualWielding && s >= baseSwings;
-
-            long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
-            attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
-            double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
-            attackPower = (long)(attackPower * damageModifier);
-
-            long defense = monster.GetDefensePower();
-            long damage = Math.Max(1, attackPower - defense);
-
-            monster.HP = Math.Max(0, monster.HP - damage);
-
-            if (isOffHandAttack)
-                UIHelper.WriteRow(terminal, Loc.Get("combat.tm_offhand_strike", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
-            else
-                UIHelper.WriteRow(terminal, Loc.Get("combat.companion_hits", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
-            result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
-
-            // Apply post-hit enchantment effects
-            ApplyPostHitEnchantments(teammate, monster, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
-
-            if (s < swings - 1 && monster.IsAlive)
-                await Pacing.Wait(GetCombatDelay(500));
-        }
-
-        // Teammate can improve basic attack proficiency through combat use (silent — no message)
-        int profCap = TrainingSystem.GetProficiencyCapForCharacter(teammate);
-        TrainingSystem.TryImproveFromUse(teammate, "basic_attack", random, profCap);
-
-        await Pacing.Wait(GetCombatDelay(1000));
     }
 
     /// <summary>
@@ -20576,8 +20461,8 @@ public partial class CombatEngine
         if (!teammate.IsAlive) return;
         using var evKind = ActAs(CombatEventKind.Basic);   // 1.2.6: a teammate's swing; its spells and abilities set their own
 
-        // v0.60.0: tick statuses + skip turn for control effects (see ProcessTeammateAction
-        // for the full rationale (the "Stun only works on enemies" player report).
+        // v0.60.0: tick the teammate's status durations (and poison or bleed), then skip the turn when a control
+        // effect (Stun, Paralyze, Sleep, Freeze) prevents acting, as the player's turn does.
         foreach (var (msg, color) in teammate.ProcessStatusEffects())
         {
             terminal.WriteLine(msg, color);
@@ -20598,14 +20483,6 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
             await Pacing.Wait(GetCombatDelay(800));
-            return;
-        }
-
-        // 1.4.0 W: a Cautious ally losing the fight tries to pull back, before any other choice (1.4.0 W2: before a
-        // potion or a heal too, whatever heals it has left)
-        if (WantsToWithdraw(teammate, result))
-        {
-            await TryWithdraw(teammate, result);
             return;
         }
 

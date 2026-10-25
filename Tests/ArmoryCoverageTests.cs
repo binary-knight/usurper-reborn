@@ -54,7 +54,6 @@ public class ArmoryCoverageTests
         ["ApplyAbilityEffects"] = "dead: the single-monster ability path throws DeadCombatPathGuard",
         ["ApplySpellEffects"] = "dead monster branch: every live caller passes a null monster",
         ["ExecuteLearnedAbility"] = "dead: no callers",
-        ["ProcessTeammateAction"] = "dead: the single-monster teammate turn has no callers",
         ["ProcessCorruptionTick"] = "the target is a player-side Character, not an enemy",
         ["ProcessBossAoE"] = "the target is a player-side Character, not an enemy",
     };
