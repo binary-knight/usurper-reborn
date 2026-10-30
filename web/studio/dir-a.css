@@ -1,0 +1,415 @@
+@import url("https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&display=swap");
+
+/* Direction A: Phosphor ledger.
+   One amber phosphor on black, in three brightness steps; hard 1px rules, square corners,
+   block characters as structure. Scanlines on the hero only, static.
+   Contrast on #000 / card #0d0900: a1 11.46 / 10.85, a2 7.97 / 7.55, a3 5.16 / 4.89,
+   black on the a1 slab 11.46. */
+
+html[data-direction="a"] {
+    --a1: #ffb000;
+    --a2: #d49300;
+    --a3: #a87400;
+    --rule: #6b4a00;
+    --rule-soft: #3a2800;
+
+    --bg-dark: #000000;
+    --bg-card: #0d0900;
+    --bg-card-hover: #140e00;
+    --border: var(--rule);
+    --cyan: var(--a1);
+    --cyan-dim: var(--a2);
+    --green: var(--a1);
+    --green-dim: var(--a3);
+    --gold: var(--a1);
+    --red: var(--a1);
+    --purple: var(--a2);
+    --bright-green: var(--a1);
+    --text: var(--a2);
+    --text-dim: var(--a3);
+    --glow-cyan: none;
+    --glow-green: none;
+    --glow-gold: none;
+    --glow-purple: none;
+    --glow-red: none;
+
+    scrollbar-color: var(--rule) #000;
+    color-scheme: dark;
+}
+
+/* No glow, no rounding, no soft lift anywhere. */
+html[data-direction="a"] body *,
+html[data-direction="a"] body *::before,
+html[data-direction="a"] body *::after {
+    text-shadow: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+html[data-direction="a"] ::selection { background: var(--a1); color: #000; }
+
+html[data-direction="a"] body {
+    background: #000;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 15px;
+    line-height: 1.65;
+}
+html[data-direction="a"] body::after { content: none; }
+
+html[data-direction="a"] a:focus-visible,
+html[data-direction="a"] button:focus-visible,
+html[data-direction="a"] select:focus-visible {
+    outline: 2px solid var(--a1);
+    outline-offset: 2px;
+}
+
+/* ---------- Type ---------- */
+
+html[data-direction="a"] .logo,
+html[data-direction="a"] .title-banner .title-main,
+html[data-direction="a"] .title-banner .title-sub,
+html[data-direction="a"] .hero-subtitle,
+html[data-direction="a"] .section-title,
+html[data-direction="a"] .story-page h3,
+html[data-direction="a"] .ending-card h3,
+html[data-direction="a"] .history-entry h3,
+html[data-direction="a"] .stat-card .stat-value {
+    font-family: 'VT323', 'IBM Plex Mono', monospace;
+    font-weight: 400;
+}
+
+html[data-direction="a"] .feature-card h3,
+html[data-direction="a"] .god-card h3,
+html[data-direction="a"] .class-card h4,
+html[data-direction="a"] .companion-card h3,
+html[data-direction="a"] .manifesto-block h3,
+html[data-direction="a"] .credit-card h3,
+html[data-direction="a"] .connect-card h3,
+html[data-direction="a"] .leaderboard-section h3,
+html[data-direction="a"] .feed-header h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    color: var(--a1);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+html[data-direction="a"] .god-card .god-floor,
+html[data-direction="a"] .god-card .god-domain,
+html[data-direction="a"] .class-card .stat-bar,
+html[data-direction="a"] .companion-card .companion-meta,
+html[data-direction="a"] .manifesto-closing p,
+html[data-direction="a"] .ending-card .ending-hint,
+html[data-direction="a"] .stat-card .stat-label,
+html[data-direction="a"] .highlight-card .highlight-label,
+html[data-direction="a"] .highlight-card .highlight-value,
+html[data-direction="a"] .live-badge,
+html[data-direction="a"] .feed-item .feed-time,
+html[data-direction="a"] .stats-refresh,
+html[data-direction="a"] .sponsor-name,
+html[data-direction="a"] .sponsor-cta a,
+html[data-direction="a"] .lang-picker select,
+html[data-direction="a"] .hero-live,
+html[data-direction="a"] .hero-cta-note,
+html[data-direction="a"] .class-roster,
+html[data-direction="a"] .endings-close,
+html[data-direction="a"] .roadmap-group,
+html[data-direction="a"] .history-entry p.roadmap-when,
+html[data-direction="a"] .online-count,
+html[data-direction="a"] .ssh-command,
+html[data-direction="a"] .bbs-table,
+html[data-direction="a"] .terminal-title,
+html[data-direction="a"] .terminal-status,
+html[data-direction="a"] .online-players-table,
+html[data-direction="a"] .leaderboard-table,
+html[data-direction="a"] [style*="JetBrains"] {
+    font-family: 'IBM Plex Mono', monospace !important;
+}
+
+/* ---------- Header ---------- */
+
+html[data-direction="a"] header {
+    background: #000;
+    backdrop-filter: none;
+    border-bottom: 1px solid var(--rule);
+}
+html[data-direction="a"] .logo {
+    font-size: 30px;
+    line-height: 1;
+    color: var(--a1);
+    letter-spacing: 0.06em;
+}
+html[data-direction="a"] .logo::before { content: "\2588\00a0" / ""; }
+html[data-direction="a"] .nav-links a,
+html[data-direction="a"] .nav-links a[style] { color: var(--a2) !important; }
+html[data-direction="a"] .nav-links a:hover { color: var(--a1) !important; text-decoration: underline; text-underline-offset: 4px; }
+html[data-direction="a"] .lang-picker select {
+    background: #000;
+    color: var(--a2);
+    border: 1px solid var(--rule);
+}
+html[data-direction="a"] .lang-picker select option { background: #000; color: var(--a2); }
+
+/* ---------- Hero plate ---------- */
+
+html[data-direction="a"] .hero {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 70% 60% at 50% 38%, rgba(255, 176, 0, 0.09), rgba(255, 176, 0, 0) 70%),
+        #000;
+    border-bottom: 1px solid var(--rule);
+}
+html[data-direction="a"] .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 176, 0, 0) 0,
+        rgba(255, 176, 0, 0) 2px,
+        rgba(255, 176, 0, 0.035) 2px,
+        rgba(255, 176, 0, 0.035) 3px
+    );
+}
+html[data-direction="a"] .hero > .container { position: relative; z-index: 1; }
+
+html[data-direction="a"] .title-banner { margin-bottom: 20px; }
+html[data-direction="a"] .title-banner .title-main {
+    font-size: 132px;
+    line-height: 0.9;
+    letter-spacing: 0.08em;
+    color: var(--a1);
+    margin-bottom: 0;
+}
+html[data-direction="a"] .title-banner .title-sub {
+    font-size: 40px;
+    line-height: 1;
+    letter-spacing: 0.6em;
+    padding-left: 0.6em;
+    color: var(--a2);
+}
+html[data-direction="a"] .title-banner .title-sub::before,
+html[data-direction="a"] .title-banner .title-sub::after {
+    content: "\2580\2580\2580" / "";
+    letter-spacing: 0;
+    color: var(--a3);
+}
+html[data-direction="a"] .title-banner .title-sub::before { margin-right: 0.5em; }
+html[data-direction="a"] .title-banner .title-sub::after { margin-left: -0.1em; }
+html[data-direction="a"] .hero-subtitle {
+    font-size: 26px;
+    letter-spacing: 0.18em;
+    color: var(--a1);
+}
+html[data-direction="a"] .hero-desc { color: var(--a2); font-size: 16px; line-height: 1.7; }
+html[data-direction="a"] .hero-live { color: var(--a3); }
+html[data-direction="a"] .hero-live b { color: var(--a1); }
+html[data-direction="a"] .hero-live #hl-news-text { color: var(--a2); }
+html[data-direction="a"] .live-dot-inline,
+html[data-direction="a"] .online-dot { background: var(--a1) !important; }
+html[data-direction="a"] .hero-cta-note { color: var(--a3); }
+html[data-direction="a"] .hero-alt-links a { color: var(--a2); }
+html[data-direction="a"] .hero-alt-links a:hover { color: var(--a1); }
+html[data-direction="a"] .hero-alt-links .alt-sep { color: var(--a3); }
+html[data-direction="a"] .hero-nostalgia { color: var(--a3); }
+
+/* ---------- Buttons ---------- */
+
+html[data-direction="a"] .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 0;
+    transition: background-color 0.12s, color 0.12s;
+}
+html[data-direction="a"] .btn:hover { transform: none; }
+html[data-direction="a"] .btn-primary,
+html[data-direction="a"] .btn-steam {
+    background: var(--a1);
+    color: #000;
+    border: 1px solid var(--a1);
+}
+html[data-direction="a"] .btn-primary:hover,
+html[data-direction="a"] .btn-steam:hover {
+    background: #ffc640;
+    border-color: #ffc640;
+    color: #000;
+}
+html[data-direction="a"] .btn-hero-steam { padding: 16px 34px; font-size: 17px; }
+html[data-direction="a"] .btn-hero-steam::before { content: "\2588" / ""; margin-right: 2px; }
+html[data-direction="a"] .btn-secondary,
+html[data-direction="a"] .btn-sponsor {
+    background: transparent;
+    color: var(--a1);
+    border: 1px solid var(--a1);
+}
+html[data-direction="a"] .btn-secondary:hover,
+html[data-direction="a"] .btn-sponsor:hover {
+    background: var(--a1);
+    color: #000;
+    border-color: var(--a1);
+}
+
+/* ---------- Sections and headings ---------- */
+
+html[data-direction="a"] section + section { border-top: 1px solid var(--rule); }
+html[data-direction="a"] .section-title,
+html[data-direction="a"] .section-title[style] {
+    font-size: 36px;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    color: var(--a1) !important;
+}
+html[data-direction="a"] .section-title::before { content: "\2588\2588\00a0" / ""; color: var(--a1); }
+html[data-direction="a"] .section-subtitle { color: var(--a3); }
+
+/* Cards become ruled ledger cells. */
+html[data-direction="a"] .feature-card,
+html[data-direction="a"] .god-card,
+html[data-direction="a"] .class-card,
+html[data-direction="a"] .companion-card,
+html[data-direction="a"] .ending-card,
+html[data-direction="a"] .credit-card,
+html[data-direction="a"] .connect-card,
+html[data-direction="a"] .stat-card,
+html[data-direction="a"] .highlight-card,
+html[data-direction="a"] .feed-panel,
+html[data-direction="a"] .leaderboard-section,
+html[data-direction="a"] .story-page,
+html[data-direction="a"] .sponsor-card {
+    background: #000;
+    border: 1px solid var(--rule);
+    transition: border-color 0.12s, background-color 0.12s;
+}
+html[data-direction="a"] .feature-card:hover,
+html[data-direction="a"] .god-card:hover,
+html[data-direction="a"] .class-card:hover,
+html[data-direction="a"] .companion-card:hover,
+html[data-direction="a"] .ending-card:hover,
+html[data-direction="a"] .connect-card:hover,
+html[data-direction="a"] .stat-card:hover,
+html[data-direction="a"] .highlight-card:hover,
+html[data-direction="a"] .sponsor-card:hover {
+    background: var(--bg-card);
+    border-color: var(--a2);
+    transform: none;
+}
+html[data-direction="a"] .god-card[style],
+html[data-direction="a"] .highlight-card[style] { border-top: 1px solid var(--rule) !important; }
+html[data-direction="a"] .god-card::before { background: var(--a3) !important; }
+html[data-direction="a"] .god-card .god-floor { color: var(--a3); }
+
+html[data-direction="a"] .feature-card h3::before,
+html[data-direction="a"] .god-card h3::before,
+html[data-direction="a"] .connect-card h3::before { content: "\25A0\00a0" / ""; }
+
+html[data-direction="a"] .story-page h3 { font-size: 28px; color: var(--a1); }
+html[data-direction="a"] .story-page p { color: var(--a2); }
+html[data-direction="a"] .ending-card h3 { font-size: 24px; }
+html[data-direction="a"] .history-entry h3 { font-size: 24px; color: var(--a1); }
+html[data-direction="a"] .stat-card .stat-value { font-size: 40px; color: var(--a1); }
+
+html[data-direction="a"] .manifesto-section::before { content: none; }
+html[data-direction="a"] .manifesto-lead { color: var(--a1); font-style: normal; }
+html[data-direction="a"] .manifesto-block { border-left: 1px solid var(--a3); }
+html[data-direction="a"] .manifesto-block p { color: var(--a2); }
+html[data-direction="a"] .manifesto-closing { border-top: 1px solid var(--rule); }
+
+html[data-direction="a"] .class-roster div { border-left: 1px solid var(--rule); color: var(--a2); }
+html[data-direction="a"] .class-roster div:hover { border-left-color: var(--a1); color: var(--a1); }
+html[data-direction="a"] .stat-bar .bar { background: var(--rule-soft); }
+html[data-direction="a"] .stat-bar .bar-fill.str,
+html[data-direction="a"] .stat-bar .bar-fill.def,
+html[data-direction="a"] .stat-bar .bar-fill.mag,
+html[data-direction="a"] .stat-bar .bar-fill.spd { background: var(--a2); }
+
+html[data-direction="a"] .history-timeline::before { background: var(--rule); width: 1px; }
+html[data-direction="a"] .history-entry::before { background: var(--a1); width: 9px; height: 9px; left: -28px; }
+html[data-direction="a"] .roadmap-group { color: var(--a1); }
+html[data-direction="a"] .roadmap-group::before { content: "\2591\2592\2593\00a0" / ""; letter-spacing: 0; }
+html[data-direction="a"] .history-entry [style] { color: var(--a1) !important; }
+
+/* Play section, BBS list, terminal */
+html[data-direction="a"] .ssh-command {
+    background: #000;
+    border: 1px solid var(--a3);
+    color: var(--a1);
+}
+html[data-direction="a"] .ssh-command:hover { border-color: var(--a1); }
+html[data-direction="a"] .connect-card [style*="color"] { color: var(--a3) !important; }
+html[data-direction="a"] .connect-card [style*="color"] span { color: var(--a1) !important; }
+html[data-direction="a"] .bbs-table th { color: var(--a1); border-bottom: 1px solid var(--rule); }
+html[data-direction="a"] .bbs-table td { border-bottom: 1px solid var(--rule-soft); }
+html[data-direction="a"] .bbs-table td[style],
+html[data-direction="a"] .bbs-table td a[style] { color: var(--a2) !important; }
+html[data-direction="a"] .bbs-table td a[style] { color: var(--a1) !important; }
+html[data-direction="a"] .terminal-header { background: #000; border: 1px solid var(--rule); }
+html[data-direction="a"] .terminal-dots span { background: var(--a3); }
+html[data-direction="a"] #terminal-container { border-color: var(--rule); }
+
+/* Live stats: fixed colours and the colours the board script writes inline. */
+html[data-direction="a"] .leaderboard-table th { color: var(--a1); border-bottom-color: var(--rule); }
+html[data-direction="a"] .leaderboard-table td { border-bottom-color: var(--rule-soft); }
+html[data-direction="a"] .leaderboard-table tr:hover td { background: var(--bg-card); }
+html[data-direction="a"] .leaderboard-table .rank-1,
+html[data-direction="a"] .leaderboard-table .lb-divine,
+html[data-direction="a"] .leaderboard-section.immortals h3,
+html[data-direction="a"] .online-players-table .immortal-name,
+html[data-direction="a"] .online-players-table .immortal-class,
+html[data-direction="a"] .leaderboard-table .lb-name.is-online,
+html[data-direction="a"] .leaderboard-table .online-indicator,
+html[data-direction="a"] .leaderboard-table .lb-status.online { color: var(--a1); }
+html[data-direction="a"] .leaderboard-table .rank-2,
+html[data-direction="a"] .leaderboard-table .rank-3,
+html[data-direction="a"] .leaderboard-table .lb-title,
+html[data-direction="a"] .leaderboard-table .lb-alignment { color: var(--a2); }
+html[data-direction="a"] .leaderboard-table .lb-status.offline { color: var(--a3); }
+html[data-direction="a"] #stats-content [style] { color: var(--a2) !important; border-color: var(--rule) !important; }
+html[data-direction="a"] #stats-content .feed-dot { background: var(--a2) !important; }
+html[data-direction="a"] .feed-item { border-bottom-color: var(--rule-soft); }
+html[data-direction="a"] .feed-item.is-new,
+html[data-direction="a"] .feed-item.is-flash { background: var(--bg-card); }
+html[data-direction="a"] .live-badge .live-dot { background: var(--a1); }
+
+/* Embedded widgets and avatars are toned to the phosphor. */
+html[data-direction="a"] iframe,
+html[data-direction="a"] .sponsor-avatar {
+    filter: grayscale(1) sepia(1) saturate(2.6) hue-rotate(-8deg) brightness(0.9);
+}
+html[data-direction="a"] .sponsor-avatar { border: 1px solid var(--a2); }
+html[data-direction="a"] .sponsors-section { background: #000; border-color: var(--rule); }
+html[data-direction="a"] .sponsor-cta a { color: var(--a1); border-color: var(--a1); }
+
+/* Finale and footer */
+html[data-direction="a"] .finale-section {
+    background: radial-gradient(ellipse at center, rgba(255, 176, 0, 0.07), rgba(255, 176, 0, 0) 70%);
+}
+html[data-direction="a"] .finale-line1 { color: var(--a1); }
+html[data-direction="a"] .finale-line2 { color: var(--a3); }
+html[data-direction="a"] .finale-section .hero-cta-note a[style] { color: var(--a2) !important; }
+html[data-direction="a"] .credit-card a[style],
+html[data-direction="a"] #credits [style] { color: var(--a2) !important; }
+html[data-direction="a"] #credits h3 a[style] { color: var(--a1) !important; }
+html[data-direction="a"] footer { border-top: 1px solid var(--rule); color: var(--a3); }
+html[data-direction="a"] footer a { color: var(--a2); }
+html[data-direction="a"] footer a:hover { color: var(--a1); }
+
+@media (max-width: 768px) {
+    html[data-direction="a"] .title-banner .title-main { font-size: 76px; letter-spacing: 0.06em; }
+    html[data-direction="a"] .title-banner .title-sub { font-size: 26px; letter-spacing: 0.4em; padding-left: 0.4em; }
+    html[data-direction="a"] .hero-subtitle { font-size: 20px; letter-spacing: 0.1em; }
+    html[data-direction="a"] .section-title,
+    html[data-direction="a"] .section-title[style] { font-size: 28px; }
+    html[data-direction="a"] .logo { font-size: 26px; }
+    /* The play cards and the BBS table overflow a phone today; let them wrap instead. */
+    html[data-direction="a"] .connect-methods { grid-template-columns: minmax(0, 1fr); }
+    html[data-direction="a"] .ssh-command { white-space: normal; overflow-wrap: anywhere; padding-right: 16px; }
+    html[data-direction="a"] .ssh-command .copy-hint { position: static; transform: none; display: block; margin-top: 4px; }
+    html[data-direction="a"] .bbs-table { font-size: 12px; }
+    html[data-direction="a"] .bbs-table th,
+    html[data-direction="a"] .bbs-table td { padding: 8px 6px; overflow-wrap: anywhere; }
+}

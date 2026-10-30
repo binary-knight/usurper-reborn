@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Triptych</title>
+<style>
+    :root { --bg: #101014; --panel: #1b1b21; --line: #3c3c46; --text: #f0f0f2; --dim: #b8b8c2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .bar { padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+    .bar h1 { font-size: 15px; margin: 0; }
+    .bar span { color: var(--dim); }
+    .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px; }
+    .col h2 { font-size: 14px; margin: 0 0 6px; }
+    .col h2 a { color: var(--text); }
+    .col p { margin: 0 0 8px; color: var(--dim); font-size: 13px; }
+    .frame { position: relative; overflow: hidden; border: 1px solid var(--line); background: #000; }
+    .frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="bar">
+    <h1>Triptych</h1>
+    <span>The hero of each direction at 1440 x 900, scaled to fit. Each title opens its bench.</span>
+</div>
+<div class="row">
+    <div class="col"><h2><a href="bench.html?direction=a">A: Phosphor ledger</a></h2><p>Amber CRT, terminal face, scanlines on the hero.</p><div class="frame" data-dir="a"></div></div>
+    <div class="col"><h2><a href="bench.html?direction=b">B: Woodcut and iron</a></h2><p>Charcoal and bone, old style serif, one blood red.</p><div class="frame" data-dir="b"></div></div>
+    <div class="col"><h2><a href="bench.html?direction=c">C: Illuminated chronicle</a></h2><p>Dark vellum, gold leaf and oxblood, blackletter title.</p><div class="frame" data-dir="c"></div></div>
+</div>
+<script>
+(function () {
+    var W = 1440, H = 900;
+    var frames = Array.prototype.slice.call(document.querySelectorAll('.frame'));
+    frames.forEach(function (box) {
+        var f = document.createElement('iframe');
+        f.width = W;
+        f.height = H;
+        f.title = 'Direction ' + box.dataset.dir.toUpperCase() + ' hero';
+        f.src = '/index.html?direction=' + box.dataset.dir;
+        box.appendChild(f);
+    });
+    function fit() {
+        frames.forEach(function (box) {
+            var s = box.clientWidth / W;
+            box.style.height = Math.round(H * s) + 'px';
+            box.firstChild.style.transform = 'scale(' + s + ')';
+        });
+    }
+    window.addEventListener('resize', fit);
+    fit();
+})();
+</script>
+</body>
+</html>
