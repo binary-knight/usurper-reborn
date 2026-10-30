@@ -1,15 +1,96 @@
-/* 1.3.4: the account pages (forgotten password, new password, address confirmation). Nothing is loaded from another site. */
-:root { --bg: #0a0a0f; --card: #12121a; --border: #2a2a3a; --text: #e0e0e0; --dim: #9a9aab; --gold: #ffaa00; --cyan: #00e5ff; --red: #ff6666; --green: #00ff88; }
+/* 1.3.4: the account pages (forgotten password, new password, address confirmation). Nothing is loaded from another site.
+   Look: the landing page's woodcut and iron tokens and square edges. With no web fonts here, the type is the
+   system serif (Georgia), set in small capitals where the landing page uses its engraved face.
+   Contrast on the card #1c1916: text 13.34, notes 6.69, errors 4.99; input text 14.99 on #0c0b0a;
+   input edge #8a8273 4.60 against the card; charcoal on the bone button 14.24. */
+:root {
+    --bg: #141210;
+    --bg-ink: #0c0b0a;
+    --bg-card: #1c1916;
+    --iron: #4a4640;
+    --edge: #8a8273;
+    --bone: #e8e0d0;
+    --bone-2: #d8c9a8;
+    --ash: #a89f90;
+    --blood: #9e1b1b;
+    --blood-text: #e0605a;
+    color-scheme: dark;
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
-main { max-width: 32rem; margin: 3rem auto; padding: 1.5rem; background: var(--card); border: 1px solid var(--border); border-radius: 6px; }
-h1 { color: var(--gold); font-size: 1.4rem; margin-top: 0; }
-label { display: block; margin: 1rem 0 0.3rem; }
-input { width: 100%; padding: 0.6rem; font-size: 1rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
-button { margin-top: 1rem; padding: 0.6rem 1.2rem; font-size: 1rem; background: var(--gold); color: #000; border: 0; border-radius: 4px; cursor: pointer; }
+body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image:
+        repeating-linear-gradient(115deg, rgba(232, 224, 208, 0.012) 0 1px, rgba(0, 0, 0, 0) 1px 5px),
+        repeating-linear-gradient(25deg, rgba(0, 0, 0, 0.18) 0 1px, rgba(0, 0, 0, 0) 1px 7px);
+    color: var(--bone);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.55;
+}
+main {
+    max-width: 32rem;
+    margin: 3rem auto;
+    padding: 1.75rem 1.5rem 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--iron);
+    border-top: 6px solid var(--iron);
+}
+h1 {
+    margin: 0 0 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--iron);
+    font-size: 1.6rem;
+    font-weight: normal;
+    font-variant: small-caps;
+    letter-spacing: 0.04em;
+    color: var(--bone);
+}
+label {
+    display: block;
+    margin: 1.1rem 0 0.35rem;
+    font-variant: small-caps;
+    letter-spacing: 0.04em;
+    color: var(--bone-2);
+}
+input {
+    width: 100%;
+    padding: 0.65rem 0.7rem;
+    font: inherit;
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 1rem;
+    background: var(--bg-ink);
+    color: var(--bone);
+    border: 1px solid var(--edge);
+    border-radius: 0;
+}
+input:focus {
+    outline: 2px solid var(--bone);
+    outline-offset: 2px;
+    border-color: var(--bone);
+}
+button {
+    margin-top: 1.2rem;
+    padding: 0.7rem 1.4rem;
+    font: inherit;
+    font-variant: small-caps;
+    letter-spacing: 0.06em;
+    background: var(--bone);
+    color: var(--bg);
+    border: 1px solid var(--bone);
+    border-radius: 0;
+    cursor: pointer;
+}
+button:hover { background: #f6f1e7; }
+button:focus-visible { outline: 2px solid var(--bone); outline-offset: 3px; }
 button:disabled { opacity: 0.6; cursor: default; }
-.note { color: var(--dim); font-size: 0.9rem; }
+.note { color: var(--ash); font-size: 0.92rem; }
 .msg { margin-top: 1rem; }
-.msg.bad { color: var(--red); }
-.msg.good { color: var(--green); }
-a { color: var(--cyan); }
+.msg.bad { color: var(--blood-text); }
+.msg.good { color: var(--bone); font-style: italic; }
+a { color: var(--bone-2); text-underline-offset: 3px; }
+a:hover { color: var(--bone); text-decoration-color: var(--blood); }
+a:focus-visible { outline: 2px solid var(--bone); outline-offset: 2px; }
+@media (max-width: 36rem) {
+    main { margin: 1.5rem 16px; padding: 1.4rem 1.1rem 1.2rem; }
+}

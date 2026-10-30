@@ -3,61 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Usurper Reborn - A Modern Remake of the 1993 BBS Classic</title>
+    <title>Usurper Reborn: A Modern Remake of the 1993 BBS Classic</title>
     <meta name="description" content="A text RPG remake of the 1993 BBS door game Usurper. 60+ NPCs that live and die on their own, a 100-floor dungeon, seven gods to save or destroy, and five endings. Free and open source. Play in your browser, over SSH, or on a BBS.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
     <style>
+        /* Usurper Reborn: woodcut and iron.
+           Charcoal ground, bone text, iron rules, one blood red spent only on Steam.
+           Contrast on --bg / --bg-card: bone 14.24 / 13.34, bone-2 11.4 / 10.7, ash 7.14 / 6.69,
+           blood-text 5.33 / 4.99; bone on the blood slab 6.09 (5.09 on hover); charcoal on bone 14.24. */
         :root {
-            --bg-dark: #0a0a0f;
-            --bg-card: #12121a;
-            --bg-card-hover: #1a1a25;
-            --border: #2a2a3a;
-            --cyan: #00e5ff;
-            --cyan-dim: #0099aa;
-            --green: #00ff88;
-            --green-dim: #009955;
-            --gold: #ffaa00;
-            --red: #ff4444;
-            --purple: #aa66ff;
-            --text: #e0e0e0;
-            --text-dim: #888899;
-            --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.3);
-            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
-            --glow-gold: 0 0 20px rgba(255, 170, 0, 0.3);
-            --glow-purple: 0 0 20px rgba(170, 102, 255, 0.3);
-            --glow-red: 0 0 20px rgba(255, 68, 68, 0.3);
+            --bg: #141210;
+            --bg-deep: #100e0c;
+            --bg-ink: #0c0b0a;
+            --bg-card: #1c1916;
+            --bg-card-hover: #221e1a;
+            --iron: #4a4640;
+            --iron-dark: #2c2925;
+            --bone: #e8e0d0;
+            --bone-2: #d8c9a8;
+            --ash: #a89f90;
+            --blood: #9e1b1b;
+            --blood-hi: #b22222;
+            --blood-dark: #5e0f0f;
+            --blood-edge: #c0393a;
+            --blood-text: #e0605a;
+            --display: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+            --head: 'IM Fell English', Georgia, serif;
+            --body: 'Source Serif 4', Georgia, serif;
+            --mono: 'IBM Plex Mono', ui-monospace, monospace;
+            --hatch: repeating-linear-gradient(45deg, rgba(232, 224, 208, 0.05) 0 1px, rgba(0, 0, 0, 0) 1px 6px),
+                     repeating-linear-gradient(-45deg, rgba(232, 224, 208, 0.035) 0 1px, rgba(0, 0, 0, 0) 1px 9px);
+            color-scheme: dark;
+            scrollbar-color: var(--iron) var(--bg);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         html { scroll-behavior: smooth; }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
+        /* Charcoal with a fine diagonal grain, like an inked block. */
         body {
-            background: var(--bg-dark);
-            color: var(--text);
-            font-family: 'Inter', sans-serif;
-            line-height: 1.6;
+            background-color: var(--bg);
+            background-image:
+                repeating-linear-gradient(115deg, rgba(232, 224, 208, 0.012) 0 1px, rgba(0, 0, 0, 0) 1px 5px),
+                repeating-linear-gradient(25deg, rgba(0, 0, 0, 0.18) 0 1px, rgba(0, 0, 0, 0) 1px 7px);
+            color: var(--bone);
+            font-family: var(--body);
+            font-size: 16px;
+            line-height: 1.65;
             min-height: 100vh;
         }
 
-        /* Scanline overlay */
-        body::after {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                rgba(0, 0, 0, 0.03) 2px,
-                rgba(0, 0, 0, 0.03) 4px
-            );
-            pointer-events: none;
-            z-index: 1000;
+        ::selection { background: var(--blood); color: var(--bone); }
+
+        a:focus-visible,
+        button:focus-visible,
+        select:focus-visible,
+        .ssh-command:focus-visible {
+            outline: 2px solid var(--bone);
+            outline-offset: 2px;
         }
+
+        [hidden] { display: none !important; }
 
         .container {
             max-width: 960px;
@@ -65,456 +76,580 @@
             padding: 0 20px;
         }
 
-        /* Header */
+        iframe { max-width: 100%; }
+
+        /* ---------- Header ---------- */
+
         header {
             padding: 20px 0;
-            border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
-            background: rgba(10, 10, 15, 0.95);
-            backdrop-filter: blur(10px);
             z-index: 100;
+            background: var(--bg);
+            border-bottom: 3px solid var(--iron);
         }
-
+        header::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: -7px;
+            height: 1px;
+            background: var(--iron);
+        }
         header .container {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
         .logo {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 14px;
-            color: var(--cyan);
+            font-family: var(--display);
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: 0.04em;
+            color: var(--bone);
             text-decoration: none;
-            text-shadow: var(--glow-cyan);
         }
-
+        .nav-links { display: flex; align-items: center; }
         .nav-links a {
-            color: var(--text-dim);
+            color: var(--ash);
             text-decoration: none;
             margin-left: 20px;
+            font-size: 15px;
+        }
+        .nav-links a:hover {
+            color: var(--bone);
+            text-decoration: underline;
+            text-decoration-color: var(--blood);
+            text-underline-offset: 5px;
+        }
+        .lang-picker { position: relative; display: inline-block; margin-left: 20px; }
+        .lang-picker select {
+            background: var(--bg);
+            color: var(--bone);
+            border: 1px solid var(--iron);
+            padding: 4px 8px;
+            font-family: var(--display);
             font-size: 13px;
-            transition: color 0.2s;
+            letter-spacing: 0.03em;
+            cursor: pointer;
         }
+        .lang-picker select:hover { border-color: var(--bone-2); }
+        .lang-picker select option { background: var(--bg); color: var(--bone); }
 
-        .nav-links a:hover { color: var(--cyan); }
+        /* ---------- Sections and headings ---------- */
 
-        /* Hero */
-        .hero {
+        section { padding: 60px 0; }
+        section + section { border-top: 3px solid var(--iron); }
+
+        .section-title {
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: 34px;
+            line-height: 1.15;
+            letter-spacing: 0.04em;
+            color: var(--bone);
             text-align: center;
-            padding: 80px 0 60px;
+            width: fit-content;
+            max-width: 100%;
+            margin: 0 auto 16px;
+            padding: 10px 6px 8px;
+            border-top: 3px solid var(--bone-2);
+            border-bottom: 1px solid var(--bone-2);
         }
-
-        .hero-title {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 32px;
-            color: var(--cyan);
-            text-shadow: var(--glow-cyan);
-            margin-bottom: 8px;
-            line-height: 1.4;
-        }
-
-        .hero-subtitle {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 12px;
-            color: var(--gold);
-            margin-bottom: 24px;
-            letter-spacing: 2px;
-        }
-
-        .hero-desc {
-            font-size: 18px;
-            color: var(--text-dim);
-            max-width: 600px;
+        .section-subtitle {
+            text-align: center;
+            color: var(--ash);
+            font-style: italic;
+            font-size: 15px;
+            max-width: 650px;
             margin: 0 auto 40px;
+        }
+
+        /* ---------- Hero: a split plate, title and Steam left, a portrait print right ---------- */
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            padding: 64px 0 60px;
+            background-color: var(--bg-deep);
+            background-image:
+                radial-gradient(ellipse 75% 70% at 50% 42%, rgba(20, 18, 16, 0.92) 0%, rgba(20, 18, 16, 0.55) 55%, rgba(8, 7, 6, 0.2) 100%),
+                repeating-linear-gradient(45deg, rgba(232, 224, 208, 0.07) 0 1px, rgba(0, 0, 0, 0) 1px 6px),
+                repeating-linear-gradient(-45deg, rgba(232, 224, 208, 0.05) 0 1px, rgba(0, 0, 0, 0) 1px 9px);
+            border-top: 1px solid var(--iron);
+            border-bottom: 6px solid var(--iron);
+        }
+        .hero::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: 4px;
+            height: 1px;
+            background: var(--iron);
+        }
+        .hero > .container {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 386px;
+            column-gap: 36px;
+            align-items: start;
+            max-width: 1080px;
+        }
+        .hero > .container > * { grid-column: 1; }
+        .hero > .container > .hero-portrait {
+            grid-column: 2;
+            grid-row: 1 / span 9;
+            align-self: center;
+        }
+
+        .title-banner { margin-bottom: 18px; }
+        .title-banner .title-main {
+            font-family: var(--display);
+            font-size: 104px;
+            line-height: 0.95;
+            letter-spacing: 0.02em;
+            color: var(--bone);
+            margin-bottom: 4px;
+        }
+        .title-banner .title-sub {
+            display: inline-block;
+            font-family: var(--display);
+            font-size: 30px;
+            line-height: 1;
+            letter-spacing: 0.5em;
+            padding: 10px 0;
+            color: var(--bone-2);
+            border-top: 3px solid var(--blood);
+            border-bottom: 1px solid var(--iron);
+        }
+        .hero-subtitle {
+            font-family: var(--display);
+            font-size: 20px;
+            letter-spacing: 0.12em;
+            color: var(--ash);
+            margin-bottom: 24px;
+        }
+        .hero-desc {
+            font-size: 19px;
+            line-height: 1.65;
+            color: var(--bone);
+            max-width: 34em;
+            margin: 0 0 32px;
+        }
+
+        .hero-live {
+            font-family: var(--display);
+            font-size: 15px;
+            letter-spacing: 0.03em;
+            color: var(--ash);
+            margin: 0 0 6px;
+            line-height: 1.9;
+        }
+        .hero-live b { color: var(--bone); font-weight: 700; }
+        .hero-live .hl-news-line { display: block; font-size: 14px; }
+        .hero-live #hl-news-text { color: var(--bone-2); }
+        .live-dot-inline {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 8px;
+            vertical-align: middle;
+            background: var(--blood-text);
+            animation: pulse-dot 2s ease-in-out infinite;
         }
 
         .hero-buttons {
             display: flex;
             gap: 16px;
-            justify-content: center;
             flex-wrap: wrap;
         }
+        .hero-cta-note {
+            font-family: var(--display);
+            font-size: 15px;
+            letter-spacing: 0.03em;
+            color: var(--ash);
+            margin-top: 10px;
+        }
+        .hero-alt-links { margin-top: 16px; font-size: 13px; }
+        .hero-alt-links a {
+            color: var(--bone-2);
+            text-decoration: underline;
+            text-decoration-color: var(--iron);
+            text-underline-offset: 3px;
+        }
+        .hero-alt-links a:hover { color: var(--bone); text-decoration-color: var(--blood); }
+        .hero-alt-links .alt-sep { color: var(--iron); margin: 0 10px; }
+        .hero-nostalgia {
+            margin-top: 26px;
+            max-width: 640px;
+            font-family: var(--head);
+            font-size: 16px;
+            font-style: italic;
+            color: var(--ash);
+        }
+
+        .hero-portrait.print {
+            background-color: var(--bg-ink);
+            background-image: var(--hatch);
+            border-top-width: 6px;
+        }
+        .hero-portrait.print img {
+            width: 384px;
+            max-width: 100%;
+            margin: 0 auto;
+            image-rendering: pixelated;
+        }
+        .hero-portrait.print figcaption {
+            border-top: 1px solid var(--iron);
+            padding-top: 8px;
+            color: var(--bone);
+            text-align: center;
+        }
+
+        /* ---------- Buttons: red is spent on Steam, every other primary is bone ---------- */
 
         .btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             padding: 14px 28px;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: 19px;
+            letter-spacing: 0.06em;
             text-decoration: none;
             cursor: pointer;
             border: none;
-            transition: all 0.2s;
+            transition: background-color 0.12s, color 0.12s, border-color 0.12s;
         }
-
         .btn-primary {
-            background: var(--cyan);
-            color: var(--bg-dark);
-            box-shadow: var(--glow-cyan);
+            background: var(--bone);
+            color: var(--bg);
+            border: 1px solid var(--bone);
         }
-
-        .btn-primary:hover {
-            background: #33eeff;
-            transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        .btn-primary:hover { background: #f6f1e7; border-color: #f6f1e7; }
+        .btn-steam {
+            background: var(--blood);
+            color: var(--bone);
+            border: 1px solid var(--blood-dark);
+            border-top-color: var(--blood-edge);
         }
-
+        .btn-steam:hover { background: var(--blood-hi); border-color: var(--blood-dark); }
         .btn-secondary {
             background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
+            color: var(--bone);
+            border: 1px solid var(--bone-2);
+        }
+        .btn-secondary:hover { background: var(--bone); color: var(--bg); border-color: var(--bone); }
+        .hero .hero-buttons .btn { padding: 14px 22px; font-size: 18px; }
+        .hero .hero-buttons .btn-hero-steam { padding: 15px 30px; font-size: 21px; }
+
+        /* ---------- Cards ---------- */
+
+        .feature-card,
+        .god-card,
+        .companion-card,
+        .credit-card,
+        .connect-card,
+        .stat-card,
+        .highlight-card,
+        .feed-panel,
+        .leaderboard-section,
+        .story-page {
+            background: var(--bg-card);
+            border: 1px solid var(--iron);
+            border-top: 4px solid var(--iron);
+            transition: border-color 0.12s;
+        }
+        .feature-card:hover,
+        .god-card:hover,
+        .companion-card:hover,
+        .connect-card:hover,
+        .stat-card:hover,
+        .highlight-card:hover {
+            background: var(--bg-card-hover);
+            border-top-color: var(--blood);
         }
 
-        .btn-secondary:hover {
-            border-color: var(--cyan-dim);
-            color: var(--cyan);
+        .feature-card h3,
+        .god-card h3,
+        .companion-card h3,
+        .credit-card h3,
+        .connect-card h3,
+        .story-page h3,
+        .history-entry h3,
+        .manifesto-block h3,
+        .leaderboard-section h3,
+        .feed-header h3 {
+            font-family: var(--head);
+            font-weight: 400;
+            color: var(--bone);
         }
 
-        .btn-sponsor {
-            background: transparent;
-            color: #ea4aaa;
-            border: 1px solid #ea4aaa;
-        }
-
-        .btn-sponsor:hover {
-            background: rgba(234, 74, 170, 0.1);
-            border-color: #ff6ec7;
-            color: #ff6ec7;
-            transform: translateY(-2px);
-            box-shadow: 0 0 20px rgba(234, 74, 170, 0.3);
-        }
-
-        /* Title banner */
-        .title-banner {
-            margin-bottom: 24px;
-            text-align: center;
-        }
-        .title-banner .title-main {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 36px;
-            color: var(--cyan);
-            text-shadow: var(--glow-cyan), 0 0 40px rgba(0, 229, 255, 0.15);
-            letter-spacing: 4px;
-            margin-bottom: 8px;
-        }
-        .title-banner .title-sub {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 20px;
-            color: var(--gold);
-            text-shadow: var(--glow-gold), 0 0 30px rgba(255, 215, 0, 0.15);
-            letter-spacing: 6px;
-        }
-
-        /* Section styling */
-        section { padding: 60px 0; }
-        section + section { border-top: 1px solid var(--border); }
-
-        .section-title {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 14px;
-            color: var(--green);
-            text-align: center;
-            margin-bottom: 16px;
-            text-shadow: var(--glow-green);
-        }
-
-        .section-subtitle {
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 15px;
-            margin-bottom: 40px;
-            max-width: 650px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        /* Feature grid */
+        /* Features */
         .feature-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
             gap: 16px;
         }
-
-        .feature-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 24px;
-            transition: all 0.2s;
-        }
-
-        .feature-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--cyan-dim);
-        }
-
-
-        .feature-card h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            color: var(--cyan);
-            margin-bottom: 8px;
-        }
-
-        .feature-card p {
-            font-size: 14px;
-            color: var(--text-dim);
-        }
-
-        /* Story pages */
-        .story-page {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 32px;
-            margin-bottom: 16px;
-        }
-
-        .story-page h3 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 11px;
-            color: var(--gold);
+        .feature-card { padding: 24px; }
+        .feature-card h3 { font-size: 21px; margin-bottom: 8px; }
+        .feature-card p { font-size: 14px; color: var(--ash); line-height: 1.6; }
+        .feature-footer {
+            margin: 28px auto 0;
+            max-width: 780px;
             text-align: center;
-            margin-bottom: 20px;
-            text-shadow: var(--glow-gold);
+            color: var(--ash);
+            font-size: 14px;
         }
 
+        /* Story */
+        .story-page { padding: 36px; margin-bottom: 16px; }
+        .story-page h3 { font-size: 26px; text-align: center; margin-bottom: 20px; }
         .story-page p {
-            color: var(--text-dim);
-            font-size: 15px;
-            margin-bottom: 12px;
-            text-align: center;
+            color: var(--bone-2);
+            font-size: 17px;
+            margin: 0 auto 12px;
             max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
+            text-align: center;
         }
-
         .story-page p:last-child { margin-bottom: 0; }
 
-        /* God cards */
+        /* Gods */
         .god-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 16px;
         }
-
-        .god-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 24px;
-            transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .god-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-        }
-
-        .god-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--purple);
-            transform: translateY(-2px);
-        }
-
+        .god-card { padding: 24px; }
         .god-card .god-floor {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: var(--text-dim);
-            margin-bottom: 4px;
-        }
-
-        .god-card h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 15px;
-            color: var(--purple);
-            margin-bottom: 2px;
-        }
-
-        .god-card .god-title {
+            font-family: var(--display);
             font-size: 12px;
-            color: var(--gold);
-            font-style: italic;
+            letter-spacing: 0.03em;
+            color: var(--ash);
             margin-bottom: 4px;
         }
-
+        .god-card h3 { font-size: 21px; margin-bottom: 2px; }
+        .god-card .god-title { font-size: 13px; font-style: italic; color: var(--bone-2); margin-bottom: 4px; }
         .god-card .god-domain {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: var(--cyan-dim);
+            font-family: var(--display);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            color: var(--bone-2);
             margin-bottom: 10px;
         }
+        .god-card p { font-size: 13px; color: var(--ash); }
 
-        .god-card p {
-            font-size: 13px;
-            color: var(--text-dim);
-        }
-
-        /* Class/Race grids */
-        .class-grid {
+        /* Classes: the twelve portraits as woodcut prints */
+        #classes > .container { display: flex; flex-direction: column; }
+        #classes .class-note { order: 3; }
+        .class-gallery {
+            order: 2;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            width: 100%;
+            max-width: 960px;
+            margin: 8px auto;
         }
-
-        .class-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            transition: all 0.2s;
-        }
-
-        .class-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--cyan-dim);
-        }
-
-        .class-card h4 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--cyan);
-            margin-bottom: 6px;
-        }
-
-        .class-card .class-role {
-            font-size: 11px;
-            color: var(--gold);
-            margin-bottom: 8px;
-        }
-
-        .class-card p {
-            font-size: 12px;
-            color: var(--text-dim);
-            line-height: 1.5;
-        }
-
-        .class-card .stat-bar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 4px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-        }
-
-        .stat-bar .bar {
-            flex: 1;
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .stat-bar .bar-fill {
-            height: 100%;
-            border-radius: 2px;
-        }
-
-        .stat-bar .bar-fill.str { background: var(--red); }
-        .stat-bar .bar-fill.def { background: var(--cyan); }
-        .stat-bar .bar-fill.mag { background: var(--purple); }
-        .stat-bar .bar-fill.spd { background: var(--green); }
-
-        /* Companion cards */
-        .companion-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-            gap: 16px;
-        }
-
-        .companion-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 24px;
-            transition: all 0.2s;
-        }
-
-        .companion-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--green-dim);
-        }
-
-        .companion-card h3 {
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--green);
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-
-        .companion-card .companion-title {
-            font-size: 12px;
-            color: var(--gold);
-            font-style: italic;
-            margin-bottom: 10px;
-        }
-
-        .companion-card .companion-desc {
-            font-size: 13px;
-            color: var(--text-dim);
-            margin-bottom: 10px;
-        }
-
-        .companion-card .companion-backstory {
-            font-size: 13px;
-            color: var(--text-dim);
-            border-left: 2px solid var(--border);
-            padding-left: 12px;
-            margin-bottom: 10px;
-        }
-
-        .companion-card .companion-meta {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: var(--text-dim);
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .companion-card .companion-meta span { color: var(--cyan-dim); }
-
-        .companion-card .companion-quote {
-            font-style: italic;
-            color: var(--gold);
-            font-size: 12px;
-            margin-top: 10px;
-        }
-
-        /* Manifesto / Philosophy section */
-        .manifesto-section {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .manifesto-section::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(ellipse at center, rgba(170, 102, 255, 0.04) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .manifesto-lead {
+        .class-gallery .print {
+            background-color: var(--bg-ink);
+            background-image: var(--hatch);
             text-align: center;
+        }
+        .class-gallery img {
+            max-width: 192px;
+            margin: 0 auto;
+            filter: grayscale(1) sepia(0.25) contrast(1.3) brightness(1.08);
+        }
+        .class-gallery figcaption {
+            border-top: 1px solid var(--iron);
+            padding-top: 8px;
+            color: var(--bone);
+        }
+        .class-note {
+            margin: 22px auto 0;
+            max-width: 720px;
+            text-align: center;
+            color: var(--ash);
+            font-size: 13px;
+        }
+        .class-note.prestige { color: var(--bone-2); font-style: italic; }
+
+        /* Images are prints: greyscale with a slight warm tone, framed by iron rules. */
+        .print {
+            margin: 0;
+            background: var(--bg-ink);
+            border: 1px solid var(--iron);
+            border-top: 4px solid var(--iron);
+            padding: 10px 10px 9px;
+        }
+        .print img {
+            display: block;
+            width: 100%;
+            height: auto;
+            filter: grayscale(1) sepia(0.22) contrast(1.18) brightness(1.04);
+        }
+        .print figcaption {
+            margin-top: 9px;
+            font-family: var(--display);
+            font-size: 15px;
+            line-height: 1.35;
+            letter-spacing: 0.03em;
+            color: var(--bone-2);
+        }
+
+        /* Screenshots */
+        #shots > .container { max-width: 1240px; }
+        .shot-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 32px;
+        }
+        .shot-strip img {
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            object-position: left top;
+            border: 1px solid var(--iron-dark);
+        }
+
+        /* Steam band: the one place a whole surface is red */
+        .steam-band {
+            padding: 44px 0;
+            background-color: var(--blood);
+            background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.13) 0 1px, rgba(0, 0, 0, 0) 1px 6px);
+            border-bottom: 3px solid var(--blood-dark);
+        }
+        section + .steam-band { border-top: 3px solid var(--blood-dark); }
+        .steam-band > .container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 18px 32px;
+            text-align: center;
+        }
+        .steam-band p {
+            max-width: 560px;
+            font-family: var(--head);
+            font-size: 23px;
+            line-height: 1.35;
+            color: var(--bone);
+        }
+        /* Inside the red band the Steam button inverts to bone, or it would vanish. */
+        .steam-band .btn-steam {
+            background: var(--bone);
+            color: var(--bg);
+            border: 1px solid var(--bone);
+            padding: 16px 36px;
+            font-size: 22px;
+        }
+        .steam-band .btn-steam:hover { background: #f6f1e7; border-color: #f6f1e7; }
+        .steam-band + section { border-top: 0; }
+
+        /* Ways to play */
+        .connect-methods {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 24px;
+            margin-top: 32px;
+        }
+        .connect-card { padding: 28px; }
+        .connect-card h3 { font-size: 21px; margin-bottom: 12px; }
+        .connect-card p { color: var(--ash); font-size: 14px; margin-bottom: 16px; }
+        .connect-card .btn { width: 100%; justify-content: center; }
+        .connect-card .connect-note {
+            margin: 8px 0 0;
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--ash);
+        }
+        .connect-card .connect-note span { color: var(--bone); }
+        .ssh-command {
+            overflow-wrap: anywhere;
+            padding: 12px 16px;
+            background: var(--bg-ink);
+            border: 1px solid var(--iron);
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--bone);
+            cursor: pointer;
+            transition: border-color 0.12s;
+        }
+        .ssh-command:hover { border-color: var(--bone-2); }
+        .ssh-command .copy-hint {
+            display: block;
+            margin-top: 4px;
+            color: var(--ash);
+            font-size: 11px;
+        }
+        .steam-widget { display: flex; justify-content: center; margin-top: 32px; }
+
+        /* Finale */
+        .finale-section {
+            text-align: center;
+            padding: 100px 0;
+            background-color: var(--bg-deep);
+            background-image:
+                radial-gradient(ellipse 70% 80% at 50% 50%, rgba(20, 18, 16, 0.95) 0%, rgba(20, 18, 16, 0.6) 60%, rgba(8, 7, 6, 0.2) 100%),
+                repeating-linear-gradient(45deg, rgba(232, 224, 208, 0.06) 0 1px, rgba(0, 0, 0, 0) 1px 6px);
+        }
+        .finale-line1 {
+            max-width: 700px;
+            margin: 0 auto;
+            font-family: var(--head);
+            font-size: 26px;
+            line-height: 1.6;
+            color: var(--bone);
+        }
+        .finale-line2 { margin-top: 14px; font-size: 16px; font-style: italic; color: var(--ash); }
+        .finale-section .hero-buttons { justify-content: center; margin-top: 28px; }
+        .finale-section .hero-cta-note { margin-top: 12px; }
+        .finale-section .hero-cta-note a { color: var(--bone-2); }
+        .finale-steam { padding: 16px 36px; font-size: 22px; }
+
+        /* More: the sections that are not on the page, as a ruled index. Each one shows
+           only when a link targets it, and then sits after this block. */
+        .more-list {
+            list-style: none;
+            margin: 32px auto 0;
+            max-width: 860px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            border-top: 3px solid var(--iron);
+        }
+        .more-list li { border-bottom: 1px solid var(--iron); }
+        .more-list a {
+            display: block;
+            padding: 12px 10px;
+            font-family: var(--display);
+            font-size: 18px;
+            color: var(--bone-2);
+            text-decoration: none;
+        }
+        .more-list a:hover {
+            color: var(--bone);
+            background: var(--bg-card-hover);
+            text-decoration: underline;
+            text-decoration-color: var(--blood);
+            text-underline-offset: 5px;
+        }
+        #more ~ section:not(:target) { display: none; }
+        #more ~ section:target { border-top: 6px solid var(--iron); }
+
+        /* ---------- Sections reached from More ---------- */
+
+        /* Philosophy */
+        .manifesto-lead {
             max-width: 700px;
             margin: 0 auto 48px;
-            font-size: 18px;
-            color: var(--text);
+            text-align: center;
+            font-family: var(--head);
+            font-size: 21px;
             line-height: 1.8;
             font-style: italic;
+            color: var(--bone);
         }
-
         .manifesto-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -522,751 +657,143 @@
             max-width: 720px;
             margin: 0 auto;
         }
-
-        .manifesto-block {
-            padding-left: 20px;
-            border-left: 2px solid var(--purple);
-        }
-
-        .manifesto-block h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--purple);
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-        }
-
-        .manifesto-block p {
-            font-size: 15px;
-            color: var(--text-dim);
-            line-height: 1.7;
-        }
-
+        .manifesto-block { padding-left: 20px; border-left: 4px solid var(--iron); }
+        .manifesto-block h3 { font-size: 21px; margin-bottom: 8px; }
+        .manifesto-block p { font-size: 16px; color: var(--bone-2); line-height: 1.7; }
         .manifesto-closing {
             text-align: center;
             margin-top: 48px;
             padding-top: 32px;
-            border-top: 1px solid var(--border);
+            border-top: 3px solid var(--iron);
         }
-
         .manifesto-closing p {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--text-dim);
             max-width: 500px;
             margin: 0 auto;
+            font-family: var(--display);
+            font-size: 15px;
+            letter-spacing: 0.03em;
             line-height: 1.7;
+            color: var(--ash);
         }
+        .manifesto-closing .manifesto-play { color: var(--bone); margin-top: 16px; }
+        .free-steam-note { font-size: 13px; color: var(--ash); max-width: 720px; margin: 12px auto 0; }
 
-        .manifesto-closing .manifesto-play {
-            color: var(--text);
-            font-size: 14px;
-            margin-top: 16px;
-        }
-
-        /* Ending cards */
-        .ending-grid {
+        /* Companions */
+        .companion-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
             gap: 16px;
         }
-
-        .ending-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 24px;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .ending-card:hover {
-            background: var(--bg-card-hover);
-            transform: translateY(-2px);
-        }
-
-        .ending-card h3 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 11px;
-            margin-bottom: 8px;
-        }
-
-        .ending-card p {
-            font-size: 13px;
-            color: var(--text-dim);
-        }
-
-        .ending-card .ending-hint {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            margin-top: 10px;
-            color: var(--text-dim);
-            font-style: italic;
-        }
-
-        /* History section */
-        .history-timeline {
-            position: relative;
-            padding-left: 24px;
-        }
-
-        .history-timeline::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: var(--border);
-        }
-
-        .history-entry {
-            position: relative;
-            margin-bottom: 32px;
-            padding-left: 24px;
-        }
-
-        .history-entry::before {
-            content: '';
-            position: absolute;
-            left: -29px;
-            top: 8px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--cyan);
-            box-shadow: var(--glow-cyan);
-        }
-
-        .history-entry h3 {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 11px;
-            color: var(--gold);
-            margin-bottom: 8px;
-        }
-
-        .history-entry p {
+        .companion-card { padding: 24px; }
+        .companion-card h3 { font-size: 21px; margin-bottom: 2px; }
+        .companion-card .companion-title { font-size: 13px; font-style: italic; color: var(--bone-2); margin-bottom: 10px; }
+        .companion-card .companion-desc { font-size: 14px; color: var(--ash); margin-bottom: 10px; }
+        .companion-card .companion-backstory {
             font-size: 14px;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-        }
-
-        /* Credits */
-        .credits-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-
-        .credit-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .credit-card h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            color: var(--gold);
-            margin-bottom: 4px;
-        }
-
-        .credit-card .credit-role {
-            font-size: 12px;
-            color: var(--cyan-dim);
+            color: var(--ash);
+            border-left: 3px solid var(--iron);
+            padding-left: 12px;
             margin-bottom: 10px;
         }
-
-        .credit-card p {
-            font-size: 13px;
-            color: var(--text-dim);
+        .companion-card .companion-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            font-family: var(--display);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            color: var(--bone-2);
         }
+        .companion-card .companion-quote { margin-top: 10px; font-size: 13px; font-style: italic; color: var(--bone-2); }
 
-        /* Connect section */
-        .connect-methods {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 32px;
-        }
-
-        .btn-steam {
-            background: #1b2838;
-            color: #c7d5e0;
-            border: 1px solid #2a475e;
-            width: 100%;
-            justify-content: center;
-        }
-
-        .btn-steam:hover {
-            background: #2a475e;
-            color: #fff;
-            border-color: #66c0f4;
-        }
-
-        .connect-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 28px;
-        }
-
-        .connect-card h3 {
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--gold);
-            margin-bottom: 12px;
+        /* Endings */
+        .endings-teaser { max-width: 760px; margin: 0 auto; }
+        .endings-close {
+            margin-top: 16px;
+            font-family: var(--display);
             font-size: 14px;
+            letter-spacing: 0.03em;
+            color: var(--bone-2);
         }
 
-        .connect-card p {
-            color: var(--text-dim);
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .ssh-command {
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 12px 110px 12px 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--green);
-            cursor: pointer;
-            position: relative;
-            transition: border-color 0.2s;
-            overflow: hidden;
-            white-space: nowrap;
-        }
-
-        .ssh-command:hover { border-color: var(--green-dim); }
-
-        .ssh-command .copy-hint {
+        /* History and roadmap */
+        .history-timeline { position: relative; padding-left: 24px; }
+        .history-timeline::before {
+            content: "";
             position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-dim);
-            font-size: 11px;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--iron);
         }
+        .history-entry { position: relative; margin-bottom: 32px; padding-left: 24px; }
+        .history-entry::before {
+            content: "";
+            position: absolute;
+            left: -28px;
+            top: 8px;
+            width: 11px;
+            height: 11px;
+            background: var(--bone-2);
+            transform: rotate(45deg);
+        }
+        .history-entry h3 { font-size: 22px; margin-bottom: 8px; }
+        .history-entry p { font-size: 14px; color: var(--ash); margin-bottom: 8px; }
+        .history-entry strong { color: var(--bone); }
+        .history-entry p.roadmap-when {
+            font-family: var(--display);
+            font-size: 13px;
+            letter-spacing: 0.03em;
+        }
+        .roadmap-now h3 { color: var(--blood-text); }
+        .roadmap-group {
+            margin: 8px 0 20px;
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: 17px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--bone);
+        }
+        .roadmap-group-shipped { color: var(--ash); margin-top: 16px; }
 
-        /* BBS List */
+        /* BBS list */
         .bbs-table {
             width: 100%;
             border-collapse: collapse;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--mono);
             font-size: 13px;
             margin-top: 24px;
         }
-
         .bbs-table th {
             text-align: left;
             padding: 10px 12px;
-            color: var(--cyan);
-            border-bottom: 2px solid var(--border);
             font-size: 12px;
+            color: var(--bone);
+            border-bottom: 3px solid var(--iron);
         }
-
         .bbs-table td {
             padding: 10px 12px;
-            color: var(--text-dim);
-            border-bottom: 1px solid var(--border);
+            color: var(--ash);
+            border-bottom: 1px solid var(--iron-dark);
         }
+        .bbs-table td:first-child { color: var(--bone); }
+        .bbs-table td:last-child { color: var(--bone-2); }
+        .bbs-table a { color: var(--bone); }
+        .bbs-note { text-align: center; margin-top: 24px; font-size: 14px; color: var(--ash); }
+        .bbs-note a { color: var(--bone-2); }
+        .bbs-note a:hover { color: var(--bone); }
 
-        .bbs-note {
-            text-align: center;
-            margin-top: 24px;
-            font-size: 14px;
-            color: var(--text-dim);
-        }
-
-        .bbs-note a {
-            color: var(--cyan-dim);
-            text-decoration: none;
-        }
-
-        .bbs-note a:hover { color: var(--cyan); }
-
-        /* Terminal */
-        .terminal-section {
-            display: none;
-            padding: 0 0 40px;
-            border-top: none !important;
-        }
-
-        .terminal-section.active { display: block; }
-
-        .terminal-header {
+        /* Community */
+        .community-embed {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background: #1a1a25;
-            border: 1px solid var(--border);
-            border-bottom: none;
-            border-radius: 8px 8px 0 0;
-        }
-
-        .terminal-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--text-dim);
-        }
-
-        .terminal-dots {
-            display: flex;
-            gap: 6px;
-        }
-
-        .terminal-dots span {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-
-        .dot-red { background: var(--red); }
-        .dot-yellow { background: var(--gold); }
-        .dot-green { background: var(--green); }
-
-        .terminal-close {
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0 4px;
-        }
-
-        .terminal-close:hover { color: var(--red); }
-
-        #terminal-container {
-            border: 1px solid var(--border);
-            border-radius: 0 0 8px 8px;
-            overflow: hidden;
-            height: 500px;
-        }
-
-        .terminal-status {
-            text-align: center;
-            padding: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: var(--text-dim);
-        }
-
-        .terminal-status.connected { color: var(--green); }
-        .terminal-status.error { color: var(--red); }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 32px 0;
-            text-align: center;
-        }
-
-        footer p {
-            color: var(--text-dim);
-            font-size: 13px;
-        }
-
-        footer a {
-            color: var(--cyan-dim);
-            text-decoration: none;
-        }
-
-        footer a:hover { color: var(--cyan); }
-
-        .footer-links {
-            display: flex;
-            gap: 24px;
+            flex-wrap: wrap;
             justify-content: center;
-            margin-bottom: 12px;
+            align-items: flex-start;
+            gap: 24px;
         }
 
-        /* Live Stats Dashboard */
-        .stats-online-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        .online-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--green);
-            box-shadow: var(--glow-green);
-            animation: pulse-dot 2s ease-in-out infinite;
-        }
-
-        .online-dot.offline {
-            background: var(--text-dim);
-            box-shadow: none;
-            animation: none;
-        }
-
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-
-        .online-count {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            color: var(--green);
-        }
-
-        .online-count.none { color: var(--text-dim); }
-
-        .online-players-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            margin-bottom: 24px;
-        }
-
-        .online-players-table th {
-            text-align: left;
-            padding: 8px 12px;
-            color: var(--cyan);
-            border-bottom: 2px solid var(--border);
-            font-size: 11px;
-        }
-
-        .online-players-table td {
-            padding: 8px 12px;
-            color: var(--text-dim);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .online-players-table .player-name { color: var(--green); }
-        .online-players-table .player-class { color: var(--gold); }
-        .online-players-table .player-via { color: var(--text-dim); font-size: 12px; }
-
-        .online-empty {
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 14px;
-            padding: 16px;
-            font-style: italic;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px 16px;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .stat-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--cyan-dim);
-        }
-
-        .stat-card .stat-value {
-            font-family: 'Press Start 2P', monospace;
-            font-size: 18px;
-            color: var(--cyan);
-            text-shadow: var(--glow-cyan);
-            margin-bottom: 6px;
-        }
-
-        .stat-card .stat-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .highlights-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .highlight-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            transition: all 0.2s;
-        }
-
-        .highlight-card:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--gold);
-        }
-
-        .highlight-card .highlight-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 6px;
-        }
-
-        .highlight-card .highlight-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            color: var(--gold);
-        }
-
-        .highlight-card .highlight-detail {
-            font-size: 12px;
-            color: var(--text-dim);
-            margin-top: 2px;
-        }
-
-        /* Side-by-side feeds container */
-        .feeds-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-top: 20px;
-        }
-        @media (max-width: 800px) {
-            .feeds-row { grid-template-columns: 1fr; }
-        }
-
-        /* Feed panels */
-        .feed-panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .feed-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 4px;
-        }
-
-        .feed-header h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            margin: 0;
-        }
-
-        .feed-panel.npc .feed-header h3 { color: var(--gold); }
-        .feed-panel.player .feed-header h3 { color: var(--cyan); }
-
-        .feed-subtitle {
-            font-size: 11px;
-            color: var(--text-dim);
-            font-style: italic;
-            margin-bottom: 14px;
-        }
-
-        .live-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--red);
-            letter-spacing: 1px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .live-badge.connected { opacity: 1; }
-        .live-badge .live-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--red);
-            border-radius: 50%;
-            animation: livePulse 2s ease-in-out infinite;
-        }
-        @keyframes livePulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,68,68,0.6); }
-            50% { opacity: 0.6; box-shadow: 0 0 8px 3px rgba(255,68,68,0.3); }
-        }
-
-        .feed-scroll {
-            max-height: 380px;
-            overflow-y: auto;
-            overflow-anchor: none;
-        }
-
-        /* Prevent live-updating stats/feeds from causing page scroll jumps */
-        #stats-content, #stats-upper, #stats-feeds {
-            overflow-anchor: none;
-        }
-        .feed-scroll::-webkit-scrollbar { width: 4px; }
-        .feed-scroll::-webkit-scrollbar-track { background: transparent; }
-        .feed-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-        .feed-item {
-            padding: 7px 0;
-            border-bottom: 1px solid rgba(42,42,58,0.5);
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        .feed-item:last-child { border-bottom: none; }
-
-        .feed-item .feed-time {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-            margin-right: 8px;
-        }
-
-        .feed-item .feed-dot {
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            margin-right: 6px;
-            vertical-align: middle;
-        }
-
-        .feed-item.is-new {
-            animation: feedSlideIn 0.4s ease-out;
-        }
-        @keyframes feedSlideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .feed-item.is-flash {
-            background: rgba(255,170,0,0.06);
-            transition: background 2s ease-out;
-        }
-
-        .feed-empty {
-            color: var(--text-dim);
-            font-style: italic;
-            font-size: 12px;
-            padding: 20px 0;
-            text-align: center;
-        }
-
-        .leaderboard-section {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-
-        .leaderboard-section h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: var(--gold);
-            margin-bottom: 12px;
-        }
-
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-        }
-
-        .leaderboard-table th {
-            text-align: left;
-            padding: 8px 10px;
-            border-bottom: 1px solid var(--border);
-            color: var(--text-dim);
-            font-size: 11px;
-            text-transform: uppercase;
-        }
-
-        .leaderboard-table td {
-            padding: 6px 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.03);
-        }
-
-        .leaderboard-table tr:hover td { background: rgba(255,255,255,0.03); }
-
-        .leaderboard-table .rank-col { width: 50px; color: var(--text-dim); }
-        .leaderboard-table .rank-1 { color: var(--gold); font-weight: bold; }
-        .leaderboard-table .rank-2 { color: #ccc; font-weight: bold; }
-        .leaderboard-table .rank-3 { color: #cd7f32; font-weight: bold; }
-        .leaderboard-table .lb-name { color: var(--green); }
-        .leaderboard-table .lb-name.is-online { color: var(--bright-green, #5f5); }
-        .leaderboard-table .lb-class { color: var(--gold); }
-        .leaderboard-table .lb-xp { color: var(--text-dim); text-align: right; }
-        .leaderboard-table .lb-level { text-align: center; }
-        .leaderboard-table .online-indicator { color: #0f0; font-size: 8px; margin-right: 4px; }
-
-        .leaderboard-empty {
-            color: var(--text-dim);
-            font-style: italic;
-            font-size: 13px;
-            padding: 12px 0;
-        }
-
-        .leaderboard-section.pvp { margin-top: 16px; }
-        .leaderboard-section.pvp h3 { color: var(--red); }
-        .leaderboard-table .lb-wins { color: var(--green); text-align: center; }
-        .leaderboard-table .lb-losses { color: var(--red); text-align: center; }
-        .leaderboard-table .lb-gold { color: var(--gold); text-align: right; }
-
-        .leaderboard-section.immortals { margin-top: 0; margin-bottom: 16px; }
-        .leaderboard-section.immortals h3 { color: #ffd700; }
-        .leaderboard-table .lb-divine { color: #ffd700; }
-        .leaderboard-table .lb-title { color: #ccc; }
-        .leaderboard-table .lb-alignment { color: #aaa; text-align: center; }
-        .leaderboard-table .lb-believers { color: var(--green); text-align: center; }
-        .leaderboard-table .lb-status { text-align: center; }
-        .leaderboard-table .lb-status.online { color: #0f0; }
-        .leaderboard-table .lb-status.offline { color: #666; }
-        .online-players-table .immortal-name { color: #ffd700; }
-        .online-players-table .immortal-class { color: #ffd700; }
-
-        .stats-refresh {
-            text-align: center;
-            margin-top: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-        }
-
-        .stats-error {
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 14px;
-            padding: 40px 0;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .hero-title { font-size: 20px; }
-            .hero-subtitle { font-size: 10px; }
-            .title-banner .title-main { font-size: 20px; letter-spacing: 2px; }
-            .title-banner .title-sub { font-size: 12px; letter-spacing: 3px; }
-            .connect-methods { grid-template-columns: 1fr; }
-            .companion-grid { grid-template-columns: 1fr; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .highlights-grid { grid-template-columns: 1fr; }
-            header .container { flex-direction: column; gap: 12px; }
-            .nav-links { display: flex; flex-wrap: wrap; justify-content: center; }
-            .nav-links a { margin: 4px 8px; }
-            .sponsors-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
-        }
-
-        /* Sponsors section */
-        .sponsors-section { background: var(--bg-dark); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        /* Sponsors */
+        .sponsors-section > .container { padding-top: 48px; padding-bottom: 48px; }
         .sponsors-grid {
             display: flex;
             flex-wrap: wrap;
@@ -1279,155 +806,369 @@
             flex-direction: column;
             align-items: center;
             gap: 8px;
-            text-decoration: none;
-            transition: all 0.2s;
             padding: 12px;
-            border-radius: 8px;
+            text-decoration: none;
+            background: var(--bg-card);
+            border: 1px solid var(--iron);
+            border-top: 4px solid var(--iron);
         }
-        .sponsor-card:hover {
-            background: var(--bg-card-hover);
-            transform: translateY(-2px);
-        }
+        .sponsor-card:hover { background: var(--bg-card-hover); border-top-color: var(--blood); }
         .sponsor-avatar {
             width: 64px;
             height: 64px;
-            border-radius: 50%;
-            border: 2px solid #ea4aaa;
-            box-shadow: 0 0 12px rgba(234, 74, 170, 0.3);
+            border: 1px solid var(--iron);
+            filter: grayscale(1) contrast(1.1);
         }
         .sponsor-name {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: #ea4aaa;
+            font-family: var(--display);
+            font-size: 13px;
+            letter-spacing: 0.03em;
+            color: var(--bone);
             text-align: center;
         }
-        .sponsor-tier {
-            font-size: 10px;
-            color: var(--text-dim);
-        }
-        .sponsor-cta {
-            text-align: center;
-            margin-top: 32px;
-        }
+        .sponsor-tier { font-size: 11px; color: var(--ash); }
+        .sponsor-cta { text-align: center; margin-top: 32px; }
         .sponsor-cta a {
-            color: #ea4aaa;
-            text-decoration: none;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            border: 1px solid rgba(234, 74, 170, 0.3);
-            padding: 8px 24px;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-        .sponsor-cta a:hover {
-            background: rgba(234, 74, 170, 0.1);
-            border-color: #ea4aaa;
-            box-shadow: 0 0 20px rgba(234, 74, 170, 0.2);
-        }
-        .sponsors-empty {
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 14px;
-            padding: 16px;
-        }
-
-        /* Language picker */
-        .lang-picker {
-            position: relative;
             display: inline-block;
+            padding: 8px 24px;
+            font-family: var(--display);
+            font-size: 15px;
+            letter-spacing: 0.03em;
+            color: var(--bone);
+            text-decoration: none;
+            border: 1px solid var(--bone-2);
         }
-        .lang-picker select {
-            background: var(--bg-card);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            cursor: pointer;
-            outline: none;
-        }
-        .lang-picker select:hover {
-            border-color: var(--cyan-dim);
-        }
-        .lang-picker select option {
-            background: var(--bg-dark);
-            color: var(--text);
-        }
+        .sponsor-cta a:hover { background: var(--bone); color: var(--bg); }
+        .sponsors-empty { text-align: center; color: var(--ash); font-size: 14px; padding: 16px; }
 
-        /* v1.0 redesign additions */
-        .hero-live {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--text-dim);
-            margin: 18px auto 6px;
-            max-width: 720px;
-            line-height: 1.9;
+        /* Credits */
+        .credits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
         }
-        .hero-live b { color: var(--green); font-weight: 700; }
-        .hero-live .hl-news-line { display: block; color: var(--text-dim); font-size: 12px; }
-        .hero-live #hl-news-text { color: var(--cyan); }
-        .live-dot-inline {
-            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-            background: var(--green); margin-right: 8px; vertical-align: middle;
-            box-shadow: 0 0 6px var(--green);
+        .credit-card { padding: 24px; text-align: center; }
+        .credit-card h3 { font-size: 21px; margin-bottom: 4px; }
+        .credit-card h3 a { color: var(--bone); text-decoration: none; }
+        .credit-card .credit-role {
+            font-family: var(--display);
+            font-size: 13px;
+            letter-spacing: 0.03em;
+            color: var(--bone-2);
+            margin-bottom: 10px;
+        }
+        .credit-card p { font-size: 13px; color: var(--ash); }
+        .credit-card p a { color: var(--bone-2); }
+        .credits-thanks { text-align: center; margin-top: 32px; color: var(--ash); font-size: 14px; }
+        .credits-thanks p + p { margin-top: 12px; }
+        .credits-thanks a { color: var(--bone-2); text-decoration: none; }
+        .credits-thanks a:hover { color: var(--bone); text-decoration: underline; }
+
+        /* ---------- Live world board (reached from More and the Live link) ---------- */
+
+        #stats-content, #stats-upper, #stats-feeds { overflow-anchor: none; }
+
+        .stats-online-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .online-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--blood-text);
             animation: pulse-dot 2s ease-in-out infinite;
         }
-        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-        .hero-cta-note {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px; color: var(--text-dim);
-            margin-top: 10px; text-align: center;
+        .online-dot.offline { background: var(--ash); animation: none; }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
-        .hero-alt-links {
-            margin-top: 16px; text-align: center; font-size: 13px;
+        .online-count {
+            font-family: var(--display);
+            font-size: 15px;
+            letter-spacing: 0.03em;
+            color: var(--bone);
         }
-        .hero-alt-links a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
-        .hero-alt-links a:hover { color: var(--cyan); }
-        .hero-alt-links .alt-sep { color: var(--border); margin: 0 10px; }
-        .hero-nostalgia {
-            margin: 26px auto 0; max-width: 640px; text-align: center;
-            font-size: 13px; font-style: italic; color: var(--text-dim);
+        .online-count.none { color: var(--ash); }
+
+        .online-players-table,
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--mono);
+            font-size: 13px;
         }
-        .feature-footer {
-            margin-top: 28px; text-align: center; color: var(--text-dim);
-            font-size: 14px; max-width: 780px; margin-left: auto; margin-right: auto;
+        .online-players-table { margin-bottom: 24px; }
+        .online-players-table th,
+        .leaderboard-table th {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--bone);
+            border-bottom: 3px solid var(--iron);
         }
-        .class-roster {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 8px 24px; max-width: 860px; margin: 0 auto;
-            font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text);
+        .online-players-table td {
+            padding: 8px 12px;
+            color: var(--ash);
+            border-bottom: 1px solid var(--iron-dark);
         }
-        .class-roster div { padding: 6px 10px; border-left: 2px solid var(--border); }
-        .class-roster div:hover { border-left-color: var(--cyan); color: var(--cyan); }
-        .class-note {
-            margin-top: 22px; text-align: center; color: var(--text-dim);
-            font-size: 13px; max-width: 720px; margin-left: auto; margin-right: auto;
+        .online-players-table .player-name,
+        .online-players-table .immortal-name { color: var(--bone); }
+        .online-players-table .player-class,
+        .online-players-table .immortal-class { color: var(--bone-2); }
+        .online-players-table .player-via { color: var(--ash); font-size: 12px; }
+        .online-players-table .player-location { color: var(--ash); font-style: italic; }
+        .online-empty { text-align: center; color: var(--ash); font-size: 14px; padding: 16px; font-style: italic; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
         }
-        .class-note.prestige { color: var(--purple); }
-        .endings-teaser { max-width: 760px; margin: 0 auto; }
-        .endings-close {
-            margin-top: 16px; color: var(--purple);
-            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+        .stat-card { padding: 20px 16px; text-align: center; }
+        .stat-card .stat-value {
+            font-family: var(--display);
+            font-size: 40px;
+            line-height: 1.1;
+            color: var(--bone);
+            margin-bottom: 6px;
         }
-        .roadmap-now h3 { color: var(--green); }
-        .roadmap-group {
-            font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 2px;
-            text-transform: uppercase; color: var(--cyan); margin: 8px 0 20px;
+        .stat-card .stat-label {
+            font-family: var(--display);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            color: var(--ash);
         }
-        .roadmap-group-shipped { color: var(--text-dim); margin-top: 16px; }
-        .history-entry p.roadmap-when { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-        .free-steam-note { font-size: 13px; color: var(--text-dim); max-width: 720px; margin: 12px auto 0; }
-        .finale-section {
-            text-align: center; padding: 100px 0;
-            background: radial-gradient(ellipse at center, rgba(139,92,246,0.08), transparent 70%);
+
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
         }
-        .finale-line1 {
-            font-size: 22px; color: var(--text); max-width: 700px;
-            margin: 0 auto; line-height: 1.6;
+        .highlight-card { padding: 20px; }
+        .highlight-card .highlight-label {
+            font-family: var(--display);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            color: var(--ash);
+            margin-bottom: 6px;
         }
-        .finale-line2 {
-            font-size: 16px; color: var(--text-dim); margin-top: 14px;
+        .highlight-card .highlight-value { font-family: var(--mono); font-size: 14px; color: var(--bone); }
+        .highlight-card .highlight-detail { font-size: 12px; color: var(--ash); margin-top: 2px; }
+        .highlight-card.most-wanted { border-top-color: var(--blood); }
+        .highlight-card.most-wanted .highlight-label { color: var(--blood-text); }
+
+        .feeds-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .feed-panel { padding: 20px; display: flex; flex-direction: column; }
+        .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .feed-header h3 { font-size: 18px; margin: 0; }
+        .feed-subtitle { font-size: 12px; color: var(--ash); font-style: italic; margin-bottom: 14px; }
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: var(--display);
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            color: var(--blood-text);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .live-badge.connected { opacity: 1; }
+        .live-badge .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--blood-text);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        .feed-scroll { max-height: 380px; overflow-y: auto; overflow-anchor: none; scrollbar-width: thin; }
+        .feed-item {
+            padding: 7px 0;
+            border-bottom: 1px solid var(--iron-dark);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-item .feed-time {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--ash);
+            margin-right: 8px;
+        }
+        .feed-item .feed-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .feed-item.is-new { animation: feedSlideIn 0.4s ease-out; }
+        @keyframes feedSlideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .feed-item.is-flash { background: var(--bg-card-hover); transition: background 2s ease-out; }
+        .feed-empty { color: var(--ash); font-style: italic; font-size: 12px; padding: 20px 0; text-align: center; }
+
+        .leaderboard-section { padding: 20px; margin-top: 20px; }
+        .leaderboard-section h3 { font-size: 18px; margin-bottom: 12px; }
+        .leaderboard-table td { padding: 6px 10px; border-bottom: 1px solid var(--iron-dark); }
+        .leaderboard-table tr:hover td { background: var(--bg-card-hover); }
+        .leaderboard-table .rank-col { width: 50px; color: var(--ash); }
+        .leaderboard-table .rank-1 { color: var(--bone); font-weight: bold; }
+        .leaderboard-table .rank-2,
+        .leaderboard-table .rank-3 { color: var(--bone-2); font-weight: bold; }
+        .leaderboard-table .lb-name,
+        .leaderboard-table .lb-name.is-online { color: var(--bone); }
+        .leaderboard-table .lb-class { color: var(--bone-2); }
+        .leaderboard-table .lb-xp { color: var(--ash); text-align: right; }
+        .leaderboard-table .lb-level { text-align: center; }
+        .leaderboard-table .online-indicator { color: var(--blood-text); font-size: 8px; margin-right: 4px; }
+        .leaderboard-empty { color: var(--ash); font-style: italic; font-size: 13px; padding: 12px 0; }
+        .leaderboard-section.pvp { margin-top: 16px; }
+        .leaderboard-section.pvp h3 { color: var(--blood-text); }
+        .leaderboard-table .lb-wins { color: var(--bone); text-align: center; }
+        .leaderboard-table .lb-losses { color: var(--blood-text); text-align: center; }
+        .leaderboard-table .lb-gold { color: var(--bone-2); text-align: right; }
+        .leaderboard-section.immortals { margin-top: 0; margin-bottom: 16px; }
+        .leaderboard-table .lb-divine { color: var(--bone); }
+        .leaderboard-table .lb-title { color: var(--bone-2); }
+        .leaderboard-table .lb-alignment { color: var(--ash); text-align: center; }
+        .leaderboard-table .lb-believers { color: var(--bone); text-align: center; }
+        .leaderboard-table .lb-status { text-align: center; }
+        .leaderboard-table .lb-status.online { color: var(--bone); }
+        .leaderboard-table .lb-status.offline { color: var(--ash); }
+
+        .stats-refresh {
+            text-align: center;
+            margin-top: 16px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--ash);
+        }
+        .stats-error { text-align: center; color: var(--ash); font-size: 14px; padding: 40px 0; }
+
+        /* ---------- Browser terminal ---------- */
+
+        .terminal-section { display: none; padding: 0 0 40px; }
+        .terminal-section.active { display: block; }
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--iron);
+            border-top: 4px solid var(--iron);
+            border-bottom: none;
+        }
+        .terminal-title { font-family: var(--mono); font-size: 13px; color: var(--ash); }
+        .terminal-dots { display: flex; gap: 6px; }
+        .terminal-dots span { width: 10px; height: 10px; background: var(--iron); }
+        .terminal-close {
+            background: none;
+            border: none;
+            color: var(--ash);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 4px;
+        }
+        .terminal-close:hover { color: var(--bone); }
+        #terminal-container { border: 1px solid var(--iron); overflow: hidden; height: 500px; }
+        .terminal-status {
+            text-align: center;
+            padding: 8px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--ash);
+        }
+        .terminal-status.connected { color: var(--bone); }
+        .terminal-status.error { color: var(--blood-text); }
+
+        /* ---------- Footer ---------- */
+
+        footer {
+            border-top: 6px solid var(--iron);
+            padding: 32px 0;
+            text-align: center;
+        }
+        footer p { color: var(--ash); font-size: 13px; }
+        footer p + p { margin-top: 4px; }
+        footer a { color: var(--bone-2); text-decoration: none; }
+        footer a:hover { color: var(--bone); }
+        .footer-links { display: flex; gap: 24px; justify-content: center; margin-bottom: 12px; }
+
+        /* ---------- Narrow screens ---------- */
+
+        @media (max-width: 900px) {
+            .hero > .container { grid-template-columns: minmax(0, 1fr); }
+            .hero > .container > .hero-portrait {
+                grid-column: 1;
+                grid-row: auto;
+                order: 6;
+                justify-self: center;
+                width: min(100%, 404px);
+                margin: 28px 0 8px;
+            }
+            .hero .title-banner { order: 1; }
+            .hero .hero-subtitle { order: 2; }
+            .hero .hero-desc { order: 3; }
+            .hero .hero-live { order: 4; }
+            .hero .hero-buttons { order: 5; }
+            .hero .hero-cta-note { order: 7; }
+            .hero .hero-alt-links { order: 8; }
+            .hero .hero-nostalgia { order: 9; }
+            .shot-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .class-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 800px) {
+            .feeds-row { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            header .container { flex-direction: column; gap: 12px; }
+            .nav-links { flex-wrap: wrap; justify-content: center; }
+            .nav-links a { margin: 4px 8px; }
+            .lang-picker { margin: 4px 8px; }
+            .hero { padding: 44px 0; }
+            .title-banner .title-main { font-size: 68px; }
+            .title-banner .title-sub { font-size: 20px; letter-spacing: 0.4em; }
+            .hero-subtitle { font-size: 16px; letter-spacing: 0.08em; }
+            .hero-desc { font-size: 17px; }
+            .section-title { font-size: 26px; }
+            .story-page { padding: 24px 18px; }
+            .steam-band p { font-size: 20px; }
+            .more-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .connect-methods { grid-template-columns: minmax(0, 1fr); }
+            .companion-grid { grid-template-columns: minmax(0, 1fr); }
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .highlights-grid { grid-template-columns: minmax(0, 1fr); }
+            .sponsors-grid { gap: 12px; }
+            /* The BBS table wraps instead of overflowing a phone. */
+            .bbs-table { font-size: 12px; }
+            .bbs-table th,
+            .bbs-table td { padding: 8px 6px; overflow-wrap: anywhere; }
+        }
+
+        @media (max-width: 560px) {
+            .class-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .shot-strip { gap: 10px; }
+            .print { padding: 7px 7px 6px; }
+            .print figcaption { font-size: 14px; }
+            .more-list { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .live-dot-inline,
+            .online-dot,
+            .live-badge .live-dot,
+            .feed-item.is-new { animation: none; }
         }
     </style>
 </head>
@@ -1442,9 +1183,9 @@
             <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
             <a href="#connect" data-i18n="nav.play">Play</a>
             <a href="/wiki/" data-i18n="nav.wiki">Wiki</a>
-            <a href="https://discord.gg/EZhwgDT6Ta" target="_blank" style="color:#5865F2;" data-i18n="nav.discord">Discord</a>
+            <a href="https://discord.gg/EZhwgDT6Ta" target="_blank" data-i18n="nav.discord">Discord</a>
             <a href="https://github.com/binary-knight/usurper-reborn" target="_blank" data-i18n="nav.github">GitHub</a>
-            <a href="https://github.com/sponsors/binary-knight" target="_blank" style="color:#ea4aaa;" data-i18n-html="nav.sponsor">&#9829; Sponsor</a>
+            <a href="https://github.com/sponsors/binary-knight" target="_blank" data-i18n-html="nav.sponsor">&#9829; Sponsor</a>
             <div class="lang-picker">
                 <select id="lang-select" onchange="switchLanguage(this.value)">
                     <option value="en">English</option>
@@ -1460,31 +1201,28 @@
             <div class="title-main">USURPER</div>
             <div class="title-sub">REBORN</div>
         </div>
-        <p class="hero-subtitle" data-i18n="hero.subtitle">THE 1993 BBS CLASSIC, REBUILT</p>
-        <p class="hero-desc" data-i18n="r1.hero_desc">
-            The town of Dorashire does not wait for you. Its people marry, raise children, grow old,
-            scheme, and remember what you did -- to them, and to their parents. Beneath their streets
-            lies a 100-floor dungeon; sealed within it, seven broken gods who would rather talk than
-            fight. This is a text RPG where the world carries on without you, where death is permanent,
-            and where your name -- for glory or for infamy -- is carved in stone.
-        </p>
+        <p class="hero-subtitle" data-i18n="hero.subtitle">A living world. A hundred floors down. One question at the bottom.</p>
+        <p class="hero-desc" data-i18n="r1.hero_desc">The town of Dorashire goes on without you: its people marry, raise children, grow old, and remember what you did to them. Death here is permanent, and a hundred floors below the streets, seven broken gods are waiting.</p>
         <div class="hero-live" id="hero-live">
             <span id="hl-online" hidden><span class="live-dot-inline"></span><b id="hl-online-n">--</b>&nbsp;<span data-i18n="r1.live_online">adventurers in the world right now</span></span>
             <span id="hl-world" hidden><span class="live-dot-inline"></span><span data-i18n="r1.live_world">The world is alive:</span> <b id="hl-marr">--</b> <span data-i18n="r1.live_marr">marriages</span>, <b id="hl-kids">--</b> <span data-i18n="r1.live_kids">children born</span>, <b id="hl-kills">--</b> <span data-i18n="r1.live_kills">monsters slain</span></span>
             <span id="hl-news" hidden class="hl-news-line"><span data-i18n="r1.live_latest">Just now:</span> <span id="hl-news-text"></span></span>
         </div>
         <div class="hero-buttons">
-            <button class="btn btn-primary" id="play-btn" onclick="openTerminal()" data-i18n="r1.cta_play">&#9658; Play Now -- Free, In Your Browser</button>
+            <a class="btn btn-steam btn-hero-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
+            <button class="btn btn-secondary" id="play-btn" onclick="openTerminal()" data-i18n="r1.cta_play">▶ Play Now (Free, In Your Browser)</button>
         </div>
         <p class="hero-cta-note" data-i18n="r1.cta_note">No download. No signup. Two minutes from now you will be fighting for your life.</p>
         <p class="hero-alt-links">
-            <a href="https://store.steampowered.com/app/4336570/" target="_blank" data-i18n="r1.alt_steam">Also on Steam</a>
-            <span class="alt-sep">&middot;</span>
             <a href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" data-i18n="r1.alt_download">Download for Windows / Linux / macOS</a>
             <span class="alt-sep">&middot;</span>
             <a href="#connect" data-i18n="r1.alt_ssh">Play over SSH or telnet</a>
         </p>
         <p class="hero-nostalgia" data-i18n="r1.hero_nostalgia">If you remember the shriek of a 14.4k modem handshake: welcome home. If you don't: this is the kind of world we fought over before MMOs existed, and it has lost none of its teeth.</p>
+        <figure class="hero-portrait print">
+            <img src="img/class-warrior.webp" width="192" height="192" alt="" decoding="async">
+            <figcaption data-i18n="r1.cl_warrior">Warrior: steel and stubbornness</figcaption>
+        </figure>
     </div>
 </section>
 
@@ -1505,55 +1243,156 @@
     </div>
 </section>
 
-<!-- Live Stats -->
-<section id="live-stats">
+<!-- Classes -->
+<section id="classes">
     <div class="container">
-        <h2 class="section-title" data-i18n="r1.stats_title">// THE WORLD, RIGHT NOW</h2>
-        <p class="section-subtitle" data-i18n="r1.stats_sub">What follows is not a screenshot. It is a live window into a running world. Every name below belongs to someone the simulation is living for at this very moment, with or without an audience.</p>
-
-        <div id="stats-content">
-            <div class="stats-error" id="stats-loading" data-i18n="stats.loading">Loading world data...</div>
+        <h2 class="section-title" data-i18n="r1.classes_title">CHOOSE YOUR SHAPE</h2>
+        <p class="section-subtitle" data-i18n="r1.classes_sub">12 classes, 10 races, and 5 prestige classes reserved for those who have seen an ending. There is no meta and there are no wrong answers: a Troll Shaman and a Gnome Assassin are both honorable careers here.</p>
+        <p class="class-note" data-i18n="r1.classes_races">Races: Human, Elf, Half-Elf, Dwarf, Troll, Orc, Gnome, Gnoll, Hobbit, Mutant. Yes, Mutant. Trolls regenerate. Gnolls bite.</p>
+        <p class="class-note prestige" data-i18n="r1.classes_prestige">See an ending and five prestige classes open on your next life: Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver. Each one is shaped by the ending you chose.</p>
+        <div class="class-gallery">
+            <figure class="print">
+                <img src="img/class-warrior.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_warrior">Warrior: steel and stubbornness</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-paladin.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_paladin">Paladin: the shield that prays</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-barbarian.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_barbarian">Barbarian: anger as a strategy</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-ranger.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_ranger">Ranger: death from a distance</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-assassin.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_assassin">Assassin: one knife, no witnesses</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-magician.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_magician">Magician: glass cannon, real cannon</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-cleric.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_cleric">Cleric: keeps everyone breathing</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-sage.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_sage">Sage: knows too much</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-bard.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_bard">Bard: fights with a song</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-jester.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_jester">Jester: chaos, grinning</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-alchemist.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_alchemist">Alchemist: science, loosely</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-shaman.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_shaman">Mystic Shaman: storms and totems</figcaption>
+            </figure>
         </div>
     </div>
 </section>
 
-<!-- Philosophy / Manifesto -->
-<section id="philosophy" class="manifesto-section">
+<!-- Story -->
+<section id="story">
     <div class="container">
-        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)" data-i18n="philosophy.title">// WHY I MADE THIS</h2>
-        <p class="section-subtitle" data-i18n="philosophy.subtitle">The short version.</p>
+        <h2 class="section-title" data-i18n="story.title">THE STORY</h2>
+        <p class="section-subtitle" data-i18n="story.subtitle">The setup. No spoilers past what you learn in the first hour.</p>
 
-        <p class="manifesto-lead" data-i18n-html="philosophy.lead">
-            I grew up dialing into BBSes on a 14.4k modem. Most people remember LORD. I remember Usurper. It was deeper, weirder, harder. Jakob Dangarden wrote it in Turbo Pascal in 1993 and open-sourced it under the GPL in 2004. I found the source code years later and couldn't stop thinking about what it could be with modern tools. That turned into this project.
-        </p>
-
-        <div class="manifesto-grid">
-            <div class="manifesto-block">
-                <h3 data-i18n="philosophy.world_title">The World Keeps Going</h3>
-                <p data-i18n-html="philosophy.world_desc">This was the thing I most wanted to get right. The NPCs aren't just standing around waiting for you to show up. They've got birthdays, personalities, opinions. They get married on their own, have kids, those kids grow up and become new NPCs. People die of old age. If you don't log in for a while, the town will look different when you come back -- people you knew might be gone, and there'll be new faces you've never seen. It's a bit like checking in on a fish tank, except the fish have drama.</p>
-            </div>
-
-            <div class="manifesto-block">
-                <h3 data-i18n="philosophy.ngplus_title">NG+ That Isn't Just Harder Numbers</h3>
-                <p data-i18n-html="philosophy.ngplus_desc">When you beat the game, it loops. But the NPCs start to remember. First cycle it's subtle -- "Have we met before?" By cycle three they're asking uncomfortable questions about why everything feels like it already happened. The five endings aren't ranked by difficulty. They're five different takes on the same problem, and honestly I don't think any of them are "the right one."</p>
-            </div>
-
-            <div class="manifesto-block">
-                <h3 data-i18n="philosophy.gods_title">The Gods Talk To You</h3>
-                <p data-i18n-html="philosophy.gods_desc">There are seven bosses sealed in the dungeon, but they're not really bosses. They're gods who used to mean something and got corrupted. Before you fight each one, they'll talk to you, and your dialogue choices actually change the combat -- different stat modifiers, different abilities. The guy at the very bottom of floor 100 doesn't even want to fight. He's just tired and he has a question for you. What you tell him determines how the game ends.</p>
-            </div>
-
-            <div class="manifesto-block">
-                <h3 data-i18n="philosophy.text_title">Why Text</h3>
-                <p data-i18n-html="philosophy.text_desc">The original was a text game and this is a text game. I get asked about this a lot. Partly it's staying true to the source material, but honestly, some of the stuff in this game hits harder as words on a screen at 2am than it would as a cutscene. There's also a shared online server where other players' choices affect the same world, and you can play from literally anything with a terminal -- browser, SSH client, telnet, even an actual BBS.</p>
-            </div>
+        <div class="story-page">
+            <h3 data-i18n="story.golden_title">~ The Golden Age ~</h3>
+            <p data-i18n-html="story.golden_desc">There used to be seven gods watching over the world. The god of war taught honor in battle. The goddess of love blessed unions. The god of light kept truth alive. Things were good, or at least the legends say they were. Nobody alive remembers it firsthand.</p>
         </div>
 
-        <div class="manifesto-closing">
-            <p data-i18n-html="philosophy.closing">Free. No ads, no microtransactions, no loot boxes.<br>
-            GPL v2 licensed. Source code is on GitHub if you want to look at it or fork it.</p>
-            <p class="manifesto-play" data-i18n="philosophy.closing_play">Server's up 24/7. Drop in whenever.</p>
-            <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
+        <div class="story-page">
+            <h3 data-i18n="story.sundering_title">~ The Sundering ~</h3>
+            <p data-i18n-html="story.sundering_desc">Then something went catastrophically wrong. Nobody agrees on what exactly happened: maybe mortals got too proud, maybe one of the gods betrayed the others. The result was the same either way: all seven gods were corrupted and imprisoned underground. The war god lost his mind. The love goddess started fading. The god of truth went quiet. One by one, they all broke.</p>
+        </div>
+
+        <div class="story-page">
+            <h3 data-i18n="story.avarice_title">~ The Age of Avarice ~</h3>
+            <p data-i18n-html="story.avarice_desc">Centuries later, the old gods are just stories people tell to scare kids. The dungeon where they're sealed (the Halls of Avarice) became a place where adventurers go to get rich or die trying. Most of them are just there for gold and glory. But some of them, if they go deep enough, start hearing things. Voices in the dark, from something very old, calling them further down.</p>
+        </div>
+
+        <div class="story-page">
+            <h3 data-i18n="story.you_title">~ You ~</h3>
+            <p data-i18n-html="story.you_desc">You show up with nothing. Pick a race, pick a class, figure the rest out as you go. Fight monsters in the dungeon, make friends or enemies in town, get involved in local politics, maybe fall in love. If you get strong enough you can challenge the king for his throne. If you go deep enough you'll find out what's actually down there. The gods at the bottom will talk to you before the fight, and what you say matters. The whole ending changes depending on those conversations.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Old Gods -->
+<section id="gods">
+    <div class="container">
+        <h2 class="section-title" data-i18n="gods.title">THE SEVEN OLD GODS</h2>
+        <p class="section-subtitle" data-i18n="gods.subtitle">Seven gods sealed in the dungeon. Each one used to stand for something. Now they're broken. You decide what happens to them.</p>
+
+        <div class="god-grid">
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.maelketh_floor">Floor 25</div>
+                <h3 data-i18n="gods.maelketh_name">Maelketh</h3>
+                <div class="god-title" data-i18n="gods.maelketh_title">The Broken Blade</div>
+                <div class="god-domain" data-i18n-html="gods.maelketh_domain">War &amp; Conquest</div>
+                <p data-i18n="gods.maelketh_desc">First one you'll run into. Used to represent honorable combat. His mind's gone now, he just fights on loop. Doesn't even know why anymore. Depending on what you say to him beforehand, the fight plays out very differently.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.veloura_floor">Floor 40</div>
+                <h3 data-i18n="gods.veloura_name">Veloura</h3>
+                <div class="god-title" data-i18n="gods.veloura_title">The Withered Heart</div>
+                <div class="god-domain" data-i18n-html="gods.veloura_domain">Love &amp; Passion</div>
+                <p data-i18n="gods.veloura_desc">She's fading. Not angry about it, just... going away. You can save her if you prove something to her, but I won't spoil what.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.thorgrim_floor">Floor 55</div>
+                <h3 data-i18n="gods.thorgrim_name">Thorgrim</h3>
+                <div class="god-title" data-i18n="gods.thorgrim_title">The Hollow Judge</div>
+                <div class="god-domain" data-i18n-html="gods.thorgrim_domain">Law &amp; Order</div>
+                <p data-i18n="gods.thorgrim_desc">God of justice turned tyrant. His arguments are technically correct and completely deranged at the same time. You can try to reason with him if you want. Good luck.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.noctura_floor">Floor 70</div>
+                <h3 data-i18n="gods.noctura_name">Noctura</h3>
+                <div class="god-title" data-i18n="gods.noctura_title">The Shadow Weaver</div>
+                <div class="god-domain" data-i18n-html="gods.noctura_domain">Shadow &amp; Secrets</div>
+                <p data-i18n="gods.noctura_desc">You've actually been running into her the whole game in various disguises. She orchestrated most of what happened to you. Won't say more than that.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.aurelion_floor">Floor 85</div>
+                <h3 data-i18n="gods.aurelion_name">Aurelion</h3>
+                <div class="god-title" data-i18n="gods.aurelion_title">The Fading Light</div>
+                <div class="god-domain" data-i18n-html="gods.aurelion_domain">Light &amp; Truth</div>
+                <p data-i18n="gods.aurelion_desc">Used to be the god of truth. He gets weaker every time someone lies in the realm above. By the time you reach him he can barely talk.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.terravok_floor">Floor 95</div>
+                <h3 data-i18n="gods.terravok_name">Terravok</h3>
+                <div class="god-title" data-i18n="gods.terravok_title">The Sleeping Mountain</div>
+                <div class="god-domain" data-i18n-html="gods.terravok_domain">Earth &amp; Endurance</div>
+                <p data-i18n="gods.terravok_desc">He's been asleep. For a very long time. The oldest of all seven. Waking him up is an option, but "should you" is the actual question.</p>
+            </div>
+
+            <div class="god-card">
+                <div class="god-floor" data-i18n="gods.manwe_floor">Floor 100</div>
+                <h3 data-i18n="gods.manwe_name">Manwe</h3>
+                <div class="god-title" data-i18n="gods.manwe_title">The Weary Creator</div>
+                <div class="god-domain" data-i18n-html="gods.manwe_domain">Creation &amp; Balance</div>
+                <p data-i18n="gods.manwe_desc">He made everything. He's at the bottom of the whole dungeon and he doesn't want to fight. He's just tired of existing and he has one question for you. Your answer is the ending of the game. This is the encounter I spent the most time writing.</p>
+            </div>
         </div>
     </div>
 </section>
@@ -1561,7 +1400,7 @@
 <!-- What makes it different: consequences, not features -->
 <section id="features">
     <div class="container">
-        <h2 class="section-title" data-i18n="r1.world_title">// A WORLD THAT REMEMBERS YOU</h2>
+        <h2 class="section-title" data-i18n="r1.world_title">A WORLD THAT REMEMBERS YOU</h2>
         <p class="section-subtitle" data-i18n="r1.world_sub">Most games build a world that waits for the player. This one does not. Six truths that hold here and almost nowhere else:</p>
         <div class="feature-grid">
             <div class="feature-card">
@@ -1586,135 +1425,183 @@
             </div>
             <div class="feature-card">
                 <h3 data-i18n="r1.w6t">The world writes its own history</h3>
-                <p data-i18n="r1.w6d">Marriages, murders, births, coups, plagues: a running chronicle of events, most of which no player caused. Scroll up to the live window. It is being written right now, mid-sentence.</p>
+                <p data-i18n="r1.w6d">Marriages, murders, births, coups, plagues: a running chronicle of events, most of which no player caused. Open “The world, right now” under More, further down. It is being written right now, mid-sentence.</p>
             </div>
         </div>
         <p class="feature-footer" data-i18n="r1.world_footer">Beneath all of that stands everything the 1993 original had: 12 classes, 10 races, 75 spells, throne politics, factions, PvP, a shared economy, and a 100-floor dungeon that stops being polite around floor 50.</p>
     </div>
 </section>
 
-<!-- Story -->
-<section id="story">
+<section id="shots" class="shots-section">
     <div class="container">
-        <h2 class="section-title" data-i18n="story.title">// THE STORY</h2>
-        <p class="section-subtitle" data-i18n="story.subtitle">The setup. No spoilers past what you learn in the first hour.</p>
-
-        <div class="story-page">
-            <h3 data-i18n="story.golden_title">~ The Golden Age ~</h3>
-            <p data-i18n-html="story.golden_desc">There used to be seven gods watching over the world. The god of war taught honor in battle. The goddess of love blessed unions. The god of light kept truth alive. Things were good, or at least the legends say they were. Nobody alive remembers it firsthand.</p>
-        </div>
-
-        <div class="story-page">
-            <h3 data-i18n="story.sundering_title">~ The Sundering ~</h3>
-            <p data-i18n-html="story.sundering_desc">Then something went catastrophically wrong. Nobody agrees on what exactly happened -- maybe mortals got too proud, maybe one of the gods betrayed the others. The result was the same either way: all seven gods were corrupted and imprisoned underground. The war god lost his mind. The love goddess started fading. The god of truth went quiet. One by one, they all broke.</p>
-        </div>
-
-        <div class="story-page">
-            <h3 data-i18n="story.avarice_title">~ The Age of Avarice ~</h3>
-            <p data-i18n-html="story.avarice_desc">Centuries later, the old gods are just stories people tell to scare kids. The dungeon where they're sealed -- the Halls of Avarice -- became a place where adventurers go to get rich or die trying. Most of them are just there for gold and glory. But some of them, if they go deep enough, start hearing things. Voices in the dark, from something very old, calling them further down.</p>
-        </div>
-
-        <div class="story-page">
-            <h3 data-i18n="story.you_title">~ You ~</h3>
-            <p data-i18n-html="story.you_desc">You show up with nothing. Pick a race, pick a class, figure the rest out as you go. Fight monsters in the dungeon, make friends or enemies in town, get involved in local politics, maybe fall in love. If you get strong enough you can challenge the king for his throne. If you go deep enough you'll find out what's actually down there. The gods at the bottom will talk to you before the fight, and what you say matters. The whole ending changes depending on those conversations.</p>
+        <h2 class="section-title" data-i18n="r2.shots_title">IN THE TERMINAL</h2>
+        <div class="shot-strip">
+            <figure class="print">
+                <img src="img/shot-combat.webp" width="911" height="519" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_combat">Combat</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-main-street.webp" width="911" height="540" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_street">Main Street</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-dungeon.webp" width="911" height="897" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_dungeon">The dungeon</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-status.webp" width="911" height="939" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_status">Character status</figcaption>
+            </figure>
         </div>
     </div>
 </section>
 
-<!-- Old Gods -->
-<section id="gods">
+<section id="steam-band" class="steam-band">
     <div class="container">
-        <h2 class="section-title" style="color:var(--purple);text-shadow:var(--glow-purple)" data-i18n="gods.title">// THE SEVEN OLD GODS</h2>
-        <p class="section-subtitle" data-i18n="gods.subtitle">Seven gods sealed in the dungeon. Each one used to stand for something. Now they're broken. You decide what happens to them.</p>
+        <p data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</p>
+        <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
+    </div>
+</section>
 
-        <div class="god-grid">
-            <div class="god-card" style="border-top:3px solid var(--red)">
-                <div class="god-floor" data-i18n="gods.maelketh_floor">Floor 25</div>
-                <h3 data-i18n="gods.maelketh_name">Maelketh</h3>
-                <div class="god-title" data-i18n="gods.maelketh_title">The Broken Blade</div>
-                <div class="god-domain" data-i18n-html="gods.maelketh_domain">War &amp; Conquest</div>
-                <p data-i18n="gods.maelketh_desc">First one you'll run into. Used to represent honorable combat. His mind's gone now, he just fights on loop. Doesn't even know why anymore. Depending on what you say to him beforehand, the fight plays out very differently.</p>
+<!-- Connect -->
+<section id="connect">
+    <div class="container">
+        <h2 class="section-title" data-i18n="connect.title">PLAY</h2>
+        <div class="connect-methods">
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.browser_title">&#9658; Play in Browser</h3>
+                <p data-i18n="connect.browser_desc">No install, no download. Opens a terminal right here in your browser.</p>
+                <button class="btn btn-primary" onclick="openTerminal()" data-i18n="connect.browser_btn">Play Now</button>
             </div>
-
-            <div class="god-card" style="border-top:3px solid #ff66aa">
-                <div class="god-floor" data-i18n="gods.veloura_floor">Floor 40</div>
-                <h3 data-i18n="gods.veloura_name">Veloura</h3>
-                <div class="god-title" data-i18n="gods.veloura_title">The Withered Heart</div>
-                <div class="god-domain" data-i18n-html="gods.veloura_domain">Love &amp; Passion</div>
-                <p data-i18n="gods.veloura_desc">She's fading. Not angry about it, just... going away. You can save her if you prove something to her, but I won't spoil what.</p>
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.ssh_title">&#9658; SSH (Recommended)</h3>
+                <p data-i18n="connect.ssh_desc">Best experience. Use any terminal or MUD client that supports SSH.</p>
+                <div class="ssh-command" onclick="copyCommand(this)">
+                    ssh usurper@play.usurper-reborn.net -p 4000
+                    <span class="copy-hint">click to copy</span>
+                </div>
+                <p class="connect-note">Password: <span>play</span> / then login or register in-game</p>
             </div>
-
-            <div class="god-card" style="border-top:3px solid var(--gold)">
-                <div class="god-floor" data-i18n="gods.thorgrim_floor">Floor 55</div>
-                <h3 data-i18n="gods.thorgrim_name">Thorgrim</h3>
-                <div class="god-title" data-i18n="gods.thorgrim_title">The Hollow Judge</div>
-                <div class="god-domain" data-i18n-html="gods.thorgrim_domain">Law &amp; Order</div>
-                <p data-i18n="gods.thorgrim_desc">God of justice turned tyrant. His arguments are technically correct and completely deranged at the same time. You can try to reason with him if you want. Good luck.</p>
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.telnet_title">&#9658; Telnet</h3>
+                <p data-i18n="connect.telnet_desc">For MUD clients that don't do SSH. Unencrypted but works fine.</p>
+                <div class="ssh-command" onclick="copyCommand(this)">
+                    telnet play.usurper-reborn.net 4000
+                    <span class="copy-hint">click to copy</span>
+                </div>
+                <p class="connect-note">No password needed / login or register at the welcome screen</p>
             </div>
-
-            <div class="god-card" style="border-top:3px solid var(--purple)">
-                <div class="god-floor" data-i18n="gods.noctura_floor">Floor 70</div>
-                <h3 data-i18n="gods.noctura_name">Noctura</h3>
-                <div class="god-title" data-i18n="gods.noctura_title">The Shadow Weaver</div>
-                <div class="god-domain" data-i18n-html="gods.noctura_domain">Shadow &amp; Secrets</div>
-                <p data-i18n="gods.noctura_desc">You've actually been running into her the whole game in various disguises. She orchestrated most of what happened to you. Won't say more than that.</p>
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.download_title">&#9658; Download</h3>
+                <p data-i18n="connect.download_desc">Standalone builds for Windows, Linux, and macOS. Play offline or connect to the online server.</p>
+                <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" data-i18n="connect.download_btn">Latest Release on GitHub</a>
             </div>
-
-            <div class="god-card" style="border-top:3px solid #ffee44">
-                <div class="god-floor" data-i18n="gods.aurelion_floor">Floor 85</div>
-                <h3 data-i18n="gods.aurelion_name">Aurelion</h3>
-                <div class="god-title" data-i18n="gods.aurelion_title">The Fading Light</div>
-                <div class="god-domain" data-i18n-html="gods.aurelion_domain">Light &amp; Truth</div>
-                <p data-i18n="gods.aurelion_desc">Used to be the god of truth. He gets weaker every time someone lies in the realm above. By the time you reach him he can barely talk.</p>
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.steam_title">&#9658; Steam</h3>
+                <p data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</p>
+                <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
+                <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" data-i18n="connect.steam_btn">Get on Steam</a>
             </div>
-
-            <div class="god-card" style="border-top:3px solid #886644">
-                <div class="god-floor" data-i18n="gods.terravok_floor">Floor 95</div>
-                <h3 data-i18n="gods.terravok_name">Terravok</h3>
-                <div class="god-title" data-i18n="gods.terravok_title">The Sleeping Mountain</div>
-                <div class="god-domain" data-i18n-html="gods.terravok_domain">Earth &amp; Endurance</div>
-                <p data-i18n="gods.terravok_desc">He's been asleep. For a very long time. The oldest of all seven. Waking him up is an option, but "should you" is the actual question.</p>
+            <div class="connect-card">
+                <h3 data-i18n-html="connect.observatory_title">&#9658; The Observatory</h3>
+                <p data-i18n="connect.observatory_desc">Track NPC relationships, personality data, demographics, and live events as they happen on the server.</p>
+                <a class="btn btn-secondary" href="/dashboard" data-i18n="connect.observatory_btn">Open Dashboard</a>
             </div>
-
-            <div class="god-card" style="border-top:3px solid var(--cyan)">
-                <div class="god-floor" data-i18n="gods.manwe_floor">Floor 100</div>
-                <h3 data-i18n="gods.manwe_name">Manwe</h3>
-                <div class="god-title" data-i18n="gods.manwe_title">The Weary Creator</div>
-                <div class="god-domain" data-i18n-html="gods.manwe_domain">Creation &amp; Balance</div>
-                <p data-i18n="gods.manwe_desc">He made everything. He's at the bottom of the whole dungeon and he doesn't want to fight. He's just tired of existing and he has one question for you. Your answer is the ending of the game. This is the encounter I spent the most time writing.</p>
-            </div>
+        </div>
+        <div class="steam-widget">
+            <iframe src="https://store.steampowered.com/widget/4336570/" frameborder="0" width="646" height="190"></iframe>
         </div>
     </div>
 </section>
 
-<!-- Classes -->
-<section id="classes">
+<!-- Finale -->
+<section id="finale" class="finale-section">
     <div class="container">
-        <h2 class="section-title" data-i18n="r1.classes_title">// CHOOSE YOUR SHAPE</h2>
-        <p class="section-subtitle" data-i18n="r1.classes_sub">12 classes, 10 races, and 5 prestige classes reserved for those who have seen an ending. There is no meta and there are no wrong answers: a Troll Shaman and a Gnome Assassin are both honorable careers here.</p>
-        <div class="class-roster">
-            <div data-i18n="r1.cl_warrior">Warrior -- steel and stubbornness</div>
-            <div data-i18n="r1.cl_paladin">Paladin -- the shield that prays</div>
-            <div data-i18n="r1.cl_barbarian">Barbarian -- anger as a strategy</div>
-            <div data-i18n="r1.cl_ranger">Ranger -- death from a distance</div>
-            <div data-i18n="r1.cl_assassin">Assassin -- one knife, no witnesses</div>
-            <div data-i18n="r1.cl_magician">Magician -- glass cannon, real cannon</div>
-            <div data-i18n="r1.cl_cleric">Cleric -- keeps everyone breathing</div>
-            <div data-i18n="r1.cl_sage">Sage -- knows too much</div>
-            <div data-i18n="r1.cl_bard">Bard -- fights with a song</div>
-            <div data-i18n="r1.cl_jester">Jester -- chaos, grinning</div>
-            <div data-i18n="r1.cl_alchemist">Alchemist -- science, loosely</div>
-            <div data-i18n="r1.cl_shaman">Mystic Shaman -- storms and totems</div>
+        <p class="finale-line1" data-i18n="r1.finale_line1">Somewhere below floor 90, the god who made everything is waiting to ask you one question.</p>
+        <p class="finale-line2" data-i18n="r1.finale_line2">The town will remember your answer. So will their children.</p>
+        <div class="hero-buttons">
+            <a class="btn btn-steam finale-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
+            <button class="btn btn-secondary" onclick="openTerminal();window.scrollTo({top:0,behavior:'smooth'});" data-i18n="r1.finale_cta">&#9658; Begin</button>
         </div>
-        <p class="class-note" data-i18n="r1.classes_races">Races: Human, Elf, Half-Elf, Dwarf, Troll, Orc, Gnome, Gnoll, Hobbit, Mutant. Yes, Mutant. Trolls regenerate. Gnolls bite.</p>
-        <p class="class-note prestige" data-i18n="r1.classes_prestige">See an ending and five prestige classes open on your next life: Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver. Each one is shaped by the ending you chose.</p>
+        <p class="hero-cta-note"><a href="#story" data-i18n="r1.finale_alt">or read the story first</a></p>
+    </div>
+</section>
+
+<section id="more" class="more-block">
+    <div class="container">
+        <h2 class="section-title" data-i18n="r2.more_title">MORE</h2>
+        <ul class="more-list">
+                <li><a href="#live-stats" data-i18n="r1.stats_title">THE WORLD, RIGHT NOW</a></li>
+                <li><a href="#philosophy" data-i18n="philosophy.title">WHY I MADE THIS</a></li>
+                <li><a href="#companions" data-i18n="companions.title">COMPANIONS</a></li>
+                <li><a href="#endings" data-i18n="endings.title">FIVE ENDINGS</a></li>
+                <li><a href="#history" data-i18n="history.title">HISTORY</a></li>
+                <li><a href="#bbs-list" data-i18n="bbs.title">BBS LIST</a></li>
+                <li><a href="#roadmap" data-i18n="r1.road_title">ROADMAP</a></li>
+                <li><a href="#community" data-i18n="r1.comm_title">THE TOWN OUTSIDE THE GAME</a></li>
+                <li><a href="#sponsors" data-i18n-html="sponsors.title">SPONSORS</a></li>
+                <li><a href="#credits" data-i18n="credits.title">CREDITS</a></li>
+        </ul>
+    </div>
+</section>
+
+<!-- Live Stats -->
+<section id="live-stats">
+    <div class="container">
+        <h2 class="section-title" data-i18n="r1.stats_title">THE WORLD, RIGHT NOW</h2>
+        <p class="section-subtitle" data-i18n="r1.stats_sub">What follows is not a screenshot. It is a live window into a running world. Every name below belongs to someone the simulation is living for at this very moment, with or without an audience.</p>
+
+        <div id="stats-content">
+            <div class="stats-error" id="stats-loading" data-i18n="stats.loading">Loading world data...</div>
+        </div>
+    </div>
+</section>
+
+<!-- Philosophy / Manifesto -->
+<section id="philosophy" class="manifesto-section">
+    <div class="container">
+        <h2 class="section-title" data-i18n="philosophy.title">WHY I MADE THIS</h2>
+        <p class="section-subtitle" data-i18n="philosophy.subtitle">The short version.</p>
+
+        <p class="manifesto-lead" data-i18n-html="philosophy.lead">
+            I grew up dialing into BBSes on a 14.4k modem. Most people remember LORD. I remember Usurper. It was deeper, weirder, harder. Jakob Dangarden wrote it in Turbo Pascal in 1993 and open-sourced it under the GPL in 2004. I found the source code years later and couldn't stop thinking about what it could be with modern tools. That turned into this project.
+        </p>
+
+        <div class="manifesto-grid">
+            <div class="manifesto-block">
+                <h3 data-i18n="philosophy.world_title">The World Keeps Going</h3>
+                <p data-i18n-html="philosophy.world_desc">This was the thing I most wanted to get right. The NPCs aren't just standing around waiting for you to show up. They've got birthdays, personalities, opinions. They get married on their own, have kids, those kids grow up and become new NPCs. People die of old age. If you don't log in for a while, the town will look different when you come back: people you knew might be gone, and there'll be new faces you've never seen. It's a bit like checking in on a fish tank, except the fish have drama.</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3 data-i18n="philosophy.ngplus_title">NG+ That Isn't Just Harder Numbers</h3>
+                <p data-i18n-html="philosophy.ngplus_desc">When you beat the game, it loops. But the NPCs start to remember. First cycle it's subtle: "Have we met before?" By cycle three they're asking uncomfortable questions about why everything feels like it already happened. The five endings aren't ranked by difficulty. They're five different takes on the same problem, and honestly I don't think any of them are "the right one."</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3 data-i18n="philosophy.gods_title">The Gods Talk To You</h3>
+                <p data-i18n-html="philosophy.gods_desc">There are seven bosses sealed in the dungeon, but they're not really bosses. They're gods who used to mean something and got corrupted. Before you fight each one, they'll talk to you, and your dialogue choices actually change the combat: different stat modifiers, different abilities. The guy at the very bottom of floor 100 doesn't even want to fight. He's just tired and he has a question for you. What you tell him determines how the game ends.</p>
+            </div>
+
+            <div class="manifesto-block">
+                <h3 data-i18n="philosophy.text_title">Why Text</h3>
+                <p data-i18n-html="philosophy.text_desc">The original was a text game and this is a text game. I get asked about this a lot. Partly it's staying true to the source material, but honestly, some of the stuff in this game hits harder as words on a screen at 2am than it would as a cutscene. There's also a shared online server where other players' choices affect the same world, and you can play from literally anything with a terminal: browser, SSH client, telnet, even an actual BBS.</p>
+            </div>
+        </div>
+
+        <div class="manifesto-closing">
+            <p data-i18n-html="philosophy.closing">Free. No ads, no microtransactions, no loot boxes.<br>
+            GPL v2 licensed. Source code is on GitHub if you want to look at it or fork it.</p>
+            <p class="manifesto-play" data-i18n="philosophy.closing_play">Server's up 24/7. Drop in whenever.</p>
+            <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
+        </div>
     </div>
 </section>
 
 <!-- Companions -->
 <section id="companions">
     <div class="container">
-        <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)" data-i18n="companions.title">// COMPANIONS</h2>
+        <h2 class="section-title" data-i18n="companions.title">COMPANIONS</h2>
         <p class="section-subtitle" data-i18n="companions.subtitle">Five recruitable NPCs with their own quest lines. They fight with you in the dungeon and they can permanently die, which matters more than you'd think.</p>
 
         <div class="companion-grid">
@@ -1788,7 +1675,7 @@
 <!-- Endings -->
 <section id="endings">
     <div class="container">
-        <h2 class="section-title" style="color:var(--red);text-shadow:var(--glow-red)" data-i18n="endings.title">// FIVE ENDINGS</h2>
+        <h2 class="section-title" data-i18n="endings.title">FIVE ENDINGS</h2>
         <p class="section-subtitle" data-i18n="r1.endings_sub">Not listed here. Deliberately.</p>
         <div class="story-page endings-teaser">
             <p data-i18n-html="r1.endings_desc">The game ends when you answer the Weary Creator's question at the bottom of floor 100. There are five answers. Power is one. Compassion is another. Two of them cannot be reached until the world has looped and the people in it begin to remember that it looped. No one agrees on which ending is the right one; the man who wrote them does not agree with himself. That is the design.</p>
@@ -1800,85 +1687,34 @@
 <!-- History -->
 <section id="history">
     <div class="container">
-        <h2 class="section-title" data-i18n="history.title">// HISTORY</h2>
+        <h2 class="section-title" data-i18n="history.title">HISTORY</h2>
         <p class="section-subtitle" data-i18n="history.subtitle">How a 1993 BBS door game became this.</p>
 
         <div class="history-timeline">
             <div class="history-entry">
                 <h3 data-i18n-html="history.bbs_title">BBSes (1978-1999)</h3>
-                <p data-i18n-html="history.bbs_desc">If you're under 35 you probably missed this entirely. Before the web, people ran Bulletin Board Systems out of their houses. You'd use your phone line to dial into someone else's computer with a modem. It made this awful screeching noise during the handshake and then you were in -- ANSI art, message forums, file downloads, games. There were something like 25,000 BBSes in the US by 1992, each one run by a "SysOp" on a dedicated phone line in their spare bedroom.</p>
+                <p data-i18n-html="history.bbs_desc">If you're under 35 you probably missed this entirely. Before the web, people ran Bulletin Board Systems out of their houses. You'd use your phone line to dial into someone else's computer with a modem. It made this awful screeching noise during the handshake and then you were in: ANSI art, message forums, file downloads, games. There were something like 25,000 BBSes in the US by 1992, each one run by a "SysOp" on a dedicated phone line in their spare bedroom.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.doors_title">Door Games</h3>
-                <p data-i18n-html="history.doors_desc">BBSes could run external programs called "door games." Totally text-based, running over a phone line at 2400-14400 baud, and you only got limited play time per day because other callers needed the line. The constraints were insane by modern standards, but that's exactly what made people creative. Trade Wars 2002, Legend of the Red Dragon, Usurper -- these games had persistent worlds where what one caller did today affected what the next caller found tomorrow. Before the term "MMO" existed, these were it.</p>
+                <p data-i18n-html="history.doors_desc">BBSes could run external programs called "door games." Totally text-based, running over a phone line at 2400-14400 baud, and you only got limited play time per day because other callers needed the line. The constraints were insane by modern standards, but that's exactly what made people creative. Trade Wars 2002, Legend of the Red Dragon, Usurper: these games had persistent worlds where what one caller did today affected what the next caller found tomorrow. Before the term "MMO" existed, these were it.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.usurper_title">Usurper (1993)</h3>
-                <p data-i18n-html="history.usurper_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> wrote it in Turbo Pascal. LORD was the big one at the time, but Usurper went way deeper -- real class differences, 10 races, a 100-level dungeon, team warfare, throne politics, complex progression. Set in Dorashire, you explored the Dungeons of Durunghins and the whole point was to get powerful enough to take the throne. It was harder and darker than most door games. Not as popular as LORD but the people who played it <em>really</em> played it.</p>
+                <p data-i18n-html="history.usurper_desc"><strong>Jakob Dangarden</strong> wrote it in Turbo Pascal. LORD was the big one at the time, but Usurper went way deeper: real class differences, 10 races, a 100-level dungeon, team warfare, throne politics, complex progression. Set in Dorashire, you explored the Dungeons of Durunghins and the whole point was to get powerful enough to take the throne. It was harder and darker than most door games. Not as popular as LORD but the people who played it <em>really</em> played it.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n="history.alive_title">Who Kept It Alive</h3>
-                <p data-i18n-html="history.alive_desc"><strong style="color:var(--gold)">Jakob Dangarden</strong> open-sourced Usurper under the GPL in 2004. Can't overstate how important that was -- without that, this remake literally could not exist.<br><br><strong style="color:var(--gold)">Rick Parrish</strong> at R&amp;M Software ported the Turbo Pascal source to run on modern systems. He also wrote GameSrv, which is the BBS server software that a lot of the surviving door game community still runs on. Huge amount of work.<br><br><strong style="color:var(--gold)">Daniel Zingaro</strong> did a ton of bug fixing on the ancient Pascal code. Edge cases from 1993 that nobody had bothered to track down until he went through it methodically. Version 0.20e is stable because of him.</p>
+                <p data-i18n-html="history.alive_desc"><strong>Jakob Dangarden</strong> open-sourced Usurper under the GPL in 2004. Can't overstate how important that was. Without that, this remake literally could not exist.<br><br><strong>Rick Parrish</strong> at R&amp;M Software ported the Turbo Pascal source to run on modern systems. He also wrote GameSrv, which is the BBS server software that a lot of the surviving door game community still runs on. Huge amount of work.<br><br><strong>Daniel Zingaro</strong> did a ton of bug fixing on the ancient Pascal code. Edge cases from 1993 that nobody had bothered to track down until he went through it methodically. Version 0.20e is stable because of him.</p>
             </div>
 
             <div class="history-entry">
                 <h3 data-i18n-html="history.reborn_title">Usurper Reborn (2024-Now)</h3>
-                <p data-i18n-html="history.reborn_desc">I (<strong style="color:var(--gold)">Jason Knight</strong>) started this project because I kept coming back to Usurper and thinking about what it could've been if the 90s hardware constraints weren't a factor. The original game had so much going on under the hood -- race mechanics, class abilities, political systems -- but the BBS environment limited how far any of it could go. I wanted to see what happened if you took that foundation and built on it with modern tools.<br><br>It's written in C# on .NET 8.0. All the original gameplay is in there. Then I added about 60 unique NPCs with an autonomous world simulation, a companion system, New Game+ where the NPCs gradually become aware of the loop, seven god encounters with branching dialogue, and five endings. The world simulation runs on the server 24/7 and keeps going whether anyone's logged in or not. It still runs on BBSes too -- there are a couple boards on the BBS list below that have it installed as a door game right now.</p>
+                <p data-i18n-html="history.reborn_desc">I (<strong>Jason Knight</strong>) started this project because I kept coming back to Usurper and thinking about what it could've been if the 90s hardware constraints weren't a factor. The original game had so much going on under the hood (race mechanics, class abilities, political systems), but the BBS environment limited how far any of it could go. I wanted to see what happened if you took that foundation and built on it with modern tools.<br><br>It's written in C# on .NET 8.0. All the original gameplay is in there. Then I added about 60 unique NPCs with an autonomous world simulation, a companion system, New Game+ where the NPCs gradually become aware of the loop, seven god encounters with branching dialogue, and five endings. The world simulation runs on the server 24/7 and keeps going whether anyone's logged in or not. It still runs on BBSes too: there are a couple boards on the BBS list below that have it installed as a door game right now.</p>
             </div>
-        </div>
-    </div>
-</section>
-
-<!-- Connect -->
-<section id="connect">
-    <div class="container">
-        <h2 class="section-title" data-i18n="connect.title">// PLAY</h2>
-        <div class="connect-methods">
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.browser_title">&#9658; Play in Browser</h3>
-                <p data-i18n="connect.browser_desc">No install, no download. Opens a terminal right here in your browser.</p>
-                <button class="btn btn-primary" onclick="openTerminal()" style="width:100%;justify-content:center;" data-i18n="connect.browser_btn">Play Now</button>
-            </div>
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.ssh_title">&#9658; SSH (Recommended)</h3>
-                <p data-i18n="connect.ssh_desc">Best experience. Use any terminal or MUD client that supports SSH.</p>
-                <div class="ssh-command" onclick="copyCommand(this)">
-                    ssh usurper@play.usurper-reborn.net -p 4000
-                    <span class="copy-hint">click to copy</span>
-                </div>
-                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">Password: <span style="color:var(--green);">play</span> / then login or register in-game</p>
-            </div>
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.telnet_title">&#9658; Telnet</h3>
-                <p data-i18n="connect.telnet_desc">For MUD clients that don't do SSH. Unencrypted but works fine.</p>
-                <div class="ssh-command" onclick="copyCommand(this)">
-                    telnet play.usurper-reborn.net 4000
-                    <span class="copy-hint">click to copy</span>
-                </div>
-                <p style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);">No password needed / login or register at the welcome screen</p>
-            </div>
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.download_title">&#9658; Download</h3>
-                <p data-i18n="connect.download_desc">Standalone builds for Windows, Linux, and macOS. Play offline or connect to the online server.</p>
-                <a class="btn btn-secondary" href="https://github.com/binary-knight/usurper-reborn/releases/latest" target="_blank" style="width:100%;justify-content:center;" data-i18n="connect.download_btn">Latest Release on GitHub</a>
-            </div>
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.steam_title">&#9658; Steam</h3>
-                <p data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</p>
-                <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
-                <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" style="width:100%;justify-content:center;" data-i18n="connect.steam_btn">Get on Steam</a>
-            </div>
-            <div class="connect-card">
-                <h3 data-i18n-html="connect.observatory_title">&#9658; The Observatory</h3>
-                <p data-i18n="connect.observatory_desc">Track NPC relationships, personality data, demographics, and live events as they happen on the server.</p>
-                <a class="btn btn-secondary" href="/dashboard" style="width:100%;justify-content:center;" data-i18n="connect.observatory_btn">Open Dashboard</a>
-            </div>
-        </div>
-        <div style="display:flex;justify-content:center;margin-top:32px;">
-            <iframe src="https://store.steampowered.com/widget/4336570/" frameborder="0" width="646" height="190" style="max-width:100%;"></iframe>
         </div>
     </div>
 </section>
@@ -1886,7 +1722,7 @@
 <!-- BBS List -->
 <section id="bbs-list">
     <div class="container">
-        <h2 class="section-title" data-i18n="bbs.title">// BBS LIST</h2>
+        <h2 class="section-title" data-i18n="bbs.title">BBS LIST</h2>
         <p class="section-subtitle" data-i18n="bbs.subtitle">BBSes that are running Usurper Reborn as a door game right now.</p>
 
         <table class="bbs-table">
@@ -1899,39 +1735,39 @@
             </thead>
             <tbody>
                 <tr>
-                    <td style="color:var(--text)">Shurato's Heavenly Sphere</td>
+                    <td>Shurato's Heavenly Sphere</td>
                     <td>EleBBS</td>
-                    <td style="color:var(--green)"><a href="https://shsbbs.net" target="_blank" style="color:var(--green)">shsbbs.net</a></td>
+                    <td><a href="https://shsbbs.net" target="_blank">shsbbs.net</a></td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">The X-BIT BBS</td>
+                    <td>The X-BIT BBS</td>
                     <td>Synchronet</td>
-                    <td style="color:var(--green)"><a href="https://x-bit.org" target="_blank" style="color:var(--green)">x-bit.org</a> :23 (telnet) / ssh -p 22222</td>
+                    <td><a href="https://x-bit.org" target="_blank">x-bit.org</a> :23 (telnet) / ssh -p 22222</td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">The UNIX-BIT BBS</td>
+                    <td>The UNIX-BIT BBS</td>
                     <td>Synchronet</td>
-                    <td style="color:var(--green)"><a href="https://x-bit.org" target="_blank" style="color:var(--green)">x-bit.org</a> :1336 (telnet) / ssh -p 1337</td>
+                    <td><a href="https://x-bit.org" target="_blank">x-bit.org</a> :1336 (telnet) / ssh -p 1337</td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">Lunatics Unleashed</td>
+                    <td>Lunatics Unleashed</td>
                     <td>Mystic</td>
-                    <td style="color:var(--green)">lunaticsunleashed.ddns.net:2333</td>
+                    <td>lunaticsunleashed.ddns.net:2333</td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">A-Net Online</td>
+                    <td>A-Net Online</td>
                     <td>Synchronet</td>
-                    <td style="color:var(--green)"><a href="https://bbs.a-net.online" target="_blank" style="color:var(--green)">bbs.a-net.online</a> :1337 (telnet) / ssh -p 1338</td>
+                    <td><a href="https://bbs.a-net.online" target="_blank">bbs.a-net.online</a> :1337 (telnet) / ssh -p 1338</td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">Nite Eyes BBS</td>
+                    <td>Nite Eyes BBS</td>
                     <td>Mystic</td>
-                    <td style="color:var(--green)">bbs.lizardmaster.com</td>
+                    <td>bbs.lizardmaster.com</td>
                 </tr>
                 <tr>
-                    <td style="color:var(--text)">Looney Bin BBS</td>
+                    <td>Looney Bin BBS</td>
                     <td>-</td>
-                    <td style="color:var(--green)"><a href="https://looneybinbbs.com" target="_blank" style="color:var(--green)">looneybinbbs.com</a>:2023</td>
+                    <td><a href="https://looneybinbbs.com" target="_blank">looneybinbbs.com</a>:2023</td>
                 </tr>
             </tbody>
         </table>
@@ -1945,17 +1781,17 @@
 <!-- Roadmap -->
 <section id="roadmap">
     <div class="container">
-        <h2 class="section-title" style="color:var(--green);text-shadow:0 0 10px rgba(80,250,123,0.4)" data-i18n="r1.road_title">// ROADMAP</h2>
+        <h2 class="section-title" data-i18n="r1.road_title">ROADMAP</h2>
         <p class="section-subtitle" data-i18n="r1.road_sub">Built in the open since 2024. The source, the issue tracker, and this list are public, and half of what ships begins as a player report. A plan is only as good as its execution; judge for yourself:</p>
 
         <div class="history-timeline">
             <div class="history-entry roadmap-now">
-                <h3 data-i18n="r1.road_now_t">NOW -- 1.3.8 is live</h3>
+                <h3 data-i18n="r1.road_now_t">Now: 1.3.8 is live</h3>
                 <p data-i18n="r1.road_now_d">1.3.8 is out: you can tell an ally to wait in a cleared dungeon room, allies who see a teammate finished remember it, and a single player load now starts from a clean story, with NPC opinions and companion settings kept as they were saved. Fixes to the stance menu, the news, saves, the SSH relay and the English spelling round it out. The roadmap below says what comes next.</p>
             </div>
             <h3 class="roadmap-group" data-i18n="r1.road_next_h">Next</h3>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_20_t">2.0 -- The graphical client</h3>
+                <h3 data-i18n="r1.road_20_t">2.0: The graphical client</h3>
                 <p data-i18n="r1.road_20_d">A graphical client for the same living world, grown from the one that already runs in the repository.</p>
                 <p class="roadmap-when" data-i18n="r1.road_20_when">After 1.3.8</p>
             </div>
@@ -1966,27 +1802,27 @@
             </div>
             <h3 class="roadmap-group roadmap-group-shipped" data-i18n="r1.road_shipped_h">Recently shipped</h3>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_138_t">1.3.8 -- Allies and saves</h3>
+                <h3 data-i18n="r1.road_138_t">1.3.8: Allies and saves</h3>
                 <p data-i18n="r1.road_138_d">Shipped: an order to tell an ally to wait in a cleared room, allies who remember a fallen teammate, single player loads that start clean, NPC opinions that hold across a load and an SSH relay that keeps the game's last lines, with 11 changes in all.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_137_t">1.3.7 -- Class tuning</h3>
+                <h3 data-i18n="r1.road_137_t">1.3.7: Class tuning</h3>
                 <p data-i18n="r1.road_137_d">Shipped: the classes tuned from the measurements of every class at every depth and against every Old God (Power Hat, the Alchemist's late bombs, the Voidreaver's Constitution and Corruption Harvest), harder monsters on floors 76 to 100, and Manwe's Creator's Ward against gear enchantments, with 18 changes in all.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_136_t">1.3.6 -- Class audit</h3>
+                <h3 data-i18n="r1.road_136_t">1.3.6: Class audit</h3>
                 <p data-i18n="r1.road_136_d">Shipped: five enchant rules (a real magic resistance, poison over several rounds, Titan's Resolve for max HP, enchants for companions, abilities, PvP and world bosses, and stronger Phoenix Fire and Frostbite), and an audit of every ability and spell of all seventeen classes, with 79 changes in all so each does what its text says.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_135_t">1.3.5 -- Enchants and the Old Gods</h3>
+                <h3 data-i18n="r1.road_135_t">1.3.5: Enchants and the Old Gods</h3>
                 <p data-i18n="r1.road_135_d">Shipped: counter enchants against the last three Old Gods, Maelketh scaled to party size and Manwe made winnable for a full party with Godbane, many enchant and loot effect fixes, and reworked gear crit damage, regeneration and armor piercing. Dungeon floors 11 to 34 were measured and kept as they are; how gear grows from floor to floor is measured and tuned with the classes in 1.3.6 and 1.3.7.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_134_t">1.3.4 -- Password reset and the Old Gods measured</h3>
+                <h3 data-i18n="r1.road_134_t">1.3.4: Password reset and the Old Gods measured</h3>
                 <p data-i18n="r1.road_134_d">Shipped: you can reset a forgotten password by email, and the Old God fights and prestige classes were measured, with fixes where a spell or a god did not do what its text said.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_133_t">1.3.3 -- Dungeon floors 25 to 100</h3>
+                <h3 data-i18n="r1.road_133_t">1.3.3: Dungeon floors 25 to 100</h3>
                 <p data-i18n="r1.road_133_d">Shipped: dungeon floors 25 to 100 grow harder with depth and are built for a full team of five, and allies at 0 HP are Downed, can be rescued with a potion and are lost only when a monster finishes them.</p>
             </div>
         </div>
@@ -1996,18 +1832,18 @@
 <!-- Community -->
 <section id="community">
     <div class="container">
-        <h2 class="section-title" style="color:#5865F2;text-shadow:0 0 10px rgba(88,101,242,0.4)" data-i18n="r1.comm_title">// THE TOWN OUTSIDE THE GAME</h2>
+        <h2 class="section-title" data-i18n="r1.comm_title">THE TOWN OUTSIDE THE GAME</h2>
         <p class="section-subtitle" data-i18n="r1.comm_sub">Small, friendly, and unusually effective: bug reports here become patches in days, and player ideas ship with credit. Come tell us how you died.</p>
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:24px;">
-            <iframe src="https://discord.com/widget?id=1361378414002573312&theme=dark" width="350" height="400" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" style="max-width:100%;"></iframe>
+        <div class="community-embed">
+            <iframe src="https://discord.com/widget?id=1361378414002573312&theme=dark" width="350" height="400" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
         </div>
     </div>
 </section>
 
 <!-- Sponsors -->
 <section class="sponsors-section" id="sponsors">
-    <div class="container" style="padding-top:48px;padding-bottom:48px;">
-        <h2 class="section-title" style="color:#ea4aaa;text-shadow:0 0 10px rgba(234,74,170,0.5)" data-i18n-html="sponsors.title">// SPONSORS</h2>
+    <div class="container">
+        <h2 class="section-title" data-i18n-html="sponsors.title">SPONSORS</h2>
         <p class="section-subtitle" data-i18n="r1.sponsors_sub">Free forever, GPL forever. No ads, no microtransactions. These people keep the server standing anyway. Thank you.</p>
         <div class="sponsors-grid" id="sponsors-grid">
             <div class="sponsors-empty" id="sponsors-loading" data-i18n="sponsors.loading">Loading sponsors...</div>
@@ -2018,22 +1854,10 @@
     </div>
 </section>
 
-<!-- Finale -->
-<section id="finale" class="finale-section">
-    <div class="container">
-        <p class="finale-line1" data-i18n="r1.finale_line1">Somewhere below floor 90, the god who made everything is waiting to ask you one question.</p>
-        <p class="finale-line2" data-i18n="r1.finale_line2">The town will remember your answer. So will their children.</p>
-        <div class="hero-buttons" style="margin-top:28px;">
-            <button class="btn btn-primary" onclick="openTerminal();window.scrollTo({top:0,behavior:'smooth'});" data-i18n="r1.finale_cta">&#9658; Begin</button>
-        </div>
-        <p class="hero-cta-note" style="margin-top:12px;"><a href="#story" style="color:var(--text-dim);" data-i18n="r1.finale_alt">or read the story first</a></p>
-    </div>
-</section>
-
 <!-- Credits -->
 <section id="credits">
     <div class="container">
-        <h2 class="section-title" style="color:var(--gold);text-shadow:var(--glow-gold)" data-i18n="credits.title">// CREDITS</h2>
+        <h2 class="section-title" data-i18n="credits.title">CREDITS</h2>
 
         <div class="credits-grid">
             <div class="credit-card">
@@ -2057,19 +1881,19 @@
                 <p data-i18n="credits.jason_desc">That's me. Built the C# remake, wrote all the story content, the NPC system, the world sim, the god encounters. Still actively developing it.</p>
             </div>
             <div class="credit-card">
-                <h3><a href="https://x-bit.org/" target="_blank" style="color:var(--gold);text-decoration:none;" data-i18n="credits.xbit_name">xbit</a></h3>
+                <h3><a href="https://x-bit.org/" target="_blank" data-i18n="credits.xbit_name">xbit</a></h3>
                 <div class="credit-role" data-i18n="credits.xbit_role">ANSI Art</div>
-                <p data-i18n-html="credits.xbit_desc">Race and class portrait art seen during character creation. Beautiful ANSI art from <a href="https://x-bit.org/" target="_blank" style="color:var(--cyan-dim);">x-bit.org</a>.</p>
+                <p data-i18n-html="credits.xbit_desc">Race and class portrait art seen during character creation. Beautiful ANSI art from <a href="https://x-bit.org/" target="_blank">x-bit.org</a>.</p>
             </div>
             <div class="credit-card">
                 <h3 data-i18n="credits.sudden_name">Sudden Death</h3>
                 <div class="credit-role" data-i18n="credits.sudden_role">ANSI Tools</div>
-                <p data-i18n-html="credits.sudden_desc">Creator of <a href="https://github.com/grymmjack/rez2ans" target="_blank" style="color:var(--cyan-dim);">rez2ans</a>, the ANSI conversion tool used to bring portrait art into the game.</p>
+                <p data-i18n-html="credits.sudden_desc">Creator of <a href="https://github.com/grymmjack/rez2ans" target="_blank">rez2ans</a>, the ANSI conversion tool used to bring portrait art into the game.</p>
             </div>
             <div class="credit-card">
-                <h3><a href="http://lunaticsunleashed.ddns.net" target="_blank" style="color:var(--gold);text-decoration:none;" data-i18n="credits.cozmo_name">Cozmo</a></h3>
+                <h3><a href="http://lunaticsunleashed.ddns.net" target="_blank" data-i18n="credits.cozmo_name">Cozmo</a></h3>
                 <div class="credit-role" data-i18n="credits.cozmo_role">ANSI Knowledge</div>
-                <p data-i18n-html="credits.cozmo_desc">ANSI art knowledge and guidance from <a href="http://lunaticsunleashed.ddns.net" target="_blank" style="color:var(--cyan-dim);">Lunatics Unleashed</a>.</p>
+                <p data-i18n-html="credits.cozmo_desc">ANSI art knowledge and guidance from <a href="http://lunaticsunleashed.ddns.net" target="_blank">Lunatics Unleashed</a>.</p>
             </div>
             <div class="credit-card">
                 <h3 data-i18n="credits.fastfinge_name">fastfinge</h3>
@@ -2103,9 +1927,9 @@
             </div>
         </div>
 
-        <div style="text-align:center;margin-top:32px;color:var(--text-dim);font-size:14px;">
+        <div class="credits-thanks">
             <p data-i18n="credits.thanks">Thanks to every SysOp who kept a board running, and every kid who dialed in to explore Durunghins.</p>
-            <p style="margin-top:12px;"><a href="https://discord.gg/EZhwgDT6Ta" target="_blank" style="color:var(--cyan-dim);text-decoration:none;" data-i18n="credits.discord">Join us on Discord</a></p>
+            <p><a href="https://discord.gg/EZhwgDT6Ta" target="_blank" data-i18n="credits.discord">Join us on Discord</a></p>
         </div>
     </div>
 </section>
@@ -2117,8 +1941,8 @@
             <a href="https://github.com/binary-knight/usurper-reborn/issues" target="_blank" data-i18n="footer.bug">Report Bug</a>
             <a href="https://discord.gg/EZhwgDT6Ta" target="_blank" data-i18n="footer.discord">Discord</a>
         </div>
-        <p data-i18n-html="footer.desc">Usurper Reborn -- a free, open-source remake of Usurper (1993) by Jakob Dangarden.</p>
-        <p style="margin-top:4px;" data-i18n-html="footer.tech">GPL v2 &bull; C# / .NET 8.0 &bull; Made by one person who liked BBS games too much</p>
+        <p data-i18n-html="footer.desc">Usurper Reborn: a free, open-source remake of Usurper (1993) by Jakob Dangarden.</p>
+        <p data-i18n-html="footer.tech">GPL v2 &bull; C# / .NET 8.0 &bull; Made by one person who liked BBS games too much</p>
     </div>
 </footer>
 
@@ -2242,10 +2066,11 @@
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', 'Courier New', monospace",
                 theme: {
-                    background: '#0a0a0f',
-                    foreground: '#e0e0e0',
-                    cursor: '#00e5ff',
-                    selectionBackground: '#264f78',
+                    background: '#0c0b0a',
+                    foreground: '#e8e0d0',
+                    cursor: '#e8e0d0',
+                    cursorAccent: '#0c0b0a',
+                    selectionBackground: '#4a4640',
                     black: '#000000',
                     red: '#ff4444',
                     green: '#00ff88',
@@ -2347,7 +2172,7 @@
         navigator.clipboard.writeText(text).then(() => {
             const hint = el.querySelector('.copy-hint');
             hint.textContent = 'copied!';
-            hint.style.color = 'var(--green)';
+            hint.style.color = 'var(--bone)';
             setTimeout(() => {
                 hint.textContent = 'click to copy';
                 hint.style.color = '';
@@ -2384,38 +2209,28 @@
         return t('stats.time_days').replace('{0}', Math.floor(hrs / 24));
     }
 
+    // Feed colours: five muted tones that sit on the charcoal card, all at least 4.5:1 on #1c1916.
+    var FEED_TONE = {
+        blood: '#e0605a',   // combat death and violence, 4.99:1
+        bone: '#e8e0d0',    // milestones: levels, coming of age, fortunes, alliances, 13.34:1
+        ochre: '#c9a46a',   // family and love: births, weddings, birthdays, 7.50:1
+        slate: '#9ea7aa',   // the gods, the dungeon and natural death, 7.13:1
+        ash: '#a89f90'      // everything else, 6.69:1
+    };
     function getActivityColor(msg) {
-        if (!msg) return '#888899';
-        // Lifecycle events
-        if (/passed away|soul moves on/i.test(msg)) return '#9966cc';   // ⚱ natural death = muted purple
-        if (msg.includes('\u2020')) return '#ff4444';                    // † combat death = red
-        if (/expecting a child/i.test(msg)) return '#ffaacc';           // pregnancy = soft pink
-        if (/proud parents|baby|born/i.test(msg)) return '#ff88dd';     // birth = bright pink
-        if (/come of age|joined the realm/i.test(msg)) return '#44ddaa'; // coming-of-age = teal
-        if (/birthday|celebrates their/i.test(msg)) return '#ffdd44';  // 🎂 birthday = gold
-        if (/COUP|ASSASSINATION|SCANDAL|SABOTAGE/.test(msg)) return '#ff6666'; // politics = bright red
-        if (/Level \d/.test(msg)) return '#ffaa00';                     // level up = gold
-        if (/team|Team/.test(msg)) return '#00e5ff';                    // team activity = cyan
-        if (/dungeon|Dungeon|conquered/.test(msg)) return '#cc66ff';    // dungeon = magenta
-        if (/purchased|deposit|Bank/.test(msg)) return '#00ff88';       // commerce = green
-        if (/divorced/i.test(msg)) return '#cc4444';                        // divorce = dark red
-        if (/affair|Scandal/i.test(msg)) return '#ff4488';                  // affair = hot pink
-        if (/polyamorous/i.test(msg)) return '#dd66ff';                    // polyamory = violet
-        if (/married|Wedding|love|Love Street/.test(msg)) return '#ff66aa'; // romance = pink
-        if (/Temple|blessing|altar/.test(msg)) return '#aaaaff';        // temple = light blue
-        if (/Guard|guard|Royal/.test(msg)) return '#ffcc44';            // military = amber
-        if (/training|trained/.test(msg)) return '#88ccff';             // training = light cyan
-        if (/returned from the realm of the dead/i.test(msg)) return '#88ff88'; // respawn = green
-        // Living World AI events (v0.29.0)
-        if (/telling anyone who'll listen/i.test(msg)) return '#cc9933';       // gossip = tavern amber
-        if (/pickpocket|stole.*gold/i.test(msg)) return '#ff8844';             // theft = orange
-        if (/publicly challenged|emerged victorious/i.test(msg)) return '#ddbb44'; // challenge = bronze
-        if (/amassed a fortune|wealthiest/i.test(msg)) return '#ffcc00';       // wealth goal = bright gold
-        if (/settled the score|got revenge/i.test(msg)) return '#ff6644';      // revenge = fiery orange
-        if (/formed a powerful.*alliance/i.test(msg)) return '#44ccff';        // alliance = sky blue
-        if (/wave of rage|wave of panic|wave of celebration|wave of grief/i.test(msg)) return '#bb88ff'; // emotional cascade = lavender
-        if (/brawl|got into a/i.test(msg)) return '#ff5555';                   // brawl = red-orange
-        return '#ccccdd';                                               // default = light gray
+        if (!msg) return FEED_TONE.ash;
+        if (msg.includes('\u2020')) return FEED_TONE.blood;                                   // combat death
+        if (/passed away|soul moves on/i.test(msg)) return FEED_TONE.slate;                   // natural death
+        if (/COUP|ASSASSINATION|SCANDAL|SABOTAGE/.test(msg)) return FEED_TONE.blood;          // politics
+        if (/brawl|got into a|settled the score|got revenge|pickpocket|stole.*gold/i.test(msg)) return FEED_TONE.blood;
+        if (/expecting a child|proud parents|baby|born|birthday|celebrates their/i.test(msg)) return FEED_TONE.ochre;
+        if (/divorced|affair|Scandal|polyamorous/i.test(msg)) return FEED_TONE.ochre;
+        if (/married|Wedding|love|Love Street/.test(msg)) return FEED_TONE.ochre;
+        if (/come of age|joined the realm|returned from the realm of the dead/i.test(msg)) return FEED_TONE.bone;
+        if (/Level \d/.test(msg)) return FEED_TONE.bone;
+        if (/amassed a fortune|wealthiest|publicly challenged|emerged victorious|formed a powerful.*alliance/i.test(msg)) return FEED_TONE.bone;
+        if (/Temple|blessing|altar|dungeon|Dungeon|conquered/.test(msg)) return FEED_TONE.slate;
+        return FEED_TONE.ash;                                                                    // commerce, training, guards, gossip, teams
     }
 
     var feedsInitialized = false;
@@ -2459,7 +2274,7 @@
                     html += '<td>' + escapeHtml(p.level) + '</td>';
                 }
                 if (isSpectating) {
-                    html += '<td style="color:#c084fc;font-style:italic">' + escapeHtml(p.location) + '</td>';
+                    html += '<td class="player-location">' + escapeHtml(p.location) + '</td>';
                 } else {
                     html += '<td>' + escapeHtml(p.location) + '</td>';
                 }
@@ -2513,8 +2328,8 @@
             html += '</div>';
         }
         if (h.mostWanted) {
-            html += '<div class="highlight-card" style="border-color: #8b0000;">';
-            html += '<div class="highlight-label" style="color: #ff4444;">' + t('stats.most_wanted') + '</div>';
+            html += '<div class="highlight-card most-wanted">';
+            html += '<div class="highlight-label">' + t('stats.most_wanted') + '</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.mostWanted.name) + '</div>';
             html += '<div class="highlight-detail">' + t('stats.blood_price') + ': ' + escapeHtml(h.mostWanted.murderWeight) + ' | Level ' + escapeHtml(h.mostWanted.level) + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
             html += '</div>';

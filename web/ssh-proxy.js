@@ -5236,7 +5236,7 @@ function handleHttpRequest(req, res) {
     res.end();
   } else if (req.method === 'GET') {
     // Static file serving for HTML pages and assets (index, dashboard, balance, admin, lang/*.json)
-    const MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
+    const MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon' };
     // 1.3.4: staticFilePath (a folder's index.html for the account pages; nothing outside the web folder)
     const resolved = staticFilePath(__dirname, req.url, fs);
     if (!resolved) {

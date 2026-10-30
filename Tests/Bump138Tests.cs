@@ -120,7 +120,7 @@ public class Bump138Tests
                 dict.ContainsKey(gone).Should().BeFalse($"{lang} {gone}");
             dict["r1.road_now_t"].Should().Contain("1.3.8", lang);
             dict["r1.road_now_d"].Should().Contain("1.3.8", lang).And.NotContain("TODO", lang);
-            dict["r1.road_138_t"].Should().StartWith("1.3.8 -- ", lang);
+            dict["r1.road_138_t"].Should().MatchRegex(@"^1\.3\.8 ?: \S", lang);
             dict["r1.road_138_d"].Should().Contain("11", lang);
             foreach (string n in next) dict["r1.road_" + n + "_when"].Should().Contain(after[n], $"{lang} {n}");
             foreach (var pair in dict.Where(p => p.Key.StartsWith("r1.road_", StringComparison.Ordinal)))
