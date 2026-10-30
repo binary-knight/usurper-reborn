@@ -816,7 +816,7 @@ jobs:
     needs: [build, smoke-test, wiki, web-test]
     if: >-
       (github.event_name == 'release') ||
-      (github.event_name == 'workflow_dispatch' && inputs.deploy_server == 'true')
+      (github.event_name == 'workflow_dispatch' && (inputs.deploy_server == true || inputs.deploy_server == 'true'))
     environment: production
     concurrency:
       group: deploy-production

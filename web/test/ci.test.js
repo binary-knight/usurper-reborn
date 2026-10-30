@@ -72,6 +72,14 @@ test('the build and the server deploy wait for the web-test job', () => {
   assert.ok(needsOf(jobBlock('deploy-server')).includes('web-test'), 'deploy-server does not need web-test');
 });
 
+// A ticked boolean workflow_dispatch input is the boolean true, never the string 'true',
+// so a condition that only compares with the string skips deploy-server on every manual run.
+test('a manual run with deploy_server ticked reaches deploy-server', () => {
+  const m = jobBlock('deploy-server').match(/^    if: >-\n([\s\S]*?)\n    [a-z]/m);
+  assert.ok(m, 'deploy-server has no if: >- condition');
+  assert.match(m[1], /inputs\.deploy_server == true\b/, 'deploy-server does not accept the boolean input');
+});
+
 test('the web tarball leaves out web/test and keeps what is served', () => {
   const cmd = stepRun(jobBlock('deploy-server'), 'Create web assets tarball');
   assert.match(cmd, /^tar -czf web\.tar\.gz -C web /);
