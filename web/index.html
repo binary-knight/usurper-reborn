@@ -634,8 +634,8 @@
             text-decoration-color: var(--blood);
             text-underline-offset: 5px;
         }
-        .more-target:not(:target) { display: none; }
-        .more-target:target { border-top: 6px solid var(--iron); }
+        #more ~ section:not(:target) { display: none; }
+        #more ~ section:target { border-top: 6px solid var(--iron); }
 
         /* ---------- Sections reached from More ---------- */
 
@@ -1425,7 +1425,7 @@
             </div>
             <div class="feature-card">
                 <h3 data-i18n="r1.w6t">The world writes its own history</h3>
-                <p data-i18n="r1.w6d">Marriages, murders, births, coups, plagues: a running chronicle of events, most of which no player caused. Scroll up to the live window. It is being written right now, mid-sentence.</p>
+                <p data-i18n="r1.w6d">Marriages, murders, births, coups, plagues: a running chronicle of events, most of which no player caused. Open “The world, right now” under More, further down. It is being written right now, mid-sentence.</p>
             </div>
         </div>
         <p class="feature-footer" data-i18n="r1.world_footer">Beneath all of that stands everything the 1993 original had: 12 classes, 10 races, 75 spells, throne politics, factions, PvP, a shared economy, and a 100-floor dungeon that stops being polite around floor 50.</p>
@@ -1546,7 +1546,7 @@
 </section>
 
 <!-- Live Stats -->
-<section id="live-stats" class="more-target">
+<section id="live-stats">
     <div class="container">
         <h2 class="section-title" data-i18n="r1.stats_title">THE WORLD, RIGHT NOW</h2>
         <p class="section-subtitle" data-i18n="r1.stats_sub">What follows is not a screenshot. It is a live window into a running world. Every name below belongs to someone the simulation is living for at this very moment, with or without an audience.</p>
@@ -1558,7 +1558,7 @@
 </section>
 
 <!-- Philosophy / Manifesto -->
-<section id="philosophy" class="more-target manifesto-section">
+<section id="philosophy" class="manifesto-section">
     <div class="container">
         <h2 class="section-title" data-i18n="philosophy.title">WHY I MADE THIS</h2>
         <p class="section-subtitle" data-i18n="philosophy.subtitle">The short version.</p>
@@ -1599,7 +1599,7 @@
 </section>
 
 <!-- Companions -->
-<section id="companions" class="more-target">
+<section id="companions">
     <div class="container">
         <h2 class="section-title" data-i18n="companions.title">COMPANIONS</h2>
         <p class="section-subtitle" data-i18n="companions.subtitle">Five recruitable NPCs with their own quest lines. They fight with you in the dungeon and they can permanently die, which matters more than you'd think.</p>
@@ -1673,7 +1673,7 @@
 </section>
 
 <!-- Endings -->
-<section id="endings" class="more-target">
+<section id="endings">
     <div class="container">
         <h2 class="section-title" data-i18n="endings.title">FIVE ENDINGS</h2>
         <p class="section-subtitle" data-i18n="r1.endings_sub">Not listed here. Deliberately.</p>
@@ -1685,7 +1685,7 @@
 </section>
 
 <!-- History -->
-<section id="history" class="more-target">
+<section id="history">
     <div class="container">
         <h2 class="section-title" data-i18n="history.title">HISTORY</h2>
         <p class="section-subtitle" data-i18n="history.subtitle">How a 1993 BBS door game became this.</p>
@@ -1720,7 +1720,7 @@
 </section>
 
 <!-- BBS List -->
-<section id="bbs-list" class="more-target">
+<section id="bbs-list">
     <div class="container">
         <h2 class="section-title" data-i18n="bbs.title">BBS LIST</h2>
         <p class="section-subtitle" data-i18n="bbs.subtitle">BBSes that are running Usurper Reborn as a door game right now.</p>
@@ -1779,7 +1779,7 @@
 </section>
 
 <!-- Roadmap -->
-<section id="roadmap" class="more-target">
+<section id="roadmap">
     <div class="container">
         <h2 class="section-title" data-i18n="r1.road_title">ROADMAP</h2>
         <p class="section-subtitle" data-i18n="r1.road_sub">Built in the open since 2024. The source, the issue tracker, and this list are public, and half of what ships begins as a player report. A plan is only as good as its execution; judge for yourself:</p>
@@ -1830,7 +1830,7 @@
 </section>
 
 <!-- Community -->
-<section id="community" class="more-target">
+<section id="community">
     <div class="container">
         <h2 class="section-title" data-i18n="r1.comm_title">THE TOWN OUTSIDE THE GAME</h2>
         <p class="section-subtitle" data-i18n="r1.comm_sub">Small, friendly, and unusually effective: bug reports here become patches in days, and player ideas ship with credit. Come tell us how you died.</p>
@@ -1841,7 +1841,7 @@
 </section>
 
 <!-- Sponsors -->
-<section class="more-target sponsors-section" id="sponsors">
+<section class="sponsors-section" id="sponsors">
     <div class="container">
         <h2 class="section-title" data-i18n-html="sponsors.title">SPONSORS</h2>
         <p class="section-subtitle" data-i18n="r1.sponsors_sub">Free forever, GPL forever. No ads, no microtransactions. These people keep the server standing anyway. Thank you.</p>
@@ -1855,7 +1855,7 @@
 </section>
 
 <!-- Credits -->
-<section id="credits" class="more-target">
+<section id="credits">
     <div class="container">
         <h2 class="section-title" data-i18n="credits.title">CREDITS</h2>
 
