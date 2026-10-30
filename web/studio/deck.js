@@ -2,6 +2,7 @@
 // Loaded by one script tag in index.html; remove that tag and this folder at promotion.
 // Keys: backtick toggles the panel. URL: ?direction=a|b|c and ?structure=s1|s2|s3 keep the
 // choice across reloads. A structure is built on direction B, so picking one switches to B.
+// ?copy=c1|c2|c3 swaps the hero copy candidates (subtitle, description, Steam button label).
 (function () {
   'use strict';
 
@@ -19,6 +20,28 @@
     { id: '', label: 'Off', name: 'Page as it is' }
   ];
   var VALID_S = { s1: 1, s2: 1, s3: 1 };
+  var COPIES = [
+    { id: 'c1', label: 'C1', name: 'Copy: today' },
+    { id: 'c2', label: 'C2', name: 'Copy: shorter' },
+    { id: 'c3', label: 'C3', name: 'Copy: support' }
+  ];
+  var VALID_C = { c1: 1, c2: 1, c3: 1 };
+  // Hero copy candidates, English only until one is picked (c1 is the page's own text).
+  var C2_DESC = 'The town of Dorashire goes on without you: its people marry, raise children, grow old, and remember what you did to them. ' +
+    'Death here is permanent, and a hundred floors below the streets, seven broken gods are waiting.';
+  var COPY_TEXT = {
+    c2: {
+      subtitle: 'A living world. A hundred floors down. One question at the bottom.',
+      desc: C2_DESC,
+      button: 'Get on Steam'
+    },
+    c3: {
+      subtitle: 'The 1993 BBS classic, rebuilt',
+      desc: C2_DESC + ' The Steam edition bundles the terminal and fonts, and buying it funds development.',
+      button: 'Support it on Steam'
+    }
+  };
+  var COPY_TARGETS = { subtitle: '.hero .hero-subtitle', desc: '.hero .hero-desc', button: '.hero .btn-hero-steam' };
   var root = document.documentElement;
   var base = (document.currentScript && document.currentScript.src) || '/studio/deck.js';
   var here = base.replace(/deck\.js(\?.*)?$/, '');
@@ -35,6 +58,31 @@
   function apply(dir) { setAttr('data-direction', dir); }
   function applyStruct(st) { setAttr('data-structure', st); }
 
+  // Swaps the hero text. The element's data-i18n key is parked so a language load does not
+  // overwrite a candidate; going back to c1 restores the key and the translated text.
+  function applyCopy(c) {
+    setAttr('data-copy', c);
+    if (!document.body) return;
+    var set = COPY_TEXT[c];
+    Object.keys(COPY_TARGETS).forEach(function (part) {
+      var el = document.querySelector(COPY_TARGETS[part]);
+      if (!el) return;
+      if (!el.hasAttribute('data-copy-key')) {
+        el.setAttribute('data-copy-key', el.getAttribute('data-i18n') || '');
+        el.setAttribute('data-copy-text', el.textContent);
+      }
+      var key = el.getAttribute('data-copy-key');
+      if (set) {
+        el.setAttribute('data-i18n', 'studio.copy');
+        el.textContent = set[part];
+      } else {
+        el.setAttribute('data-i18n', key);
+        var tr = typeof window.t === 'function' ? window.t(key) : key;
+        el.textContent = tr && tr !== key ? tr : el.getAttribute('data-copy-text');
+      }
+    });
+  }
+
   // Stylesheets go in at once so a switch never waits on the network.
   function addSheet(file) {
     var link = document.createElement('link');
@@ -45,6 +93,11 @@
   ['dir-a.css', 'dir-b.css', 'dir-c.css', 'struct-common.css', 'struct-s1.css', 'struct-s2.css', 'struct-s3.css'].forEach(addSheet);
   apply(fromUrl('direction', VALID));
   if (root.getAttribute('data-direction') === 'b') applyStruct(fromUrl('structure', VALID_S));
+  var startCopy = fromUrl('copy', VALID_C);
+  if (startCopy) {
+    setAttr('data-copy', startCopy);
+    document.addEventListener('DOMContentLoaded', function () { applyCopy(startCopy); });
+  }
 
   // Frames in the bench and the triptych show the page only, without the panel.
   if (window.self !== window.top) return;
@@ -66,6 +119,9 @@
     else u.searchParams.delete('direction');
     if (st) u.searchParams.set('structure', st);
     else u.searchParams.delete('structure');
+    var cp = root.getAttribute('data-copy') || '';
+    if (cp && cp !== 'c1') u.searchParams.set('copy', cp);
+    else u.searchParams.delete('copy');
     history.replaceState(history.state, '', u.pathname + u.search + u.hash);
   }
 
@@ -135,6 +191,25 @@
       return b;
     });
     panel.appendChild(srow);
+
+    var crow = document.createElement('div');
+    crow.className = 'studio-deck-row';
+    var cbuttons = COPIES.map(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = d.label;
+      b.title = d.name;
+      b.addEventListener('click', function () {
+        if ((root.getAttribute('data-copy') || 'c1') === d.id) return;
+        applyCopy(d.id);
+        setUrl();
+        mark();
+        pop();
+      });
+      crow.appendChild(b);
+      return b;
+    });
+    panel.appendChild(crow);
     panel.appendChild(name);
 
     function mark() {
@@ -150,6 +225,12 @@
         var on = d.id === cs;
         sbuttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
         if (on && d.id) label += ', ' + d.name;
+      });
+      var cc = root.getAttribute('data-copy') || 'c1';
+      COPIES.forEach(function (d, i) {
+        var on = d.id === cc;
+        cbuttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (on && d.id !== 'c1') label += ', ' + d.name.toLowerCase();
       });
       name.textContent = label;
     }
