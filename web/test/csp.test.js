@@ -113,6 +113,11 @@ test('every external script, stylesheet, frame and image host is allowed where i
   }
   // the wiki stylesheet imports its fonts stylesheet
   for (const m of read('tools', 'wiki-build', 'wiki.css').matchAll(/@import\s+url\("(https?:[^"]+)"\)/g)) seen.style.add(hostOf(m[1]));
+  // the studio direction stylesheets (injected by studio/deck.js) import their fonts stylesheets too
+  const studio = path.join(ROOT, 'web', 'studio');
+  for (const f of fs.existsSync(studio) ? fs.readdirSync(studio).filter((n) => n.endsWith('.css')) : []) {
+    for (const m of read('web', 'studio', f).matchAll(/@import\s+url\(["']?(https?:[^"')]+)["']?\)/g)) seen.style.add(hostOf(m[1]));
+  }
 
   assert.ok(seen.script.size >= 1 && seen.style.size >= 2 && seen.frame.size >= 2, 'the scan must find the known sources');
   for (const o of seen.script) assert.ok(allowed(p['script-src'], o), `script-src lacks ${o}`);
