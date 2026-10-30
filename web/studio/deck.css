@@ -28,7 +28,8 @@
 }
 .studio-deck-head:active { cursor: grabbing; }
 .studio-deck-hint { font-weight: 400; color: #c4c4cc; font-size: 12px; }
-.studio-deck-row { display: flex; gap: 6px; padding: 10px 10px 6px; }
+.studio-deck-row { display: flex; gap: 6px; padding: 8px 10px 0; }
+.studio-deck-row + .studio-deck-name { padding-top: 8px; }
 .studio-deck-row button {
   flex: 1 1 auto;
   padding: 6px 8px;

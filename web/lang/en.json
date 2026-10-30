@@ -530,5 +530,12 @@
   "account.verify.title": "Confirm your email address",
   "account.verify.intro": "Press the button to confirm the address this link was sent to.",
   "account.verify.submit": "Confirm address",
-  "account.verify.done": "Thank you. The request is complete. If the address could not be added, a mail to it explains why."
+  "account.verify.done": "Thank you. The request is complete. If the address could not be added, a mail to it explains why.",
+  "r2.shots_title": "// IN THE TERMINAL",
+  "r2.shot_combat": "Combat",
+  "r2.shot_street": "Main Street",
+  "r2.shot_dungeon": "The dungeon",
+  "r2.shot_status": "Character status",
+  "r2.live_more": "Open the full live board",
+  "r2.more_title": "// MORE"
 }

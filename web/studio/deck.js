@@ -1,6 +1,7 @@
 // Studio deck: switches the landing page between the redesign directions.
 // Loaded by one script tag in index.html; remove that tag and this folder at promotion.
-// Keys: backtick toggles the panel. URL: ?direction=a|b|c keeps the choice across reloads.
+// Keys: backtick toggles the panel. URL: ?direction=a|b|c and ?structure=s1|s2|s3 keep the
+// choice across reloads. A structure is built on direction B, so picking one switches to B.
 (function () {
   'use strict';
 
@@ -11,19 +12,28 @@
     { id: '', label: 'Current', name: 'Live site' }
   ];
   var VALID = { a: 1, b: 1, c: 1 };
+  var STRUCTS = [
+    { id: 's1', label: 'S1', name: 'Store page' },
+    { id: 's2', label: 'S2', name: 'Chronicle' },
+    { id: 's3', label: 'S3', name: 'Portrait led' },
+    { id: '', label: 'Off', name: 'Page as it is' }
+  ];
+  var VALID_S = { s1: 1, s2: 1, s3: 1 };
   var root = document.documentElement;
   var base = (document.currentScript && document.currentScript.src) || '/studio/deck.js';
   var here = base.replace(/deck\.js(\?.*)?$/, '');
 
-  function fromUrl() {
-    var v = (new URLSearchParams(location.search).get('direction') || '').toLowerCase();
-    return VALID[v] ? v : '';
+  function fromUrl(name, valid) {
+    var v = (new URLSearchParams(location.search).get(name) || '').toLowerCase();
+    return valid[v] ? v : '';
   }
 
-  function apply(dir) {
-    if (dir) root.setAttribute('data-direction', dir);
-    else root.removeAttribute('data-direction');
+  function setAttr(name, v) {
+    if (v) root.setAttribute(name, v);
+    else root.removeAttribute(name);
   }
+  function apply(dir) { setAttr('data-direction', dir); }
+  function applyStruct(st) { setAttr('data-structure', st); }
 
   // Stylesheets go in at once so a switch never waits on the network.
   function addSheet(file) {
@@ -32,8 +42,9 @@
     link.href = here + file;
     document.head.appendChild(link);
   }
-  ['dir-a.css', 'dir-b.css', 'dir-c.css'].forEach(addSheet);
-  apply(fromUrl());
+  ['dir-a.css', 'dir-b.css', 'dir-c.css', 'struct-common.css', 'struct-s1.css', 'struct-s2.css', 'struct-s3.css'].forEach(addSheet);
+  apply(fromUrl('direction', VALID));
+  if (root.getAttribute('data-direction') === 'b') applyStruct(fromUrl('structure', VALID_S));
 
   // Frames in the bench and the triptych show the page only, without the panel.
   if (window.self !== window.top) return;
@@ -47,10 +58,14 @@
     try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* storage blocked: position resets */ }
   }
 
-  function setUrl(dir) {
+  function setUrl() {
     var u = new URL(location.href);
+    var dir = root.getAttribute('data-direction') || '';
+    var st = root.getAttribute('data-structure') || '';
     if (dir) u.searchParams.set('direction', dir);
     else u.searchParams.delete('direction');
+    if (st) u.searchParams.set('structure', st);
+    else u.searchParams.delete('structure');
     history.replaceState(history.state, '', u.pathname + u.search + u.hash);
   }
 
@@ -91,7 +106,8 @@
       b.addEventListener('click', function () {
         if ((root.getAttribute('data-direction') || '') === d.id) return;
         apply(d.id);
-        setUrl(d.id);
+        if (d.id !== 'b') applyStruct('');
+        setUrl();
         mark();
         pop();
       });
@@ -99,15 +115,43 @@
       return b;
     });
     panel.appendChild(row);
+
+    var srow = document.createElement('div');
+    srow.className = 'studio-deck-row';
+    var sbuttons = STRUCTS.map(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = d.label;
+      b.title = d.name;
+      b.addEventListener('click', function () {
+        if ((root.getAttribute('data-structure') || '') === d.id) return;
+        if (d.id) apply('b');
+        applyStruct(d.id);
+        setUrl();
+        mark();
+        pop();
+      });
+      srow.appendChild(b);
+      return b;
+    });
+    panel.appendChild(srow);
     panel.appendChild(name);
 
     function mark() {
       var cur = root.getAttribute('data-direction') || '';
+      var cs = root.getAttribute('data-structure') || '';
+      var label = '';
       DIRS.forEach(function (d, i) {
         var on = d.id === cur;
         buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
-        if (on) name.textContent = d.name;
+        if (on) label = d.name;
       });
+      STRUCTS.forEach(function (d, i) {
+        var on = d.id === cs;
+        sbuttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (on && d.id) label += ', ' + d.name;
+      });
+      name.textContent = label;
     }
     mark();
 

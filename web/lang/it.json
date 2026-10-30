@@ -504,5 +504,12 @@
   "account.verify.title": "Conferma il tuo indirizzo email",
   "account.verify.intro": "Premi il pulsante per confermare l'indirizzo a cui è stato inviato questo link.",
   "account.verify.submit": "Conferma l'indirizzo",
-  "account.verify.done": "Grazie. La richiesta è completa. Se l'indirizzo non è stato aggiunto, una email a quell'indirizzo spiega il motivo."
+  "account.verify.done": "Grazie. La richiesta è completa. Se l'indirizzo non è stato aggiunto, una email a quell'indirizzo spiega il motivo.",
+  "r2.shots_title": "// NEL TERMINALE",
+  "r2.shot_combat": "Combattimento",
+  "r2.shot_street": "La via principale",
+  "r2.shot_dungeon": "Il dungeon",
+  "r2.shot_status": "Scheda del personaggio",
+  "r2.live_more": "Apri il tabellone dal vivo completo",
+  "r2.more_title": "// ALTRO"
 }

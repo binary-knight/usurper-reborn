@@ -1,0 +1,79 @@
+/* Structure S1, store page, on direction B.
+   Hero (Steam first) with the live line as a slim strip, screenshots, the world, the gods,
+   the class portraits, a Steam band, ways to play, community, the finale with Steam, and
+   a More block for everything else. Sections reorder with flex `order`; the ones that left
+   the page show only when a link targets them, and then sit after the More block.
+   Promotion note: reorder the markup itself so tab and reading order match. */
+
+html[data-direction="b"][data-structure="s1"] body { display: flex; flex-direction: column; }
+html[data-direction="b"][data-structure="s1"] body > * { order: 20; }
+html[data-direction="b"][data-structure="s1"] body > header { order: 0; }
+html[data-direction="b"][data-structure="s1"] .hero { order: 1; }
+html[data-direction="b"][data-structure="s1"] #terminal-section { order: 2; }
+html[data-direction="b"][data-structure="s1"] #shots { order: 3; }
+html[data-direction="b"][data-structure="s1"] #features { order: 4; }
+html[data-direction="b"][data-structure="s1"] #gods { order: 5; }
+html[data-direction="b"][data-structure="s1"] #classes { order: 6; }
+html[data-direction="b"][data-structure="s1"] #steam-band { order: 7; }
+html[data-direction="b"][data-structure="s1"] #connect { order: 8; }
+html[data-direction="b"][data-structure="s1"] #community { order: 9; }
+html[data-direction="b"][data-structure="s1"] #finale { order: 10; }
+html[data-direction="b"][data-structure="s1"] #more { order: 11; }
+html[data-direction="b"][data-structure="s1"] body > footer { order: 30; }
+
+/* Rules follow the visual order, not the markup order. */
+html[data-direction="b"][data-structure="s1"] section + section { border-top: 0; }
+html[data-direction="b"][data-structure="s1"] section { border-top: 3px solid var(--iron); }
+html[data-direction="b"][data-structure="s1"] .hero { border-top: 1px solid var(--iron); }
+html[data-direction="b"][data-structure="s1"] #steam-band { border-top: 3px solid #5e0f0f; }
+html[data-direction="b"][data-structure="s1"] #steam-band + #connect,
+html[data-direction="b"][data-structure="s1"] #connect { border-top: 0; }
+
+/* New parts on, old parts off. */
+html[data-direction="b"][data-structure="s1"] #shots,
+html[data-direction="b"][data-structure="s1"] #steam-band,
+html[data-direction="b"][data-structure="s1"] #more { display: block; }
+html[data-direction="b"][data-structure="s1"] .class-gallery { display: grid; }
+html[data-direction="b"][data-structure="s1"] #classes .class-roster { display: none; }
+html[data-direction="b"][data-structure="s1"] .finale-steam { display: inline-flex; }
+html[data-direction="b"][data-structure="s1"] .live-more { display: inline-block; margin-top: 4px; }
+
+html[data-direction="b"][data-structure="s1"] #live-stats:not(:target),
+html[data-direction="b"][data-structure="s1"] #philosophy:not(:target),
+html[data-direction="b"][data-structure="s1"] #story:not(:target),
+html[data-direction="b"][data-structure="s1"] #companions:not(:target),
+html[data-direction="b"][data-structure="s1"] #endings:not(:target),
+html[data-direction="b"][data-structure="s1"] #history:not(:target),
+html[data-direction="b"][data-structure="s1"] #bbs-list:not(:target),
+html[data-direction="b"][data-structure="s1"] #roadmap:not(:target),
+html[data-direction="b"][data-structure="s1"] #sponsors:not(:target),
+html[data-direction="b"][data-structure="s1"] #credits:not(:target) { display: none; }
+
+html[data-direction="b"][data-structure="s1"] #more li[data-more="live-stats"],
+html[data-direction="b"][data-structure="s1"] #more li[data-more="features"],
+html[data-direction="b"][data-structure="s1"] #more li[data-more="community"] { display: none; }
+
+/* The hero's live line becomes a slim strip on the hero's lower edge. */
+html[data-direction="b"][data-structure="s1"] .hero { padding-bottom: 0; }
+html[data-direction="b"][data-structure="s1"] .hero > .container { display: flex; flex-direction: column; align-items: center; }
+html[data-direction="b"][data-structure="s1"] .hero > .container > * { max-width: 100%; }
+html[data-direction="b"][data-structure="s1"] .hero-live {
+    order: 10;
+    align-self: stretch;
+    margin: 40px 0 0;
+    padding: 12px 0 14px;
+    border-top: 1px solid var(--iron);
+    text-align: center;
+}
+
+/* The finale leads with Steam; Begin steps back to an outline. */
+html[data-direction="b"][data-structure="s1"] .finale-section .btn-primary {
+    background: transparent;
+    color: var(--bone);
+    border: 1px solid var(--bone-2);
+}
+html[data-direction="b"][data-structure="s1"] .finale-section .btn-primary:hover {
+    background: var(--bone);
+    color: var(--bg-dark);
+}
+html[data-direction="b"][data-structure="s1"] .finale-steam { padding: 16px 36px; font-size: 22px; }

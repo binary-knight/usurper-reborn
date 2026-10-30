@@ -1474,6 +1474,7 @@
             <span id="hl-online" hidden><span class="live-dot-inline"></span><b id="hl-online-n">--</b>&nbsp;<span data-i18n="r1.live_online">adventurers in the world right now</span></span>
             <span id="hl-world" hidden><span class="live-dot-inline"></span><span data-i18n="r1.live_world">The world is alive:</span> <b id="hl-marr">--</b> <span data-i18n="r1.live_marr">marriages</span>, <b id="hl-kids">--</b> <span data-i18n="r1.live_kids">children born</span>, <b id="hl-kills">--</b> <span data-i18n="r1.live_kills">monsters slain</span></span>
             <span id="hl-news" hidden class="hl-news-line"><span data-i18n="r1.live_latest">Just now:</span> <span id="hl-news-text"></span></span>
+            <a class="live-more" href="#live-stats" hidden data-i18n="r2.live_more">Open the full live board</a>
         </div>
         <div class="hero-buttons">
             <a class="btn btn-primary btn-hero-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
@@ -1486,6 +1487,11 @@
             <a href="#connect" data-i18n="r1.alt_ssh">Play over SSH or telnet</a>
         </p>
         <p class="hero-nostalgia" data-i18n="r1.hero_nostalgia">If you remember the shriek of a 14.4k modem handshake: welcome home. If you don't: this is the kind of world we fought over before MMOs existed, and it has lost none of its teeth.</p>
+        <!-- studio: structure s3 hero portrait -->
+        <figure class="hero-portrait print" hidden>
+            <img src="img/class-warrior.webp" width="192" height="192" alt="" decoding="async">
+            <figcaption data-i18n="r1.cl_warrior">Warrior -- steel and stubbornness</figcaption>
+        </figure>
     </div>
 </section>
 
@@ -1709,6 +1715,57 @@
         </div>
         <p class="class-note" data-i18n="r1.classes_races">Races: Human, Elf, Half-Elf, Dwarf, Troll, Orc, Gnome, Gnoll, Hobbit, Mutant. Yes, Mutant. Trolls regenerate. Gnolls bite.</p>
         <p class="class-note prestige" data-i18n="r1.classes_prestige">See an ending and five prestige classes open on your next life: Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver. Each one is shaped by the ending you chose.</p>
+        <!-- studio: structures s1 and s3 class gallery -->
+        <div class="class-gallery" hidden>
+            <figure class="print">
+                <img src="img/class-warrior.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_warrior">Warrior -- steel and stubbornness</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-paladin.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_paladin">Paladin -- the shield that prays</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-barbarian.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_barbarian">Barbarian -- anger as a strategy</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-ranger.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_ranger">Ranger -- death from a distance</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-assassin.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_assassin">Assassin -- one knife, no witnesses</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-magician.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_magician">Magician -- glass cannon, real cannon</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-cleric.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_cleric">Cleric -- keeps everyone breathing</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-sage.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_sage">Sage -- knows too much</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-bard.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_bard">Bard -- fights with a song</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-jester.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_jester">Jester -- chaos, grinning</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-alchemist.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_alchemist">Alchemist -- science, loosely</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/class-shaman.webp" width="192" height="192" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r1.cl_shaman">Mystic Shaman -- storms and totems</figcaption>
+            </figure>
+        </div>
     </div>
 </section>
 
@@ -2025,6 +2082,7 @@
         <p class="finale-line1" data-i18n="r1.finale_line1">Somewhere below floor 90, the god who made everything is waiting to ask you one question.</p>
         <p class="finale-line2" data-i18n="r1.finale_line2">The town will remember your answer. So will their children.</p>
         <div class="hero-buttons" style="margin-top:28px;">
+            <a class="btn btn-steam finale-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" hidden data-i18n="connect.steam_btn">Get on Steam</a>
             <button class="btn btn-primary" onclick="openTerminal();window.scrollTo({top:0,behavior:'smooth'});" data-i18n="r1.finale_cta">&#9658; Begin</button>
         </div>
         <p class="hero-cta-note" style="margin-top:12px;"><a href="#story" style="color:var(--text-dim);" data-i18n="r1.finale_alt">or read the story first</a></p>
@@ -2110,6 +2168,69 @@
         </div>
     </div>
 </section>
+
+<!-- studio: structures s1 and s3 screenshot strip -->
+<section id="shots" class="shots-section" hidden>
+    <div class="container">
+        <h2 class="section-title" data-i18n="r2.shots_title">// IN THE TERMINAL</h2>
+        <div class="shot-strip">
+            <figure class="print">
+                <img src="img/shot-combat.webp" width="911" height="519" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_combat">Combat</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-main-street.webp" width="911" height="540" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_street">Main Street</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-dungeon.webp" width="911" height="897" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_dungeon">The dungeon</figcaption>
+            </figure>
+            <figure class="print">
+                <img src="img/shot-status.webp" width="911" height="939" alt="" loading="lazy" decoding="async">
+                <figcaption data-i18n="r2.shot_status">Character status</figcaption>
+            </figure>
+        </div>
+    </div>
+</section>
+
+<!-- studio: structures s1 and s3 Steam band -->
+<section id="steam-band" class="steam-band" hidden>
+    <div class="container">
+        <p data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</p>
+        <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
+    </div>
+</section>
+
+<!-- studio: structures s1 and s3 More block -->
+<section id="more" class="more-block" hidden>
+    <div class="container">
+        <h2 class="section-title" data-i18n="r2.more_title">// MORE</h2>
+        <ul class="more-list">
+                <li data-more="live-stats"><a href="#live-stats" data-i18n="r1.stats_title">// THE WORLD, RIGHT NOW</a></li>
+                <li data-more="philosophy"><a href="#philosophy" data-i18n="philosophy.title">// WHY I MADE THIS</a></li>
+                <li data-more="features"><a href="#features" data-i18n="r1.world_title">// A WORLD THAT REMEMBERS YOU</a></li>
+                <li data-more="story"><a href="#story" data-i18n="story.title">// THE STORY</a></li>
+                <li data-more="companions"><a href="#companions" data-i18n="companions.title">// COMPANIONS</a></li>
+                <li data-more="endings"><a href="#endings" data-i18n="endings.title">// FIVE ENDINGS</a></li>
+                <li data-more="history"><a href="#history" data-i18n="history.title">// HISTORY</a></li>
+                <li data-more="bbs-list"><a href="#bbs-list" data-i18n="bbs.title">// BBS LIST</a></li>
+                <li data-more="roadmap"><a href="#roadmap" data-i18n="r1.road_title">// ROADMAP</a></li>
+                <li data-more="community"><a href="#community" data-i18n="r1.comm_title">// THE TOWN OUTSIDE THE GAME</a></li>
+                <li data-more="sponsors"><a href="#sponsors" data-i18n-html="sponsors.title">// SPONSORS</a></li>
+                <li data-more="credits"><a href="#credits" data-i18n="credits.title">// CREDITS</a></li>
+        </ul>
+    </div>
+</section>
+
+<!-- studio: structure s2 Steam bar -->
+<div class="steam-bar" id="steam-bar" hidden>
+    <div class="container">
+        <span class="steam-bar-name">USURPER REBORN</span>
+        <span class="steam-bar-line" data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</span>
+        <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
+    </div>
+</div>
 
 <footer>
     <div class="container">
@@ -2814,6 +2935,19 @@
             });
     }
     fetchSponsors();
+</script>
+<script>
+    // studio: structure s2 Steam bar, shown once the hero has scrolled out of view
+    (function () {
+        if (typeof IntersectionObserver !== 'function') return;
+        var bar = document.getElementById('steam-bar');
+        var hero = document.querySelector('.hero');
+        if (!bar || !hero) return;
+        new IntersectionObserver(function (entries) {
+            var e = entries[entries.length - 1];
+            bar.classList.toggle('is-shown', !e.isIntersecting && e.boundingClientRect.top < 0);
+        }).observe(hero);
+    })();
 </script>
 
 </body>

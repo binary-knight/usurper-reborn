@@ -504,5 +504,12 @@
   "account.verify.title": "Confirma tu dirección de correo",
   "account.verify.intro": "Pulsa el botón para confirmar la dirección a la que se envió este enlace.",
   "account.verify.submit": "Confirmar dirección",
-  "account.verify.done": "Gracias. La solicitud se ha completado. Si la dirección no se pudo añadir, un correo a esa dirección explica por qué."
+  "account.verify.done": "Gracias. La solicitud se ha completado. Si la dirección no se pudo añadir, un correo a esa dirección explica por qué.",
+  "r2.shots_title": "// EN LA TERMINAL",
+  "r2.shot_combat": "Combate",
+  "r2.shot_street": "La calle principal",
+  "r2.shot_dungeon": "La mazmorra",
+  "r2.shot_status": "Ficha del personaje",
+  "r2.live_more": "Abrir el tablero en vivo completo",
+  "r2.more_title": "// MÁS"
 }

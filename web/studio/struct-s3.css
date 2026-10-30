@@ -1,0 +1,118 @@
+/* Structure S3, portrait led, on direction B.
+   A split hero (title and Steam on the left, one class portrait as a print on the right,
+   under the buttons on a phone), then the class portraits, the story, the gods, the
+   screenshots, a Steam band, the ways to play, and the More block for the rest.
+   Promotion note: reorder the markup itself so tab and reading order match. */
+
+html[data-direction="b"][data-structure="s3"] body { display: flex; flex-direction: column; }
+html[data-direction="b"][data-structure="s3"] body > * { order: 20; }
+html[data-direction="b"][data-structure="s3"] body > header { order: 0; }
+html[data-direction="b"][data-structure="s3"] .hero { order: 1; }
+html[data-direction="b"][data-structure="s3"] #terminal-section { order: 2; }
+html[data-direction="b"][data-structure="s3"] #classes { order: 3; }
+html[data-direction="b"][data-structure="s3"] #story { order: 4; }
+html[data-direction="b"][data-structure="s3"] #gods { order: 5; }
+html[data-direction="b"][data-structure="s3"] #shots { order: 6; }
+html[data-direction="b"][data-structure="s3"] #steam-band { order: 7; }
+html[data-direction="b"][data-structure="s3"] #connect { order: 8; }
+html[data-direction="b"][data-structure="s3"] #more { order: 9; }
+html[data-direction="b"][data-structure="s3"] body > footer { order: 30; }
+
+html[data-direction="b"][data-structure="s3"] section + section { border-top: 0; }
+html[data-direction="b"][data-structure="s3"] section { border-top: 3px solid var(--iron); }
+html[data-direction="b"][data-structure="s3"] .hero { border-top: 1px solid var(--iron); }
+html[data-direction="b"][data-structure="s3"] #steam-band { border-top: 3px solid #5e0f0f; }
+html[data-direction="b"][data-structure="s3"] #connect { border-top: 0; }
+
+html[data-direction="b"][data-structure="s3"] #shots,
+html[data-direction="b"][data-structure="s3"] #steam-band,
+html[data-direction="b"][data-structure="s3"] #more,
+html[data-direction="b"][data-structure="s3"] .hero-portrait { display: block; }
+html[data-direction="b"][data-structure="s3"] .class-gallery { display: grid; }
+html[data-direction="b"][data-structure="s3"] #classes .class-roster { display: none; }
+html[data-direction="b"][data-structure="s3"] #finale { display: none; }
+
+html[data-direction="b"][data-structure="s3"] #live-stats:not(:target),
+html[data-direction="b"][data-structure="s3"] #philosophy:not(:target),
+html[data-direction="b"][data-structure="s3"] #features:not(:target),
+html[data-direction="b"][data-structure="s3"] #companions:not(:target),
+html[data-direction="b"][data-structure="s3"] #endings:not(:target),
+html[data-direction="b"][data-structure="s3"] #history:not(:target),
+html[data-direction="b"][data-structure="s3"] #bbs-list:not(:target),
+html[data-direction="b"][data-structure="s3"] #roadmap:not(:target),
+html[data-direction="b"][data-structure="s3"] #community:not(:target),
+html[data-direction="b"][data-structure="s3"] #sponsors:not(:target),
+html[data-direction="b"][data-structure="s3"] #credits:not(:target) { display: none; }
+html[data-direction="b"][data-structure="s3"] #more li[data-more="story"] { display: none; }
+
+/* ---------- Split hero ---------- */
+
+html[data-direction="b"][data-structure="s3"] .hero { text-align: left; padding: 64px 0 60px; }
+html[data-direction="b"][data-structure="s3"] .hero > .container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 386px;
+    column-gap: 36px;
+    align-items: start;
+    max-width: 1080px;
+}
+html[data-direction="b"][data-structure="s3"] .hero > .container > * { grid-column: 1; }
+html[data-direction="b"][data-structure="s3"] .hero > .container > .hero-portrait {
+    grid-column: 2;
+    grid-row: 1 / span 9;
+    align-self: center;
+}
+html[data-direction="b"][data-structure="s3"] .hero-portrait img {
+    width: 384px;
+    max-width: 100%;
+    margin: 0 auto;
+    image-rendering: pixelated;
+}
+html[data-direction="b"][data-structure="s3"] .hero-portrait {
+    background-color: #0c0b0a;
+    background-image:
+        repeating-linear-gradient(45deg, rgba(232, 224, 208, 0.05) 0 1px, rgba(0, 0, 0, 0) 1px 6px),
+        repeating-linear-gradient(-45deg, rgba(232, 224, 208, 0.035) 0 1px, rgba(0, 0, 0, 0) 1px 9px);
+    border-top-width: 6px;
+}
+html[data-direction="b"][data-structure="s3"] .hero-portrait figcaption {
+    border-top: 1px solid var(--iron);
+    padding-top: 8px;
+    color: var(--bone);
+    text-align: center;
+}
+
+html[data-direction="b"][data-structure="s3"] .title-banner { text-align: left; }
+html[data-direction="b"][data-structure="s3"] .title-banner .title-main { font-size: 104px; }
+html[data-direction="b"][data-structure="s3"] .title-banner .title-sub { padding-left: 0; }
+html[data-direction="b"][data-structure="s3"] .hero-desc { margin: 0 0 32px; max-width: 34em; }
+html[data-direction="b"][data-structure="s3"] .hero-live { text-align: left; margin-left: 0; margin-right: 0; }
+html[data-direction="b"][data-structure="s3"] .hero-buttons .btn { padding: 14px 22px; font-size: 18px; }
+html[data-direction="b"][data-structure="s3"] .hero-buttons .btn-hero-steam { padding: 15px 30px; font-size: 21px; }
+html[data-direction="b"][data-structure="s3"] .hero-buttons { justify-content: flex-start; }
+html[data-direction="b"][data-structure="s3"] .hero-cta-note,
+html[data-direction="b"][data-structure="s3"] .hero-alt-links,
+html[data-direction="b"][data-structure="s3"] .hero-nostalgia { text-align: left; margin-left: 0; margin-right: 0; }
+
+@media (max-width: 900px) {
+    html[data-direction="b"][data-structure="s3"] .hero > .container { grid-template-columns: minmax(0, 1fr); }
+    html[data-direction="b"][data-structure="s3"] .hero > .container > .hero-portrait {
+        grid-column: 1;
+        grid-row: auto;
+        order: 6;
+        margin: 28px 0 8px;
+        justify-self: center;
+        width: min(100%, 404px);
+    }
+    html[data-direction="b"][data-structure="s3"] .title-banner { order: 1; }
+    html[data-direction="b"][data-structure="s3"] .hero-subtitle { order: 2; }
+    html[data-direction="b"][data-structure="s3"] .hero-desc { order: 3; }
+    html[data-direction="b"][data-structure="s3"] .hero-live { order: 4; }
+    html[data-direction="b"][data-structure="s3"] .hero-buttons { order: 5; }
+    html[data-direction="b"][data-structure="s3"] .hero-cta-note { order: 7; }
+    html[data-direction="b"][data-structure="s3"] .hero-alt-links { order: 8; }
+    html[data-direction="b"][data-structure="s3"] .hero-nostalgia { order: 9; }
+}
+@media (max-width: 768px) {
+    html[data-direction="b"][data-structure="s3"] .hero { padding: 44px 0 44px; }
+    html[data-direction="b"][data-structure="s3"] .title-banner .title-main { font-size: 68px; }
+}

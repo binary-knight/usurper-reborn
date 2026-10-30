@@ -504,5 +504,12 @@
   "account.verify.title": "Confirmez votre adresse e-mail",
   "account.verify.intro": "Appuyez sur le bouton pour confirmer l'adresse à laquelle ce lien a été envoyé.",
   "account.verify.submit": "Confirmer l'adresse",
-  "account.verify.done": "Merci. La demande est terminée. Si l'adresse n'a pas pu être ajoutée, un message envoyé à cette adresse en explique la raison."
+  "account.verify.done": "Merci. La demande est terminée. Si l'adresse n'a pas pu être ajoutée, un message envoyé à cette adresse en explique la raison.",
+  "r2.shots_title": "// DANS LE TERMINAL",
+  "r2.shot_combat": "Combat",
+  "r2.shot_street": "La rue principale",
+  "r2.shot_dungeon": "Le donjon",
+  "r2.shot_status": "Fiche du personnage",
+  "r2.live_more": "Ouvrir le tableau en direct complet",
+  "r2.more_title": "// PLUS"
 }

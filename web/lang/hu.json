@@ -504,5 +504,12 @@
   "account.verify.title": "Erősítsd meg az e-mail címedet",
   "account.verify.intro": "Nyomd meg a gombot annak a címnek a megerősítéséhez, amelyre ez a hivatkozás érkezett.",
   "account.verify.submit": "Cím megerősítése",
-  "account.verify.done": "Köszönjük. A kérés teljesült. Ha a címet nem lehetett a fiókhoz adni, egy erre a címre küldött levél elmagyarázza, miért."
+  "account.verify.done": "Köszönjük. A kérés teljesült. Ha a címet nem lehetett a fiókhoz adni, egy erre a címre küldött levél elmagyarázza, miért.",
+  "r2.shots_title": "// A TERMINÁLBAN",
+  "r2.shot_combat": "Harc",
+  "r2.shot_street": "A főutca",
+  "r2.shot_dungeon": "A kazamata",
+  "r2.shot_status": "Karakterlap",
+  "r2.live_more": "A teljes élő tábla megnyitása",
+  "r2.more_title": "// TOVÁBBIAK"
 }

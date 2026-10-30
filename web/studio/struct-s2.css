@@ -1,0 +1,105 @@
+/* Structure S2, chronicle, on direction B.
+   Today's order, tightened: companions as a compact row, history and credits compact,
+   and a slim Steam bar along the bottom once the hero has scrolled away (the small script
+   at the end of index.html adds .is-shown). */
+
+/* ---------- Companions: a compact row of names ---------- */
+
+html[data-direction="b"][data-structure="s2"] #companions .companion-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+}
+html[data-direction="b"][data-structure="s2"] #companions .companion-card { padding: 16px 14px; }
+html[data-direction="b"][data-structure="s2"] #companions .companion-card h3 { font-size: 21px; margin-bottom: 2px; }
+html[data-direction="b"][data-structure="s2"] #companions .companion-desc,
+html[data-direction="b"][data-structure="s2"] #companions .companion-backstory,
+html[data-direction="b"][data-structure="s2"] #companions .companion-quote,
+html[data-direction="b"][data-structure="s2"] #companions .companion-meta span:not(:first-child) { display: none; }
+html[data-direction="b"][data-structure="s2"] #companions .companion-meta { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--iron); }
+
+/* ---------- History: titles with two lines each ---------- */
+
+html[data-direction="b"][data-structure="s2"] #history .history-entry { margin-bottom: 18px; }
+html[data-direction="b"][data-structure="s2"] #history .history-entry p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+html[data-direction="b"][data-structure="s2"] #history .history-entry p ~ p { display: none; }
+
+/* ---------- Credits: names and roles only ---------- */
+
+html[data-direction="b"][data-structure="s2"] #credits .credits-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+    gap: 10px;
+}
+html[data-direction="b"][data-structure="s2"] #credits .credit-card { padding: 14px 16px; }
+html[data-direction="b"][data-structure="s2"] #credits .credit-card p { display: none; }
+
+/* ---------- Steam bar ---------- */
+
+html[data-direction="b"][data-structure="s2"] body { padding-bottom: 72px; }
+html[data-direction="b"][data-structure="s2"] #steam-bar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    background: #100e0c;
+    border-top: 3px solid var(--iron);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+}
+html[data-direction="b"][data-structure="s2"] #steam-bar.is-shown {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.15s ease, visibility 0s;
+}
+html[data-direction="b"][data-structure="s2"] #steam-bar > .container {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+html[data-direction="b"][data-structure="s2"] .steam-bar-name {
+    font-family: 'IM Fell English SC', Georgia, serif;
+    font-size: 19px;
+    color: var(--bone);
+    white-space: nowrap;
+}
+html[data-direction="b"][data-structure="s2"] .steam-bar-line {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 15px;
+    color: var(--ash);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+html[data-direction="b"][data-structure="s2"] #steam-bar .btn-steam {
+    padding: 8px 20px;
+    font-size: 18px;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-direction="b"][data-structure="s2"] #steam-bar,
+    html[data-direction="b"][data-structure="s2"] #steam-bar.is-shown { transition: none; }
+}
+@media (max-width: 900px) {
+    html[data-direction="b"][data-structure="s2"] #companions .companion-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+    html[data-direction="b"][data-structure="s2"] #companions .companion-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html[data-direction="b"][data-structure="s2"] body { padding-bottom: 60px; }
+    html[data-direction="b"][data-structure="s2"] .steam-bar-line { display: none; }
+    html[data-direction="b"][data-structure="s2"] #steam-bar { padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+    html[data-direction="b"][data-structure="s2"] #steam-bar > .container { justify-content: space-between; }
+    html[data-direction="b"][data-structure="s2"] .steam-bar-name { font-size: 16px; }
+    html[data-direction="b"][data-structure="s2"] #steam-bar .btn-steam { padding: 7px 14px; font-size: 16px; }
+}
