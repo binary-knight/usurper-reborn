@@ -5,7 +5,7 @@
    and a few rules. Hatched plate on the hero, square corners, thick top and bottom rules.
    Contrast on #141210 / card #1c1916: bone 14.24 / 13.34, bone-2 #d8c9a8 on card 10.70,
    dim #a89f90 7.14 / 6.69, red text #e0605a 5.33 / 4.99; bone on the #9e1b1b slab 6.09,
-   on its #b22222 hover 5.09. */
+   on its #b22222 hover 5.09. Charcoal on the bone slab (non-Steam primary) 14.24. */
 
 html[data-direction="b"] {
     --bone: #e8e0d0;
@@ -241,14 +241,25 @@ html[data-direction="b"] .btn {
     transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
 html[data-direction="b"] .btn:hover { transform: none; }
-html[data-direction="b"] .btn-primary,
+/* Red is spent on Steam: any other primary action is a bone slab. */
+html[data-direction="b"] .btn-primary {
+    background: var(--bone);
+    color: var(--bg-dark);
+    border: 1px solid var(--bone);
+}
+html[data-direction="b"] .btn-primary:hover {
+    background: #f6f1e7;
+    color: var(--bg-dark);
+    border-color: #f6f1e7;
+}
+html[data-direction="b"] .btn-hero-steam,
 html[data-direction="b"] .btn-steam {
     background: var(--blood);
     color: var(--bone);
     border: 1px solid #5e0f0f;
     border-top: 1px solid #c0393a;
 }
-html[data-direction="b"] .btn-primary:hover,
+html[data-direction="b"] .btn-hero-steam:hover,
 html[data-direction="b"] .btn-steam:hover {
     background: var(--blood-hi);
     color: var(--bone);
