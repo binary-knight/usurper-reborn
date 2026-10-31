@@ -807,11 +807,13 @@
         document.getElementById('pad-keys').setAttribute('aria-pressed', padKeys ? 'true' : 'false');
         if (padKeys) { renderKeyboard(box); return; }
         if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
-        // The compass shows only on a menu screen, when the game sent compass exits and this screen
-        // offers one of them. A yes or no question in a room keeps its own two buttons.
+        // The compass shows only on the room screen itself: a menu drawn since the last Enter, no fight
+        // on (an ambush starts one with no Enter after the move), and every exit the game sent offered
+        // on screen as its key. A yes or no question in a room keeps its own two buttons.
         var keys = {};
-        if (p.kind === 'menu' && fresh === true) cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
-        var shown = DIRS.filter(function (x) { return state.exits[x.d] && keys[x.k]; });
+        if (p.kind === 'menu' && fresh === true && !state.inCombat) cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
+        var exitDirs = DIRS.filter(function (x) { return state.exits[x.d]; });
+        var shown = exitDirs.length && exitDirs.every(function (x) { return keys[x.k]; }) ? exitDirs : [];
         if (shown.length) {
             var row = el('div', 'compass-row');
             row.appendChild(el('span', 'pad-label', t('play.pad.exits')));

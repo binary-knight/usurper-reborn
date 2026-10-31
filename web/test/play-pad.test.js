@@ -347,3 +347,18 @@ test('on a touch screen only Type focuses the terminal', () => {
   for (const l of lines) assert.ok(l.includes('!isTouch()') || l.includes('the one deliberate way to raise the phone keyboard'), l.trim());
   assert.strictEqual(lines.filter((l) => !l.includes('!isTouch()')).length, 1);
 });
+
+test('an ambush after a move keeps the fight\'s buttons, and a screen missing an exit gets no compass', async () => {
+  const p = await load({ matchMedia: TOUCH });
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Crypt","exits":{"east":"r2","south":"r0"}}}')`);
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Char.Combat.Start","data":{"enemies":[{"name":"Goblin","level":1,"hp":5,"maxHp":5}]}}')`);
+  pad(p, ['║ [A] Attack            ║', '║ [E] Precise Strike    ║', '║ [S] View Status       ║', 'Choose action:'], true);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0, 'no arrows in a fight, even right after the move');
+  assert.deepStrictEqual(chips(p), ['A, Attack', 'E, Precise Strike', 'S, View Status']);
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Char.Combat.End","data":{"outcome":"Victory","kills":1,"xpGained":1,"goldGained":1}}')`);
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Hall","exits":{"north":"r1","south":"r0","west":"r3"}}}')`);
+  pad(p, ['  [N] A dark passage leads north.', '  [B] Buy  [L] Leave', '[40hp 100st] Dungeon Fl.1 >'], true);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0, 'south and west are not on this screen');
+  pad(p, ROOM, true);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 4, 'the room screen offers every exit');
+});
