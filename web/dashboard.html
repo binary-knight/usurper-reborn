@@ -441,12 +441,163 @@
             ['questhall', 'Quest Hall'], ['prison', 'Prison']
         ];
         var ELSEWHERE = 'elsewhere';
-        var PLACE_LABEL = {};
-        PLACES.forEach(function (p) { PLACE_LABEL[p[0]] = p[1]; });
-        PLACE_LABEL[ELSEWHERE] = 'Elsewhere';
+        // Every table the page keys by text from the API is a Map or a Set, never a plain object, so a
+        // name such as "__proto__" or "toString" is only ever a key.
+        var PLACE_LABELS = new Map(PLACES.map(function (p) { return [p[0], p[1]]; }));
+        PLACE_LABELS.set(ELSEWHERE, 'Elsewhere');
+        function placeLabel(k) { return PLACE_LABELS.get(k) || 'Elsewhere'; }
 
-        var KINDS = [['death', 'Deaths'], ['brawl', 'Brawls'], ['teams', 'Teams'], ['gossip', 'Gossip'], ['training', 'Training'],
-            ['life', 'Life'], ['boss', 'World boss'], ['players', 'Players'], ['other', 'Other']];
+        var KINDS = [['death', 'Deaths'], ['brawl', 'Fights'], ['teams', 'Teams'], ['gossip', 'Gossip'], ['training', 'Training and levels'],
+            ['life', 'Life'], ['crown', 'The throne'], ['boss', 'World boss'], ['players', 'Players'], ['other', 'Other']];
+        // The English news templates the world simulation writes with the "npc" category (Localization/en.json,
+        // keys news.*, worldsim.*, social.*, city.*, challenge.*, team.*, street_encounter.*, npc_behavior.*,
+        // goal.*, meme.*, settlement.*, prison.*). {} is a name or other text, {n} a number, {o} an ordinal.
+        // Each template is matched whole, so a name never decides the kind. Deaths are tested first, then gossip
+        // (which quotes other news), then the rest; anything else is Other.
+        var TEMPLATES = [
+            ['death', [
+                '{} was slain by {} at {}!',
+                '{} has been slain by {} and will not return. The realm mourns.',
+                '{} has passed away peacefully at the age of {n}. The soul moves on...',
+                '{}, a {} of {n} years, has passed away peacefully. The soul moves on...',
+                '{} murdered {} in cold blood! They will not return.',
+                'Several townsfolk witnessed {} murder {} at the {}',
+                '{} has avenged the blood of their kin. {} is dead.',
+                '{} was executed by the Crown for the murder of {}. Justice is served.',
+                '{} {} executed {}!',
+                "REBELLION! The tyrant {} was overthrown and EXECUTED by the people's court!"]],
+            ['gossip', [
+                '{} is telling anyone who\'ll listen: "{}"',
+                'Dark whispers about {} circulate through the taverns',
+                "Tales of {}'s heroism have spread across the realm",
+                '{} was overheard warning {} about {}',
+                "{} sang {}'s praises to {}",
+                'Scandalous rumors swirl about {} and {}...',
+                '{} and {} shared drinks and gossip at the Inn.',
+                'Scandal! {} and {} are having a secret affair!',
+                "{} has become known as the town's {}",
+                '{} has taken up a new calling as {}',
+                'A new idea is stirring in {}: "{}" {}',
+                'The idea of "{}" continues to spread through the realm',
+                'The idea of "{}" has faded from popular interest']],
+            ['brawl', [
+                'Several townsfolk witnessed {} brawl with {} at the {}',
+                'Several townsfolk witnessed {} attack {} at the {}',
+                'Several townsfolk witnessed {} challenge {} at the {}',
+                'Several townsfolk witnessed {} defend {} at the {}',
+                '{} and {} traded blows at the Inn before the keeper threw them out.',
+                'Tensions are rising between {} and {} at the {}.',
+                '{} publicly challenged {} at the {}! {} emerged victorious.',
+                '{} defeated {} in a tavern brawl!',
+                '{} defeated {} in a grudge match!',
+                '{} got revenge on {}!',
+                '{} got bloody revenge on {}!',
+                "{} defeated {}'s murder revenge attempt!",
+                '{} defeated {} who confronted them!',
+                '{} brought justice to {}!',
+                '{} humiliated {} in a confrontation over an affair!',
+                '{} and {} came to blows over a love affair!',
+                "{} spared {}'s life at the {}."]],
+            ['teams', [
+                "{} joined the team '{}'!",
+                "{} formed a new team called '{}' with {}!",
+                "{} formed a new team: '{}'!",
+                "{} recruited {} into '{}'!",
+                "{} recruited {} into team '{}'!",
+                '{} recruited {} into {}',
+                '{} has been recruited to {}',
+                'Gang Recruitment! {} joined {}!',
+                "Team '{}' conquered dungeon level {n}, defeating {n} monsters!",
+                "The team '{}' has disbanded as {} went solo!",
+                "The team '{}' has been disbanded!",
+                "{} abandoned '{}'!",
+                "Team War! '{}' clashes with '{}' at {}!",
+                "'{}' emerged victorious against '{}'!",
+                "'{}' has taken control of the town!",
+                "'{}' has taken control of the city!",
+                "'{}' defeated '{}' and now controls the city!",
+                "'{}' successfully defended the city against '{}'!",
+                'The city is no longer under team control!',
+                "'{}' is challenging for city control!",
+                "'{}' controls the city.",
+                "{} has left '{}'.",
+                "{} left the team '{}'!",
+                '{} left the team.',
+                "{} was kicked out of team '{}'!",
+                "{} quit {}'s team over unpaid wages!",
+                "{}'s team now controls the city and collects tax revenue from every sale!",
+                '{} has formed a powerful new alliance!',
+                '{} ceased to exist!',
+                "{} defended their turf by defeating {} of '{}'!",
+                "'{}' defeated {} in a turf war!",
+                "{} paid off '{}' to avoid a turf war.",
+                "{} surrendered turf to '{}' without a fight.",
+                'Gang War! {} defeated {}!',
+                'Gang War! {} repelled {}!',
+                '{} has taken control of the town!',
+                '{} abandoned control of the town!']],
+            ['training', [
+                '{} has been training hard at the Gym!',
+                '{} has achieved Level {n}!',
+                '{} advanced to level {n} with help from {}!']],
+            ['life', [
+                '{} and {} are proud parents of {}!',
+                '{} and {} are expecting a child!',
+                '{} and {} were married at the {}!',
+                '{} and {} have gotten married! Congratulations to the happy couple!',
+                'Wedding Bells! {} and {} have gotten married!',
+                'Scandal and Romance! {} left {} and immediately married {}!',
+                '{}, child of {} and {}, has come of age and joined the realm!',
+                '{}, raised in the Royal Orphanage, has come of age and joined the Royal Guard!',
+                '{}, raised in the Royal Orphanage, has come of age and joined the realm!',
+                'Young {}, child of the late {} and {}, has been taken into the Royal Orphanage.',
+                '{} the {} celebrates their {o} birthday!',
+                '{} has returned from the realm of the dead!',
+                '{} and {} have divorced!',
+                '{} has divorced their partner due to infidelity!',
+                '{} and {} have entered a polyamorous union!',
+                '{} played matchmaker for {} and {}.',
+                '{} {} traveler named {} has arrived in town.',
+                '{} has joined the Outskirts settlement.']],
+            ['crown', [
+                '{} storms the castle to challenge {} {}!',
+                '{} prepares their forces... the challenge approaches!',
+                'THREAT: {} (Level {n}) has declared intent to challenge for the throne!',
+                '{} has challenged {} {} for the throne!',
+                'URGENT: Royal Guards are being summoned to defend the throne!',
+                '{} awaits at the castle gates...',
+                "Guard {}'s loyalty questioned for failing to defend the throne!",
+                '{} slew the monster guard {}!',
+                '{} was defeated by the monster guards!',
+                'Cowardly guard {} fled instead of fighting!',
+                "BETRAYAL! Guard {} has joined {}'s cause!",
+                '{} defeated guard {}!',
+                '{} was defeated by the Royal Guards!',
+                '{} has DEFEATED {} {} in combat!',
+                'ALL HAIL {} {}! A new monarch sits upon the throne!',
+                'The designated heir {} has claimed the throne! ALL HAIL {} {}!',
+                'The designated heir {} could not be found or is not eligible.',
+                '{} has claimed the empty throne! ALL HAIL {} {}!',
+                '{} was thrown in prison for {n} days!',
+                '{} has been released from prison.',
+                '{} {} has ruled for {n} days.',
+                '{} has joined the Royal Guard!',
+                'King {} proclaims: {}',
+                'The royal treasury hemorrhages {n} gold daily!']]
+        ];
+        // A template as an anchored pattern: the literal text escaped, the placeholders as wildcards.
+        function templatePattern(text) {
+            var src = text.split(/(\{\}|\{n\}|\{o\})/).map(function (part) {
+                if (part === '{}') return '[\\s\\S]+';
+                if (part === '{n}') return '[\\d,]+';
+                if (part === '{o}') return '\\d+(?:st|nd|rd|th)';
+                return reEsc(part);
+            }).join('');
+            return new RegExp('^' + src + '$');
+        }
+        var KIND_PATTERNS = TEMPLATES.map(function (k) { return [k[0], k[1].map(templatePattern)]; });
+        // The symbol NewsSystem puts before some rows (left out in screen reader mode).
+        var NEWS_PREFIX = /^(?:\u2020|\u2665|\u26B1|\uD83C\uDF82|\u2B06|\u2717|\uD83D\uDC8B|\u2654|\u2691|\u2694|\u26D3|\u271D|\u2606) /;
         var TABS = ['now', 'town', 'power', 'people'];
         var WATCH_KEY = 'usurper.observatory.watch';
         var CHRON_STEP = 40;
@@ -460,7 +611,7 @@
             events: null, hourly: null, stats: null, hist24: null, histRange: null, histHours: 24,
             names: new Set(), tab: 'now', profileName: '', profile: null, profileState: '',
             chip: 'all', chronLimit: CHRON_STEP, place: '', dirLimit: DIR_STEP, dirOptions: '',
-            errors: [], feed: null
+            errors: [], feed: null, opener: null
         };
         var W = readWatch();
 
@@ -470,6 +621,7 @@
         function num(v) { return typeof v === 'number' && isFinite(v) ? v : 0; }
         function isArr(v) { return Array.isArray(v); }
         function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+        function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined; }
         function fmtN(v) { return Math.round(num(v)).toLocaleString('en-US'); }
         function pct(v) { return Math.max(0, Math.min(100, Math.round(num(v) * 100))); }
         function byId(id) { return document.getElementById(id); }
@@ -483,12 +635,12 @@
         function clear(node) { node.textContent = ''; return node; }
         function button(cls, text) { var b = el('button', cls, text); b.setAttribute('type', 'button'); return b; }
         function empty(text) { return el('p', 'empty', text); }
-        function className(id) { return CLASS_NAMES[id] || 'Unknown class'; }
-        function raceName(id) { return RACE_NAMES[id] || 'Unknown race'; }
-        function factionName(id) { var k = String(typeof id === 'number' ? id : -1); return FACTION_NAMES[k] || FACTION_NAMES['-1']; }
+        function className(id) { return Number.isInteger(id) && CLASS_NAMES[id] || 'Unknown class'; }
+        function raceName(id) { return Number.isInteger(id) && RACE_NAMES[id] || 'Unknown race'; }
+        function factionName(id) { return FACTION_ORDER.indexOf(id) === -1 ? FACTION_NAMES['-1'] : FACTION_NAMES[String(id)]; }
         function placeKey(raw) {
             var k = String(raw === null || raw === undefined ? '' : raw).toLowerCase().replace(/[\s_]+/g, '');
-            return Object.prototype.hasOwnProperty.call(PLACE_LABEL, k) && k !== ELSEWHERE ? k : ELSEWHERE;
+            return PLACE_LABELS.has(k) && k !== ELSEWHERE ? k : ELSEWHERE;
         }
         function isAlive(p) { return !p.isDead; }
 
@@ -850,12 +1002,12 @@
         function renderActivity() {
             var box = clear(byId('activity'));
             var rows = S.hourly || [];
-            var byHour = {};
+            var byHour = new Map();
             var total = 0;
             rows.forEach(function (r) {
                 if (!isObj(r)) return;
                 var k = str(r.hour);
-                byHour[k] = (byHour[k] || 0) + num(r.count);
+                byHour.set(k, (byHour.get(k) || 0) + num(r.count));
                 total += num(r.count);
             });
             if (!total) { box.hidden = true; return; }
@@ -866,7 +1018,7 @@
             for (var i = 23; i >= 0; i--) {
                 var t = top - i * 3600000;
                 var key = new Date(t).toISOString().slice(0, 13).replace('T', ' ') + ':00';
-                pts.push({ label: fmtClock(t), value: byHour[key] || 0 });
+                pts.push({ label: fmtClock(t), value: byHour.get(key) || 0 });
             }
             add(box, el('span', 'label', 'Events per hour, last 24 hours: ' + fmtN(total)));
             var s = spark(pts, 'Events per hour, last 24 hours', { zero: true, tall: true });
@@ -875,14 +1027,11 @@
 
         function kindOf(e) {
             var c = str(e.category).toLowerCase();
-            var m = str(e.message);
             if (c && c !== 'npc') return c === 'world_boss' ? 'boss' : 'players';
-            if (/telling anyone|rumou?r|gossip|whisper/i.test(m)) return 'gossip';
-            if (/slain|†|killed|murdered|has died|perished|executed/i.test(m)) return 'death';
-            if (/\bteam\b|city control|the city against|\bgang\b/i.test(m)) return 'teams';
-            if (/brawl|fight|tension|duel|attack/i.test(m)) return 'brawl';
-            if (/train|level master|reached level/i.test(m)) return 'training';
-            if (/marri|wedding|\bborn\b|\bchild|pregnan|realm of the dead|resurrect/i.test(m)) return 'life';
+            var m = str(e.message).trim().replace(NEWS_PREFIX, '');
+            for (var i = 0; i < KIND_PATTERNS.length; i++) {
+                if (KIND_PATTERNS[i][1].some(function (re) { return re.test(m); })) return KIND_PATTERNS[i][0];
+            }
             return 'other';
         }
 
@@ -896,12 +1045,15 @@
                 var msg = str(e.message);
                 return { e: e, msg: msg, kind: kindOf(e), t: parseTime(e.time), watched: !!(match && match.test(msg)) };
             });
-            var counts = { all: tagged.length, watched: 0 };
-            tagged.forEach(function (x) { counts[x.kind] = (counts[x.kind] || 0) + 1; if (x.watched) counts.watched++; });
-            var chipDefs = [['all', 'All']].concat(KINDS.filter(function (k) { return counts[k[0]]; }), [['watched', 'Watched']]);
+            var counts = new Map([['all', tagged.length], ['watched', 0]]);
+            tagged.forEach(function (x) {
+                counts.set(x.kind, (counts.get(x.kind) || 0) + 1);
+                if (x.watched) counts.set('watched', counts.get('watched') + 1);
+            });
+            var chipDefs = [['all', 'All']].concat(KINDS.filter(function (k) { return counts.get(k[0]); }), [['watched', 'Watched']]);
             if (!chipDefs.some(function (c) { return c[0] === S.chip; })) S.chip = 'all';
             chipDefs.forEach(function (c) {
-                var b = add(chips, button('chip' + (S.chip === c[0] ? ' on' : ''), c[1] + ' ' + fmtN(counts[c[0]] || 0)));
+                var b = add(chips, button('chip' + (S.chip === c[0] ? ' on' : ''), c[1] + ' ' + fmtN(counts.get(c[0]) || 0)));
                 b.setAttribute('data-chip', c[0]);
                 b.setAttribute('aria-pressed', S.chip === c[0] ? 'true' : 'false');
             });
@@ -1020,23 +1172,26 @@
                 title.textContent = 'Who is there';
                 return;
             }
-            var groups = {};
+            var groups = new Map();
             S.people.filter(isAlive).forEach(function (p) {
                 var k = placeKey(p.location);
-                (groups[k] = groups[k] || []).push(p);
+                if (!groups.has(k)) groups.set(k, []);
+                groups.get(k).push(p);
             });
-            var count = function (k) { return groups[k] ? groups[k].length : 0; };
-            var ranked = Object.keys(groups).sort(function (a, b) { return count(b) - count(a) || PLACE_LABEL[a].localeCompare(PLACE_LABEL[b]); });
+            var count = function (k) { return groups.has(k) ? groups.get(k).length : 0; };
+            var ranked = Array.from(groups.keys()).sort(function (a, b) { return count(b) - count(a) || placeLabel(a).localeCompare(placeLabel(b)); });
             if (!ranked.length) {
                 listBox.appendChild(empty('No living NPCs are in town.'));
             } else {
                 listBox.appendChild(bars(ranked.map(function (k) {
-                    var b = button('place-btn', PLACE_LABEL[k]);
+                    var b = button('place-btn', placeLabel(k));
                     b.setAttribute('data-place', k);
-                    return { name: PLACE_LABEL[k], value: count(k), node: b };
+                    return { name: placeLabel(k), value: count(k), node: b };
                 }), { unit: 'NPCs' }));
             }
-            if (!S.place || !groups[S.place]) S.place = ranked[0] || '';
+            // A place the map shows stays selected even when no one is there; Elsewhere only while it has someone.
+            var known = S.place && PLACE_LABELS.has(S.place) && (S.place !== ELSEWHERE || count(ELSEWHERE) > 0);
+            if (!known) S.place = ranked[0] || '';
             var keys = PLACES.map(function (p) { return p[0]; });
             if (count(ELSEWHERE)) keys.push(ELSEWHERE);
             keys.forEach(function (k) {
@@ -1045,13 +1200,18 @@
                 var t = add(tiles, button('tile ' + shade(n) + (wide ? ' wide' : '') + (k === ELSEWHERE ? ' other' : '') + (k === S.place ? ' sel' : '')));
                 t.setAttribute('data-place', k);
                 t.setAttribute('aria-pressed', k === S.place ? 'true' : 'false');
-                t.setAttribute('title', PLACE_LABEL[k] + ': ' + plural(n, 'NPC', 'NPCs'));
-                add(t, el('span', 't', PLACE_LABEL[k]));
+                t.setAttribute('title', placeLabel(k) + ': ' + plural(n, 'NPC', 'NPCs'));
+                add(t, el('span', 't', placeLabel(k)));
                 add(t, el('span', 'c', fmtN(n)));
             });
             if (!S.place) { title.textContent = 'Who is there'; whoBox.appendChild(empty('No one to show.')); return; }
-            var here = groups[S.place].slice().sort(function (a, b) { return num(b.level) - num(a.level) || str(a.name).localeCompare(str(b.name)); });
-            title.textContent = PLACE_LABEL[S.place] + ': ' + plural(here.length, 'NPC', 'NPCs');
+            var here = (groups.get(S.place) || []).slice().sort(function (a, b) { return num(b.level) - num(a.level) || str(a.name).localeCompare(str(b.name)); });
+            if (!here.length) {
+                title.textContent = placeLabel(S.place);
+                whoBox.appendChild(empty(placeLabel(S.place) + ': no NPCs here right now.'));
+                return;
+            }
+            title.textContent = placeLabel(S.place) + ': ' + plural(here.length, 'NPC', 'NPCs');
             var wrap = add(whoBox, el('div', 'scrollx'));
             var table = add(wrap, el('table'));
             var head = add(add(table, el('thead')), el('tr'));
@@ -1113,34 +1273,36 @@
         function renderFactions() {
             var box = clear(byId('factions'));
             if (!S.people) { box.appendChild(empty('The factions could not be loaded.')); return; }
-            var f = {};
+            var tally = new Map();
             S.people.filter(isAlive).forEach(function (p) {
                 var k = FACTION_ORDER.indexOf(p.npcFaction) === -1 ? -1 : p.npcFaction;
-                f[k] = f[k] || { members: 0, levels: 0 };
-                f[k].members++;
-                f[k].levels += num(p.level);
+                if (!tally.has(k)) tally.set(k, { members: 0, levels: 0 });
+                tally.get(k).members++;
+                tally.get(k).levels += num(p.level);
             });
-            var rows = FACTION_ORDER.filter(function (k) { return f[k]; })
-                .sort(function (a, b) { return f[b].members - f[a].members || f[b].levels - f[a].levels; });
+            var f = function (k) { return tally.get(k); };
+            var rows = FACTION_ORDER.filter(function (k) { return tally.has(k); })
+                .sort(function (a, b) { return f(b).members - f(a).members || f(b).levels - f(a).levels; });
             if (!rows.length) { box.appendChild(empty('No living NPCs to count.')); return; }
             add(box, el('span', 'label', 'Members'));
-            box.appendChild(bars(rows.map(function (k) { return { name: factionName(k), value: f[k].members }; }), { unit: 'members' }));
+            box.appendChild(bars(rows.map(function (k) { return { name: factionName(k), value: f(k).members }; }), { unit: 'members' }));
             add(box, el('span', 'label', 'Combined level'));
-            box.appendChild(bars(rows.map(function (k) { return { name: factionName(k), value: f[k].levels }; }), { unit: 'levels' }));
+            box.appendChild(bars(rows.map(function (k) { return { name: factionName(k), value: f(k).levels }; }), { unit: 'levels' }));
         }
 
         function renderTeams() {
             var box = clear(byId('teams'));
             if (!S.people) { box.appendChild(empty('The teams could not be loaded.')); return; }
-            var t = {};
+            var teams = new Map();
             S.people.filter(isAlive).forEach(function (p) {
                 var name = str(p.team);
                 if (!name) return;
-                t[name] = t[name] || { members: 0, levels: 0 };
-                t[name].members++;
-                t[name].levels += num(p.level);
+                if (!teams.has(name)) teams.set(name, { members: 0, levels: 0 });
+                teams.get(name).members++;
+                teams.get(name).levels += num(p.level);
             });
-            var names = Object.keys(t).sort(function (a, b) { return t[b].levels - t[a].levels || a.localeCompare(b); });
+            var t = function (name) { return teams.get(name); };
+            var names = Array.from(teams.keys()).sort(function (a, b) { return t(b).levels - t(a).levels || a.localeCompare(b); });
             if (!names.length) { box.appendChild(empty('No NPC teams right now.')); return; }
             var holder = S.realm && isObj(S.realm.cityControl) ? str(S.realm.cityControl.team) : '';
             var table = add(add(box, el('div', 'scrollx')), el('table'));
@@ -1155,8 +1317,8 @@
                 var td = add(tr, el('td'));
                 add(td, el('span', 'nm', name));
                 if (name === holder) add(td, el('span', 'tag', 'holds the city'));
-                add(tr, el('td', 'num', fmtN(t[name].members)));
-                add(tr, el('td', 'num', fmtN(t[name].levels)));
+                add(tr, el('td', 'num', fmtN(t(name).members)));
+                add(tr, el('td', 'num', fmtN(t(name).levels)));
                 add(tr, el('td')).appendChild(watchButton('team', name));
             });
         }
@@ -1241,18 +1403,18 @@
                 return;
             }
             var people = S.people;
-            var uniq = function (f) { var s = {}; people.forEach(function (p) { s[f(p)] = true; }); return Object.keys(s); };
-            var classes = uniq(function (p) { return num(p.class); }).map(Number).sort(function (a, b) { return a - b; });
-            var races = uniq(function (p) { return num(p.race); }).map(Number).sort(function (a, b) { return a - b; });
+            var uniq = function (f) { var set = new Set(); people.forEach(function (p) { set.add(f(p)); }); return Array.from(set); };
+            var classes = uniq(function (p) { return num(p.class); }).sort(function (a, b) { return a - b; });
+            var races = uniq(function (p) { return num(p.race); }).sort(function (a, b) { return a - b; });
             var factions = FACTION_ORDER.filter(function (f) { return people.some(function (p) { return p.npcFaction === f; }); });
-            var places = uniq(function (p) { return placeKey(p.location); }).sort(function (a, b) { return PLACE_LABEL[a].localeCompare(PLACE_LABEL[b]); });
+            var places = uniq(function (p) { return placeKey(p.location); }).sort(function (a, b) { return placeLabel(a).localeCompare(placeLabel(b)); });
             var sig = [classes, races, factions, places].join('|');
             if (sig !== S.dirOptions) {
                 S.dirOptions = sig;
                 fillSelect(byId('dir-class'), classes.map(function (c) { return [String(c), className(c)]; }));
                 fillSelect(byId('dir-race'), races.map(function (r) { return [String(r), raceName(r)]; }));
                 fillSelect(byId('dir-faction'), factions.map(function (f) { return [String(f), factionName(f)]; }));
-                fillSelect(byId('dir-place'), places.map(function (k) { return [k, PLACE_LABEL[k]]; }));
+                fillSelect(byId('dir-place'), places.map(function (k) { return [k, placeLabel(k)]; }));
             }
             var q = str(byId('dir-search').value).trim().toLowerCase();
             var fc = byId('dir-class').value;
@@ -1292,7 +1454,7 @@
                 add(tr, el('td', 'wide-col', raceName(p.race)));
                 add(tr, el('td', 'wide-col', factionName(p.npcFaction)));
                 add(tr, el('td', 'wide-col', str(p.team)));
-                add(tr, el('td', null, PLACE_LABEL[placeKey(p.location)] === 'Elsewhere' ? (str(p.location) || 'Unknown') : PLACE_LABEL[placeKey(p.location)]));
+                add(tr, el('td', null, placeLabel(placeKey(p.location)) === 'Elsewhere' ? (str(p.location) || 'Unknown') : placeLabel(placeKey(p.location))));
             });
             note.textContent = plural(rows.length, 'NPC matches', 'NPCs match') + '; sorted by level.' +
                 (rows.length > S.dirLimit ? ' Showing the first ' + S.dirLimit + '.' : '');
@@ -1452,7 +1614,7 @@
             fact(null, raceName(n.race) + (num(n.age) ? ', age ' + fmtN(n.age) : ''));
             fact(null, factionName(n.npcFaction));
             if (str(n.team)) fact(null, 'Team: ' + str(n.team));
-            fact(null, 'At ' + (PLACE_LABEL[placeKey(n.location)] === 'Elsewhere' ? (str(n.location) || 'an unknown place') : PLACE_LABEL[placeKey(n.location)]));
+            fact(null, 'At ' + (placeLabel(placeKey(n.location)) === 'Elsewhere' ? (str(n.location) || 'an unknown place') : placeLabel(placeKey(n.location))));
             if (n.isKing) fact(S.realm && isObj(S.realm.ruler) && str(S.realm.ruler.name) === str(n.name) ? (str(S.realm.ruler.title) || 'Ruler') : 'Ruler', '');
             if (n.isMarried && str(n.spouseName)) {
                 var m = fact(null, 'Married to ');
@@ -1469,23 +1631,24 @@
             add(traits, el('h2', null, 'Personality'));
             add(traits, el('p', 'note', 'From 0 to 100.'));
             var pp = isObj(n.personalityProfile) ? n.personalityProfile : {};
-            traits.appendChild(bars(TRAITS.map(function (t) { return { name: t[1], value: pct(pp[t[0]]), text: String(pct(pp[t[0]])) }; }), { max: 100 }));
+            traits.appendChild(bars(TRAITS.map(function (t) { return { name: t[1], value: pct(own(pp, t[0])), text: String(pct(own(pp, t[0]))) }; }), { max: 100 }));
             var side = add(grid, el('div', 'col'));
             var tiesCard = add(side, el('div', 'card'));
             add(tiesCard, el('h2', null, 'Strongest feelings'));
             var rel = isObj(n.relationships) ? n.relationships : {};
-            var ties = Object.keys(rel).filter(function (k) { return typeof rel[k] === 'number' && isFinite(rel[k]) && rel[k] !== 0; })
-                .sort(function (a, b) { return Math.abs(rel[b]) - Math.abs(rel[a]) || a.localeCompare(b); }).slice(0, 8);
+            var ties = Object.entries(rel).filter(function (e) { return typeof e[1] === 'number' && isFinite(e[1]) && e[1] !== 0; })
+                .sort(function (a, b) { return Math.abs(b[1]) - Math.abs(a[1]) || a[0].localeCompare(b[0]); }).slice(0, 8);
             if (!ties.length) tiesCard.appendChild(empty('No strong feelings toward other NPCs.'));
-            ties.forEach(function (k) {
-                var v = Math.round(rel[k]);
+            ties.forEach(function (e) {
+                var k = e[0];
+                var v = Math.round(e[1]);
                 tiesCard.appendChild(divRow(who(k), v, (str(n.name) || name) + (v < 0 ? ' dislikes ' : ' likes ') + k + ': ' + (v > 0 ? '+' : '') + v));
             });
             var moodCard = add(side, el('div', 'card'));
             add(moodCard, el('h2', null, 'Mood'));
             add(moodCard, el('p', 'note', 'How this NPC feels now, from 0 to 100.'));
             var es = isObj(n.emotionalState) ? n.emotionalState : {};
-            moodCard.appendChild(bars(MOODS.map(function (t) { return { name: t[1], value: pct(es[t[0]]), text: String(pct(es[t[0]])) }; }), { max: 100 }));
+            moodCard.appendChild(bars(MOODS.map(function (t) { return { name: t[1], value: pct(own(es, t[0])), text: String(pct(own(es, t[0]))) }; }), { max: 100 }));
 
             var gm = add(box, el('div', 'g2'));
             var goalsCard = add(gm, el('div', 'card'));
@@ -1533,23 +1696,44 @@
             showView(tab);
             try { if (window.history && window.history.replaceState) window.history.replaceState(null, '', '#' + tab); } catch (e) { /* no history */ }
         }
-        function openProfile(name) {
+        // Focus: opening a profile moves focus to its Back button and remembers what opened it (the first
+        // opener when one profile opens another). Back returns focus there when it is still on the page and
+        // outside the profile, otherwise to the active tab button. Refreshes never move focus.
+        function focusOn(node) { if (node && typeof node.focus === 'function') { try { node.focus(); } catch (e) { /* not focusable */ } } }
+        function activeTabButton() {
+            var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-tab="' + S.tab + '"]'));
+            return buttons.filter(function (b) { return b.offsetParent !== null; })[0] || buttons[0] || null;
+        }
+        function openProfile(name, opener) {
             if (!name) return;
+            var profileOpen = byId('view-profile').hidden === false;
+            if (!profileOpen) S.opener = opener || document.activeElement || null;
             setTabs(S.tab);
             showView('profile');
             if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+            focusOn(document.querySelector('#view-profile [data-action="back"]'));
             return loadProfile(name);
         }
-        function closeProfile() { S.profileName = ''; showView(S.tab); }
+        function closeProfile() {
+            S.profileName = '';
+            showView(S.tab);
+            var o = S.opener;
+            S.opener = null;
+            var usable = o && o.isConnected && !(typeof o.closest === 'function' && o.closest('#view-profile'));
+            focusOn(usable ? o : activeTabButton());
+        }
 
         function onClick(ev) {
             var t = ev.target;
             if (!t || typeof t.closest !== 'function') return;
             var hit;
             if ((hit = t.closest('[data-watch-npc]'))) {
+                var inProfile = typeof hit.closest === 'function' && !!hit.closest('#profile');
                 toggle(W.npcs, hit.getAttribute('data-watch-npc'));
                 safe(renderWatched); safe(renderChronicle);
                 if (S.profileName) safe(renderProfile);
+                // the profile's button was rebuilt; keep focus on its replacement
+                if (inProfile) focusOn(document.querySelector('#profile [data-watch-npc]'));
                 return;
             }
             if ((hit = t.closest('[data-watch-team]'))) {
@@ -1557,7 +1741,7 @@
                 safe(renderWatched); safe(renderChronicle); safe(renderTeams);
                 return;
             }
-            if ((hit = t.closest('[data-npc]'))) { openProfile(hit.getAttribute('data-npc')); return; }
+            if ((hit = t.closest('[data-npc]'))) { openProfile(hit.getAttribute('data-npc'), hit); return; }
             if ((hit = t.closest('[data-tab]'))) {
                 showTab(hit.getAttribute('data-tab'));
                 if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
@@ -1600,7 +1784,8 @@
 
         window.Observatory = {
             state: S, watch: W, renderAll: renderAll, openProfile: openProfile, showTab: showTab, placeKey: placeKey,
-            kindOf: kindOf, parseTime: parseTime, loadHistoryRange: loadHistoryRange, addLive: addLive
+            kindOf: kindOf, templates: TEMPLATES, parseTime: parseTime,
+            refresh: function () { return Promise.all([loadPeople(), loadRealm(), loadTies(), loadStats(), loadEvents()]); }, loadHistoryRange: loadHistoryRange, addLive: addLive
         };
         init();
     })();

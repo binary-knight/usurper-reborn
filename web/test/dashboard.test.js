@@ -275,13 +275,13 @@ test('chronicle: kinds as chips, a chip filters, live news arrives from the feed
       ev('† Malachi the Dark was slain by Lysandra the Pure at Bank!', 'npc', 60000),
       ev('Several townsfolk witnessed Noric Elderbranch brawl with Mord at the Weapon Shop', 'npc', 120000),
       ev("Lady Morgana joined the team 'The Nautical Guild'!", 'npc', 180000),
-      ev('Sister Mercy is telling anyone who will listen: "Lysandra got into a brawl"', 'npc', 240000),
+      ev('Sister Mercy is telling anyone who\'ll listen: "Lysandra got into a brawl"', 'npc', 240000),
       ev('Sir Darius the Lost has been training hard at the Gym!', 'npc', 300000),
       ev('The Lich King rises', 'world_boss', 360000),
     ],
   });
   const chipText = p.el('chron-chips').textContent;
-  for (const c of ['All 6', 'Deaths 1', 'Brawls 1', 'Teams 1', 'Gossip 1', 'Training 1', 'World boss 1', 'Watched 0']) assert.ok(chipText.includes(c), c);
+  for (const c of ['All 6', 'Deaths 1', 'Fights 1', 'Teams 1', 'Gossip 1', 'Training and levels 1', 'World boss 1', 'Watched 0']) assert.ok(chipText.includes(c), c);
   assert.ok(p.el('chron').querySelector('.w'), 'a death is marked');
   assert.ok(p.el('chron-note').textContent.startsWith('Covers the last 6 events'));
   p.click(p.el('chron-chips').querySelector('[data-chip="death"]'));
@@ -391,4 +391,148 @@ test('dataviz: bars carry a text value and a title; feelings diverge around the 
   assert.strictEqual(ties[1].querySelector('i').style.left, '50%');
   const depth = p.el('depths').textContent;
   assert.ok(depth.includes('Floors 1 to 10') && depth.includes('1 death with no floor recorded'));
+});
+
+// ---------------------------------------------------------------- review fixes
+
+test('names such as __proto__, constructor and toString are only keys: true counts, Object.prototype untouched', async () => {
+  const n = (name, team, extra) => Object.assign({ name, level: 10, class: 1, race: 0, npcFaction: 0, team, location: 'Gym', isDead: false, wealth: 1 }, extra);
+  const people = [
+    n('A1', '__proto__'),
+    n('B1', 'constructor'), n('B2', 'constructor'),
+    n('C1', 'toString'), n('C2', 'toString'), n('C3', 'toString'),
+    n('D1', 'hasOwnProperty', { location: '__proto__', class: 'constructor', race: '__proto__', npcFaction: '__proto__' }),
+    n('E1', '', { location: 'constructor' }),
+  ];
+  const now = Date.now();
+  const p = await open({
+    '/api/dash/people': people,
+    '/api/dash/events/hourly': [{ hour: '__proto__', category: 'npc', count: 3 }, { hour: 'constructor', category: 'npc', count: 2 }],
+    '/api/dash/events': [{ message: '__proto__', category: 'npc', time: sqlTime(now) }, { message: 'x', category: '__proto__', time: sqlTime(now) }],
+  }, { storage: { 'usurper.observatory.watch': JSON.stringify({ npcs: ['__proto__'], teams: ['constructor'] }) } });
+  const teams = p.el('teams').querySelectorAll('tbody tr').map((tr) => tr.querySelectorAll('td').slice(0, 3).map((td) => td.textContent));
+  assert.deepStrictEqual(teams, [['toString', '3', '30'], ['constructor', '2', '20'], ['__proto__', '1', '10'], ['hasOwnProperty', '1', '10']]);
+  // the two odd places are both Elsewhere, and the faction, class and race fall back to their plain names
+  assert.strictEqual(p.el('town-tiles').querySelector('[data-place="elsewhere"]').querySelector('.c').textContent, '2');
+  assert.ok(p.el('factions').textContent.includes('The Crown'));
+  assert.ok(p.el('dir').textContent.includes('Unknown class') && p.el('dir').textContent.includes('Unknown race'));
+  assert.strictEqual(p.run('Object.getOwnPropertyNames(Object.prototype).filter(function (k) { return ["members", "levels", "all", "watched", "other", "players"].indexOf(k) !== -1; }).length'), 0);
+  assert.strictEqual(p.run('({}).members === undefined && ({}).levels === undefined && typeof ({}).toString === "function"'), true);
+  noErrors(p, 'prototype names');
+});
+
+test('focus: a profile opened from a name focuses Back; Back returns focus to that name', async () => {
+  const p = await open(world('Alice'));
+  p.click(p.doc.querySelector('.tabbar [data-tab="people"]'));
+  const link = p.el('dir').querySelector('[data-npc]');
+  link.focus();
+  p.click(link);
+  await p.settle();
+  const back = p.el('view-profile').querySelector('[data-action="back"]');
+  assert.strictEqual(p.doc.activeElement, back, 'focus on Back');
+  p.click(back);
+  assert.strictEqual(p.el('view-people').hidden, false);
+  assert.strictEqual(p.doc.activeElement, link, 'focus back on the name that opened the profile');
+  noErrors(p, 'focus');
+});
+
+test('focus: a refresh while a profile is open keeps focus; Back then falls to the active tab', async () => {
+  const p = await open(world('Alice'));
+  p.click(p.doc.querySelector('.tabbar [data-tab="people"]'));
+  const link = p.el('dir').querySelector('[data-npc]');
+  link.focus();
+  p.click(link);
+  await p.settle();
+  const back = p.el('view-profile').querySelector('[data-action="back"]');
+  p.run('Observatory.renderAll()');
+  assert.strictEqual(p.doc.activeElement, back, 'the refresh did not move focus');
+  assert.strictEqual(link.isConnected, false, 'the refresh replaced the opener');
+  p.click(back);
+  assert.strictEqual(p.doc.activeElement.getAttribute('data-tab'), 'people', 'focus on the active tab button');
+  // watching from the profile keeps focus on the rebuilt Watch button
+  const again = p.el('dir').querySelector('[data-npc]');
+  again.focus();
+  p.click(again);
+  await p.settle();
+  const watch = p.el('profile').querySelector('[data-watch-npc]');
+  watch.focus();
+  p.click(watch);
+  assert.strictEqual(p.doc.activeElement, p.el('profile').querySelector('[data-watch-npc]'));
+  assert.strictEqual(p.doc.activeElement.getAttribute('aria-pressed'), 'true');
+  noErrors(p, 'focus refresh');
+});
+
+test('town: an empty place stays selected and says so', async () => {
+  const people = [{ name: 'Gymrat', level: 10, class: 1, race: 0, npcFaction: 0, team: '', location: 'Gym', isDead: false, wealth: 1 }];
+  const p = await open({ '/api/dash/people': people });
+  const prison = p.el('town-tiles').querySelector('[data-place="prison"]');
+  p.click(prison);
+  assert.strictEqual(p.el('who-title').textContent, 'Prison');
+  assert.ok(p.el('town-who').textContent.includes('Prison: no NPCs here right now.'));
+  assert.ok(p.el('town-tiles').querySelector('[data-place="prison"]').classList.contains('sel'));
+  p.run('Observatory.renderAll()');
+  assert.strictEqual(p.el('who-title').textContent, 'Prison', 'a refresh keeps the selection');
+  noErrors(p, 'empty place');
+});
+
+// Messages built from the game's English news templates (Localization/en.json) with hostile names.
+const H = HOSTILE;
+const KIND_CASES = [
+  ['death', `† ${H} was slain by ${H} at Bank!`, 'news.death'],
+  ['death', '† Whisperwind was slain by Alice at Bank!', 'news.death, a name that holds "whisper"'],
+  ['death', `${H} has passed away peacefully at the age of 81. The soul moves on...`, 'worldsim.news_natural_death'],
+  ['death', `⚱ ${H}, a Elf of 80 years, has passed away peacefully. The soul moves on...`, 'news.natural_death'],
+  ['death', `${H} has been slain by ${H} and will not return. The realm mourns.`, 'worldsim.news_permadeath'],
+  ['death', `${H} murdered ${H} in cold blood! They will not return.`, 'street_encounter.news.murdered'],
+  ['gossip', `${H} is telling anyone who'll listen: "${H} got into a brawl with ${H} at the Bank"`, 'worldsim.news_gossip'],
+  ['gossip', 'Sister Mercy is telling anyone who\'ll listen: "Whisperwind was slain by Alice at Bank!"', 'gossip that quotes a death'],
+  ['gossip', `Dark whispers about ${H} circulate through the taverns`, 'social.news_dark_whispers'],
+  ['brawl', `Several townsfolk witnessed ${H} brawl with ${H} at the Bank`, 'social.news_witnessed_brawl'],
+  ['brawl', `Tensions are rising between ${H} and ${H} at the Inn.`, 'worldsim.news_tension'],
+  ['teams', `${H} recruited ${H} into '${H}'!`, 'worldsim.news_team_recruited'],
+  ['teams', `'${H}' has taken control of the town!`, 'worldsim.news_town_control'],
+  ['teams', `${H} joined the team '${H}'!`, 'team.news_joined'],
+  ['teams', `⚑ Gang Recruitment! ${H} joined ${H}!`, 'street_encounter.gang.news_header and news_joined'],
+  ['training', `⬆ ${H} the Elf Cleric has achieved Level 12!`, 'news.npc_level_up'],
+  ['training', `${H} has been training hard at the Gym!`, 'worldsim.news_training'],
+  ['life', `♥ ${H} and ${H} are proud parents of ${H}!`, 'news.birth'],
+  ['life', `${H} and ${H} are expecting a child!`, 'worldsim.news_expecting'],
+  ['life', `♥ ${H} and ${H} were married at the Church!`, 'news.marriage'],
+  ['life', `${H} has returned from the realm of the dead!`, 'worldsim.news_respawned'],
+  ['crown', `${H} has challenged King ${H} for the throne!`, 'challenge.news_challenged'],
+  ['other', `${H} purchased Steel Sword from the shop.`, 'worldsim.news_purchased'],
+  ['other', 'Whisperwind', 'a bare name picks no kind'],
+  ['other', 'Sister Mercy trained a gang of whispering teams', 'loose words pick no kind'],
+];
+
+test('chronicle kinds come from whole game templates; names never decide the kind', async () => {
+  const p = await open({});
+  for (const [kind, message, source] of KIND_CASES) {
+    p.ctx.__m = message;
+    assert.strictEqual(p.run('Observatory.kindOf({ message: __m, category: "npc" })'), kind, source + ': ' + message);
+  }
+  assert.strictEqual(p.run('Observatory.kindOf({ message: "x", category: "world_boss" })'), 'boss');
+  assert.strictEqual(p.run('Observatory.kindOf({ message: "x", category: "pvp" })'), 'players');
+});
+
+test('every Chronicle template is an English news template of the game', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const en = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'Localization', 'en.json'), 'utf8'));
+  const norm = (t) => t.replace(/\{[^}]*\}/g, '{}').replace(/(\{\})+/g, '{}').replace(/" -- \{\}$/, '" {}');
+  const known = new Set(Object.values(en).filter((v) => typeof v === 'string').map(norm));
+  const p = await open({});
+  const templates = JSON.parse(p.run('JSON.stringify(Observatory.templates)'));
+  let n = 0;
+  for (const [, list] of templates) {
+    for (const t of list) {
+      n++;
+      if (t === 'Gang Recruitment! {} joined {}!') {
+        assert.ok(known.has('Gang Recruitment!') && known.has('{} joined {}!'), t);
+        continue;
+      }
+      assert.ok(known.has(norm(t)), 'not an en.json template: ' + t);
+    }
+  }
+  assert.ok(n > 100, 'templates read');
 });

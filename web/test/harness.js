@@ -281,7 +281,7 @@ class FakeElement {
   set innerHTML(v) {
     this._html = String(v);
     this._text = '';
-    this.childNodes = [];
+    this._detachChildren();
     const tree = parseHtml(this._html);
     for (const c of tree.children) this._adopt(c);
   }
@@ -295,7 +295,10 @@ class FakeElement {
     if (this._text) return this._text;
     return this.childNodes.map((c) => c.textContent).join('');
   }
-  set textContent(v) { this._text = v === null || v === undefined ? '' : String(v); this.childNodes = []; this._html = ''; }
+  set textContent(v) { this._text = v === null || v === undefined ? '' : String(v); this._detachChildren(); this._html = ''; }
+  // Removed children lose their parent, so isConnected and focus checks see them as gone.
+  _detachChildren() { for (const c of this.childNodes) if (c && typeof c === 'object') c.parentElement = null; this.childNodes = []; }
+  get isConnected() { for (let e = this; e; e = e.parentElement) if (e === this.ownerDocument.documentElement) return true; return false; }
   appendChild(c) { if (c) { c.parentElement = this; this.childNodes.push(c); } return c; }
   insertBefore(c, ref) {
     c.parentElement = this;
@@ -303,7 +306,7 @@ class FakeElement {
     if (i === -1) this.childNodes.push(c); else this.childNodes.splice(i, 0, c);
     return c;
   }
-  removeChild(c) { const i = this.childNodes.indexOf(c); if (i !== -1) this.childNodes.splice(i, 1); return c; }
+  removeChild(c) { const i = this.childNodes.indexOf(c); if (i !== -1) { this.childNodes.splice(i, 1); c.parentElement = null; } return c; }
   remove() { if (this.parentElement) this.parentElement.removeChild(this); }
   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
   removeEventListener(type, fn) { const l = this.listeners[type] || []; const i = l.indexOf(fn); if (i !== -1) l.splice(i, 1); }
@@ -321,7 +324,10 @@ class FakeElement {
     return out;
   }
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
-  focus() {} blur() {} select() {} click() { this.ownerDocument.dispatch(this, 'click'); }
+  // A minimal focus model: focus() makes this the document's activeElement, blur() returns it to the body.
+  focus() { this.ownerDocument.activeElement = this; }
+  blur() { if (this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = this.ownerDocument.body; }
+  select() {} click() { this.ownerDocument.dispatch(this, 'click'); }
   scrollIntoView() {}
   getBoundingClientRect() { return { width: 800, height: 600, left: 0, top: 0, right: 800, bottom: 600 }; }
   getContext() { return makeAny(); }
@@ -332,6 +338,7 @@ class FakeDocument {
     this.listeners = {};
     this.documentElement = new FakeElement(this, 'html', []);
     this.body = this.documentElement;
+    this.activeElement = this.body;
     if (markup) {
       const tree = parseHtml(markup);
       for (const c of tree.children) this.documentElement._adopt(c);
