@@ -198,3 +198,42 @@ test('the landing page Play buttons open /play/ in a new tab, and the old termin
     assert.ok(!/right in the page|en la propia página|directement dans la page|közvetlenül az oldalon|direttamente nella pagina/.test(d['connect.browser_desc']), l);
   }
 });
+
+test('the Combat and Chat buttons stay hidden until the first GMCP frame', async () => {
+  const p = await load();
+  assert.strictEqual(p.el('rail').hidden, true, 'no GMCP yet: the terminal alone');
+  assert.strictEqual(p.el('drawer').hidden, true);
+  p.ctx.__f = 'not json';
+  p.run('UsurperPlay.handleFrame(__f)');
+  p.ctx.__f = '{"nogmcp":1}';
+  p.run('UsurperPlay.handleFrame(__f)');
+  assert.strictEqual(p.el('rail').hidden, true, 'a frame that is not GMCP does not show them');
+  frame(p, 'Room.Info', { name: 'Main Street' });
+  assert.strictEqual(p.el('rail').hidden, false);
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('reconnecting hides the panels and clears the old vitals until the new connection sends GMCP', async () => {
+  const p = await load();
+  frame(p, 'Char.Vitals', { hp: 5, maxHp: 10, mp: 0, maxMp: 0 });
+  frame(p, 'Room.Info', { name: 'Main Street' });
+  p.run("UsurperPlay.setDrawer('chat')");
+  assert.strictEqual(p.el('rail').hidden, false);
+  assert.strictEqual(p.el('drawer').hidden, false);
+  p.click(p.el('reconnect'));
+  assert.strictEqual(p.el('rail').hidden, true, 'no GMCP on the new connection yet');
+  assert.strictEqual(p.el('drawer').hidden, true);
+  assert.strictEqual(p.el('hp-meter').hidden, true, 'the old HP is gone');
+  assert.strictEqual(p.el('room').textContent, '');
+  frame(p, 'Char.Vitals', { hp: 7, maxHp: 10, mp: 0, maxMp: 0 });
+  assert.strictEqual(p.el('rail').hidden, false);
+  assert.strictEqual(p.el('hp-num').textContent, '7/10');
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('opening the drawer always shows its buttons', async () => {
+  const p = await load();
+  assert.strictEqual(p.el('rail').hidden, true);
+  p.run("UsurperPlay.setDrawer('chat')");
+  assert.strictEqual(p.el('rail').hidden, false);
+});

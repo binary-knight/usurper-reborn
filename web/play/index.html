@@ -35,6 +35,7 @@
         body { font-family: var(--mono); font-size: 16px; display: flex; flex-direction: column; overflow: hidden; }
         button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
         [hidden] { display: none !important; }
+        .play:has(> .rail[hidden]) { padding-bottom: 0; }
 
         /* Top bar */
         .top { flex: none; height: 52px; display: flex; align-items: center; gap: 20px; padding: 0 24px; background: var(--bg-ink); border-bottom: 1px solid var(--iron-dark); }
@@ -173,7 +174,7 @@
         </div>
     </aside>
 
-    <nav class="rail" aria-label="Panels">
+    <nav class="rail" id="rail" aria-label="Panels" hidden>
         <button type="button" id="rail-combat" data-tab="combat" aria-pressed="false" data-i18n="play.tab.combat">Combat</button>
         <button type="button" id="rail-chat" data-tab="chat" aria-pressed="false" data-i18n="play.tab.chat">Chat</button>
     </nav>
@@ -391,6 +392,7 @@
     // terminal, so a fight lights the Combat button instead of opening it.
     function drawerBeside() { return window.matchMedia ? window.matchMedia('(min-width: 1200px)').matches : true; }
     function setDrawer(tab) {
+        if (tab) showPanels();   // an open drawer always has its buttons beside it
         openTab = tab;
         var drawer = document.getElementById('drawer');
         drawer.hidden = !tab;
@@ -498,10 +500,21 @@
                 break;
         }
     }
+    // The Combat and Chat buttons stay hidden until the game sends its first GMCP frame, so a
+    // connection with no GMCP (a server that does not offer it) shows the terminal alone.
+    var panelsShown = false;
+    function showPanels() {
+        if (panelsShown) return;
+        panelsShown = true;
+        document.getElementById('rail').hidden = false;
+        fitTerminal();
+    }
+
     function handleFrame(text) {
         var msg;
         try { msg = JSON.parse(text); } catch (e) { return; }
         if (!obj(msg) || typeof msg.gmcp !== 'string') return;
+        showPanels();
         try { handleGmcp(msg.gmcp, msg.data); } catch (e) {}
     }
 
@@ -527,6 +540,8 @@
         var availW = scroll.clientWidth - (isPhone() ? 24 : 0);
         // Beside a closed drawer, keep its room so opening it never changes the font size.
         if (drawerBeside() && document.getElementById('drawer').hidden) availW -= 341;
+        // Keep the rail's room while it is hidden, so showing it never changes the font size.
+        if (!isPhone() && document.getElementById('rail').hidden) availW -= 45;
         var availH = scroll.clientHeight;
         var fs = MAX_FONT, cell;
         for (; fs >= MIN_FONT; fs--) {
@@ -573,7 +588,14 @@
     }
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
+        state.vitals = null; state.status = null; state.room = null;
         renderCombat();
+        renderVitals();
+        // A new connection starts as the first did: no panels until its own first GMCP frame.
+        setDrawer(null);
+        panelsShown = false;
+        document.getElementById('rail').hidden = true;
+        fitTerminal();
         if (terminal) terminal.reset();
         connect();
     });
