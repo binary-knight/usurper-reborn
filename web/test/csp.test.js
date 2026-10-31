@@ -18,7 +18,7 @@ const ROOT = path.join(__dirname, '..', '..');
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
 const TEMPLATE = read('scripts-server', 'nginx-usurper.conf');
 const SNIPPET = read('scripts-server', 'nginx-csp.conf');
-const PAGES = fs.readdirSync(path.join(ROOT, 'web')).filter((f) => f.endsWith('.html'));
+const PAGES = fs.readdirSync(path.join(ROOT, 'web')).filter((f) => f.endsWith('.html')).concat(['play/index.html']);
 
 // The policy as it ran report-only on the live site, where every page showed no violation.
 const POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +

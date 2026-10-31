@@ -91,18 +91,22 @@ public static class GmcpBridge
         long hp = player.HP, maxHp = player.MaxHP;
         long mana = player.Mana, maxMana = player.MaxMana;
         long sta = player.Stamina;
+        long combatSp = player.CurrentCombatStamina, maxCombatSp = player.MaxCombatStamina;
         int mental = player.Mental; // v1.1.15: Mental runs in both modes, so it belongs on Vitals too
         if (hp == ctx.LastGmcpHp && maxHp == ctx.LastGmcpMaxHp
             && mana == ctx.LastGmcpMana && maxMana == ctx.LastGmcpMaxMana
-            && sta == ctx.LastGmcpStamina && mental == ctx.LastGmcpMental)
+            && sta == ctx.LastGmcpStamina && mental == ctx.LastGmcpMental
+            && combatSp == ctx.LastGmcpCombatStamina && maxCombatSp == ctx.LastGmcpMaxCombatStamina)
             return;
 
         ctx.LastGmcpHp = hp; ctx.LastGmcpMaxHp = maxHp;
         ctx.LastGmcpMana = mana; ctx.LastGmcpMaxMana = maxMana;
         ctx.LastGmcpStamina = sta;
+        ctx.LastGmcpCombatStamina = combatSp; ctx.LastGmcpMaxCombatStamina = maxCombatSp;
         ctx.LastGmcpMental = mental;
 
-        Emit("Char.Vitals", new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta, mental, maxMental = GameConfig.MaxMentalStability });
+        // sp is the Stamina stat; combatSp and maxCombatSp (1.3.9) are the fight stamina the game shows.
+        Emit("Char.Vitals", new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta, mental, maxMental = GameConfig.MaxMentalStability, combatSp, maxCombatSp });
     }
 
     /// <summary>

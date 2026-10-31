@@ -60,6 +60,10 @@ public class SessionContext : IDisposable
     public long LastGmcpMana { get; set; } = -1;
     public long LastGmcpMaxMana { get; set; } = -1;
     public long LastGmcpStamina { get; set; } = -1;
+    /// <summary>1.3.9: last emitted fight stamina and its maximum (Character.CurrentCombatStamina,
+    /// MaxCombatStamina), part of the same Char.Vitals change check. sp stays the Stamina stat.</summary>
+    public long LastGmcpCombatStamina { get; set; } = -1;
+    public long LastGmcpMaxCombatStamina { get; set; } = -1;
     /// <summary>v1.1.15: last emitted Mental value, part of the same Char.Vitals change check.</summary>
     public int LastGmcpMental { get; set; } = -1;
 

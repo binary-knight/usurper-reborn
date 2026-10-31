@@ -221,7 +221,9 @@ Players can connect directly from a web browser at `https://usurper-reborn.net`.
 - **ssh-proxy.js** (Node.js) runs on port 3000, providing:
   - WebSocket-to-game bridge: browser connects via WebSocket; by default the proxy opens a TCP connection to the MUD server on 127.0.0.1:4001 (`MUD_HOST`, `MUD_PORT`), and with `MUD_MODE=0` it uses the older SSH hop to 127.0.0.1:4000
   - Stats REST API: `GET /api/stats` returns live game data from the SQLite database
+  - GMCP for the play page: a websocket opened as `/ws?gmcp=1` (MUD mode only) has the proxy answer the game's `IAC WILL GMCP`, send each GMCP frame to the page as JSON text and the terminal bytes as binary (`web/gmcp-split.js`). Every other connection keeps the plain byte pipe.
 - **xterm.js** in the browser provides the terminal emulator UI
+- **The play page** at `/play/` is a full page terminal, 80 columns, with a status line and a Combat and Chat drawer filled from GMCP
 - **Live Stats Dashboard** on the landing page shows who's online, aggregate stats, highlights, and news
 
 ### Stats API Response
@@ -239,7 +241,9 @@ The response also carries `immortals`, `pvpLeaderboard`, `economy`, `npcActiviti
 
 ### Key Files
 - `web/index.html` - Landing page with embedded xterm.js terminal + live stats dashboard
+- `web/play/index.html` - Full page terminal at `/play/` with GMCP panels
 - `web/ssh-proxy.js` - Node.js HTTP + WebSocket server (ws + ssh2 + better-sqlite3)
+- `web/gmcp-split.js` - Telnet and GMCP splitter for `/ws?gmcp=1` connections
 - `web/package.json` - Node.js dependencies
 - `scripts-server/nginx-usurper.conf` - nginx reverse proxy config
 - `scripts-server/usurper-web.service` - systemd service for web proxy

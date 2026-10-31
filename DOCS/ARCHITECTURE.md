@@ -1079,13 +1079,13 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 ### Packages Shipped
 | Package | Trigger | Payload |
 |---|---|---|
-| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental }` (v1.1.15: mental and maxMental added, both modes) |
+| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental, combatSp, maxCombatSp }` (v1.1.15: mental and maxMental added, both modes; 1.3.9: combatSp and maxCombatSp are the fight stamina, while sp stays the Stamina stat) |
 | `Char.Status` | Every location change | `{ name, class, level, race, gold, bank, xp, location }` |
 | `Room.Info` | Every location change | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
 
-Strict opt-in: SSH-relayed, web terminal, BBS, and Electron sessions skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. Synchronous per-stream lock prevents interleaved frames.
+Strict opt-in: SSH-relayed, BBS and Electron sessions and the landing page terminal skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. The play page (`/play/`) gets GMCP because the web proxy answers the offer for it (Section 36). Synchronous per-stream lock prevents interleaved frames.
 
 ### Shipped Since
 The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). Each spell in `Char.Skills.List` carries the mana a cast costs that player (`SpellSystem.CalculateManaCost`) and the level at which the spell opens for the class (`SpellSystem.GetLevelRequired`), since 1.3.5. Each ability in `Char.Skills.List` carries the stamina cost charged, tier increase included (`ClassAbilitySystem.GetEffectiveStaminaCost`, 1.3.6). `Core.Supports.Set` is recorded per session but changes nothing yet.
@@ -1531,11 +1531,22 @@ Dark-themed responsive page with:
 - PvP leaderboard, Hall of Fame, event color coding
 - Game lore: story, Old Gods, classes, races, companions, endings, BBS history, Founder Hall
 
+### Play Page
+**File**: `web/play/index.html`, served at `/play/` (the folder index; no nginx rule needed)
+
+- A full page terminal: xterm.js 5.5.0, always 80 columns, with the font the largest size from 20px down to 12px that fits 80 columns and 25 rows. On a phone the 80 columns stay at 12px and slide sideways.
+- Opens `/ws?gmcp=1`, so the proxy splits the stream (below). Binary frames go to the terminal; text frames are GMCP as `{"gmcp": "Package.Name", "data": ...}`.
+- A status line under the terminal: HP and MP bars and the fight stamina (`Char.Vitals` hp, mp, combatSp and their maximums), level and gold (`Char.Status`) and the location name (`Room.Info`). `Char.Vitals.sp` is the Stamina stat, so it is not drawn.
+- A drawer with Combat and Chat. Combat lists enemies and party (`Char.Combat.Start`, `.Enemies`, `.Party`), marks a killed enemy dead (`Char.Combat.Killed`, since the game sends no enemy update after the last blow) and shows the result (`Char.Combat.End`, `Char.Death`). Chat keeps the last 200 `Comm.Channel.Text` lines; the player's own lines are not sent by the game, and `/history` shows the last 50 messages (`ChatHistoryStore.Capacity`), own lines included.
+- At 1200px and wider the drawer sits beside the terminal and opens on its own when a fight starts. Narrower, it lies over the terminal, so a fight marks the Combat button instead.
+- GMCP values are kept only as strings or finite numbers and drawn with `textContent`; the page script has no HTML sinks (`web/test/play-page.test.js`). UI strings are the `play.*` keys in `web/lang/*.json`.
+
 ### Web Proxy
 **File**: `web/ssh-proxy.js` (Node.js, port 3000)
 
 - **HTTP**: serves `/api/stats`, `/api/feed` (SSE), and `/api/admin/*` family
 - **WebSocket bridge**: browser -> TCP to the MUD server on 127.0.0.1:4001 (`MUD_MODE` on by default); `MUD_MODE=0` falls back to SSH on 127.0.0.1:4000
+- **GMCP split for the play page** (`web/gmcp-split.js`): only a MUD mode websocket opened as `/ws?gmcp=1`. When the game sends `IAC WILL GMCP`, the proxy answers `IAC DO GMCP` once, inside the server's 250ms probe window. Each `IAC SB GMCP ... IAC SE` frame goes to the page as one JSON text frame; terminal bytes go as binary with all other telnet negotiation removed. State carries across TCP chunks, `IAC IAC` becomes one 0xFF, a payload over 20 KB is dropped whole (the game's own cap is 16 KB with framing), and a malformed subnegotiation, or one still open after 64 KB or 5 seconds, closes the session; the terminal text before it is sent first. Every other connection, the landing page and the Electron client included, keeps the plain byte pipe.
 - **Stats API**: 2 minute server-side cache (`CACHE_TTL`) + 15s browser cache
 - **SSE feed**: 5s poll of `news` table with high-water marks; auto-reconnect after 5s
 - **Discord bot**: discord.js v14 bidirectional gossip relay (Section 24)
@@ -2019,7 +2030,9 @@ web/
 ├── dashboard.html                  NPC Analytics Dashboard
 ├── admin.html                      Admin console (bots, bans, settings, players)
 ├── steam.html                      Steam landing page
+├── play/index.html                 Full page terminal at /play/ with GMCP panels
 ├── ssh-proxy.js                    HTTP + WS + SSE + Discord + admin API + account mail + telemetry
+├── gmcp-split.js                   Telnet and GMCP splitter for /ws?gmcp=1
 ├── wiki-bot.js                     Discord wiki Ask and Suggest
 ├── account/                        Forgotten password, reset and address pages (1.3.4)
 ├── package.json                    ws, ssh2, better-sqlite3, discord.js

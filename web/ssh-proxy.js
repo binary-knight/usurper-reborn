@@ -21,6 +21,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
+const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
 
 let bcrypt;
 try {
@@ -5866,6 +5867,19 @@ wss.on('connection', (ws, req) => {
     // presents an interactive login/register menu directly to the user.
     // Detect client type from origin header
     const clientType = origin.startsWith('file://') || origin.startsWith('app://') ? 'Electron' : 'Web';
+    // The /play page opens /ws?gmcp=1: the proxy answers the game's GMCP offer for it and
+    // sends GMCP frames as JSON text, terminal bytes as binary (gmcp-split.js). Every other
+    // connection, the landing page and the Electron client included, keeps the byte pipe.
+    const splitter = wantsGmcp(req.url) ? createGmcpSplitter({
+      onTerminal: (buf) => { if (ws.readyState === ws.OPEN) ws.send(buf); },
+      onGmcp: (json) => { if (ws.readyState === ws.OPEN) ws.send(json); },
+      onReply: (buf) => { if (!tcp.destroyed) tcp.write(buf); },
+      onFatal: (reason) => {
+        console.error(`[usurper-web] GMCP framing error for ${clientIP}: ${reason}`);
+        tcp.destroy();
+        if (ws.readyState === ws.OPEN) ws.close(1011, 'Game stream error');
+      },
+    }) : null;
 
     const tcp = net.connect({ host: MUD_HOST, port: MUD_PORT }, () => {
       console.log(`[usurper-web] TCP connected to MUD server for ${clientIP} (${clientType})`);
@@ -5876,9 +5890,9 @@ wss.on('connection', (ws, req) => {
 
     // TCP → WebSocket
     tcp.on('data', (data) => {
-      if (ws.readyState === ws.OPEN) {
-        ws.send(data);
-      }
+      if (ws.readyState !== ws.OPEN) return;
+      if (splitter) splitter.push(data);
+      else ws.send(data);
     });
 
     tcp.on('close', () => {
