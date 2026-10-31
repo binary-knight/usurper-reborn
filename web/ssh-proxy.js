@@ -24,6 +24,7 @@ const os = require('os');
 const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
 const { publicNpcs } = require('./dash-npcs');
 const { createObservatory, playerNameSet } = require('./dash-observatory');
+const { publicChildren } = require('./dash-public');
 
 let bcrypt;
 try {
@@ -1347,11 +1348,15 @@ function getDashSummary() {
     }
   } catch (e) { /* economy data may not be available */ }
 
-  // Children data from world_state (serialized by WorldSimService)
+  // Children data from world_state (serialized by WorldSimService). Only the public projection
+  // goes out: no childrenRaw, kidnap state, location or ids, and no player character's name.
   let children = null;
   try {
     const childRow = db.prepare("SELECT value FROM world_state WHERE key = 'children'").get();
-    if (childRow && childRow.value) children = JSON.parse(childRow.value);
+    if (childRow && childRow.value) {
+      const npcIds = new Set(npcs.map((n) => n && (n.characterID || n.CharacterID)).filter(Boolean));
+      children = publicChildren(JSON.parse(childRow.value), npcIds);
+    }
   } catch (e) { /* children data may not exist yet */ }
 
   return {
