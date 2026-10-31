@@ -67,9 +67,28 @@ public class LoginColors139Tests
     public void TheRelayWelcomeBox_IsPurpleWithAGreenMenuAndARedQuit(string lang)
     {
         var text = RelayClient.AuthMenuText(lang);
-        var rows = text.Where(t => t.Contains('║') || t.Contains('╔') || t.Contains('╚')).ToList();
+        var rows = text.Where(t => t.Contains('║') || t.Contains('╔') || t.Contains('╠') || t.Contains('╚')).ToList();
+        rows.Should().HaveCount(10, "top, title, separator, blank, four entries, blank, bottom");
         CheckBox(rows, UsurperRemake.Systems.Loc.GetIn(lang, "auth.relay_title"));
         string.Concat(rows).Should().Contain("[Q]");
+        // The colour is reset after the box, before the prompt.
+        int last = text.FindLastIndex(t => t.Contains('╝'));
+        int prompt = text.FindIndex(t => t.Contains(UsurperRemake.Systems.Loc.GetIn(lang, "auth.choice")));
+        prompt.Should().BeGreaterThan(last);
+        text.Skip(last + 1).Take(prompt - last - 1).Should().Contain("\u001b[0m");
+        text[prompt].Should().NotContain("\u001b[1;");
+    }
+
+    [Fact]
+    public void LongTitlesAndLabelsAreCutToKeepTheBox79Wide()
+    {
+        var rows = MudServer.AuthBoxRows(new string('T', 120), new[]
+        {
+            (MudServer.AuthMenuColor, "L", new string('a', 71)),   // exactly fits: 77 - "  [L] ".Length
+            (MudServer.AuthMenuColor, "R", new string('b', 72)),   // one over
+            (MudServer.AuthQuitColor, "Q", new string('c', 200)),
+        });
+        CheckBox(rows, new string('T', 77));
     }
 
     [Fact]
