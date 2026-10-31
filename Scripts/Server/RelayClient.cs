@@ -299,7 +299,6 @@ public static class RelayClient
                 if (rawMode != null)
                 {
                     connectionType += ";echo=1";
-                    Console.Error.WriteLine("[RELAY] Terminal in raw mode; server-side echo requested");
                 }
             }
 
@@ -364,7 +363,6 @@ public static class RelayClient
             }
 
             // Auth succeeded — bridge stdin/stdout ↔ TCP socket
-            Console.Error.WriteLine($"[RELAY] Connected as '{username}', bridging I/O");
 
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var socket = client.Client;
