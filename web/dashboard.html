@@ -1400,9 +1400,7 @@ function updateChildren() {
         const soulClass = soul.match(/angel|well-behaved/i) ? 'child-soul-good' :
                           soul.match(/evil|naughty|bad/i) ? 'child-soul-bad' : 'child-soul-neutral';
         const parents = [c.mother, c.father].filter(Boolean).join(' & ') || 'Unknown';
-        const status = c.kidnapped ? '<span style="color:var(--red)">Kidnapped</span>' :
-                       c.royal ? '<span class="child-royal">Royal</span>' :
-                       escapeHtml(c.location || 'Home');
+        const status = c.royal ? '<span class="child-royal">Royal</span>' : '';
         const ageStr = c.age !== undefined ? c.age : '?';
         return `<div class="child-row">
             <span class="child-name">${escapeHtml(c.name || 'Unknown')}</span>
