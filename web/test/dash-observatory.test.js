@@ -14,6 +14,8 @@ const Database = require('better-sqlite3');
 const { publicNpcs } = require('../dash-npcs');
 const O = require('../dash-observatory');
 const { schemaSql, slice, proxySource, planOf } = require('./balance-api-harness');
+const { monsterSources } = require('./monster-names-source');
+const MONSTERS = require('../dash-monster-names');
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
@@ -48,7 +50,8 @@ function fixtureSchema() {
 
 // ---------------------------------------------------------------- the planted world
 
-// Logins differ from display names. "Torvin Ash" is a player who took an NPC's name.
+// Logins differ from display names. "Torvin Ash" is a player who took an NPC's name by display name,
+// "kael" by login. "Wolf" is a player named like a monster.
 const PLAYERS = [
   { username: 'acct_hroth', display: 'HrothgarZq' },
   { username: 'acct_mira', display: 'MirabelXq' },
@@ -56,11 +59,16 @@ const PLAYERS = [
   { username: 'acct_xyq', display: 'Xy' },
   { username: 'acct_boss_ww', display: 'Bosshitter Ww' },
   { username: 'acct_fallen_qq', display: 'Fallenhero Qq' },
+  { username: 'kael', display: 'Kaelthorn Bright' },
+  { username: 'acct_wolf', display: 'Wolf' },
 ];
-const PLAYER_NAMES = new Set(PLAYERS.flatMap((p) => [p.username.toLowerCase(), p.display.toLowerCase()]));
-const LOGINS = PLAYERS.map((p) => p.username);
-// Display names that are not also an NPC's name.
-const DISPLAYS = PLAYERS.map((p) => p.display).filter((d) => d !== 'Torvin Ash' && d !== 'Xy');
+const PLAYER_ROWS = PLAYERS.map((p) => ({ username: p.username, display_name: p.display }));
+const PLAYER_NAMES = O.playerNameSet(PLAYER_ROWS);
+const LOGINS = PLAYERS.map((p) => p.username).filter((u) => u !== 'kael');
+// Display names, checked as text (the two short ones are checked by name where they matter), and the
+// NPC names that a player shares.
+const DISPLAYS = PLAYERS.map((p) => p.display).filter((d) => d !== 'Xy' && d !== 'Wolf');
+const SHARED = ['Torvin Ash', 'Kael'];
 // Values that are planted in fields no endpoint may send.
 const HIDDEN = ['acct_seller_zz', 'acct_buyer_zz', 'ITEMJSON_SECRET', '987654', 'HEIR_SECRET', '55555', 'affair', 'mord-guid'];
 
@@ -87,6 +95,7 @@ const NPCS = [
   },
   { id: 'torvin-guid', name: 'Torvin Ash', level: 20, class: 10, race: 4, npcFaction: -1, isDead: true, isAgedDeath: true,
     relationships: { 'Elara Vane': -10 } },
+  { id: 'kael-guid', name: 'Kael', level: 12, class: 1, race: 0, npcFaction: -1, relationships: { 'Mord Necro': 60 } },
 ];
 
 const ECONOMY = {
@@ -99,6 +108,7 @@ const COURT = {
   kingTaxPercent: 5, cityTaxPercent: 6, designatedHeir: 'HEIR_SECRET', monarchHistory: [{ name: 'HrothgarZq' }],
 };
 
+// The fixture file goes in os.tmpdir(), which follows TMPDIR where the default is read only.
 function makeFixture(fill) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-observatory-'));
   const file = path.join(dir, 'usurper_online.db');
@@ -158,7 +168,8 @@ function assertClean(value, what) {
   for (const s of [...LOGINS, ...HIDDEN, 'acct_', 'player_name', 'username', 'seller', 'buyer', 'heirloom', 'item_json']) {
     assert.ok(!json.includes(s), `${what}: ${s} must not appear`);
   }
-  for (const d of DISPLAYS) assert.ok(!json.includes(d), `${what}: display name ${d} must not appear`);
+  for (const d of [...DISPLAYS, ...SHARED]) assert.ok(!json.includes(d), `${what}: player name ${d} must not appear`);
+  assert.ok(!/(?<![\p{L}\p{N}])kael(?![\p{L}\p{N}])/iu.test(json), `${what}: the login kael must not appear`);
 }
 
 // ---------------------------------------------------------------- people, profile, ties
@@ -168,10 +179,11 @@ const PEOPLE_KEYS = ['name', 'level', 'class', 'race', 'npcFaction', 'team', 'lo
 
 test('people: the allow-list per NPC, wealth, seeking, and no player in a team name', () => {
   const people = O.buildPeople(NPCS, PLAYER_NAMES);
-  assert.strictEqual(people.length, 4);
+  assert.deepStrictEqual(people.map((p) => p.name), ['Elara Vane', 'Sir Galahad', 'Mord Necro'],
+    'an NPC sharing a player display name or login is left out');
   people.forEach((p, i) => assertKeys(p, PEOPLE_KEYS, 'people[' + i + ']'));
   assertClean(people, 'people');
-  const [elara, galahad, mord, torvin] = people;
+  const [elara, galahad, mord] = people;
   assert.strictEqual(elara.wealth, 12900);
   assert.strictEqual(elara.seeking, true);
   assert.strictEqual(galahad.seeking, false, 'an inactive goal is not seeking');
@@ -179,13 +191,15 @@ test('people: the allow-list per NPC, wealth, seeking, and no player in a team n
   assert.strictEqual(mord.wealth, 0, 'a non-number gold is 0');
   assert.strictEqual(elara.team, 'The Wave Guild');
   assert.strictEqual(galahad.team, '', 'a team named after a player is blanked');
-  assert.strictEqual(torvin.isAgedDeath, true);
+  assert.strictEqual(mord.isPermaDead, true);
   assert.strictEqual(galahad.isKing, true);
+  const kept = O.buildPeople(NPCS, O.playerNameSet([]));
+  assert.strictEqual(kept.length, 5, 'with no players every NPC is listed');
+  assert.strictEqual(kept[3].isAgedDeath, true);
 });
 
-test('people: no player list means no team names', () => {
-  const people = O.buildPeople(NPCS, null);
-  assert.ok(people.every((p) => p.team === ''));
+test('people: no player list means no people', () => {
+  assert.deepStrictEqual(O.buildPeople(NPCS, null), []);
   assert.deepStrictEqual(O.buildPeople('garbage', PLAYER_NAMES), []);
   assert.deepStrictEqual(O.buildPeople([null, 5, 'x'], PLAYER_NAMES), []);
 });
@@ -194,6 +208,10 @@ test('profile: one entry of the public NPC list by name, null for an unknown nam
   const list = publicNpcs(NPCS, PLAYER_NAMES);
   const ob = O.createObservatory({ getDb: () => null, getNpcs: () => NPCS, getPublicNpcs: () => list, getPlayerNames: () => PLAYER_NAMES });
   assert.strictEqual(ob.profile('Elara Vane'), list[0]);
+  assert.strictEqual(ob.profile('Torvin Ash'), null, 'an NPC sharing a player display name');
+  assert.strictEqual(ob.profile('Kael'), null, 'an NPC sharing a player login');
+  const closed = O.createObservatory({ getDb: () => null, getNpcs: () => NPCS, getPublicNpcs: () => list, getPlayerNames: () => null });
+  assert.strictEqual(closed.profile('Elara Vane'), null, 'no player list, no profiles');
   assert.strictEqual(ob.profile('elara vane'), null);
   assert.strictEqual(ob.profile('HrothgarZq'), null);
   assert.strictEqual(ob.profile('__proto__'), null);
@@ -206,7 +224,7 @@ test('ties: the strongest likes and dislikes, NPC to NPC only, each pair once', 
   assertKeys(ties, ['dislikes', 'likes'], 'ties');
   [...ties.dislikes, ...ties.likes].forEach((t, i) => assertKeys(t, ['from', 'to', 'value'], 'tie ' + i));
   assertClean(ties, 'ties');
-  assert.ok(!JSON.stringify(ties).includes('Torvin Ash'), 'an NPC name a player shares is never in a tie');
+  assert.ok(!JSON.stringify(ties).includes('Torvin Ash') && !JSON.stringify(ties).includes('Kael'), 'an NPC name a player shares is never in a tie');
   assert.deepStrictEqual(O.buildTies(publicNpcs(NPCS, PLAYER_NAMES), null), { dislikes: [], likes: [] }, 'no player list, no ties');
   assert.deepStrictEqual(ties.dislikes, [{ from: 'Elara Vane', to: 'Sir Galahad', value: -100 }]);
   assert.deepStrictEqual(ties.likes, [
@@ -244,7 +262,29 @@ function assertRealmShape(r) {
   r.bossLeaders.forEach((l, i) => assertKeys(l, ['name', 'damage'], 'bossLeaders[' + i + ']'));
 }
 // The realm with the allowed display names (boss leaders) taken out.
-const realmWithoutLeaders = (r) => Object.assign({}, r, { bossLeaders: r.bossLeaders.map((l) => ({ damage: l.damage })) });
+const realmWithoutLeaders = (r) => Object.assign({}, r, {
+  bossLeaders: r.bossLeaders.map((l) => ({ damage: l.damage })),
+  ruler: Object.assign({}, r.ruler, { name: '' }),
+  god: Object.assign({}, r.god, { name: '' }),
+});
+// fx.db with the given world_state values (JSON text, or a value to stringify) in place of the stored ones.
+function withState(fxdb, values) {
+  return {
+    prepare(sql) {
+      const st = fxdb.prepare(sql);
+      return {
+        get: (...a) => {
+          if (sql.includes('world_state') && Object.prototype.hasOwnProperty.call(values, a[0])) {
+            const v = values[a[0]];
+            return { value: typeof v === 'string' ? v : JSON.stringify(v) };
+          }
+          return st.get(...a);
+        },
+        all: (...a) => st.all(...a),
+      };
+    },
+  };
+}
 
 test('realm: ruler, money, city control, god, the coming boss and the last boss leaders', () => {
   let lastBoss;
@@ -299,21 +339,13 @@ test('realm: an active boss is now, with its own leaders, top 10', () => {
 test('realm: the city leader is named only when it is an NPC no player shares', () => {
   const fx = makeFixture();
   try {
-    const run = (econ) => {
-      const npcs = NPCS;
-      const db = {
-        prepare(sql) {
-          const st = fx.db.prepare(sql);
-          return { get: (...a) => (sql.includes('world_state') && a[0] === 'economy' ? { value: JSON.stringify(Object.assign({}, ECONOMY, econ)) } : st.get(...a)), all: (...a) => st.all(...a) };
-        },
-      };
-      return O.buildRealm(db, npcs, PLAYER_NAMES, Date.now()).cityControl;
-    };
+    const run = (econ) => O.buildRealm(withState(fx.db, { economy: Object.assign({}, ECONOMY, econ) }), NPCS, PLAYER_NAMES, Date.now()).cityControl;
     assert.strictEqual(run({}).leader, 'Elara Vane');
     assert.strictEqual(run({ cityControlLeaderIsPlayer: true }).leader, '', 'the game marks the leader as a player');
     assert.strictEqual(run({ cityControlLeader: 'HrothgarZq' }).leader, '', 'a player display name');
     assert.strictEqual(run({ cityControlLeader: 'acct_hroth' }).leader, '', 'a login');
     assert.strictEqual(run({ cityControlLeader: 'Torvin Ash' }).leader, '', 'an NPC name a player shares');
+    assert.strictEqual(run({ cityControlLeader: 'Kael' }).leader, '', 'an NPC name a player login shares');
     assert.strictEqual(run({ cityControlLeader: 'Nobody Known' }).leader, '', 'not an NPC');
     assert.strictEqual(run({ cityControlLeader: 'elara-guid' }).leader, 'Elara Vane', 'an NPC id resolves to the name');
     assert.strictEqual(run({ cityControlTeam: 'Hammers of MirabelXq' }).team, '', 'a team named after a player');
@@ -368,6 +400,56 @@ test('realm: malformed world_state rows give empty values, never a throw', () =>
   try { assertRealmShape(O.buildRealm(empty, NPCS, PLAYER_NAMES, Date.now())); } finally { empty.close(); }
 });
 
+test('realm: a player king and a player god are named, a login key never', () => {
+  const fx = makeFixture();
+  try {
+    const realm = (court, week, players = PLAYER_NAMES) =>
+      O.buildRealm(withState(fx.db, { royal_court: court, god_of_week: week }), NPCS, players, Date.now());
+    const r = realm(Object.assign({}, COURT, { kingName: 'HrothgarZq', kingSex: 2 }), { week: 43, god: 'Divine Hrothvar', standing: 7 });
+    assertRealmShape(r);
+    assert.strictEqual(r.ruler.name, 'HrothgarZq', 'a player ruler by display name, as /api/stats sends it');
+    assert.strictEqual(r.ruler.title, 'Queen');
+    assert.deepStrictEqual(r.god, { name: 'Divine Hrothvar', week: 43, rule: 'followers get 5% more XP' });
+    const json = JSON.stringify(r);
+    for (const login of LOGINS) assert.ok(!json.includes(login), login);
+    // A stored login (not that player's display name) is never sent; the rest of the record stays.
+    const l = realm(Object.assign({}, COURT, { kingName: 'acct_hroth' }), { week: 43, god: 'ACCT_MIRA' });
+    assert.deepStrictEqual(l.ruler, { name: '', title: 'King', reignDays: 12, since: '2026-10-19T08:00:00.000Z' });
+    assert.deepStrictEqual(l.god, { name: '', week: 43, rule: '' });
+    const econ = O.buildRealm(withState(fx.db, { royal_court: '{', economy: Object.assign({}, ECONOMY, { kingName: 'kael' }) }), NPCS, PLAYER_NAMES, Date.now());
+    assert.strictEqual(econ.ruler.name, '', 'the economy fallback is checked too');
+    // A login that is also that player's display name is the display name.
+    const same = O.playerNameSet([{ username: 'samename', display_name: 'Samename' }]);
+    assert.strictEqual(realm({ kingName: 'Samename' }, { week: 1, god: 'Solarius' }, same).ruler.name, 'Samename');
+    // No player list: no name.
+    const closed = realm(COURT, { week: 43, god: 'Solarius' }, null);
+    assert.strictEqual(closed.ruler.name, '');
+    assert.deepStrictEqual(closed.god, { name: '', week: 43, rule: '' });
+    assert.strictEqual(O.buildRealm(withState(fx.db, {}), NPCS, new Set(['x']), Date.now()).ruler.name, '', 'a set without its login map fails closed');
+  } finally { fx.close(); }
+});
+
+test('realm: a schedule with a bad window or date is no coming boss, never a throw', () => {
+  const fx = makeFixture();
+  try {
+    const nowMs = Date.parse('2098-12-31T00:00:00Z');
+    const next = (sched) => O.buildRealm(withState(fx.db, { world_boss_schedule: Object.assign(
+      { definitionId: 'iron_titan', bossLevel: 77, spawnUtc: '2099-01-01T01:00:00Z', windowHours: 3, spawnedBossId: 0 }, sched) }),
+    NPCS, PLAYER_NAMES, nowMs).boss.next;
+    assert.ok(next({}), 'a good schedule is next');
+    assert.strictEqual(next({ windowHours: 168 }).endsAt, '2099-01-08T01:00:00.000Z');
+    for (const windowHours of [1e12, -3, 0, 169, 2.5, '3', null, 'NaN', [], {}, true]) {
+      assert.strictEqual(next({ windowHours }), null, JSON.stringify(windowHours));
+    }
+    assert.strictEqual(O.buildRealm(withState(fx.db, { world_boss_schedule: '{"definitionId":"iron_titan","spawnUtc":"2099-01-01T01:00:00Z","windowHours":NaN,"spawnedBossId":0}' }),
+      NPCS, PLAYER_NAMES, nowMs).boss.next, null, 'NaN in the JSON text');
+    for (const spawnUtc of ['9999-12-31T23:00:00Z', '1970-01-01T00:00:00Z', '2099-13-45T99:00:00Z', 'soon', 5, null]) {
+      assert.strictEqual(next({ spawnUtc }), null, String(spawnUtc));
+    }
+    for (const spawnedBossId of [7, '0', null, undefined]) assert.strictEqual(next({ spawnedBossId }), null, String(spawnedBossId));
+  } finally { fx.close(); }
+});
+
 // ---------------------------------------------------------------- movers, depths, market, fallen
 
 test('movers: logged gains of the last 7 days, NPC names in the public list only, top 10', () => {
@@ -379,11 +461,13 @@ test('movers: logged gains of the last 7 days, NPC names in the public list only
     addLog(w, 'Sir Galahad', 99999, 99999, '-8 days');
     addLog(w, 'HrothgarZq', 99999, 99999);
     addLog(w, 'acct_hroth', 99999, 99999);
+    addLog(w, 'Torvin Ash', 99999, 99999);
+    addLog(w, 'Kael', 99999, 99999);
     for (let i = 0; i < 12; i++) addLog(w, 'N' + i, 10 + i, 10 + i);
   });
   try {
-    const names = new Set(['Elara Vane', 'Sir Galahad', 'Mord Necro', ...Array.from({ length: 12 }, (_, i) => 'N' + i)]);
-    const m = O.buildMovers(fx.db, names);
+    const names = new Set(['Elara Vane', 'Sir Galahad', 'Mord Necro', 'Torvin Ash', 'Kael', ...Array.from({ length: 12 }, (_, i) => 'N' + i)]);
+    const m = O.buildMovers(fx.db, names, PLAYER_NAMES);
     assertKeys(m, ['days', 'xp', 'gold'], 'movers');
     m.xp.forEach((x) => assertKeys(x, ['name', 'xp'], 'mover xp'));
     m.gold.forEach((x) => assertKeys(x, ['name', 'gold'], 'mover gold'));
@@ -394,14 +478,16 @@ test('movers: logged gains of the last 7 days, NPC names in the public list only
     assert.strictEqual(m.xp.length, 10);
     assert.ok(m.gold.every((g) => g.name !== 'Elara Vane'), 'a net loss is not a gain');
     assert.ok(m.xp.every((g) => g.name !== 'Mord Necro'));
-    assert.deepStrictEqual(O.buildMovers(fx.db, null), { days: 7, xp: [], gold: [] });
+    assert.deepStrictEqual(O.buildMovers(fx.db, null, PLAYER_NAMES), { days: 7, xp: [], gold: [] });
+    assert.deepStrictEqual(O.buildMovers(fx.db, names, null), { days: 7, xp: [], gold: [] }, 'no player list, no movers');
   } finally { fx.close(); }
 });
 
-test('depths: deaths of the last 7 days in 10-floor bands, counts only', () => {
+test('depths: deaths of the last 7 days in the ten bands of floors 1 to 100, counts only', () => {
   const fx = makeFixture((w) => {
-    addDeath(w, 1); addDeath(w, 10); addDeath(w, 11); addDeath(w, 99); addDeath(w, 100); addDeath(w, 101);
-    addDeath(w, null); addDeath(w, 0);
+    addDeath(w, 1); addDeath(w, 10); addDeath(w, 11); addDeath(w, 99); addDeath(w, 100);
+    addDeath(w, null); addDeath(w, 0); addDeath(w, 101); addDeath(w, 100001); addDeath(w, 9007199254740991);
+    addDeath(w, 5.5); addDeath(w, -3); addDeath(w, 'deep');
     addDeath(w, 5, '-8 days');
     addDeath(w, 5, '-1 hours', 'victory');
   });
@@ -410,12 +496,13 @@ test('depths: deaths of the last 7 days in 10-floor bands, counts only', () => {
     assertKeys(d, ['days', 'bands', 'unknown'], 'depths');
     d.bands.forEach((b) => assertKeys(b, ['band', 'deaths'], 'band'));
     assertClean(d, 'depths');
-    assert.strictEqual(d.bands.length, 11);
+    assert.strictEqual(d.bands.length, 10);
     assert.deepStrictEqual(d.bands[0], { band: '1-10', deaths: 2 });
     assert.deepStrictEqual(d.bands[1], { band: '11-20', deaths: 1 });
     assert.deepStrictEqual(d.bands[9], { band: '91-100', deaths: 2 });
-    assert.deepStrictEqual(d.bands[10], { band: '101-110', deaths: 1 });
-    assert.strictEqual(d.unknown, 2);
+    assert.strictEqual(d.unknown, 8, 'none, 0, 101, huge, fraction, negative and text are unknown');
+    assert.strictEqual(O.MAX_FLOOR, 100);
+    assert.match(read('Scripts', 'Core', 'GameConfig.cs'), /public static int MaxDungeonLevel \{ get; set; \} = 100;/, 'the dungeon is 100 floors');
   } finally { fx.close(); }
   assert.strictEqual(O.buildDepths(null).bands.length, 10);
 });
@@ -442,7 +529,7 @@ test('market: active listings newest first, at most 50, never seller, buyer or i
   assert.deepStrictEqual(O.buildMarket(null), { count: 0, listings: [] });
 });
 
-test('fallen: the 20 latest, the killer only when it is not a player', () => {
+test('fallen: the 20 latest, the killer only when it is positively an NPC or a monster', () => {
   const fx = makeFixture((w) => {
     addFallen(w, 'Fallenhero Qq', 'Cave Troll', '-1 hours', 31);
     addFallen(w, 'HrothgarZq', 'MirabelXq', '-2 hours');
@@ -451,6 +538,13 @@ test('fallen: the 20 latest, the killer only when it is not a player', () => {
     addFallen(w, 'Fallenhero Qq', 'Torvin Ash', '-5 hours');
     addFallen(w, 'Fallenhero Qq', 'Sir Galahad', '-6 hours');
     addFallen(w, 'Fallenhero Qq', 'Xylophage', '-7 hours');
+    addFallen(w, 'Fallenhero Qq', 'FormerHero', '-8 hours');
+    addFallen(w, 'Fallenhero Qq', 'Swift Frenzied Goblin Champion', '-9 hours');
+    addFallen(w, 'Fallenhero Qq', 'Kael', '-10 hours');
+    addFallen(w, 'Fallenhero Qq', 'Wolf', '-11 hours');
+    addFallen(w, 'Fallenhero Qq', 'an unknown end', '-12 hours');
+    addFallen(w, 'Fallenhero Qq', 'Swift Bob', '-13 hours');
+    addFallen(w, 'Fallenhero Qq', 'galahad-guid', '-14 hours');
     for (let i = 0; i < 20; i++) addFallen(w, 'Old Hero', 'Rat', '-' + (10 + i) + ' days');
   });
   try {
@@ -460,11 +554,19 @@ test('fallen: the 20 latest, the killer only when it is not a player', () => {
     assertClean(f.map((x) => Object.assign({}, x, { name: '' })), 'fallen');
     assert.deepStrictEqual(f[0], { name: 'Fallenhero Qq', level: 31, className: 'Paladin', killer: 'Cave Troll', diedAt: f[0].diedAt });
     assert.match(f[0].diedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-    assert.deepStrictEqual(f.slice(1, 7).map((x) => x.killer), ['', '', '', '', 'Sir Galahad', 'Xylophage'],
-      'PvP by display name, by login, a short name in a phrase, and an NPC name a player shares are blanked');
+    assert.deepStrictEqual(f.slice(1, 14).map((x) => x.killer), ['', '', '', '', 'Sir Galahad', '', '', 'Swift Frenzied Goblin Champion',
+      '', '', 'an unknown end', '', 'Sir Galahad'],
+      'PvP by display name and by login, a short name in a phrase, NPC names a player shares, unknown text, a renamed or ' +
+      'deleted player, a monster named like a player and an unknown name in a monster template are blanked; a monster with ' +
+      'and without its templates, an NPC by name or id and the no-monster text are kept');
+    assert.strictEqual(f[0].killer, 'Cave Troll');
     assert.strictEqual(f[1].name, 'HrothgarZq', 'the fallen hero\'s own display name is the one name sent');
     const closed = O.buildFallen(fx.db, NPCS, null);
     assert.ok(closed.every((x) => x.killer === ''), 'no player list means no killers');
+    // A killer who was a player is blanked whether or not the name is still in the player list.
+    const before = O.buildFallen(fx.db, NPCS, O.playerNameSet([...PLAYER_ROWS, { username: 'formerlogin', display_name: 'FormerHero' }]));
+    assert.strictEqual(before[7].killer, '');
+    assert.strictEqual(f[7].killer, '', 'the same killer after the player was renamed or deleted');
   } finally { fx.close(); }
   assert.deepStrictEqual(O.buildFallen(null, NPCS, PLAYER_NAMES), []);
 });
@@ -472,7 +574,7 @@ test('fallen: the 20 latest, the killer only when it is not a player', () => {
 test('old database without the tables: every endpoint is empty, none throws', () => {
   const empty = new Database(':memory:');
   try {
-    assert.deepStrictEqual(O.buildMovers(empty, new Set(['Elara Vane'])), { days: 7, xp: [], gold: [] });
+    assert.deepStrictEqual(O.buildMovers(empty, new Set(['Elara Vane']), PLAYER_NAMES), { days: 7, xp: [], gold: [] });
     assert.strictEqual(O.buildDepths(empty).unknown, 0);
     assert.deepStrictEqual(O.buildMarket(empty), { count: 0, listings: [] });
     assert.deepStrictEqual(O.buildFallen(empty, NPCS, PLAYER_NAMES), []);
@@ -503,11 +605,22 @@ test('each endpoint returns the same object within its period and rebuilds after
   try {
     let t = 1000000;
     let reads = 0;
-    const list = publicNpcs(NPCS, PLAYER_NAMES);
     const ob = O.createObservatory({
-      getDb: () => fx.db, getNpcs: () => { reads++; return NPCS; }, getPublicNpcs: () => list,
+      getDb: () => fx.db, getNpcs: () => { reads++; return NPCS; }, getPublicNpcs: () => publicNpcs(NPCS, PLAYER_NAMES),
       getPlayerNames: () => PLAYER_NAMES, now: () => t,
     });
+    {
+      const start = t;
+      const a = ob.profile('Elara Vane');
+      assert.ok(a);
+      t = start + O.TTL.profile - 1;
+      assert.strictEqual(ob.profile('Elara Vane'), a, 'profile within its period');
+      t = start + O.TTL.profile;
+      const b = ob.profile('Elara Vane');
+      assert.notStrictEqual(b, a, 'profile after its period');
+      assert.deepStrictEqual(b, a);
+      t += 1;
+    }
     assert.deepStrictEqual({ ...O.TTL }, { people: 10000, profile: 10000, ties: 10000, realm: 60000,
       movers: 600000, depths: 600000, market: 60000, fallen: 60000 });
     for (const name of ['people', 'ties', 'realm', 'movers', 'depths', 'market', 'fallen']) {
@@ -521,6 +634,24 @@ test('each endpoint returns the same object within its period and rebuilds after
     }
     assert.ok(reads > 0);
   } finally { fx.close(); }
+});
+
+test('the monster names equal the game data they are built from', () => {
+  const src = monsterSources(ROOT);
+  assert.deepStrictEqual(MONSTERS.NAMES, src.names);
+  assert.deepStrictEqual(MONSTERS.AFFIXES, src.affixes);
+  assert.deepStrictEqual(MONSTERS.OTHER, src.other);
+  assert.strictEqual(src.sources.families.length, 75, 'every tier of every family');
+  assert.strictEqual(src.sources.worldBosses.length, 8);
+  assert.ok(src.sources.oldGods.includes('Maelketh, The Broken Blade') && MONSTERS.NAMES.includes('Maelketh'));
+  assert.ok(MONSTERS.AFFIXES.includes('Swift {0}') && MONSTERS.AFFIXES.includes('{0} Shaman') && MONSTERS.AFFIXES.includes('{0} Leader'));
+  // Every template the generator writes in English is one of them.
+  const gen = read('Scripts', 'Systems', 'MonsterGenerator.cs');
+  for (const m of gen.matchAll(/=> \$"([^"]*\{baseName\}[^"]*)"/g)) {
+    assert.ok(MONSTERS.AFFIXES.includes(m[1].replace('{baseName}', '{0}')), m[1]);
+  }
+  assert.ok(O.isMonsterName('Alpha Goblin King') && O.isMonsterName('Commanding Orc Warchief Leader'));
+  assert.ok(!O.isMonsterName('Alpha') && !O.isMonsterName('{0} Champion') && !O.isMonsterName(''));
 });
 
 test('the boss name map equals the Id and Name pairs in WorldBossData.cs', () => {
@@ -546,7 +677,7 @@ function loadRoutes(db) {
   ].join('\n');
   const npcs = JSON.parse(db.prepare("SELECT value FROM world_state WHERE key = 'npcs'").get().value);
   const ctx = {
-    db, publicNpcs, createObservatory: O.createObservatory, URL, JSON, Object, Date, Set, String,
+    db, publicNpcs, createObservatory: O.createObservatory, playerNameSet: O.playerNameSet, URL, JSON, Object, Date, Set, String,
     DASH_NPC_CACHE_TTL: 10000, getDashNpcs: () => npcs, dashSseClients: new Set(),
     getDashSummary: () => ({}), getDashEvents: () => [], getDashEventsHourly: () => [],
     console: { log() {}, warn() {}, info() {}, error() {} },
@@ -578,6 +709,7 @@ test('routes: every Observatory endpoint is a public GET with JSON from its allo
     const { api, call } = loadRoutes(fx.db);
     const names = api.getDashPlayerNames();
     for (const p of PLAYERS) assert.ok(names.has(p.username) && names.has(p.display.toLowerCase()), 'player names read from the db');
+    assert.strictEqual(names.loginToDisplay.get('acct_hroth'), 'hrothgarzq');
     const all = {};
     for (const route of ['people', 'ties', 'realm', 'movers', 'depths', 'market', 'fallen']) {
       const r = await call('/api/dash/' + route);
@@ -585,7 +717,7 @@ test('routes: every Observatory endpoint is a public GET with JSON from its allo
       assert.strictEqual(r.type, 'application/json', route);
       all[route] = r.body;
     }
-    assert.strictEqual(all.people.length, 4);
+    assert.strictEqual(all.people.length, 3);
     all.people.forEach((p) => assertKeys(p, PEOPLE_KEYS, 'route people'));
     assertRealmShape(all.realm);
     assert.deepStrictEqual(all.realm.bossLeaders, [{ name: 'Bosshitter Ww', damage: 70 }]);

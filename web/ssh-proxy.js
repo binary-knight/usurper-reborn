@@ -23,7 +23,7 @@ const fs = require('fs');
 const os = require('os');
 const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
 const { publicNpcs } = require('./dash-npcs');
-const { createObservatory } = require('./dash-observatory');
+const { createObservatory, playerNameSet } = require('./dash-observatory');
 
 let bcrypt;
 try {
@@ -1160,11 +1160,7 @@ function getDashPlayerNames() {
   if (dashPlayerNamesCacheTime && (now - dashPlayerNamesCacheTime) < DASH_NPC_CACHE_TTL) return dashPlayerNamesCache;
   let names = null;
   try {
-    names = new Set();
-    for (const r of db.prepare('SELECT username, display_name FROM players').all()) {
-      if (r.username) names.add(String(r.username).toLowerCase());
-      if (r.display_name) names.add(String(r.display_name).toLowerCase());
-    }
+    names = playerNameSet(db.prepare('SELECT username, display_name FROM players').all());
   } catch (err) {
     // Without the player list nothing about other characters can be checked, so none is sent.
     console.error(`[usurper-web] Dashboard player name query error: ${err.message}`);
