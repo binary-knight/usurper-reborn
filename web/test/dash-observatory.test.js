@@ -1,13 +1,12 @@
 'use strict';
 // The Observatory endpoints (web/dash-observatory.js and its routes in ssh-proxy.js) are public. Each
 // sends an allow-list, never a login key (username, seller, buyer, world_boss_damage.player_name),
-// and a player's display name only as a boss leader or a fallen hero. The fixture database is a temp
-// file built from the game's own CREATE TABLE text and migration columns, so the queries follow the
-// real schema and indexes.
+// and a player's display name only as a boss leader, a fallen hero, the ruler or the god of the week.
+// The fixture database is in memory, built from the game's own CREATE TABLE text and migration
+// columns, so the queries follow the real schema and indexes.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const Database = require('better-sqlite3');
@@ -108,11 +107,10 @@ const COURT = {
   kingTaxPercent: 5, cityTaxPercent: 6, designatedHeir: 'HEIR_SECRET', monarchHistory: [{ name: 'HrothgarZq' }],
 };
 
-// The fixture file goes in os.tmpdir(), which follows TMPDIR where the default is read only.
+// The fixture lives in memory (no file on disk) and is made query only once seeded, as the
+// server's handle is read only.
 function makeFixture(fill) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-observatory-'));
-  const file = path.join(dir, 'usurper_online.db');
-  const w = new Database(file);
+  const w = new Database(':memory:');
   w.exec(fixtureSchema());
   const addPlayer = w.prepare("INSERT INTO players (username, display_name, player_data) VALUES (?, ?, '{}')");
   PLAYERS.forEach((p) => addPlayer.run(p.username, p.display));
@@ -124,9 +122,8 @@ function makeFixture(fill) {
   ws.run('world_boss_schedule', JSON.stringify({ definitionId: 'iron_titan', bossLevel: 77, spawnUtc: '2099-01-01T01:00:00Z',
     windowHours: 3, spawnedBossId: 0, medianLevel: 70 }));
   if (fill) fill(w);
-  w.close();
-  const db = new Database(file, { readonly: true, fileMustExist: true });
-  return { db, close: () => { db.close(); fs.rmSync(dir, { recursive: true, force: true }); } };
+  w.pragma('query_only = ON');
+  return { db: w, close: () => { w.close(); } };
 }
 
 function addBoss(w, { name, level = 60, max = 1000, cur = 400, status = 'active', expires = '+2 hours', started = '-1 hours' }) {
