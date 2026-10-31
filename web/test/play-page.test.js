@@ -183,3 +183,19 @@ test('every play key the page uses is in all five languages', () => {
     for (const k of used) assert.strictEqual((d[k].match(/\{\d\}/g) || []).sort().join(), (en[k].match(/\{\d\}/g) || []).sort().join(), l + ' placeholders ' + k);
   }
 });
+
+test('the landing page Play buttons open /play/ in a new tab, and the old terminal is gone', () => {
+  const html = readPage('index.html');
+  for (const key of ['r1.cta_play', 'connect.browser_btn', 'r1.finale_cta']) {
+    const re = new RegExp('<a class="btn [^"]*"(?: id="play-btn")? href="/play/" target="_blank" rel="noopener" data-i18n="' + key.replace(/\./g, '\\.') + '">');
+    assert.match(html, re, key);
+  }
+  for (const gone of ['openTerminal', 'closeTerminal', 'terminal-section', 'terminal-container', '@xterm/', "new WebSocket("]) {
+    assert.ok(!html.includes(gone), gone);
+  }
+  for (const l of LANGS) {
+    const d = lang(l);
+    assert.deepStrictEqual(Object.keys(d).filter((k) => k.startsWith('terminal.')), [], l + ' has no terminal.* keys');
+    assert.ok(!/right in the page|en la propia página|directement dans la page|közvetlenül az oldalon|direttamente nella pagina/.test(d['connect.browser_desc']), l);
+  }
+});

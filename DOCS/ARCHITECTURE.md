@@ -1085,7 +1085,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
 
-Strict opt-in: SSH-relayed, BBS and Electron sessions and the landing page terminal skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. The play page (`/play/`) gets GMCP because the web proxy answers the offer for it (Section 36). Synchronous per-stream lock prevents interleaved frames.
+Strict opt-in: SSH-relayed, BBS and Electron sessions and any other websocket client skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. The play page (`/play/`) gets GMCP because the web proxy answers the offer for it (Section 36). Synchronous per-stream lock prevents interleaved frames.
 
 ### Shipped Since
 The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). Each spell in `Char.Skills.List` carries the mana a cast costs that player (`SpellSystem.CalculateManaCost`) and the level at which the spell opens for the class (`SpellSystem.GetLevelRequired`), since 1.3.5. Each ability in `Char.Skills.List` carries the stamina cost charged, tier increase included (`ClassAbilitySystem.GetEffectiveStaminaCost`, 1.3.6). `Core.Supports.Set` is recorded per session but changes nothing yet.
@@ -1525,7 +1525,7 @@ Beta. Text mode is the supported way to play; Electron is optional. Phase 9.5 po
 **File**: `web/index.html`
 
 Dark-themed responsive page with:
-- Embedded xterm.js 5.5.0 web terminal (WebSocket bridge to the game)
+- Play buttons that open the play page (`/play/`) in a new tab
 - Live stats dashboard (`/api/stats`, 2 minute server cache)
 - SSE live feed (`/api/feed`) for NPC activity and player news
 - PvP leaderboard, Hall of Fame, event color coding
@@ -1546,7 +1546,7 @@ Dark-themed responsive page with:
 
 - **HTTP**: serves `/api/stats`, `/api/feed` (SSE), and `/api/admin/*` family
 - **WebSocket bridge**: browser -> TCP to the MUD server on 127.0.0.1:4001 (`MUD_MODE` on by default); `MUD_MODE=0` falls back to SSH on 127.0.0.1:4000
-- **GMCP split for the play page** (`web/gmcp-split.js`): only a MUD mode websocket opened as `/ws?gmcp=1`. When the game sends `IAC WILL GMCP`, the proxy answers `IAC DO GMCP` once, inside the server's 250ms probe window. Each `IAC SB GMCP ... IAC SE` frame goes to the page as one JSON text frame; terminal bytes go as binary with all other telnet negotiation removed. State carries across TCP chunks, `IAC IAC` becomes one 0xFF, a payload over 20 KB is dropped whole (the game's own cap is 16 KB with framing), and a malformed subnegotiation, or one still open after 64 KB or 5 seconds, closes the session; the terminal text before it is sent first. Every other connection, the landing page and the Electron client included, keeps the plain byte pipe.
+- **GMCP split for the play page** (`web/gmcp-split.js`): only a MUD mode websocket opened as `/ws?gmcp=1`. When the game sends `IAC WILL GMCP`, the proxy answers `IAC DO GMCP` once, inside the server's 250ms probe window. Each `IAC SB GMCP ... IAC SE` frame goes to the page as one JSON text frame; terminal bytes go as binary with all other telnet negotiation removed. State carries across TCP chunks, `IAC IAC` becomes one 0xFF, a payload over 20 KB is dropped whole (the game's own cap is 16 KB with framing), and a malformed subnegotiation, or one still open after 64 KB or 5 seconds, closes the session; the terminal text before it is sent first. Every other connection, the Electron client included, keeps the plain byte pipe.
 - **Stats API**: 2 minute server-side cache (`CACHE_TTL`) + 15s browser cache
 - **SSE feed**: 5s poll of `news` table with high-water marks; auto-reconnect after 5s
 - **Discord bot**: discord.js v14 bidirectional gossip relay (Section 24)
@@ -2026,7 +2026,7 @@ Scripts/
     └── (helpers)
 
 web/
-├── index.html                      Landing page + terminal + stats
+├── index.html                      Landing page + stats
 ├── dashboard.html                  NPC Analytics Dashboard
 ├── admin.html                      Admin console (bots, bans, settings, players)
 ├── steam.html                      Steam landing page
