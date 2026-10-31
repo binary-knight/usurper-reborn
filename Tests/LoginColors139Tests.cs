@@ -1,7 +1,16 @@
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
+using UsurperRemake.Systems;
 using FluentAssertions;
 using UsurperRemake.Server;
 using Xunit;
@@ -11,8 +20,19 @@ using Xunit;
 /// Online") is drawn in two colours and red: the border and title bright purple, the menu bright
 /// green, and the whole Quit entry red. Every border segment carries its own colour code.
 /// </summary>
-public class LoginColors139Tests
+[Collection("SharedGameSingletons")]
+public class LoginColors139Tests : IDisposable
 {
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-login139-{Guid.NewGuid():N}.db");
+    private SqlSaveBackend? _db;
+    private SqlSaveBackend Db => _db ??= new SqlSaveBackend(_path);
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        try { File.Delete(_path); } catch { }
+    }
+
     private const string Purple = "1;35", Green = "1;32", Red = "1;31";
 
     // Each visible character of a row with the SGR code in force when it was drawn.
@@ -105,6 +125,56 @@ public class LoginColors139Tests
         MudServer.AuthBoxColor.Should().Be(Purple);
         MudServer.AuthMenuColor.Should().Be(Green);
         MudServer.AuthQuitColor.Should().Be(Red);
+    }
+
+    // Input "Q" then end of stream; everything the gate writes is kept, raw.
+    private sealed class GateStream : Stream
+    {
+        private readonly byte[] _in = Encoding.UTF8.GetBytes("Q\r\n");
+        private int _pos;
+        public readonly MemoryStream Out = new();
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_pos >= _in.Length) return 0;
+            int n = Math.Min(count, _in.Length - _pos);
+            Array.Copy(_in, _pos, buffer, offset, n);
+            _pos += n;
+            return n;
+        }
+        public override void Write(byte[] buffer, int offset, int count) => Out.Write(buffer, offset, count);
+        public override void Flush() { }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+    }
+
+    private async Task<string> GateOutput(bool plainText)
+    {
+        var server = (MudServer)RuntimeHelpers.GetUninitializedObject(typeof(MudServer));
+        typeof(MudServer).GetField("<ActiveSessions>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(server, new ConcurrentDictionary<string, PlayerSession>());
+        var auth = typeof(MudServer).GetMethod("InteractiveAuthAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var stream = new GateStream();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var task = (Task)auth.Invoke(server, new object?[] { stream, Db, cts.Token, plainText, false, "198.51.100.139", true })!;
+        await task.WaitAsync(TimeSpan.FromSeconds(20));
+        return Encoding.UTF8.GetString(stream.Out.ToArray());
+    }
+
+    [Fact]
+    public async Task TheScreenReaderMenuHasNoColourCodesAtAll_WhileTheBoxDoes()
+    {
+        string plain = await GateOutput(plainText: true);
+        plain.Should().Contain("[L] " + Loc.GetIn("en", "auth.login")).And.Contain("[Q] " + Loc.GetIn("en", "auth.quit"));
+        plain.Should().NotContain("\u001b[", "screen-reader players get the menu with no escape codes");
+        plain.Should().NotContain("\u2551");
+
+        string boxed = await GateOutput(plainText: false);
+        boxed.Should().Contain($"\u001b[{Purple}m\u2554").And.Contain($"\u001b[{Red}m[Q]");
     }
 
     [Fact]
