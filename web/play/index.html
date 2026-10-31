@@ -35,6 +35,7 @@
         body { font-family: var(--mono); font-size: 16px; display: flex; flex-direction: column; overflow: hidden; }
         button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
         [hidden] { display: none !important; }
+        .play:has(> .rail[hidden]) { padding-bottom: 0; }
 
         /* Top bar */
         .top { flex: none; height: 52px; display: flex; align-items: center; gap: 20px; padding: 0 24px; background: var(--bg-ink); border-bottom: 1px solid var(--iron-dark); }
@@ -173,7 +174,7 @@
         </div>
     </aside>
 
-    <nav class="rail" aria-label="Panels">
+    <nav class="rail" id="rail" aria-label="Panels" hidden>
         <button type="button" id="rail-combat" data-tab="combat" aria-pressed="false" data-i18n="play.tab.combat">Combat</button>
         <button type="button" id="rail-chat" data-tab="chat" aria-pressed="false" data-i18n="play.tab.chat">Chat</button>
     </nav>
@@ -498,10 +499,21 @@
                 break;
         }
     }
+    // The Combat and Chat buttons stay hidden until the game sends its first GMCP frame, so a
+    // connection with no GMCP (a server that does not offer it) shows the terminal alone.
+    var panelsShown = false;
+    function showPanels() {
+        if (panelsShown) return;
+        panelsShown = true;
+        document.getElementById('rail').hidden = false;
+        fitTerminal();
+    }
+
     function handleFrame(text) {
         var msg;
         try { msg = JSON.parse(text); } catch (e) { return; }
         if (!obj(msg) || typeof msg.gmcp !== 'string') return;
+        showPanels();
         try { handleGmcp(msg.gmcp, msg.data); } catch (e) {}
     }
 

@@ -198,3 +198,17 @@ test('the landing page Play buttons open /play/ in a new tab, and the old termin
     assert.ok(!/right in the page|en la propia página|directement dans la page|közvetlenül az oldalon|direttamente nella pagina/.test(d['connect.browser_desc']), l);
   }
 });
+
+test('the Combat and Chat buttons stay hidden until the first GMCP frame', async () => {
+  const p = await load();
+  assert.strictEqual(p.el('rail').hidden, true, 'no GMCP yet: the terminal alone');
+  assert.strictEqual(p.el('drawer').hidden, true);
+  p.ctx.__f = 'not json';
+  p.run('UsurperPlay.handleFrame(__f)');
+  p.ctx.__f = '{"nogmcp":1}';
+  p.run('UsurperPlay.handleFrame(__f)');
+  assert.strictEqual(p.el('rail').hidden, true, 'a frame that is not GMCP does not show them');
+  frame(p, 'Room.Info', { name: 'Main Street' });
+  assert.strictEqual(p.el('rail').hidden, false);
+  assert.deepStrictEqual(p.errors, []);
+});
