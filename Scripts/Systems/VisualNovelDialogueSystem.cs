@@ -2759,6 +2759,7 @@ namespace UsurperRemake.Systems
             npc.Married = true;
             npc.SpouseName = player.Name2; // v1.1.1: identity key, see RelationshipSystem
             npc.MarriedTimes++;
+            WorldSnapshotCounters.AddMarriage();   // O2: one wedding for the hourly world snapshot
 
             // Add to RomanceTracker as spouse
             RomanceTracker.Instance.AddSpouse(npc.ID, false);

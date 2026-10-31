@@ -22,6 +22,8 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
+const { publicNpcs } = require('./dash-npcs');
+const { createObservatory, playerNameSet } = require('./dash-observatory');
 
 let bcrypt;
 try {
@@ -381,7 +383,6 @@ function initPeakTracking() {
 const DASH_NPC_CACHE_TTL = 10000; // 10 seconds
 const DASH_EVENTS_CACHE_TTL = 5000; // 5 seconds
 const DASH_HOURLY_CACHE_TTL = 60000; // 60 seconds
-const DASH_SNAPSHOT_INTERVAL = 30000; // 30 seconds for NPC snapshots
 
 const CLASS_NAMES = {
   0: 'Alchemist', 1: 'Assassin', 2: 'Barbarian', 3: 'Bard',
@@ -1149,6 +1150,49 @@ function getDashNpcs() {
   }
 }
 
+// Lower-cased player character names and login names, read at most once per NPC cache period, or
+// null when they could not be read. Every public dashboard list uses this one set only to keep
+// players out of it; it is never sent.
+let dashPlayerNamesCache = null;
+let dashPlayerNamesCacheTime = 0;
+function getDashPlayerNames() {
+  const now = Date.now();
+  if (dashPlayerNamesCacheTime && (now - dashPlayerNamesCacheTime) < DASH_NPC_CACHE_TTL) return dashPlayerNamesCache;
+  let names = null;
+  try {
+    names = playerNameSet(db.prepare('SELECT username, display_name FROM players').all());
+  } catch (err) {
+    // Without the player list nothing about other characters can be checked, so none is sent.
+    console.error(`[usurper-web] Dashboard player name query error: ${err.message}`);
+    names = null;
+  }
+  dashPlayerNamesCache = names;
+  dashPlayerNamesCacheTime = now;
+  return names;
+}
+
+// The public NPC list (dash-npcs.js) behind the Observatory profile, ties and movers, rebuilt at most once
+// per NPC cache period.
+let dashPublicNpcCache = null;
+let dashPublicNpcCacheTime = 0;
+function getDashPublicNpcs() {
+  const now = Date.now();
+  if (dashPublicNpcCache && (now - dashPublicNpcCacheTime) < DASH_NPC_CACHE_TTL) return dashPublicNpcCache;
+  dashPublicNpcCache = publicNpcs(getDashNpcs(), getDashPlayerNames());
+  dashPublicNpcCacheTime = now;
+  return dashPublicNpcCache;
+}
+
+// The Observatory endpoints (dash-observatory.js), each cached for its own period.
+const dashObservatory = createObservatory({
+  getDb: () => db,
+  getNpcs: getDashNpcs,
+  getPublicNpcs: getDashPublicNpcs,
+  getPlayerNames: getDashPlayerNames,
+  now: () => Date.now(),
+  log: (msg) => console.error(`[usurper-web] Observatory query error: ${msg}`),
+});
+
 // Read royal court data from world_state (the authoritative source).
 // The world sim maintains the 'royal_court' key 24/7. Player sessions write to it
 // when they change king state (throne challenges, tax changes, treasury ops).
@@ -1166,172 +1210,6 @@ function getRoyalCourtFromWorldState() {
     if (row && row.value) return JSON.parse(row.value);
   } catch (e) { /* economy key may not exist yet */ }
   return null;
-}
-
-// Derive city controller info from NPC data (isTeamLeader maps to CTurf in-game)
-function getCityControllerFromNpcs(npcs) {
-  if (!npcs || npcs.length === 0) return null;
-  const controllers = npcs.filter(n => {
-    const isLeader = n.isTeamLeader || n.IsTeamLeader;
-    const hasTeam = n.team || n.Team;
-    const alive = !(n.isDead || n.IsDead);
-    return isLeader && hasTeam && alive;
-  });
-  if (controllers.length === 0) return null;
-
-  const teamName = controllers[0].team || controllers[0].Team;
-  // All members of the controlling team (not just leaders)
-  const teamMembers = npcs.filter(n => (n.team || n.Team) === teamName && !(n.isDead || n.IsDead));
-  const teamLeader = teamMembers.sort((a, b) => (b.level || b.Level || 0) - (a.level || a.Level || 0))[0];
-  const totalPower = teamMembers.reduce((sum, n) => {
-    return sum + (n.level || n.Level || 0) + (n.strength || n.Strength || 0) + (n.defence || n.Defence || 0);
-  }, 0);
-
-  return {
-    teamName,
-    memberCount: teamMembers.length,
-    totalPower,
-    leaderName: teamLeader ? (teamLeader.name || teamLeader.Name || 'None') : 'None',
-    leaderBank: teamLeader ? (teamLeader.bankGold || teamLeader.BankGold || 0) : 0
-  };
-}
-
-function getDashSummary() {
-  const npcs = getDashNpcs();
-  if (!npcs || npcs.length === 0) return { total: 0 };
-
-  const alive = npcs.filter(n => !n.isDead && !n.IsDead);
-  const dead = npcs.filter(n => n.isDead || n.IsDead);
-  const permadead = npcs.filter(n => n.isPermaDead || n.IsPermaDead);
-  const agedDeath = npcs.filter(n => n.isAgedDeath || n.IsAgedDeath);
-  const married = npcs.filter(n => n.isMarried || n.IsMarried);
-  const pregnant = npcs.filter(n => n.pregnancyDueDate || n.PregnancyDueDate);
-  const teams = new Set(npcs.filter(n => n.team || n.Team).map(n => n.team || n.Team).filter(t => t));
-
-  // Class distribution (alive NPCs only — exclude permadead)
-  const classDist = {};
-  alive.forEach(n => {
-    const cls = CLASS_NAMES[n.class] || CLASS_NAMES[n.Class] || 'Unknown';
-    classDist[cls] = (classDist[cls] || 0) + 1;
-  });
-
-  // Race distribution (alive only)
-  const raceDist = {};
-  alive.forEach(n => {
-    const race = RACE_NAMES[n.race] || RACE_NAMES[n.Race] || 'Unknown';
-    raceDist[race] = (raceDist[race] || 0) + 1;
-  });
-
-  // Faction distribution (alive only)
-  const factionDist = {};
-  alive.forEach(n => {
-    const fid = String(n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1));
-    const fname = FACTION_NAMES[fid] || 'None';
-    factionDist[fname] = (factionDist[fname] || 0) + 1;
-  });
-
-  // Location distribution (alive only)
-  const locationDist = {};
-  alive.forEach(n => {
-    const loc = n.location || n.Location || 'Unknown';
-    locationDist[loc] = (locationDist[loc] || 0) + 1;
-  });
-
-  // Level distribution (alive only)
-  const levelDist = {};
-  alive.forEach(n => {
-    const lvl = n.level || n.Level || 1;
-    const bucket = Math.floor(lvl / 10) * 10;
-    const key = `${bucket}-${bucket + 9}`;
-    levelDist[key] = (levelDist[key] || 0) + 1;
-  });
-
-  // Age distribution (alive only)
-  const ageDist = {};
-  alive.forEach(n => {
-    const age = n.age || n.Age || 0;
-    if (age > 0) {
-      const bucket = Math.floor(age / 10) * 10;
-      const key = `${bucket}-${bucket + 9}`;
-      ageDist[key] = (ageDist[key] || 0) + 1;
-    }
-  });
-
-  // Average level (alive only)
-  const levels = alive.map(n => n.level || n.Level || 1);
-  const avgLevel = levels.length > 0 ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : 0;
-
-  // Total gold (alive only)
-  const totalGold = alive.reduce((sum, n) => sum + (n.gold || n.Gold || 0), 0);
-
-  // King - from NPC data (which NPC has isKing flag)
-  const kingNpc = npcs.find(n => n.isKing || n.IsKing);
-
-  // Economy data: read from world_state (the authoritative source).
-  // The world sim maintains the 'royal_court' and 'economy' keys 24/7.
-  // Player sessions write to 'royal_court' when they change king state.
-  let economy = null;
-  try {
-    const royalCourt = getRoyalCourtFromWorldState();
-    const cityController = getCityControllerFromNpcs(npcs);
-
-    // Economy summary from world sim (daily income/expenses/revenue counters)
-    let econSummary = {};
-    try {
-      const econRow = db.prepare("SELECT value FROM world_state WHERE key = 'economy'").get();
-      if (econRow && econRow.value) econSummary = JSON.parse(econRow.value);
-    } catch (e) {}
-
-    if (royalCourt || cityController || Object.keys(econSummary).length > 0) {
-      economy = {
-        kingName: royalCourt?.kingName || econSummary.kingName || 'None',
-        kingIsActive: true,
-        treasury: royalCourt?.treasury ?? econSummary.treasury ?? 0,
-        taxRate: royalCourt?.taxRate ?? econSummary.taxRate ?? 0,
-        kingTaxPercent: royalCourt?.kingTaxPercent ?? econSummary.kingTaxPercent ?? 0,
-        cityTaxPercent: royalCourt?.cityTaxPercent ?? econSummary.cityTaxPercent ?? 0,
-        dailyTaxRevenue: econSummary.dailyTaxRevenue || 0,
-        dailyCityTaxRevenue: econSummary.dailyCityTaxRevenue || 0,
-        dailyIncome: econSummary.dailyIncome || 0,
-        dailyExpenses: econSummary.dailyExpenses || 0,
-        cityControlTeam: cityController?.teamName || econSummary.cityControlTeam || 'None',
-        cityControlMembers: cityController?.memberCount || econSummary.cityControlMembers || 0,
-        cityControlPower: cityController?.totalPower || econSummary.cityControlPower || 0,
-        cityControlLeader: cityController?.leaderName || econSummary.cityControlLeader || 'None',
-        cityControlLeaderBank: cityController?.leaderBank || econSummary.cityControlLeaderBank || 0
-      };
-    }
-  } catch (e) { /* economy data may not be available */ }
-
-  // Children data from world_state (serialized by WorldSimService)
-  let children = null;
-  try {
-    const childRow = db.prepare("SELECT value FROM world_state WHERE key = 'children'").get();
-    if (childRow && childRow.value) children = JSON.parse(childRow.value);
-  } catch (e) { /* children data may not exist yet */ }
-
-  return {
-    total: npcs.length,
-    alive: alive.length,
-    dead: dead.length,
-    permadead: permadead.length,
-    agedDeath: agedDeath.length,
-    married: married.length,
-    pregnant: pregnant.length,
-    teams: economy?.cityControlTeam && economy.cityControlTeam !== 'None' && !teams.has(economy.cityControlTeam)
-      ? teams.size + 1 : teams.size,
-    avgLevel: parseFloat(avgLevel),
-    totalGold,
-    king: economy?.kingName || (kingNpc ? (kingNpc.name || kingNpc.Name) : null),
-    classDist,
-    raceDist,
-    factionDist,
-    locationDist,
-    levelDist,
-    ageDist,
-    economy,
-    children
-  };
 }
 
 function getDashEvents() {
@@ -1385,8 +1263,6 @@ function getDashEventsHourly() {
 // --- Dashboard SSE Feed ---
 const dashSseClients = new Set();
 let dashLastNewsId = 0;
-let lastNpcSnapshotTime = 0;
-let lastNpcSnapshotHash = '';
 
 function initDashFeedIds() {
   if (!db) return;
@@ -1412,37 +1288,6 @@ function dashPollFeed() {
       dashLastNewsId = newsRows[newsRows.length - 1].id;
       const items = newsRows.map(r => ({ message: r.message, category: r.category, time: r.created_at }));
       dashBroadcast('news', JSON.stringify({ items }));
-    }
-
-    // NPC snapshot (every 30 seconds)
-    const now = Date.now();
-    if (now - lastNpcSnapshotTime >= DASH_SNAPSHOT_INTERVAL) {
-      lastNpcSnapshotTime = now;
-      const npcs = getDashNpcs();
-      if (npcs && npcs.length > 0) {
-        // Compact snapshot for SSE (just key fields per NPC)
-        const snapshot = npcs.map(n => ({
-          name: n.name || n.Name,
-          level: n.level || n.Level || 1,
-          class: n.class !== undefined ? n.class : (n.Class !== undefined ? n.Class : -1),
-          race: n.race !== undefined ? n.race : (n.Race !== undefined ? n.Race : -1),
-          location: n.location || n.Location || 'Unknown',
-          alive: !(n.isDead || n.IsDead),
-          married: !!(n.isMarried || n.IsMarried),
-          faction: n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1),
-          isKing: !!(n.isKing || n.IsKing),
-          pregnant: !!(n.pregnancyDueDate || n.PregnancyDueDate),
-          emotion: n.emotionalState || n.EmotionalState || null,
-          hp: n.hp || n.HP || 0,
-          maxHp: n.maxHP || n.MaxHP || 1
-        }));
-        const hash = crypto.createHash('md5').update(JSON.stringify(snapshot)).digest('hex');
-        if (hash !== lastNpcSnapshotHash) {
-          lastNpcSnapshotHash = hash;
-          const summary = getDashSummary();
-          dashBroadcast('npc-snapshot', JSON.stringify({ npcs: snapshot, summary }));
-        }
-      }
     }
   } catch (e) {
     // Silently ignore
@@ -2910,30 +2755,6 @@ async function handleDashRequest(req, res) {
     dashSseClients.add(res);
     console.log(`[usurper-web] Dashboard SSE connected (${dashSseClients.size} total)`);
 
-    // Send initial snapshot immediately
-    try {
-      const npcs = getDashNpcs();
-      if (npcs && npcs.length > 0) {
-        const snapshot = npcs.map(n => ({
-          name: n.name || n.Name,
-          level: n.level || n.Level || 1,
-          class: n.class !== undefined ? n.class : (n.Class !== undefined ? n.Class : -1),
-          race: n.race !== undefined ? n.race : (n.Race !== undefined ? n.Race : -1),
-          location: n.location || n.Location || 'Unknown',
-          alive: !(n.isDead || n.IsDead),
-          married: !!(n.isMarried || n.IsMarried),
-          faction: n.npcFaction !== undefined ? n.npcFaction : (n.NPCFaction !== undefined ? n.NPCFaction : -1),
-          isKing: !!(n.isKing || n.IsKing),
-          pregnant: !!(n.pregnancyDueDate || n.PregnancyDueDate),
-          emotion: n.emotionalState || n.EmotionalState || null,
-          hp: n.hp || n.HP || 0,
-          maxHp: n.maxHP || n.MaxHP || 1
-        }));
-        const summary = getDashSummary();
-        res.write(`event: npc-snapshot\ndata: ${JSON.stringify({ npcs: snapshot, summary })}\n\n`);
-      }
-    } catch (e) {}
-
     req.on('close', () => {
       dashSseClients.delete(res);
       console.log(`[usurper-web] Dashboard SSE disconnected (${dashSseClients.size} total)`);
@@ -2941,17 +2762,31 @@ async function handleDashRequest(req, res) {
     return true;
   }
 
-  // Data endpoints
-  if (method === 'GET' && url === '/api/dash/npcs') {
-    const npcs = getDashNpcs();
-    sendJson(res, 200, npcs);
-    return true;
-  }
-
-  if (method === 'GET' && url === '/api/dash/summary') {
-    const summary = getDashSummary();
-    sendJson(res, 200, summary);
-    return true;
+  // Observatory endpoints: public, allow-listed, cached (dash-observatory.js).
+  if (method === 'GET') {
+    let parsed = null;
+    try { parsed = new URL(url, 'http://localhost'); } catch (e) { parsed = null; }
+    const route = parsed ? parsed.pathname : '';
+    const simple = {
+      '/api/dash/people': dashObservatory.people,
+      '/api/dash/ties': dashObservatory.ties,
+      '/api/dash/realm': dashObservatory.realm,
+      '/api/dash/movers': dashObservatory.movers,
+      '/api/dash/depths': dashObservatory.depths,
+      '/api/dash/market': dashObservatory.market,
+      '/api/dash/fallen': dashObservatory.fallen,
+    };
+    if (Object.prototype.hasOwnProperty.call(simple, route)) {
+      sendJson(res, 200, simple[route]());
+      return true;
+    }
+    if (route === '/api/dash/profile') {
+      const name = parsed.searchParams.get('name');
+      const entry = name && name.length <= 100 ? dashObservatory.profile(name) : null;
+      if (entry) sendJson(res, 200, entry);
+      else sendJson(res, 404, { error: 'Not found' });
+      return true;
+    }
   }
 
   if (method === 'GET' && url === '/api/dash/events') {
@@ -2966,8 +2801,75 @@ async function handleDashRequest(req, res) {
     return true;
   }
 
+  // O2: the hourly world snapshots for the Observatory trends
+  if (method === 'GET' && dashHistory.matches(url)) {
+    dashHistory.handle(req, res);
+    return true;
+  }
+
   return false; // Not a dash route
 }
+
+// --- Dashboard History (O2) ---
+// GET /api/dash/history?hours=24|168|720: the world_snapshots rows of the last 24 hours, 7 days or 30 days,
+// oldest first, with the table's columns only. Any other hours value (or none) is 24. The game's world sim
+// writes one row per UTC hour, keyed 'yyyy-MM-ddTHH:00:00Z', so the window is a primary key range on
+// that string. Cached 5 minutes per window. A database without the table (a game not yet upgraded) gives [].
+const DASH_HISTORY_HOURS = [24, 168, 720];
+const DASH_HISTORY_CACHE_MS = 5 * 60 * 1000;
+const DASH_HISTORY_COLUMNS = ['taken_at', 'npcs_alive', 'npcs_dead', 'npcs_married', 'children', 'treasury',
+  'players_online', 'births', 'deaths', 'marriages'];
+const DASH_HISTORY_SQL = `SELECT ${DASH_HISTORY_COLUMNS.join(', ')} FROM world_snapshots
+  WHERE taken_at > ? AND taken_at <= ? ORDER BY taken_at ASC`;
+
+// The hours asked for when it is one of the three windows, else 24.
+function dashHistoryHours(url) {
+  let raw = null;
+  try { raw = new URL(url, 'http://localhost').searchParams.get('hours'); } catch { raw = null; }
+  const n = /^[0-9]{1,4}$/.test(raw || '') ? Number(raw) : NaN;
+  return DASH_HISTORY_HOURS.includes(n) ? n : 24;
+}
+
+// The row key of the UTC hour that holds the instant: 'yyyy-MM-ddTHH:00:00Z', as the game writes it.
+function dashHistoryHourKey(ms) {
+  return new Date(ms).toISOString().slice(0, 13) + ':00:00Z';
+}
+
+// deps: getDb() gives the read only game database (or null), now() the clock, sendJson the reply.
+function createDashHistory(deps) {
+  const cache = new Map();   // hours -> { at, rows }
+
+  function matches(url) {
+    return url === '/api/dash/history' || (typeof url === 'string' && url.startsWith('/api/dash/history?'));
+  }
+
+  // The window's rows: after the hour that held now minus hours, up to the hour that holds now (hours rows at most).
+  function rows(hours) {
+    const t = deps.now();
+    const hit = cache.get(hours);
+    if (hit && t - hit.at < DASH_HISTORY_CACHE_MS) return hit.rows;
+    const db = deps.getDb();
+    if (!db) return [];
+    try {
+      const found = db.prepare(DASH_HISTORY_SQL)
+        .all(dashHistoryHourKey(t - hours * 60 * 60 * 1000), dashHistoryHourKey(t))
+        .map((r) => Object.fromEntries(DASH_HISTORY_COLUMNS.map((c) => [c, r[c]])));
+      cache.set(hours, { at: t, rows: found });
+      return found;
+    } catch (err) {
+      return hit ? hit.rows : [];
+    }
+  }
+
+  function handle(req, res) {
+    deps.sendJson(res, 200, rows(dashHistoryHours(req.url)));
+  }
+
+  return { matches, rows, handle };
+}
+
+const dashHistory = createDashHistory({ getDb: () => db, now: () => Date.now(), sendJson: (res, status, data) => sendJson(res, status, data) });
+// --- End Dashboard History ---
 
 // --- Admin Dashboard API ---
 const ADMIN_SERVICES = ['usurper-mud', 'sshd-usurper', 'usurper-web', 'nginx'];

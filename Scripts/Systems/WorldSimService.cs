@@ -45,6 +45,18 @@ namespace UsurperRemake.Systems
         // while another process holds the lock: no ticks, no world state writes, no final save
         private readonly bool _pauseWithoutLock;
 
+        // O2: only the MUD's world sim writes the hourly world_snapshots row. The hour whose row is done (added, or
+        // found already there), and the attempts made at the current hour with the time of the next one.
+        private readonly bool _writeWorldSnapshots;
+        private string? _snapshotDoneHour;
+        private string? _snapshotTryHour;
+        private int _snapshotTries;
+        private DateTime _snapshotNextTry = DateTime.MinValue;
+        internal const int SnapshotMaxTriesPerHour = 5;
+
+        /// <summary>O2 test seam: runs at the start of the gauge read; a throw there is a failed read.</summary>
+        internal Action? BeforeSnapshotGaugeRead;
+
         /// <summary>v1.1.14: this sim lost the lock and is paused until a heartbeat takes it back.</summary>
         internal bool PausedWithoutLock => _pauseWithoutLock && _heartbeatOwnerId != null && !_heldWorldSimLock;
 
@@ -68,7 +80,8 @@ namespace UsurperRemake.Systems
             float npcXpMultiplier = 0.25f,
             int saveIntervalMinutes = 5,
             string? heartbeatOwnerId = null,
-            bool pauseWithoutLock = false)
+            bool pauseWithoutLock = false,
+            bool writeWorldSnapshots = false)
         {
             this.sqlBackend = backend;
             this.simIntervalSeconds = simIntervalSeconds;
@@ -76,6 +89,7 @@ namespace UsurperRemake.Systems
             this.saveIntervalMinutes = saveIntervalMinutes;
             this._heartbeatOwnerId = heartbeatOwnerId;
             this._pauseWithoutLock = pauseWithoutLock;
+            this._writeWorldSnapshots = writeWorldSnapshots;
         }
 
         /// <summary>
@@ -171,7 +185,99 @@ namespace UsurperRemake.Systems
                 await SaveWorldState();
                 lastSaveTime = DateTime.UtcNow;
             }
+
+            // O2: the hourly world_snapshots row (the MUD's world sim only)
+            if (_writeWorldSnapshots) WriteHourlySnapshotIfDue(DateTime.UtcNow);
             return true;
+        }
+
+        /// <summary>
+        /// O2: the world_snapshots row of the current UTC hour, written once. Gauges (NPCs alive, dead and married,
+        /// children, treasury, players online) as of now; births, deaths and marriages since the previous row, taken
+        /// from WorldSnapshotCounters. The hour is done once its row is added or found already there (a second
+        /// process start in the hour); the counts of a row found there go back to the next row. A failed gauge read,
+        /// a failed write or a lost world sim lock writes nothing, gives the counts back and tries again on a later
+        /// tick: at most SnapshotMaxTriesPerHour tries an hour, the wait doubling from one sim interval. Returns
+        /// whether this call added the row. A sim paused without the lock writes nothing.
+        /// </summary>
+        internal bool WriteHourlySnapshotIfDue(DateTime utcNow)
+        {
+            if (PausedWithoutLock) return false;
+            string hour = SqlSaveBackend.WorldSnapshotHourKey(utcNow);
+            if (hour == _snapshotDoneHour) return false;
+            if (hour != _snapshotTryHour)
+            {
+                _snapshotTryHour = hour;
+                _snapshotTries = 0;
+                _snapshotNextTry = DateTime.MinValue;
+            }
+            if (_snapshotTries >= SnapshotMaxTriesPerHour || utcNow < _snapshotNextTry) return false;
+            _snapshotTries++;
+
+            if (!TryReadSnapshotGauges(out var gauges))
+            {
+                WaitBeforeNextSnapshotTry(utcNow, "a gauge could not be read");
+                return false;
+            }
+
+            var (births, deaths, marriages) = WorldSnapshotCounters.TakeAndReset();
+            var outcome = sqlBackend.WriteWorldSnapshot(utcNow,
+                new WorldSnapshotRow(gauges.Alive, gauges.Dead, gauges.Married, gauges.Children, gauges.Treasury,
+                    births, deaths, marriages),
+                _heartbeatOwnerId);
+            if (outcome == WorldSnapshotWrite.Inserted)
+            {
+                _snapshotDoneHour = hour;
+                return true;
+            }
+            WorldSnapshotCounters.GiveBack(births, deaths, marriages);
+            if (outcome == WorldSnapshotWrite.AlreadyExists) _snapshotDoneHour = hour;
+            else WaitBeforeNextSnapshotTry(utcNow, outcome == WorldSnapshotWrite.NotOwner ? "another process holds the world sim lock" : "the write failed");
+            return false;
+        }
+
+        private void WaitBeforeNextSnapshotTry(DateTime utcNow, string why)
+        {
+            double seconds = Math.Max(1, simIntervalSeconds) * (1 << Math.Min(_snapshotTries - 1, 10));
+            _snapshotNextTry = utcNow.AddSeconds(Math.Min(seconds, 15 * 60));
+            DebugLogger.Instance.LogWarning("WORLDSIM", $"World snapshot not written ({why}); try {_snapshotTries} of {SnapshotMaxTriesPerHour} this hour.");
+        }
+
+        /// <summary>
+        /// O2: the gauges, or false when any of them cannot be read. The roster and the children are copied with
+        /// ToArray (they have no lock), again if a session changes one under the copy.
+        /// </summary>
+        private bool TryReadSnapshotGauges(out (long Alive, long Dead, long Married, long Children, long Treasury) gauges)
+        {
+            gauges = default;
+            try
+            {
+                BeforeSnapshotGaugeRead?.Invoke();
+                var npcs = CopyWithRetry(() => NPCSpawnSystem.Instance?.ActiveNPCs?.ToArray() ?? Array.Empty<NPC>());
+                var children = CopyWithRetry(() => FamilySystem.Instance?.AllChildren?.ToArray() ?? Array.Empty<Child>());
+                gauges = (
+                    npcs.Count(n => n != null && n.IsAlive && !n.IsDead),
+                    npcs.Count(n => n != null && (!n.IsAlive || n.IsDead) && !n.IsDowned),   // as the tick log counts
+                    npcs.Count(n => n != null && n.IsMarried),   // as the dashboard summary counts
+                    children.Count(c => c != null && !c.Deleted),
+                    CastleLocation.GetCurrentKing()?.Treasury ?? 0);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("WORLDSIM", $"World snapshot gauges not read: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>A copy of a list another thread may change: tried three times, the last failure thrown.</summary>
+        private static T[] CopyWithRetry<T>(Func<T[]> copy)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try { return copy(); }
+                catch (Exception) when (attempt < 3) { }
+            }
         }
 
         /// <summary>The loop's end: the final save (v1.1.14: skipped by a sim paused without the lock), then the lock released.</summary>

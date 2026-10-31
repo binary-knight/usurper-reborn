@@ -4543,6 +4543,7 @@ public class HomeLocation : BaseLocation
                 currentPlayer.Gold -= cost;
                 toResurrect.HP = toResurrect.MaxHP / 2; // Resurrect at half HP
                 toResurrect.IsDead = false;
+                WorldSnapshotCounters.NpcRevived(toResurrect);   // O2: revived here, so its next death counts
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("home.resurrect_success", toResurrect.DisplayName));
