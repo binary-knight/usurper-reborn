@@ -286,20 +286,30 @@ jobs:
             artifact: linux-x64-build
             runner: ubuntu-latest
             exe: build/UsurperReborn
+          # macOS 14 images are retired on 2026-11-02 (actions/runner-images#13518); macos-15 is arm64.
           - name: macOS Intel (Rosetta)
             artifact: mac-build
-            runner: macos-14
+            runner: macos-15
             exe: build/usurper-reborn.app/Contents/MacOS/usurper-reborn
             prefix: arch -x86_64
           - name: macOS ARM64
             artifact: mac-arm64-build
-            runner: macos-14
+            runner: macos-15
             exe: build/usurper-reborn.app/Contents/MacOS/usurper-reborn
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: build/
+
+      # The run step below accepts a non-zero exit, so a runner without Rosetta would pass it
+      # unseen. The Intel job first fails here if Rosetta cannot run x86_64 code.
+      - name: Check Rosetta
+        if: matrix.prefix
+        shell: bash
+        run: |
+          arch -x86_64 /usr/bin/true || { echo "::error::Rosetta cannot run x86_64 code on this runner"; exit 1; }
+          file "${{ matrix.exe }}"
 
       - name: Run executable
         shell: bash
