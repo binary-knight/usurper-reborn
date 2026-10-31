@@ -37,8 +37,8 @@ test('the page script never writes HTML', () => {
 test('the page opens the split stream and pins xterm 5.5.0', () => {
   const html = readPage(PAGE);
   assert.match(html, /new WebSocket\(proto \+ '\/\/' \+ location\.host \+ '\/ws\?gmcp=1'\)/);
-  assert.ok(html.includes('src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"'));
-  assert.ok(html.includes('href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css"'));
+  assert.match(html, /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@xterm\/xterm@5\.5\.0\/lib\/xterm\.min\.js"><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="https:\/\/cdn\.jsdelivr\.net\/npm\/@xterm\/xterm@5\.5\.0\/css\/xterm\.css">/);
 });
 
 test('a chat line with HTML stays plain text', async () => {
