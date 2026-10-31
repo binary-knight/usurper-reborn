@@ -2485,6 +2485,7 @@ namespace UsurperRemake.Systems
                 if (!onPlayerTeam && !inPartyList) continue;
 
                 npc.HP = npc.MaxHP;
+                global::UsurperRemake.Systems.WorldSnapshotCounters.NpcRevived(npc);   // O2: a roster NPC healed back to life here, so its next death counts
                 if (npc.MaxMana > 0) npc.Mana = npc.MaxMana;
                 healed++;
             }

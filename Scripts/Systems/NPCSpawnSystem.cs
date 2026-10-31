@@ -1131,6 +1131,7 @@ namespace UsurperRemake.Systems
             npc.CellDoorOpen = false;
             npc.RescuedBy = rescuerName;
             npc.HP = npc.MaxHP;
+            if (ActiveNPCs.Contains(npc)) WorldSnapshotCounters.NpcRevived(npc);   // O2: a roster NPC back at full HP here, so its next death counts
             npc.CurrentLocation = "Main Street";
             // GD.Print($"[NPCSpawn] {npc.Name2} released from prison" +
             //     (string.IsNullOrEmpty(rescuerName) ? "" : $" by {rescuerName}"));
