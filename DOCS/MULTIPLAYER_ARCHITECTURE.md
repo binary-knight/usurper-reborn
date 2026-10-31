@@ -241,7 +241,7 @@ The response also carries `immortals`, `pvpLeaderboard`, `economy`, `npcActiviti
 
 ### Key Files
 - `web/index.html` - Landing page with live stats dashboard; its Play buttons open `/play/` in a new tab
-- `web/play/index.html` - Full page terminal at `/play/` with GMCP panels
+- `web/play/index.html` - Full page terminal at `/play/` with GMCP panels, and a tap pad on touch screens
 - `web/ssh-proxy.js` - Node.js HTTP + WebSocket server (ws + ssh2 + better-sqlite3)
 - `web/gmcp-split.js` - Telnet and GMCP splitter for `/ws?gmcp=1` connections
 - `web/package.json` - Node.js dependencies

@@ -1536,12 +1536,19 @@ Dark-themed responsive page with:
 ### Play Page
 **File**: `web/play/index.html`, served at `/play/` (the folder index; no nginx rule needed)
 
-- A full page terminal: xterm.js 5.5.0, always 80 columns, with the font the largest size from 20px down to 12px that fits 80 columns and 25 rows. On a phone the 80 columns stay at 12px and slide sideways.
+- A full page terminal: xterm.js 5.5.0, always 80 columns, with the font the largest size from 20px down to 12px that fits 80 columns and 25 rows. With a mouse, a phone width keeps the 80 columns at 12px and slides them sideways.
+- Touch screens (`(hover: none) and (pointer: coarse)`: phones and tablets) get `body.touch`:
+  - The font fits all 80 columns to the width, in 0.25px steps down to 4px ("whole screen", the default). The Aa button in the top bar switches to the 12px floor that slides sideways; the choice is kept as `playFit` in localStorage.
+  - A tap pad sits under the terminal, or beside it when the stage is wider than 1.3 times its height. It shows the options of the current screen as buttons: `[K] Label`, `[E]nter`, `[AUTO]` and the like, read from the xterm buffer from the cursor up to the row where the player last pressed Enter (an xterm marker), the previous game prompt, or the top of the screen.
+  - A tap sends the key and Enter, since the game reads lines. A yes or no question offers the two letters its `(x/y)` prompt shows, so (S/N) and (O/N) work. A question ending in a colon offers the keyboard; a screen with nothing to pick lights Enter.
+  - Fixed keys: Enter, Back (0x7f), Keys (every key, one character per tap) and Type (focuses the terminal to raise the phone keyboard; the pad steps aside until it closes).
+  - A compass shows the `Room.Info` exits that are compass directions when the screen also offers that key. The dungeon sends `Room.Info` when the player moves to a room, so it appears from the first step.
+  - The terminal is not focused on connect or on a tap, so the phone keyboard opens only from Type.
 - Opens `/ws?gmcp=1`, so the proxy splits the stream (below). Binary frames go to the terminal; text frames are GMCP as `{"gmcp": "Package.Name", "data": ...}`.
 - A status line under the terminal: HP and MP bars and the fight stamina (`Char.Vitals` hp, mp, combatSp and their maximums), level and gold (`Char.Status`) and the location name (`Room.Info`). `Char.Vitals.sp` is the Stamina stat, so it is not drawn.
 - A drawer with Combat and Chat. Combat lists enemies and party (`Char.Combat.Start`, `.Enemies`, `.Party`), marks a killed enemy dead (`Char.Combat.Killed`, since the game sends no enemy update after the last blow) and shows the result (`Char.Combat.End`, `Char.Death`). Chat keeps the last 200 `Comm.Channel.Text` lines; the player's own lines are not sent by the game, and `/history` shows the last 50 messages (`ChatHistoryStore.Capacity`), own lines included.
 - At 1200px and wider the drawer sits beside the terminal and opens on its own when a fight starts. Narrower, it lies over the terminal, so a fight marks the Combat button instead.
-- GMCP values are kept only as strings or finite numbers and drawn with `textContent`; the page script has no HTML sinks (`web/test/play-page.test.js`). UI strings are the `play.*` keys in `web/lang/*.json`.
+- GMCP values are kept only as strings or finite numbers and drawn with `textContent`; the page script has no HTML sinks (`web/test/play-page.test.js`; the pad in `web/test/play-pad.test.js`). UI strings are the `play.*` keys in `web/lang/*.json`.
 
 ### Web Proxy
 **File**: `web/ssh-proxy.js` (Node.js, port 3000)
