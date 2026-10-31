@@ -1570,14 +1570,13 @@ Dark-themed responsive page with:
 ### NPC Analytics Dashboard ("The Observatory")
 **File**: `web/dashboard.html`
 
-Public dashboard at `/dashboard`. Real-time observation of the NPC simulation:
-- World Map: location grid with NPC dots colored by faction, sized by level
-- NPC Detail: personality radar (13 traits), emotional state bars, goals, memories, relationships
-- Demographics: class / race / faction doughnut charts, level histogram (Chart.js)
-- Relationship Network: D3.js force-directed graph
-- Live Event Timeline: SSE feed via `/api/dash/feed`
-- Trend Charts: events/hour, alive/dead breakdown
-- 6 endpoints under `/api/dash/` (feed, npcs, summary, events, events/hourly, history)
+Public page at `/dashboard`, in the site theme, with four tabs (Now, Town, Power, People) and a full-width NPC profile. Every value is drawn with textContent; no chart library.
+- Now: headline numbers (NPCs alive, players online, treasury, ruler, god of the week, world boss), hourly trend sparklines when `/api/dash/history` answers, the Chronicle (`/api/dash/events` plus the SSE `news` event of `/api/dash/feed`) with kind chips and watched names, players online from `/api/stats`
+- Town: living NPCs by place as a ranked list and a tile map shaded in five steps; unknown places grouped as Elsewhere
+- Power: the crown, factions, teams, movers, deaths by depth, the market
+- People: directory with filters, wealthiest, highest level, feuds and friendships, seeking a partner, fallen heroes, leaderboard and PvP from `/api/stats`
+- Watched NPCs and teams are kept in the viewer's localStorage
+- Endpoints under `/api/dash/`: people, profile, ties, realm, movers, depths, market, fallen (`web/dash-observatory.js`), history, events, events/hourly, feed (SSE, `news` only)
 - Hourly history: the MUD's world sim writes one `world_snapshots` row per UTC hour (NPCs alive, dead and married, children, treasury, players online, and the births, NPC deaths and marriages since the previous row), kept 90 days; `/api/dash/history?hours=24|168|720` reads it
 
 **Known limit of the history counts.** Only the MUD server process counts events, because it owns the world. On the official server, online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the MUD that shares the database adds no counts. Deaths are recorded deaths and can be slightly off on rare revival or concurrent paths.
@@ -2032,7 +2031,7 @@ Scripts/
 
 web/
 ├── index.html                      Landing page + stats
-├── dashboard.html                  NPC Analytics Dashboard
+├── dashboard.html                  The Observatory (public town dashboard)
 ├── admin.html                      Admin console (bots, bans, settings, players)
 ├── steam.html                      Steam landing page
 ├── play/index.html                 Full page terminal at /play/ with GMCP panels

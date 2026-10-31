@@ -312,7 +312,7 @@
   "connect.steam_desc": "Puedes conseguir Usurper Reborn en Steam, con terminal y fuentes incluidos.",
   "connect.steam_btn": "Obtener en Steam",
   "connect.observatory_title": "&#9658; El Observatorio",
-  "connect.observatory_desc": "El Observatorio es un panel en vivo de los NPCs del pueblo. Muestra gráficos de personalidad, mapas de relaciones, cifras de población y eventos en vivo.",
+  "connect.observatory_desc": "El Observatorio es una vista en directo del reino: quién gobierna, qué está pasando, dónde está cada uno y a quién conviene conocer.",
   "connect.observatory_btn": "Abrir Panel de Control",
   "bbs.title": "LISTA DE BBS",
   "bbs.subtitle": "BBSes que están ejecutando Usurper Reborn como juego de puerta ahora mismo.",

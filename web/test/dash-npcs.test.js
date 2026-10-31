@@ -1,6 +1,6 @@
 'use strict';
-// /api/dash/npcs is public: web/dash-npcs.js sends an allow-list of the fields the dashboard reads,
-// and nothing about a player character.
+// web/dash-npcs.js builds the public NPC list behind the Observatory (/api/dash/profile and ties): an
+// allow-list of the fields the page reads, and nothing about a player character.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -103,12 +103,26 @@ test('odd input never throws and never passes a raw value', () => {
   assert.deepStrictEqual(odd.memories, []);
 });
 
-test('/api/dash/npcs sends the public list', () => {
+test('the raw and public NPC lists are not served whole; the Observatory reads the public list', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'ssh-proxy.js'), 'utf8');
-  const route = src.slice(src.indexOf("url === '/api/dash/npcs'"), src.indexOf("url === '/api/dash/summary'"));
-  assert.match(route, /sendJson\(res, 200, getDashPublicNpcs\(\)\);/);
-  assert.ok(!/sendJson\(res, 200, (npcs|getDashNpcs\(\))\)/.test(route));
+  assert.ok(!src.includes("'/api/dash/npcs'"), 'no /api/dash/npcs route');
+  assert.ok(!src.includes("'/api/dash/summary'"), 'no /api/dash/summary route');
+  assert.ok(!/npc-snapshot/.test(src), 'no NPC snapshot on the event stream');
+  assert.match(src, /getPublicNpcs: getDashPublicNpcs,/);
+  assert.match(src, /dashPublicNpcCache = publicNpcs\(getDashNpcs\(\), getDashPlayerNames\(\)\);/);
   assert.match(src, /SELECT username, display_name FROM players/);
+});
+
+test('the children list is not served; only its count reaches the stats', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'ssh-proxy.js'), 'utf8');
+  const read = "SELECT value FROM world_state WHERE key = 'children'";
+  const at = src.indexOf(read);
+  assert.ok(at > 0, 'the count read is there');
+  assert.strictEqual(src.indexOf(read, at + 1), -1, 'one children read only');
+  const body = src.slice(at, src.indexOf('} catch', at));
+  assert.match(body, /childrenCount = childData\.count \|\| 0;/);
+  assert.ok(!/childData\.children|childrenRaw/.test(body), 'no child rows leave this read');
+  assert.ok(!src.includes('publicChildren'), 'no children projection is served');
 });
 
 test('a team name that holds a player name is left out; others stay', () => {
@@ -138,15 +152,17 @@ test('a relationship or memory keyed by an NPC id is kept under that NPC name; u
   assert.ok(!JSON.stringify(mord).includes('guid-'));
 });
 
-test('the old dashboard draws the filtered list without errors (table, notable bar, detail with goals and memories)', async () => {
-  const p = await loadPage('dashboard.html', { fetch: () => [] });
-  p.ctx.__npcs = publicNpcs(NPCS, PLAYERS);
-  p.run('allNpcs = __npcs; renderNpcTable(allNpcs); updateNotableHighlights();');
-  assert.ok(p.el('npc-table-body').innerHTML.includes('Elara Vane'));
-  p.run("selectedNpc = 'Elara Vane'; showNpcDetail(__npcs[0]);");
-  const detail = p.el('detail-content').innerHTML;
-  assert.ok(detail.includes('Make Friends'), 'goal shown');
-  assert.ok(detail.includes('I helped Sir Galahad'), 'memory shown');
-  assert.ok(!detail.includes('HrothgarZq'));
+test('the Observatory profile draws a public entry without errors (goals and memories, no player name)', async () => {
+  const entry = publicNpcs(NPCS, PLAYERS)[0];
+  const p = await loadPage('dashboard.html', {
+    fetch: (url) => (url === '/api/dash/profile?name=' + encodeURIComponent('Elara Vane') ? entry : url === '/api/dash/history?hours=24' ? { status: 404, body: { error: 'Not found' } } : []),
+  });
+  await p.run("Observatory.openProfile('Elara Vane')");
+  await p.settle();
+  const text = p.el('profile').textContent;
+  assert.ok(text.includes('Make Friends'), 'goal shown');
+  assert.ok(text.includes('I helped Sir Galahad'), 'memory shown');
+  assert.ok(!text.includes('HrothgarZq'));
   assert.deepStrictEqual(p.errors, []);
+  assert.strictEqual(p.run('JSON.stringify(Observatory.state.errors)'), '[]');
 });
