@@ -186,10 +186,9 @@ test('every play key the page uses is in all five languages', () => {
 
 test('the landing page Play buttons open /play/ in a new tab, and the old terminal is gone', () => {
   const html = readPage('index.html');
-  for (const key of ['r1.cta_play', 'connect.browser_btn', 'r1.finale_cta']) {
-    const re = new RegExp('<a class="btn [^"]*"(?: id="play-btn")? href="/play/" target="_blank" rel="noopener" data-i18n="' + key.replace(/\./g, '\\.') + '">');
-    assert.match(html, re, key);
-  }
+  assert.match(html, /<a class="btn btn-secondary" id="play-btn" href="\/play\/" target="_blank" rel="noopener" data-i18n="r1\.cta_play">/);
+  assert.match(html, /<a class="btn btn-primary" href="\/play\/" target="_blank" rel="noopener" data-i18n="connect\.browser_btn">/);
+  assert.match(html, /<a class="btn btn-secondary" href="\/play\/" target="_blank" rel="noopener" data-i18n="r1\.finale_cta">/);
   for (const gone of ['openTerminal', 'closeTerminal', 'terminal-section', 'terminal-container', '@xterm/', "new WebSocket("]) {
     assert.ok(!html.includes(gone), gone);
   }
