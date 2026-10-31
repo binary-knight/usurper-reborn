@@ -46,7 +46,7 @@ public class WorldSnapshotsO2Tests : IDisposable
             try { File.Delete(f); } catch { }
     }
 
-    private static DateTime Utc(int day, int hour, int minute = 0) => new(2026, 10, day, hour, minute, 0, DateTimeKind.Utc);
+    private static DateTime Utc(int day, int hour, int minute = 0, int second = 0) => new(2026, 10, day, hour, minute, second, DateTimeKind.Utc);
 
     private SqliteConnection Open()
     {
@@ -84,7 +84,7 @@ public class WorldSnapshotsO2Tests : IDisposable
     private void PutRow(string takenAt, long births = 0) =>
         Exec($"INSERT INTO world_snapshots VALUES ('{takenAt}', 1, 1, 1, 1, 1, 1, {births}, 0, 0);");
 
-    private static WorldSnapshotRow Row(long births = 0) => new(10, 2, 4, 3, 500, 1, births, 0, 0);
+    private static WorldSnapshotRow Row(long births = 0) => new(10, 2, 4, 3, 500, births, 0, 0);
 
     /// <summary>The roster replaced by the given NPCs (and the king by none) for the body, then put back.</summary>
     private static T WithRoster<T>(IEnumerable<NPC> roster, Func<T> body)
@@ -173,24 +173,30 @@ public class WorldSnapshotsO2Tests : IDisposable
     [Fact]
     public void ASecondWriteInTheSameHour_IsIgnored_AndTheFirstRowStands()
     {
-        Db.WriteWorldSnapshot(Utc(31, 14, 5), Row(births: 7)).Should().BeTrue();
-        Db.WriteWorldSnapshot(Utc(31, 14, 50), Row(births: 99)).Should().BeFalse();
+        Db.WriteWorldSnapshot(Utc(31, 14, 5), Row(births: 7)).Should().Be(WorldSnapshotWrite.Inserted);
+        Db.WriteWorldSnapshot(Utc(31, 14, 50), Row(births: 99)).Should().Be(WorldSnapshotWrite.AlreadyExists);
         var rows = Snapshots();
         rows.Should().HaveCount(1);
         rows[0]["births"].Should().Be(7L, "INSERT OR IGNORE keeps the first row of the hour");
     }
 
+    /// <summary>
+    /// A second world sim service in the same process and hour (the static counters are shared, as in one MUD
+    /// process): its row is already there, so it adds none and its counts wait for the next row. A real process
+    /// restart starts with empty counters and loses the counts not yet written.
+    /// </summary>
     [Fact]
-    public void ARestartInTheSameHour_AddsNoRow_AndKeepsTheCountsForTheNextRow()
+    public void ASecondServiceInTheSameProcessAndHour_AddsNoRow_AndKeepsTheCountsForTheNextRow()
     {
         WithRoster(new[] { Npc("o2_restart") }, () =>
         {
             new WorldSimService(Db).WriteHourlySnapshotIfDue(Utc(31, 14, 5)).Should().BeTrue();
             WorldSnapshotCounters.AddBirth();
-            var restarted = new WorldSimService(Db);
-            restarted.WriteHourlySnapshotIfDue(Utc(31, 14, 30)).Should().BeFalse();
+            var second = new WorldSimService(Db);
+            second.WriteHourlySnapshotIfDue(Utc(31, 14, 30)).Should().BeFalse();
             WorldSnapshotCounters.Births.Should().Be(1, "a row not written gives its counts back");
-            restarted.WriteHourlySnapshotIfDue(Utc(31, 15, 0)).Should().BeTrue();
+            second.WriteHourlySnapshotIfDue(Utc(31, 14, 45)).Should().BeFalse("the hour is done once its row is found");
+            second.WriteHourlySnapshotIfDue(Utc(31, 15, 0)).Should().BeTrue();
             return 0;
         });
         Snapshots().Select(r => (long)r["births"]!).Should().Equal(0L, 1L);
@@ -286,7 +292,7 @@ public class WorldSnapshotsO2Tests : IDisposable
         PutRow(Key(now.AddDays(-90).AddHours(-1)));
         PutRow(Key(now.AddDays(-90)));   // exactly 90 days: kept
         PutRow(Key(now.AddDays(-30)));
-        Db.WriteWorldSnapshot(now, Row()).Should().BeTrue();
+        Db.WriteWorldSnapshot(now, Row()).Should().Be(WorldSnapshotWrite.Inserted);
         Snapshots().Select(r => (string)r["taken_at"]!).Should().Equal(
             Key(now.AddDays(-90)), Key(now.AddDays(-30)), Key(now));
     }
@@ -296,9 +302,9 @@ public class WorldSnapshotsO2Tests : IDisposable
     {
         var now = Utc(31, 12, 20);
         _ = Db;
-        Db.WriteWorldSnapshot(now, Row()).Should().BeTrue();
+        Db.WriteWorldSnapshot(now, Row()).Should().Be(WorldSnapshotWrite.Inserted);
         PutRow(SqlSaveBackend.WorldSnapshotHourKey(now.AddDays(-100)));
-        Db.WriteWorldSnapshot(now.AddMinutes(10), Row()).Should().BeFalse();
+        Db.WriteWorldSnapshot(now.AddMinutes(10), Row()).Should().Be(WorldSnapshotWrite.AlreadyExists);
         Snapshots().Select(r => (string)r["taken_at"]!).Should().Equal(SqlSaveBackend.WorldSnapshotHourKey(now));
     }
 
@@ -403,6 +409,164 @@ public class WorldSnapshotsO2Tests : IDisposable
         finally { NPCMarriageRegistry.Instance.EndMarriage(a.ID); }
     }
 
+    // ---------- retries, failures and the lock ----------
+
+    [Fact]
+    public void AFailedWrite_GivesTheCountsBack_AndATryLaterInTheHourWritesTheRow()
+    {
+        _ = Db;
+        Exec("DROP TABLE world_snapshots;");   // the write fails
+        var sim = new WorldSimService(Db, simIntervalSeconds: 60);
+        WorldSnapshotCounters.AddBirth();
+        WithRoster(new[] { Npc("o2_fail") }, () =>
+        {
+            sim.WriteHourlySnapshotIfDue(Utc(31, 16, 0)).Should().BeFalse();
+            WorldSnapshotCounters.Births.Should().Be(1, "a failed write gives the counts back");
+            _ = new SqlSaveBackend(_path);   // the table is back
+            SqliteConnection.ClearAllPools();
+            sim.WriteHourlySnapshotIfDue(Utc(31, 16, 0, 30)).Should().BeFalse("the next try waits one sim interval");
+            sim.WriteHourlySnapshotIfDue(Utc(31, 16, 1)).Should().BeTrue("the hour is tried again after a failure");
+            return 0;
+        });
+        var row = Snapshots().Single();
+        row["taken_at"].Should().Be("2026-10-31T16:00:00Z");
+        row["births"].Should().Be(1L);
+        WorldSnapshotCounters.Births.Should().Be(0);
+    }
+
+    [Fact]
+    public void AFailingHour_IsTriedAtMostFiveTimes()
+    {
+        _ = Db;
+        Exec("DROP TABLE world_snapshots;");
+        var sim = new WorldSimService(Db, simIntervalSeconds: 1);
+        int tries = 0;
+        sim.BeforeSnapshotGaugeRead = () => tries++;
+        WithRoster(Array.Empty<NPC>(), () =>
+        {
+            for (int s = 0; s < 3600; s++) sim.WriteHourlySnapshotIfDue(Utc(31, 17, 0).AddSeconds(s));
+            return 0;
+        });
+        tries.Should().Be(WorldSimService.SnapshotMaxTriesPerHour);
+    }
+
+    [Fact]
+    public void AGaugeReadFailure_WritesNoRow_KeepsTheCounts_AndIsTriedAgain()
+    {
+        var sim = new WorldSimService(Db, simIntervalSeconds: 60);
+        bool fail = true;
+        sim.BeforeSnapshotGaugeRead = () => { if (fail) throw new InvalidOperationException("Collection was modified"); };
+        WorldSnapshotCounters.AddMarriage();
+        WithRoster(new[] { Npc("o2_gauge") }, () =>
+        {
+            sim.WriteHourlySnapshotIfDue(Utc(31, 18, 0)).Should().BeFalse();
+            Snapshots().Should().BeEmpty("no row from a gauge that could not be read");
+            WorldSnapshotCounters.Marriages.Should().Be(1);
+            fail = false;
+            sim.WriteHourlySnapshotIfDue(Utc(31, 18, 2)).Should().BeTrue();
+            return 0;
+        });
+        var row = Snapshots().Single();
+        (row["npcs_alive"], row["marriages"]).Should().Be((1L, 1L));
+    }
+
+    [Fact]
+    public void TwoOwners_OnlyTheLockHolderWrites_AndTheOtherKeepsItsCounts()
+    {
+        Db.TryAcquireWorldSimLock("mud_a").Should().BeTrue();
+        var a = new WorldSimService(Db, heartbeatOwnerId: "mud_a");
+        var b = new WorldSimService(Db, heartbeatOwnerId: "mud_b");
+        WithRoster(new[] { Npc("o2_owner") }, () =>
+        {
+            Db.TakeOverWorldSimLock("mud_b");   // b takes the lock over; a has lost it
+            WorldSnapshotCounters.AddDeath();
+            a.WriteHourlySnapshotIfDue(Utc(31, 19, 0)).Should().BeFalse();
+            Snapshots().Should().BeEmpty("a process that lost the lock writes nothing");
+            WorldSnapshotCounters.Deaths.Should().Be(1, "and keeps its counters");
+            b.WriteHourlySnapshotIfDue(Utc(31, 19, 0)).Should().BeTrue();
+            return 0;
+        });
+        Snapshots().Single()["deaths"].Should().Be(1L);
+    }
+
+    // ---------- a lethal duel ----------
+
+    private static async Task PvPOutcome(Character player, NPC opponent, bool lethal = true, CombatOutcome outcome = CombatOutcome.Victory)
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        typeof(CombatEngine).GetField("_pvpLethal", INP)!.SetValue(engine, lethal);
+        await (Task)typeof(CombatEngine).GetMethod("DeterminePvPOutcome", INP)!
+            .Invoke(engine, new object[] { new CombatResult { Player = player, Opponent = opponent, Outcome = outcome } })!;
+    }
+
+    private static Character Hunter() =>
+        new() { Name1 = "o2_hunter", Name2 = "O2 Hunter", Level = 30, HP = 500, MaxHP = 500, Gold = 0 };
+
+    /// <summary>
+    /// The Anchor Road bounty hunt: a lethal PlayerVsPlayer against a roster NPC that ends at 0 HP. One death,
+    /// not counted again by the world sim's dead scan or a later world sim kill of the corpse; after it lives
+    /// again, its next death counts.
+    /// </summary>
+    [Fact]
+    public async Task ALethalBountyKill_OfARosterNpc_CountsOnce_AndTheDeadScanDoesNotCountItAgain()
+    {
+        var target = Npc("o2_bounty_mark", hp: 0);
+        var sim = new WorldSimulator();
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        var saved = active.ToList();
+        var party = GameEngine.Instance.DungeonPartyNPCIds.ToList();
+        try
+        {
+            active.Clear();
+            active.Add(target);
+            GameEngine.Instance.SetDungeonPartyNPCs(Array.Empty<string>());
+            await PvPOutcome(Hunter(), target);
+            WorldSnapshotCounters.Deaths.Should().Be(1);
+            sim.TrackDeadNPCsForRespawn();
+            sim.TrackDeadNPCsForRespawn();
+            WorldSnapshotCounters.Deaths.Should().Be(1, "the dead scan counts no death");
+            sim.MarkNPCDead(target, 0f, "A Killer", "Inn");
+            WorldSnapshotCounters.Deaths.Should().Be(1, "the same death seen by a second path counts once");
+
+            target.IsDead = false; target.HP = target.MaxHP;   // respawned
+            sim.TrackDeadNPCsForRespawn();
+            target.HP = 0;
+            await PvPOutcome(Hunter(), target);
+            WorldSnapshotCounters.Deaths.Should().Be(2, "a new death after the NPC lived again counts");
+        }
+        finally
+        {
+            active.Clear();
+            active.AddRange(saved);
+            GameEngine.Instance.SetDungeonPartyNPCs(party);
+        }
+    }
+
+    [Fact]
+    public async Task ASparedOrNonlethalDuel_OrAnOpponentOutsideTheRoster_CountsNoDeath()
+    {
+        var spared = Npc("o2_spared", hp: 1);
+        var duelled = Npc("o2_duelled", hp: 0);
+        var stranger = Npc("o2_stranger", hp: 0);
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        var saved = active.ToList();
+        try
+        {
+            active.Clear();
+            active.Add(spared);
+            active.Add(duelled);
+            await PvPOutcome(Hunter(), spared, outcome: CombatOutcome.OpponentSpared);
+            await PvPOutcome(Hunter(), duelled, lethal: false);
+            await PvPOutcome(Hunter(), stranger);
+            WorldSnapshotCounters.Deaths.Should().Be(0);
+        }
+        finally
+        {
+            active.Clear();
+            active.AddRange(saved);
+        }
+    }
+
     // ---------- the hooks inside interactive flows ----------
 
     private static string RepoRoot()
@@ -420,9 +584,9 @@ public class WorldSnapshotsO2Tests : IDisposable
     /// the flag it flips.
     /// </summary>
     [Theory]
-    [InlineData("Scripts/Locations/MagicShopLocation.cs", "WorldSnapshotCounters.AddDeath()", 1, "targetNPC.IsDead = true;")]
-    [InlineData("Scripts/Locations/CastleLocation.cs", "WorldSnapshotCounters.AddDeath()", 1, "npc.IsDead = true;")]
-    [InlineData("Scripts/Systems/StreetEncounterSystem.cs", "WorldSnapshotCounters.AddDeath()", 1, "realNpc.IsDead = true;")]
+    [InlineData("Scripts/Locations/MagicShopLocation.cs", "WorldSnapshotCounters.CountNpcDeath(targetNPC)", 1, "targetNPC.IsDead = true;")]
+    [InlineData("Scripts/Locations/CastleLocation.cs", "WorldSnapshotCounters.CountNpcDeath(npc)", 1, "npc.IsDead = true;")]
+    [InlineData("Scripts/Systems/StreetEncounterSystem.cs", "WorldSnapshotCounters.CountNpcDeath(realNpc)", 1, "realNpc.IsDead = true;")]
     [InlineData("Scripts/Locations/CastleLocation.cs", "WorldSnapshotCounters.AddMarriage()", -2, "candidate.SpouseName = currentPlayer.Name2;")]
     [InlineData("Scripts/Systems/VisualNovelDialogueSystem.cs", "WorldSnapshotCounters.AddMarriage()", -2, "npc.SpouseName = player.Name2;")]
     public void AnInteractiveSite_CallsItsCounter_NextToItsFlag(string file, string call, int offset, string flag)

@@ -4160,7 +4160,7 @@ public partial class MagicShopLocation : BaseLocation
             WrappedLine($"  {Loc.Get("magic_shop.dark_done", targetNPC.Name1)}", "cyan");
 
             // Kill the NPC — will respawn after world sim cycle
-            if (!targetNPC.IsDead) WorldSnapshotCounters.AddDeath();   // O2: a death for the hourly world snapshot
+            WorldSnapshotCounters.CountNpcDeath(targetNPC);   // O2: a death for the hourly world snapshot
             targetNPC.IsDead = true;
             // targetNPC.IsPermaDead = true;  // Disabled — NPCs now respawn after death
             targetNPC.HP = 0;

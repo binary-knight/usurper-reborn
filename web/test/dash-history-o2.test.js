@@ -1,11 +1,10 @@
 'use strict';
 // O2: GET /api/dash/history. The section between its markers in web/ssh-proxy.js is cut out and run in a vm
-// context with an injected clock and a temp game database made with the table's real DDL, read from the C#
-// (SqlSaveBackend.cs), and opened read only as the server opens it.
+// context with an injected clock and an in memory game database made with the table's real DDL, read from the C#
+// (SqlSaveBackend.cs).
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const Database = require('better-sqlite3');
@@ -31,27 +30,23 @@ function tableDdl() {
   return m[0];
 }
 
-// A game database file with the table (unless table: false) and a row for each of the hours before NOW
-// (hours: 800 by default), plus one row in the future; returned open read only.
+// An in memory game database (no temp folder needed) with the table (unless table: false) and a row for each of
+// the hours before NOW (hours: 800 by default), plus one row in the future.
 function makeDb(options = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dash-history-'));
-  const file = path.join(dir, 'usurper_online.db');
-  const w = new Database(file);
+  const db = new Database(':memory:');
   if (options.table !== false) {
-    w.exec(tableDdl());
-    const put = w.prepare('INSERT INTO world_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    db.exec(tableDdl());
+    const put = db.prepare('INSERT INTO world_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     const hours = options.hours === undefined ? 800 : options.hours;
-    w.transaction(() => {
+    db.transaction(() => {
       for (let i = 0; i < hours; i++) put.run(key(NOW - i * HOUR), 100 + i, 5, 20, 7, 1000 * i, 2, 1, 0, 1);
       put.run(key(NOW + HOUR), 0, 0, 0, 0, 0, 0, 0, 0, 0);
     })();
   }
-  w.close();
-  const db = new Database(file, { readonly: true, fileMustExist: true });
   return {
-    db, file,
-    write(sql, ...args) { const x = new Database(file); try { x.prepare(sql).run(...args); } finally { x.close(); } },
-    cleanup() { db.close(); fs.rmSync(dir, { recursive: true, force: true }); },
+    db,
+    write(sql, ...args) { db.prepare(sql).run(...args); },
+    cleanup() { db.close(); },
   };
 }
 

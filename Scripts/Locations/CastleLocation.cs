@@ -1746,7 +1746,7 @@ public class CastleLocation : BaseLocation
             var npc = NPCSpawnSystem.Instance?.GetNPCByName(name);
             if (npc != null)
             {
-                if (!npc.IsDead) WorldSnapshotCounters.AddDeath();   // O2: an execution for the hourly world snapshot
+                WorldSnapshotCounters.CountNpcDeath(npc);   // O2: an execution for the hourly world snapshot
                 npc.IsDead = true;
                 // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
                 npc.DaysInPrison = 0;

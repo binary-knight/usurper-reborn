@@ -3305,7 +3305,7 @@ public class StreetEncounterSystem
             if (realNpc != null)
             {
                 realNpc.HP = 0;
-                if (!realNpc.IsDead) WorldSnapshotCounters.AddDeath();   // O2: a murder for the hourly world snapshot
+                WorldSnapshotCounters.CountNpcDeath(realNpc);   // O2: a murder for the hourly world snapshot
                 realNpc.IsDead = true;
                 // realNpc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
             }
