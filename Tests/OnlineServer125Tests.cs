@@ -737,8 +737,8 @@ public class OnlineServer125Tests : IDisposable
         {
             var rows = MudServer.AuthBoxRows(L(lang, "auth.title"), new[]
             {
-                ("1;36", "L", L(lang, "auth.login")), ("1;32", "R", L(lang, "auth.register")),
-                ("1;35", "G", $"{L(lang, "auth.language")} (Magyar (AI Translated))"), ("1;31", "Q", L(lang, "auth.quit")),
+                (MudServer.AuthMenuColor, "L", L(lang, "auth.login")), (MudServer.AuthMenuColor, "R", L(lang, "auth.register")),
+                (MudServer.AuthMenuColor, "G", $"{L(lang, "auth.language")} (Magyar (AI Translated))"), (MudServer.AuthQuitColor, "Q", L(lang, "auth.quit")),
             }).Select(UIHelper.StripAnsi).ToList();
             rows.Should().OnlyContain(r => r.Length == MaxWidth, lang);
             rows.Should().Contain(r => r.Contains(L(lang, "auth.login")));
