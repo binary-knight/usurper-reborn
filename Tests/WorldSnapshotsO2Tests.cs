@@ -705,6 +705,61 @@ public class WorldSnapshotsO2Tests : IDisposable
         WorldSnapshotCounters.Deaths.Should().Be(Deaths);
     }
 
+    // ---------- a duel victim brought back at full HP, IsDead never set ----------
+
+    /// <summary>Killed in a lethal duel (HP 0, IsDead false, counted), brought back by revive, then killed again.</summary>
+    private async Task<long> DuelKillRevivedAndKilledAgain(NPC victim, Action revive)
+    {
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        var saved = active.ToList();
+        try
+        {
+            active.Clear();
+            active.Add(victim);
+            victim.HP = 0;
+            await PvPOutcome(Hunter(), victim);
+            victim.IsDead.Should().BeFalse();
+            revive();
+            victim.IsAlive.Should().BeTrue();
+            victim.HP = 0;
+            await PvPOutcome(Hunter(), victim);
+        }
+        finally
+        {
+            active.Clear();
+            active.AddRange(saved);
+        }
+        return WorldSnapshotCounters.Deaths;
+    }
+
+    [Fact]
+    public async Task APartyHeal_ThenASecondDeath_CountsTwo()
+    {
+        var victim = Npc("o2_party_heal"); victim.Team = "O2 Heal Crew";
+        var player = new Character { Name1 = "O2 Healer", Name2 = "O2 Healer", Team = "O2 Heal Crew", Level = 10, HP = 100, MaxHP = 100 };
+        (await DuelKillRevivedAndKilledAgain(victim, () => CompanionSystem.Instance.RestoreAllPartyHP(player))).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task APrisonRelease_ThenASecondDeath_CountsTwo()
+    {
+        var victim = Npc("o2_prison_release");
+        (await DuelKillRevivedAndKilledAgain(victim, () => NPCSpawnSystem.Instance.ReleaseNPC(victim))).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ARespawnThatFindsTheNpcAlreadyBack_ThenASecondDeath_CountsTwo()
+    {
+        var victim = Npc("o2_already_back");
+        var sim = new WorldSimulator();
+        (await DuelKillRevivedAndKilledAgain(victim, () =>
+        {
+            sim.TrackDeadNPCsForRespawn();     // queued while at 0 HP
+            victim.HP = victim.MaxHP;          // back by a path with no hook of its own
+            Respawn(sim, victim);              // the respawn drops the timer of an NPC already alive
+        })).Should().Be(2);
+    }
+
     // ---------- the hooks inside interactive flows ----------
 
     private static string RepoRoot()

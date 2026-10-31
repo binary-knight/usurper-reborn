@@ -1579,7 +1579,7 @@ Public page at `/dashboard`, in the site theme, with four tabs (Now, Town, Power
 - Endpoints under `/api/dash/`: people, profile, ties, realm, movers, depths, market, fallen (`web/dash-observatory.js`), history, events, events/hourly, feed (SSE, `news` only)
 - Hourly history: the MUD's world sim writes one `world_snapshots` row per UTC hour (NPCs alive, dead and married, children, treasury, players online, and the births, NPC deaths and marriages since the previous row), kept 90 days; `/api/dash/history?hours=24|168|720` reads it
 
-**Known limit of the history counts.** Only the MUD server process counts events, because it owns the world. On the official server, online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the MUD that shares the database adds no counts.
+**Known limit of the history counts.** Only the MUD server process counts events, because it owns the world. On the official server, online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the MUD that shares the database adds no counts. Deaths are recorded deaths and can undercount on rare revival paths.
 
 ---
 

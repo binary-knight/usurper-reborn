@@ -1341,6 +1341,8 @@ public class WorldSimulator
                 // healed, or a Downed ally back up) drops its timer: no full heal, no gold loss, no news line.
                 if (!((!npc.IsAlive || npc.IsDead) && !npc.IsDowned))
                 {
+                    // O2: brought back by another path (a heal, a release), so its next death counts
+                    if (npc.IsAlive && !npc.IsDead) UsurperRemake.Systems.WorldSnapshotCounters.NpcRevived(npc);
                     deadNPCRespawnTimers.Remove(npcName);
                     continue;
                 }
