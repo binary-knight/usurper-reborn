@@ -22,6 +22,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
+const { publicNpcs } = require('./dash-npcs');
 const { publicChildren } = require('./dash-public');
 
 let bcrypt;
@@ -1148,6 +1149,32 @@ function getDashNpcs() {
     console.error(`[usurper-web] Dashboard NPC query error: ${err.message}`);
     return dashNpcCache || [];
   }
+}
+
+// The public NPC list for /api/dash/npcs (dash-npcs.js), rebuilt at most once per NPC cache period.
+// Player character names and login names are read here only to keep them out of it; they are
+// never sent.
+let dashPublicNpcCache = null;
+let dashPublicNpcCacheTime = 0;
+function getDashPublicNpcs() {
+  const now = Date.now();
+  if (dashPublicNpcCache && (now - dashPublicNpcCacheTime) < DASH_NPC_CACHE_TTL) return dashPublicNpcCache;
+  const playerNames = new Set();
+  try {
+    for (const r of db.prepare('SELECT username, display_name FROM players').all()) {
+      if (r.username) playerNames.add(String(r.username).toLowerCase());
+      if (r.display_name) playerNames.add(String(r.display_name).toLowerCase());
+    }
+  } catch (err) {
+    // Without the player list nothing about other characters can be checked, so none is sent.
+    console.error(`[usurper-web] Dashboard player name query error: ${err.message}`);
+    dashPublicNpcCache = publicNpcs(getDashNpcs(), null);
+    dashPublicNpcCacheTime = now;
+    return dashPublicNpcCache;
+  }
+  dashPublicNpcCache = publicNpcs(getDashNpcs(), playerNames);
+  dashPublicNpcCacheTime = now;
+  return dashPublicNpcCache;
 }
 
 // Read royal court data from world_state (the authoritative source).
@@ -2948,8 +2975,7 @@ async function handleDashRequest(req, res) {
 
   // Data endpoints
   if (method === 'GET' && url === '/api/dash/npcs') {
-    const npcs = getDashNpcs();
-    sendJson(res, 200, npcs);
+    sendJson(res, 200, getDashPublicNpcs());
     return true;
   }
 
