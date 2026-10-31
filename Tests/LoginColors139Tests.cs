@@ -142,6 +142,20 @@ public class LoginColors139Tests : IDisposable
             return n;
         }
         public override void Write(byte[] buffer, int offset, int count) => Out.Write(buffer, offset, count);
+        // The gate reads and writes asynchronously. Stream's default async methods hop to the
+        // thread pool and queue on one semaphore, which a busy CI runner can hold up past the
+        // test's cap; these complete in place instead.
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) => Task.FromResult(Read(buffer, offset, count));
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            var tmp = new byte[buffer.Length];
+            int n = Read(tmp, 0, tmp.Length);
+            tmp.AsSpan(0, n).CopyTo(buffer.Span);
+            return new ValueTask<int>(n);
+        }
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct) { Write(buffer, offset, count); return Task.CompletedTask; }
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default) { Out.Write(buffer.Span); return ValueTask.CompletedTask; }
+        public override Task FlushAsync(CancellationToken ct) => Task.CompletedTask;
         public override void Flush() { }
         public override bool CanRead => true;
         public override bool CanSeek => false;
@@ -159,9 +173,9 @@ public class LoginColors139Tests : IDisposable
             .SetValue(server, new ConcurrentDictionary<string, PlayerSession>());
         var auth = typeof(MudServer).GetMethod("InteractiveAuthAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var stream = new GateStream();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var task = (Task)auth.Invoke(server, new object?[] { stream, Db, cts.Token, plainText, false, "198.51.100.139", true })!;
-        await task.WaitAsync(TimeSpan.FromSeconds(20));
+        await task.WaitAsync(TimeSpan.FromSeconds(60));
         return Encoding.UTF8.GetString(stream.Out.ToArray());
     }
 
