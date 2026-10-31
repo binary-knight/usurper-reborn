@@ -7,10 +7,11 @@ namespace UsurperRemake.Systems
     /// by the code paths that create a child, kill a roster NPC and marry two characters. Player events count too,
     /// with no names. The MUD's world sim reads and resets them when it writes the hour's row
     /// (WorldSimService.WriteHourlySnapshotIfDue); a row that is not written gives its counts back. Thread safe.
-    /// Known limits: events only count in the MUD server process, which owns the world. Online play reaches the MUD
-    /// process three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port
-    /// 4001. BBS doors and standalone play keep their own databases, and the Observatory never reads those. Counts
-    /// not yet written are held in memory only, so a real process restart loses them.
+    /// Known limits. Only the MUD server process counts events, because it owns the world. On the official server,
+    /// online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through
+    /// haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the
+    /// MUD that shares the database adds no counts. Counts not yet written are held in memory only, so a real process
+    /// restart loses them.
     /// </summary>
     public static class WorldSnapshotCounters
     {
@@ -28,9 +29,10 @@ namespace UsurperRemake.Systems
         public static void AddMarriage() => Interlocked.Increment(ref _marriages);
 
         /// <summary>
-        /// A roster NPC died, permanent or not: counted unless it is already dead or this death is already counted
-        /// (NPC.SnapshotDeathCounted, set here and cleared by the world sim's dead scan once the NPC lives again).
-        /// Called before the site sets IsDead. Returns whether it counted.
+        /// A roster NPC died, permanent or not: counted only when it is not already dead and its death mark
+        /// (NPC.SnapshotDeathCounted) changes from 0 to 1, so one death seen by two paths or two threads counts once.
+        /// The mark is set back to 0 only by NpcRevived, at each place that brings the NPC back to life. Called
+        /// before the site sets IsDead. Returns whether it counted.
         /// </summary>
         public static bool CountNpcDeath(NPC npc)
         {
@@ -40,8 +42,15 @@ namespace UsurperRemake.Systems
             return true;
         }
 
-        /// <summary>The NPC lives again, so its next death counts.</summary>
-        internal static void ClearNpcDeathMark(NPC npc) => Interlocked.Exchange(ref npc.SnapshotDeathCounted, 0);
+        /// <summary>
+        /// The NPC was brought back to life (respawn, Home or Team Corner resurrection), so its next death counts.
+        /// The reset lives at revival, not in a scan: a scan can run between a death's count and its IsDead flag, or
+        /// miss a revival and a new death that both happen between two scans.
+        /// </summary>
+        public static void NpcRevived(NPC npc)
+        {
+            if (npc != null) Interlocked.Exchange(ref npc.SnapshotDeathCounted, 0);
+        }
 
         public static long Births => Interlocked.Read(ref _births);
         public static long Deaths => Interlocked.Read(ref _deaths);

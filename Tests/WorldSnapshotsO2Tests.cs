@@ -504,8 +504,8 @@ public class WorldSnapshotsO2Tests : IDisposable
 
     /// <summary>
     /// The Anchor Road bounty hunt: a lethal PlayerVsPlayer against a roster NPC that ends at 0 HP. One death,
-    /// not counted again by the world sim's dead scan or a later world sim kill of the corpse; after it lives
-    /// again, its next death counts.
+    /// not counted again by the world sim's dead scan or a later world sim kill of the corpse; after the respawn
+    /// brings it back, its next death counts, with no scan between.
     /// </summary>
     [Fact]
     public async Task ALethalBountyKill_OfARosterNpc_CountsOnce_AndTheDeadScanDoesNotCountItAgain()
@@ -528,8 +528,8 @@ public class WorldSnapshotsO2Tests : IDisposable
             sim.MarkNPCDead(target, 0f, "A Killer", "Inn");
             WorldSnapshotCounters.Deaths.Should().Be(1, "the same death seen by a second path counts once");
 
-            target.IsDead = false; target.HP = target.MaxHP;   // respawned
-            sim.TrackDeadNPCsForRespawn();
+            Respawn(sim, target);
+            target.IsAlive.Should().BeTrue();
             target.HP = 0;
             await PvPOutcome(Hunter(), target);
             WorldSnapshotCounters.Deaths.Should().Be(2, "a new death after the NPC lived again counts");
@@ -565,6 +565,144 @@ public class WorldSnapshotsO2Tests : IDisposable
             active.Clear();
             active.AddRange(saved);
         }
+    }
+
+    // ---------- the death mark is reset where the NPC is brought back ----------
+
+    private static void Respawn(WorldSimulator sim, NPC npc)
+    {
+        var timers = (Dictionary<string, int>)typeof(WorldSimulator).GetField("deadNPCRespawnTimers", INP)!.GetValue(sim)!;
+        timers[npc.Id ?? npc.Name] = 1;
+        typeof(WorldSimulator).GetMethod("ProcessNPCRespawns", INP)!.Invoke(sim, null);
+    }
+
+    private static T InRoster<T>(IEnumerable<NPC> roster, Func<T> body)
+    {
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        var saved = active.ToList();
+        var party = GameEngine.Instance.DungeonPartyNPCIds.ToList();
+        try
+        {
+            active.Clear();
+            active.AddRange(roster);
+            GameEngine.Instance.SetDungeonPartyNPCs(Array.Empty<string>());
+            return body();
+        }
+        finally
+        {
+            active.Clear();
+            active.AddRange(saved);
+            GameEngine.Instance.SetDungeonPartyNPCs(party);
+        }
+    }
+
+    [Fact]
+    public void ARespawn_ThenADeathInTheSameTickBeforeAnyScan_CountsTwo()
+    {
+        var npc = Npc("o2_twice");
+        var sim = new WorldSimulator();
+        InRoster(new[] { npc }, () =>
+        {
+            sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+            Respawn(sim, npc);
+            npc.IsDead.Should().BeFalse();
+            sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+            return 0;
+        });
+        WorldSnapshotCounters.Deaths.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ATeamCornerResurrection_ThenADeath_CountsTwo()
+    {
+        var npc = TeamCornerRig.Npc("o2_tc_res", "Resa Mark", "O2 Crew", level: 3);
+        var sim = new WorldSimulator();
+        var active = NPCSpawnSystem.Instance.ActiveNPCs;
+        active.Add(npc);
+        try
+        {
+            sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+            npc.IsDead.Should().BeTrue();
+            var hero = TeamCornerRig.Hero(team: "O2 Crew", gold: 10000);
+            await new TeamCornerRig(hero, new[] { "resa", "y", "" }).Run("ResurrectTeammate");
+            npc.IsDead.Should().BeFalse();
+            hero.Gold.Should().Be(7000);
+            sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+        }
+        finally { active.Remove(npc); }
+        WorldSnapshotCounters.Deaths.Should().Be(2);
+    }
+
+    [Fact]
+    public void AHomeResurrection_ThenADeath_CountsTwo()
+    {
+        var npc = Npc("o2_home_res"); npc.Level = 3;
+        var hero = new Character { Name1 = "O2 Home Hero", Name2 = "O2 Home Hero", Level = 20, HP = 300, MaxHP = 300, Gold = 10000 };
+        var sim = new WorldSimulator();
+        var romance = RomanceTracker.Instance;
+        var spouses = romance.Spouses.ToList();
+        var lovers = romance.CurrentLovers.ToList();
+        try
+        {
+            romance.Spouses.Clear(); romance.CurrentLovers.Clear();
+            romance.Spouses.Add(new Spouse { NPCId = npc.ID!, NPCName = npc.Name2 });
+            InRoster(new[] { npc }, () =>
+            {
+                sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+                var home = new HomeLocation();
+                var term = new TerminalEmulator(new LineStream(new[] { "1", "", "" }), new MemoryStream());
+                typeof(BaseLocation).GetField("terminal", INP)!.SetValue(home, term);
+                typeof(BaseLocation).GetField("currentPlayer", INP)!.SetValue(home, hero);
+                ((Task)typeof(HomeLocation).GetMethod("ResurrectAlly", INP)!.Invoke(home, null)!).GetAwaiter().GetResult();
+                npc.IsDead.Should().BeFalse();
+                hero.Gold.Should().Be(7000);
+                sim.MarkNPCDead(npc, 0f, "A Killer", "Inn");
+                return 0;
+            });
+        }
+        finally
+        {
+            romance.Spouses.Clear(); romance.Spouses.AddRange(spouses);
+            romance.CurrentLovers.Clear(); romance.CurrentLovers.AddRange(lovers);
+        }
+        WorldSnapshotCounters.Deaths.Should().Be(2);
+    }
+
+    [Fact]
+    public void AScanBetweenTheCountAndTheDeadFlag_DoesNotAllowASecondCount()
+    {
+        // an execution or a dark magic kill counts before it sets IsDead; the dead scan may run in between
+        var npc = Npc("o2_between");
+        var sim = new WorldSimulator();
+        InRoster(new[] { npc }, () =>
+        {
+            WorldSnapshotCounters.CountNpcDeath(npc).Should().BeTrue();
+            npc.IsAlive.Should().BeTrue("the flag is not set yet");
+            sim.TrackDeadNPCsForRespawn();
+            WorldSnapshotCounters.CountNpcDeath(npc).Should().BeFalse("the same death, seen again");
+            npc.IsDead = true;
+            return 0;
+        });
+        WorldSnapshotCounters.Deaths.Should().Be(1);
+    }
+
+    [Fact]
+    public void ThreadsCountingTheSameDeathAtOnce_CountIt_Once()
+    {
+        const int Deaths = 2000, Threads = 8;
+        var npcs = Enumerable.Range(0, Deaths).Select(i => Npc($"o2_race_{i}")).ToArray();
+        using var barrier = new System.Threading.Barrier(Threads);
+        var workers = Enumerable.Range(0, Threads).Select(_ => new System.Threading.Thread(() =>
+        {
+            foreach (var n in npcs)
+            {
+                barrier.SignalAndWait();
+                WorldSnapshotCounters.CountNpcDeath(n);
+            }
+        })).ToList();
+        workers.ForEach(t => t.Start());
+        workers.ForEach(t => t.Join());
+        WorldSnapshotCounters.Deaths.Should().Be(Deaths);
     }
 
     // ---------- the hooks inside interactive flows ----------
