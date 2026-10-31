@@ -474,12 +474,12 @@
         // On a wide tablet the drawer takes room from the stage, so the terminal is fitted again.
         if (isTouch()) queueFit();
     }
-    function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal) terminal.focus(); }
+    function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal && !isTouch()) terminal.focus(); }
     ['combat', 'chat'].forEach(function (name) {
         document.getElementById('rail-' + name).addEventListener('click', function () { toggleTab(name); });
         document.getElementById('tab-' + name).addEventListener('click', function () { setDrawer(name); });
     });
-    document.getElementById('drawer-close').addEventListener('click', function () { setDrawer(null); if (terminal) terminal.focus(); });
+    document.getElementById('drawer-close').addEventListener('click', function () { setDrawer(null); if (terminal && !isTouch()) terminal.focus(); });
 
     // ---- GMCP from the proxy: {"gmcp": "Package.Name", "data": ...} ----
     function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : null; }
@@ -510,6 +510,7 @@
             case 'Room.Info':
                 state.room = str(d.name, 80);
                 state.exits = compassExits(d.exits);
+                roomEnter = Object.keys(state.exits).length ? enterCount : -1;
                 renderVitals();
                 schedulePad();
                 break;
@@ -667,6 +668,9 @@
     var padKeys = false;
     var padTimer = 0;
     var inputMark = null;   // an xterm marker on the row where the player last pressed Enter
+    var enterCount = 0;     // Enters sent so far
+    var roomEnter = -1;     // enterCount when the last Room.Info with compass exits arrived
+    var clearMatched = 0;   // bytes of ESC [ 2 J matched at the end of the last chunk
     function isTouch() { return window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)').matches : false; }
     function applyTouch() {
         var touch = isTouch();
@@ -681,12 +685,35 @@
         if (!ws || ws.readyState !== 1) return;
         ws.send(data);
         // Whatever the game prints after an Enter is the next screen, so the pad reads only below it.
+        if (typeof data === 'string' && data.indexOf('\r') !== -1) enterCount++;
         if (typeof data === 'string' && data.indexOf('\r') !== -1 && terminal) {
             try {
                 if (inputMark) inputMark.dispose();
                 inputMark = terminal.registerMarker(0) || null;
             } catch (e) { inputMark = null; }
         }
+    }
+
+    // The room's exits belong to the screen the game drew with them: the compass shows only while
+    // no Enter has been sent since the last Room.Info. A fight or a bag opened in the room comes
+    // after an Enter, so its [E] or [S] never turns into an arrow.
+    function roomFresh(atEnter, nowEnter) {
+        return typeof atEnter === 'number' && atEnter >= 0 && atEnter === nowEnter;
+    }
+    // The game starts a new screen with ESC [ 2 J. xterm erases in place and moves the cursor to the
+    // top, so the row of the last Enter no longer marks where the new screen begins.
+    function seesClear(bytes) {
+        var found = false;
+        for (var i = 0; i < bytes.length; i++) {
+            var b = bytes[i];
+            clearMatched = b === [0x1b, 0x5b, 0x32, 0x4a][clearMatched] ? clearMatched + 1 : (b === 0x1b ? 1 : 0);
+            if (clearMatched === 4) { found = true; clearMatched = 0; }
+        }
+        return found;
+    }
+    function screenCleared() {
+        try { if (inputMark) inputMark.dispose(); } catch (e) {}
+        inputMark = null;
     }
 
     function compassExits(exits) {
@@ -770,7 +797,7 @@
         { d: 'south', k: 'S', c: 's', label: function () { return t('play.pad.go_south'); } }
     ];
 
-    function renderPad(rows) {
+    function renderPad(rows, fresh) {
         var box = document.getElementById('pad-scroll');
         clear(box);
         rows = Array.isArray(rows) ? rows.map(function (r) { return typeof r === 'string' ? r : ''; }) : [];
@@ -783,7 +810,7 @@
         // The compass shows only on a menu screen, when the game sent compass exits and this screen
         // offers one of them. A yes or no question in a room keeps its own two buttons.
         var keys = {};
-        if (p.kind === 'menu') cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
+        if (p.kind === 'menu' && fresh === true) cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
         var shown = DIRS.filter(function (x) { return state.exits[x.d] && keys[x.k]; });
         if (shown.length) {
             var row = el('div', 'compass-row');
@@ -839,14 +866,14 @@
     function renderPadNow() {
         if (!terminal || document.getElementById('pad').hidden) return;
         var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
-        renderPad(rowsFromBuffer(terminal.buffer && terminal.buffer.active, mark));
+        renderPad(rowsFromBuffer(terminal.buffer && terminal.buffer.active, mark), roomFresh(roomEnter, enterCount));
     }
     function schedulePad() { clearTimeout(padTimer); padTimer = setTimeout(renderPadNow, 60); }
 
     function openKeyboard() {
         if (!terminal) return;
         document.body.classList.add('typing');
-        terminal.focus();
+        terminal.focus();   // the one deliberate way to raise the phone keyboard
         queueFit();
     }
     document.getElementById('pad-enter').addEventListener('click', function () { sendToGame('\r'); });
@@ -877,7 +904,11 @@
         ws.onopen = function () { setConn('play.status.connected', 'ok'); if (terminal && !isTouch()) terminal.focus(); };
         ws.onmessage = function (event) {
             if (typeof event.data === 'string') handleFrame(event.data);
-            else if (terminal) terminal.write(new Uint8Array(event.data), schedulePad);
+            else if (terminal) {
+                var bytes = new Uint8Array(event.data);
+                if (seesClear(bytes)) screenCleared();
+                terminal.write(bytes, schedulePad);
+            }
         };
         ws.onclose = function () {
             setConn('play.status.closed');
@@ -889,6 +920,7 @@
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
         state.vitals = null; state.status = null; state.room = null; state.exits = {};
+        roomEnter = -1; clearMatched = 0; screenCleared();
         renderCombat();
         renderVitals();
         // A new connection starts as the first did: no panels until its own first GMCP frame.
@@ -938,7 +970,8 @@
 
     window.UsurperPlay = {
         handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer,
-        scanCommands: scanCommands, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad,
+        scanCommands: scanCommands, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad, roomFresh: roomFresh, seesClear: seesClear,
+        padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; }
     };
 

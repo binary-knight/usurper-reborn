@@ -23,9 +23,10 @@ async function load(opts = {}) {
   await p.settle();
   return p;
 }
-function pad(p, rows) {
+function pad(p, rows, fresh) {
   p.ctx.__rows = rows;
-  p.run('UsurperPlay.renderPad(__rows)');
+  p.ctx.__fresh = fresh;
+  p.run('UsurperPlay.renderPad(__rows, __fresh)');
 }
 function scan(p, rows) {
   p.ctx.__rows = rows;
@@ -195,7 +196,7 @@ test('the compass shows the exits the game sent that this screen offers, and sen
   const sent = [];
   const p = await load({ matchMedia: TOUCH, WebSocket: socket(sent) });
   p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Burial Chamber","exits":{"south":"room_0","north":"room_9","west":"room_11"}}}')`);
-  pad(p, ROOM);
+  pad(p, ROOM, true);
   const dirs = p.el('pad-scroll').querySelectorAll('.dir');
   assert.deepStrictEqual(dirs.map((d) => [d.textContent, !!d.disabled]), [['N', false], ['W', false], ['E', true], ['S', false]]);
   assert.deepStrictEqual(chips(p), ['F, Fight the monsters', 'M, Map', 'G, Guide', '*, Inventory', 'P, Potions', '%, Status', 'Q, Leave dungeon'], 'exit keys move to the compass');
@@ -207,10 +208,10 @@ test('the compass shows the exits the game sent that this screen offers, and sen
 test('no compass when the screen offers no exit, or when the exits are town places', async () => {
   const p = await load({ matchMedia: TOUCH });
   p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Burial Chamber","exits":{"north":"room_9","south":"room_0"}}}')`);
-  pad(p, ['  [*] Inventory  [Q] Back', 'Your choice:']);
+  pad(p, ['  [*] Inventory  [Q] Back', 'Your choice:'], true);
   assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0, 'inventory open in the dungeon');
   p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Main Street","exits":{"theinn":2,"church":4}}}')`);
-  pad(p, STREET);
+  pad(p, STREET, true);
   assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0, 'town exits are places');
   assert.ok(chips(p).includes('S, Status ...'), 'S stays a Status button');
 });
@@ -258,12 +259,12 @@ test('a yes or no question in a dungeon room keeps its buttons; the compass wait
   const sent = [];
   const p = await load({ matchMedia: TOUCH, WebSocket: socket(sent) });
   p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Burial Chamber","exits":{"north":"room_9","south":"room_0"}}}')`);
-  pad(p, ['¿Beber la poción? (S/N)']);
+  pad(p, ['¿Beber la poción? (S/N)'], true);
   assert.deepStrictEqual(chips(p), ['S, Yes', 'N, No']);
   assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0);
   p.click(p.el('pad-scroll').querySelectorAll('.chip')[0]);
   assert.deepStrictEqual(sent, ['S\r']);
-  pad(p, ROOM);
+  pad(p, ROOM, true);
   assert.ok(p.el('pad-scroll').querySelectorAll('.dir').length > 0, 'the room menu still has its compass');
 });
 
@@ -286,4 +287,63 @@ test('a refit scrolls to the bottom only for a player who was already there', ()
   assert.match(html, /var atBottom = !buf \|\| !\(buf\.viewportY < buf\.baseY\);/);
   assert.match(html, /if \(atBottom\) terminal\.scrollToBottom\(\);/);
   assert.ok(!/\n\s*terminal\.scrollToBottom\(\);/.test(html), 'no unconditional scroll');
+});
+
+test('a menu opened after the room was drawn keeps its own buttons: a fight\'s [E] and [S] are not arrows', async () => {
+  const sent = [];
+  const p = await load({ matchMedia: TOUCH, WebSocket: socket(sent) });
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Burial Chamber","exits":{"east":"room_2","south":"room_0"}}}')`);
+  const FIGHT = ['║ [A] Attack            ║', '║ [E] Precise Strike    ║', '║ [S] View Status       ║', 'Choose action:'];
+  pad(p, FIGHT, false);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0);
+  assert.deepStrictEqual(chips(p), ['A, Attack', 'E, Precise Strike', 'S, View Status']);
+  p.click(p.el('pad-scroll').querySelectorAll('.chip')[1]);
+  assert.deepStrictEqual(sent, ['E\r']);
+  pad(p, ROOM);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0, 'no fresh room: plain buttons, no arrows');
+  assert.ok(chips(p).some((c) => c.startsWith('N, A dark passage')), 'the exits stay as buttons');
+});
+
+test('a room is fresh while no Enter has been sent since its exits arrived', async () => {
+  const p = await load({ matchMedia: TOUCH });
+  const f = (a, n) => p.run(`UsurperPlay.roomFresh(${JSON.stringify(a)}, ${JSON.stringify(n)})`);
+  assert.strictEqual(f(3, 3), true);
+  assert.strictEqual(f(0, 0), true, 'exits before any Enter');
+  assert.strictEqual(f(2, 3), false, 'an Enter since then');
+  assert.strictEqual(f(-1, 0), false, 'no compass exits');
+  assert.strictEqual(f(null, 0), false);
+});
+
+test('the room counts as fresh after the move that drew it, and stops being fresh at the next Enter', async () => {
+  const sent = [];
+  const p = await load({ matchMedia: TOUCH, WebSocket: socket(sent) });
+  pad(p, ROOM);
+  p.click(p.el('pad-scroll').querySelectorAll('.chip').find((c) => c.getAttribute('aria-label').startsWith('N,')));
+  assert.strictEqual(p.run('UsurperPlay.padFresh()'), false, 'an Enter and no room yet');
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Hall","exits":{"north":"r1","south":"r2"}}}')`);
+  assert.strictEqual(p.run('UsurperPlay.padFresh()'), true, 'the room the move drew');
+  p.click(p.el('pad-enter'));
+  assert.strictEqual(p.run('UsurperPlay.padFresh()'), false, 'the next Enter opens something else');
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Main Street","exits":{"theinn":2}}}')`);
+  assert.strictEqual(p.run('UsurperPlay.padFresh()'), false, 'town exits are never fresh');
+  assert.deepStrictEqual(sent, ['N\r', '\r']);
+});
+
+test('a new screen is seen at ESC [ 2 J, also when the code is split across two chunks', async () => {
+  const p = await load({ matchMedia: TOUCH });
+  const seen = (bytes) => p.run(`UsurperPlay.seesClear(new Uint8Array(${JSON.stringify(bytes)}))`);
+  assert.strictEqual(seen([65, 0x1b, 0x5b, 0x32, 0x4a, 0x1b, 0x5b, 0x48]), true);
+  assert.strictEqual(seen([0x1b, 0x5b]), false);
+  assert.strictEqual(seen([0x32, 0x4a, 66]), true, 'split ESC [ | 2 J');
+  assert.strictEqual(seen([0x1b, 0x5b, 0x32, 0x4b]), false, 'ESC [ 2 K erases a line only');
+  assert.strictEqual(seen([0x1b, 0x5b, 0x33, 0x32, 0x6d]), false, 'a colour code');
+  assert.strictEqual(seen([0x1b, 0x1b, 0x5b, 0x32, 0x4a]), true, 'a second ESC restarts the match');
+  assert.strictEqual(seen([]), false);
+});
+
+test('on a touch screen only Type focuses the terminal', () => {
+  const lines = readPage(PAGE).split('\n').filter((l) => l.includes('terminal.focus()'));
+  assert.ok(lines.length >= 5);
+  for (const l of lines) assert.ok(l.includes('!isTouch()') || l.includes('the one deliberate way to raise the phone keyboard'), l.trim());
+  assert.strictEqual(lines.filter((l) => !l.includes('!isTouch()')).length, 1);
 });
