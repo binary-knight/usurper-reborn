@@ -1286,9 +1286,8 @@ public class WorldSimulator
     }
 
     /// <summary>
-    /// The dead scan of each step: every dead NPC that can come back is queued for respawn once. It counts no
-    /// death (O2: the death was counted where it happened); it sets SnapshotDeathCounted back to 0 on an NPC that
-    /// lives again, so its next death counts.
+    /// The dead scan of each step: every dead NPC that can come back is queued for respawn once. O2: it neither
+    /// counts a death (counted where it happened) nor touches the death mark (reset where the NPC is revived).
     /// </summary>
     internal void TrackDeadNPCsForRespawn()
     {
@@ -1305,10 +1304,6 @@ public class WorldSimulator
                     UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
             }
         }
-
-        foreach (var npc in npcs.ToList())
-            if (npc != null && npc.SnapshotDeathCounted != 0 && npc.IsAlive && !npc.IsDead)
-                UsurperRemake.Systems.WorldSnapshotCounters.ClearNpcDeathMark(npc);
     }
 
     /// <summary>
@@ -1352,6 +1347,7 @@ public class WorldSimulator
 
                 // Respawn the NPC - clear permanent death flag
                 npc.IsDead = false;
+                UsurperRemake.Systems.WorldSnapshotCounters.NpcRevived(npc);   // O2: revived here, so its next death counts
 
                 // CRITICAL FIX: Ensure base stats are valid before RecalculateStats
                 // If base stats are 0 (from old saves or corruption), RecalculateStats

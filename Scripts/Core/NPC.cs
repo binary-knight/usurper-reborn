@@ -87,7 +87,7 @@ public partial class NPC : Character
     /// <summary>
     /// O2: 1 once this death is in the hourly world snapshot's count (WorldSnapshotCounters.CountNpcDeath), so a
     /// death seen by two paths (a lethal duel, then a world sim kill of the same corpse) counts once. Not saved;
-    /// the world sim's dead scan sets it back to 0 once the NPC lives again.
+    /// set back to 0 by WorldSnapshotCounters.NpcRevived wherever the NPC is brought back to life.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     internal int SnapshotDeathCounted;
