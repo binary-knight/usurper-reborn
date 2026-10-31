@@ -19,19 +19,27 @@ const arr = (v) => (Array.isArray(v) ? v : []);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 // playerNames: lower-cased player character names and login names, or null when they could not be
-// read; then no entry about another character is sent. npcNames: NPC names as stored.
-function makeGuards(npcNames, playerNames) {
-  if (!playerNames) return { isSafeNpc: () => false, mentionsPlayer: () => true };
+// read; then nothing about another character is sent, and no team name either (players name teams).
+// npcNames: NPC names as stored. npcIdToName: an NPC's id (relationship and memory keys can be ids,
+// e.g. WorldSimulator gang joins record the leader's Id) to its name.
+function makeGuards(npcNames, playerNames, npcIdToName) {
+  if (!playerNames) return { resolve: () => '', isSafeNpc: () => false, mentionsPlayer: () => true };
   const isPlayer = (name) => typeof name === 'string' && playerNames.has(name.toLowerCase());
-  // Another character may be shown only when it is an NPC and no player shares its name.
-  const isSafeNpc = (name) => typeof name === 'string' && name.length > 0 && npcNames.has(name) && !isPlayer(name);
-  // Free text (a memory, a goal) is dropped when any player name appears in it.
-  const playerList = [...playerNames].filter((p) => p.length >= 3);
-  const mentionsPlayer = (text) => {
-    const t = str(text).toLowerCase();
-    return t.length > 0 && playerList.some((p) => t.includes(p));
+  // A reference (a name or an NPC id) resolved to an NPC name, or '' when it is not an NPC.
+  const resolve = (ref) => {
+    if (typeof ref !== 'string' || ref.length === 0) return '';
+    if (npcNames.has(ref)) return ref;
+    return npcIdToName.get(ref) || '';
   };
-  return { isSafeNpc, mentionsPlayer };
+  // Another character may be shown only when it is an NPC and no player shares its name.
+  const isSafeNpc = (ref) => { const name = resolve(ref); return name.length > 0 && !isPlayer(name); };
+  // Free text (a memory, a goal, a team name) is dropped when any player name appears in it as a
+  // whole word, short names included. One compiled pattern per rebuild.
+  const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const names = [...playerNames].filter((p) => p.length > 0).sort((x, y) => y.length - x.length).map(escape);
+  const re = names.length ? new RegExp('(?<![\\p{L}\\p{N}])(?:' + names.join('|') + ')(?![\\p{L}\\p{N}])', 'iu') : null;
+  const mentionsPlayer = (text) => { const t = str(text); return re !== null && t.length > 0 && re.test(t); };
+  return { resolve, isSafeNpc, mentionsPlayer };
 }
 
 function publicNpc(n, g) {
@@ -45,7 +53,7 @@ function publicNpc(n, g) {
 
   const relationships = {};
   Object.entries(obj(n.relationships)).forEach(([who, v]) => {
-    if (g.isSafeNpc(who) && typeof v === 'number' && isFinite(v)) relationships[who] = v;
+    if (g.isSafeNpc(who) && typeof v === 'number' && isFinite(v)) relationships[g.resolve(who)] = v;
   });
 
   const currentGoals = arr(n.currentGoals)
@@ -60,14 +68,16 @@ function publicNpc(n, g) {
     .filter((x) => !g.mentionsPlayer(x.description))
     .map((x) => ({ description: str(x.description), type: str(x.type), importance: num(x.importance), timestamp: str(x.timestamp) }));
 
-  const spouse = g.isSafeNpc(n.spouseName) ? n.spouseName : '';
+  const spouse = g.isSafeNpc(n.spouseName) ? g.resolve(n.spouseName) : '';
+  // Players name teams, and recruited NPCs carry the name.
+  const team = g.mentionsPlayer(n.team) ? '' : str(n.team);
   return {
     name: str(n.name),
     level: num(n.level),
     class: num(n.class),
     race: num(n.race),
     npcFaction: typeof n.npcFaction === 'number' ? n.npcFaction : -1,
-    team: str(n.team),
+    team,
     location: str(n.location),
     gold: num(n.gold),
     age: num(n.age),
@@ -91,7 +101,9 @@ function publicNpc(n, g) {
 function publicNpcs(npcs, playerNames) {
   const list = arr(npcs).filter((n) => n && typeof n === 'object');
   const npcNames = new Set(list.map((n) => n.name).filter((x) => typeof x === 'string'));
-  const g = makeGuards(npcNames, playerNames);
+  const npcIdToName = new Map();
+  list.forEach((n) => { if (typeof n.id === 'string' && n.id && typeof n.name === 'string') npcIdToName.set(n.id, n.name); });
+  const g = makeGuards(npcNames, playerNames, npcIdToName);
   return list.map((n) => publicNpc(n, g));
 }
 

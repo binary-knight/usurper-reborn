@@ -6,10 +6,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { publicNpcs, TRAITS } = require('../dash-npcs');
+const { loadPage } = require('./harness');
 
 // Player characters (display names) and logins, lower-cased as the proxy builds them. "Torvin Ash" is a
 // player who took an NPC's name.
-const PLAYERS = new Set(['hrothgarzq', 'acct_hroth', 'torvin ash', 'mirabelxq', 'acct_mira']);
+const PLAYERS = new Set(['hrothgarzq', 'acct_hroth', 'torvin ash', 'mirabelxq', 'acct_mira', 'xy']);
 
 // Shaped as OnlineStateManager.SaveSharedNPCs writes NPCData (camelCase).
 const NPCS = [
@@ -108,4 +109,44 @@ test('/api/dash/npcs sends the public list', () => {
   assert.match(route, /sendJson\(res, 200, getDashPublicNpcs\(\)\);/);
   assert.ok(!/sendJson\(res, 200, (npcs|getDashNpcs\(\))\)/.test(route));
   assert.match(src, /SELECT username, display_name FROM players/);
+});
+
+test('a team name that holds a player name is left out; others stay', () => {
+  const out = publicNpcs([{ name: 'Sir Galahad', team: 'HrothgarZq guard' }, { name: 'Mord Necro', team: 'The Wave Guild' }], PLAYERS);
+  assert.deepStrictEqual(out.map((n) => n.team), ['', 'The Wave Guild']);
+  assert.deepStrictEqual(publicNpcs([{ name: 'Mord Necro', team: 'The Wave Guild' }], null).map((n) => n.team), [''], 'no player list: no team names');
+});
+
+test('short player names are matched as whole words, not as parts of other words', () => {
+  const out = publicNpcs([{ name: 'Mord Necro', currentGoals: [
+    { name: 'Settle Score with Xy', isActive: true }, { name: 'Settle score with XY.', isActive: true },
+    { name: 'Visit Xyleth Hall', isActive: true }, { name: 'Explore the Oxyd mines', isActive: true }] }], PLAYERS)[0];
+  assert.deepStrictEqual(out.currentGoals.map((g) => g.name), ['Visit Xyleth Hall', 'Explore the Oxyd mines']);
+});
+
+test('a relationship or memory keyed by an NPC id is kept under that NPC name; unknown ids are dropped', () => {
+  const npcs = [
+    { id: 'guid-mord', name: 'Mord Necro', relationships: { 'guid-gal': 60, 'guid-unknown': 50, 'guid-torvin': 10 },
+      memories: [{ description: 'Joined a gang', type: 'Joined', involvedCharacter: 'guid-gal', importance: 0.4 },
+                 { description: 'Met someone', type: 'Met', involvedCharacter: 'guid-player', importance: 0.4 }] },
+    { id: 'guid-gal', name: 'Sir Galahad' },
+    { id: 'guid-torvin', name: 'Torvin Ash' },
+  ];
+  const mord = publicNpcs(npcs, PLAYERS)[0];
+  assert.deepStrictEqual(mord.relationships, { 'Sir Galahad': 60 }, 'Torvin Ash shares a player name, so it is dropped too');
+  assert.deepStrictEqual(mord.memories.map((m) => m.description), ['Joined a gang']);
+  assert.ok(!JSON.stringify(mord).includes('guid-'));
+});
+
+test('the old dashboard draws the filtered list without errors (table, notable bar, detail with goals and memories)', async () => {
+  const p = await loadPage('dashboard.html', { fetch: () => [] });
+  p.ctx.__npcs = publicNpcs(NPCS, PLAYERS);
+  p.run('allNpcs = __npcs; renderNpcTable(allNpcs); updateNotableHighlights();');
+  assert.ok(p.el('npc-table-body').innerHTML.includes('Elara Vane'));
+  p.run("selectedNpc = 'Elara Vane'; showNpcDetail(__npcs[0]);");
+  const detail = p.el('detail-content').innerHTML;
+  assert.ok(detail.includes('Make Friends'), 'goal shown');
+  assert.ok(detail.includes('I helped Sir Galahad'), 'memory shown');
+  assert.ok(!detail.includes('HrothgarZq'));
+  assert.deepStrictEqual(p.errors, []);
 });
