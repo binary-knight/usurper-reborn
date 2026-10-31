@@ -87,7 +87,49 @@ public static class GmcpBridge
         if (player == null || !IsActive) return;
         var ctx = SessionContext.Current;
         if (ctx == null) return;
+        EmitVitalsIfChangedFor(ctx, player, ctx.Username, null);
+    }
 
+    /// <summary>
+    /// 1.3.9: Char.Vitals for each grouped player in <paramref name="teammates"/>, sent to that
+    /// player's own session. Group combat and shared rests run on the leader's session, so the
+    /// leader-side emits above never reached a follower's client. NPC companions, mercenaries and
+    /// echoes have no session of their own and are skipped, so solo and leader-only play send
+    /// nothing more than before.
+    /// </summary>
+    public static void EmitVitalsToGroup(System.Collections.Generic.IEnumerable<global::Character>? teammates)
+        => EmitVitalsToGroup(teammates, FollowerContext);
+
+    /// <summary>1.3.9: Char.Vitals for one grouped player, sent to that player's own session.</summary>
+    public static void EmitVitalsToFollower(global::Character? teammate)
+        => EmitVitalsToFollower(teammate, FollowerContext);
+
+    private static SessionContext? FollowerContext(string username) => GroupSystem.GetSession(username)?.Context;
+
+    internal static void EmitVitalsToGroup(System.Collections.Generic.IEnumerable<global::Character>? teammates, Func<string, SessionContext?> resolve)
+    {
+        if (teammates == null) return;
+        foreach (var t in teammates) EmitVitalsToFollower(t, resolve);
+    }
+
+    internal static void EmitVitalsToFollower(global::Character? teammate, Func<string, SessionContext?> resolve)
+    {
+        if (teammate == null || !teammate.IsGroupedPlayer || string.IsNullOrEmpty(teammate.GroupPlayerUsername)) return;
+        SessionContext? ctx;
+        try { ctx = resolve(teammate.GroupPlayerUsername); }
+        catch { return; }
+        // A follower who disconnected has no session, no stream or GMCP off: nothing is sent.
+        if (ctx == null || !ctx.GmcpEnabled || ctx.OutputStream == null) return;
+        EmitVitalsIfChangedFor(ctx, teammate, teammate.GroupPlayerUsername, teammate.RemoteTerminal);
+    }
+
+    // The change check runs on the receiving session's own LastGmcp* fields. For a follower they are
+    // written from the leader's thread while the follower's own loop is parked in the group; a race
+    // there can only repeat a frame, never lose a change, so it is left unlocked.
+    // When terminal is given (a follower), the frame is written under that terminal's writer lock,
+    // taken before the stream lock, so it never lands inside text the follower's terminal is writing.
+    private static void EmitVitalsIfChangedFor(SessionContext ctx, global::Character player, string label, TerminalEmulator? terminal)
+    {
         long hp = player.HP, maxHp = player.MaxHP;
         long mana = player.Mana, maxMana = player.MaxMana;
         long sta = player.Stamina;
@@ -106,7 +148,9 @@ public static class GmcpBridge
         ctx.LastGmcpMental = mental;
 
         // sp is the Stamina stat; combatSp and maxCombatSp (1.3.9) are the fight stamina the game shows.
-        Emit("Char.Vitals", new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta, mental, maxMental = GameConfig.MaxMentalStability, combatSp, maxCombatSp });
+        var payload = new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta, mental, maxMental = GameConfig.MaxMentalStability, combatSp, maxCombatSp };
+        if (terminal != null) terminal.RunUnderWriterLock(() => TryWriteFrame(ctx, "Char.Vitals", payload, label));
+        else TryWriteFrame(ctx, "Char.Vitals", payload, label);
     }
 
     /// <summary>

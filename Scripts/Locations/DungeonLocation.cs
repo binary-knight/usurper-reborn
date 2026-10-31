@@ -7435,6 +7435,7 @@ public class DungeonLocation : BaseLocation
                 mate.HP = Math.Min(mate.MaxHP, mate.HP + mateHeal);
                 mate.Mana = Math.Min(mate.MaxMana, mate.Mana + mateMana);
                 mate.CurrentCombatStamina = Math.Min(mate.MaxCombatStamina, mate.CurrentCombatStamina + mateSta);
+                GmcpBridge.EmitVitalsToFollower(mate);   // 1.3.9: a grouped player's own client sees the rest
 
                 if (mate.IsGroupedPlayer)
                 {
@@ -15882,6 +15883,7 @@ public class DungeonLocation : BaseLocation
                     mate.CurrentCombatStamina = Math.Min(mate.MaxCombatStamina, mate.CurrentCombatStamina + mateSta);
                     if (mate.Poison > 0) { mate.Poison = 0; mate.PoisonTurns = 0; }
                     anyTeammateHealed = true;
+                    GmcpBridge.EmitVitalsToFollower(mate);   // 1.3.9: a grouped player's own client sees the rest
 
                     // Companions / NPC teammates have no session of their own; only grouped human
                     // players get the recovery message in their own terminal.
