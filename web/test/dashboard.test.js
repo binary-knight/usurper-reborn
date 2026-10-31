@@ -322,6 +322,26 @@ test('watch list: a profile and a team can be watched, saved in localStorage, an
   noErrors(p, 'watch');
 });
 
+test('chronicle: a template matches the whole message, and number and ordinal gaps must fit', async () => {
+  const p = await open(world('Alice'));
+  const kind = (m) => p.run('Observatory.kindOf(' + JSON.stringify({ category: 'npc', message: m }) + ')');
+  // {n}: a number, digits and commas only
+  assert.strictEqual(kind('Bob has achieved Level 12!'), 'training');
+  assert.strictEqual(kind('Bob has achieved Level many!'), 'other');
+  assert.strictEqual(kind('Bob has passed away peacefully at the age of 1,204. The soul moves on...'), 'death');
+  assert.strictEqual(kind('Bob has passed away peacefully at the age of many. The soul moves on...'), 'other');
+  // {o}: an ordinal
+  assert.strictEqual(kind('Bob the Bard celebrates their 21st birthday!'), 'life');
+  assert.strictEqual(kind('Bob the Bard celebrates their many birthday!'), 'other');
+  // the template must start at the first character and end at the last
+  assert.strictEqual(kind('Wedding Bells! Bob and Ann have gotten married!'), 'life');
+  assert.strictEqual(kind('Bob says Wedding Bells! Bob and Ann have gotten married!'), 'other');
+  assert.strictEqual(kind('Wedding Bells! Bob and Ann have gotten married! Or not.'), 'other');
+  // a message longer than the matcher's limit is not matched
+  assert.strictEqual(kind('Wedding Bells! ' + 'B'.repeat(700) + ' and Ann have gotten married!'), 'other');
+  noErrors(p, 'templates');
+});
+
 test('watch list: a watched name matches only as a whole word', async () => {
   const routes = world('Ann');
   const t = routes['/api/dash/events'][0].time;

@@ -585,15 +585,37 @@
                 'King {} proclaims: {}',
                 'The royal treasury hemorrhages {n} gold daily!']]
         ];
-        // A template as an anchored pattern: the literal text escaped, the placeholders as wildcards.
+        // A template as a matcher for the whole message: the literal parts must appear in order, from the
+        // first character to the last, and each gap between them must fit its placeholder ({} any text,
+        // {n} a number, {o} an ordinal). A string walk, not a regular expression, so news text cannot
+        // make it backtrack; messages longer than TEMPLATE_MAX are not matched.
+        var TEMPLATE_MAX = 600;
+        function gapFits(kind, s) {
+            if (!s) return false;
+            if (kind === '{n}') return /^[\d,]+$/.test(s);
+            if (kind === '{o}') return /^\d+(?:st|nd|rd|th)$/.test(s);
+            return true;
+        }
         function templatePattern(text) {
-            var src = text.split(/(\{\}|\{n\}|\{o\})/).map(function (part) {
-                if (part === '{}') return '[\\s\\S]+';
-                if (part === '{n}') return '[\\d,]+';
-                if (part === '{o}') return '\\d+(?:st|nd|rd|th)';
-                return reEsc(part);
-            }).join('');
-            return new RegExp('^' + src + '$');
+            var parts = text.split(/(\{\}|\{n\}|\{o\})/);
+            // parts alternate: literal, placeholder, literal, ... with a literal (maybe '') at each end.
+            function walk(msg, i, pos) {
+                var kind = parts[i], lit = parts[i + 1];
+                if (i + 2 >= parts.length) {
+                    var end = msg.length - lit.length;
+                    return end > pos && msg.slice(end) === lit && gapFits(kind, msg.slice(pos, end));
+                }
+                for (var j = pos + 1; j + lit.length <= msg.length; j++) {
+                    if (msg.startsWith(lit, j) && gapFits(kind, msg.slice(pos, j)) && walk(msg, i + 2, j + lit.length)) return true;
+                }
+                return false;
+            }
+            return {
+                test: function (msg) {
+                    if (msg.length > TEMPLATE_MAX || !msg.startsWith(parts[0])) return false;
+                    return parts.length === 1 ? msg === parts[0] : walk(msg, 1, parts[0].length);
+                }
+            };
         }
         var KIND_PATTERNS = TEMPLATES.map(function (k) { return [k[0], k[1].map(templatePattern)]; });
         // The symbol NewsSystem puts before some rows (left out in screen reader mode).
@@ -675,7 +697,6 @@
             if (d.toDateString() === y.toDateString()) return 'Yesterday, ' + d.toLocaleDateString([], { month: 'long', day: 'numeric' });
             return d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
         }
-        function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'); }
 
         // A name: a button that opens the profile when it is an NPC on record, plain text otherwise.
         function who(name) {
