@@ -1310,8 +1310,8 @@ function getDashSummary() {
   try {
     const childRow = db.prepare("SELECT value FROM world_state WHERE key = 'children'").get();
     if (childRow && childRow.value) {
-      const npcNames = new Set(npcs.map((n) => n && (n.name || n.Name)).filter(Boolean));
-      children = publicChildren(JSON.parse(childRow.value), npcNames);
+      const npcIds = new Set(npcs.map((n) => n && (n.characterID || n.CharacterID)).filter(Boolean));
+      children = publicChildren(JSON.parse(childRow.value), npcIds);
     }
   } catch (e) { /* children data may not exist yet */ }
 
