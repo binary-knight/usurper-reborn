@@ -25,13 +25,16 @@ function fixtureSchema() {
   const backend = read('Scripts', 'Systems', 'SqlSaveBackend.cs');
   const boss = read('Scripts', 'Systems', 'SqlSaveBackend.WorldBoss.cs');
   const table = (name) => {
-    const m = backend.match(new RegExp('CREATE TABLE IF NOT EXISTS ' + name + ' \\([\\s\\S]*?\\n\\s*\\);'));
-    if (!m) throw new Error('table not found in SqlSaveBackend.cs: ' + name);
-    return m[0];
+    const start = backend.indexOf('CREATE TABLE IF NOT EXISTS ' + name + ' (');
+    const end = start === -1 ? null : /\n\s*\);/.exec(backend.slice(start));
+    if (!end) throw new Error('table not found in SqlSaveBackend.cs: ' + name);
+    return backend.slice(start, start + end.index + end[0].length);
   };
-  const indexes = (tbl) => backend.match(new RegExp('CREATE INDEX IF NOT EXISTS \\w+\\s+ON ' + tbl + '\\([^;]*\\);', 'g')) || [];
+  const indexes = (tbl) => [...backend.matchAll(/CREATE INDEX IF NOT EXISTS \w+\s+ON (\w+)\([^;]*\);/g)]
+    .filter((m) => m[1] === tbl).map((m) => m[0]);
   const columns = (arrayName) => {
-    const m = boss.match(new RegExp(arrayName + ' =\\s*\\{([\\s\\S]*?)\\};'));
+    const start = boss.indexOf(arrayName + ' =');
+    const m = start === -1 ? null : /^[^{]*\{([\s\S]*?)\};/.exec(boss.slice(start + arrayName.length + 2));
     if (!m) throw new Error('column list not found: ' + arrayName);
     return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
   };
