@@ -547,5 +547,6 @@
   "play.chat.channel.shout": "Grido",
   "play.chat.channel.guild": "Gilda",
   "play.level": "Livello {0}",
-  "play.gold": "{0} oro"
+  "play.gold": "{0} oro",
+  "play.stamina": "Resistenza"
 }

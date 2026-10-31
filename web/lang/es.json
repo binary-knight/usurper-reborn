@@ -547,5 +547,6 @@
   "play.chat.channel.shout": "Grito",
   "play.chat.channel.guild": "Gremio",
   "play.level": "Nivel {0}",
-  "play.gold": "{0} de oro"
+  "play.gold": "{0} de oro",
+  "play.stamina": "Resistencia"
 }

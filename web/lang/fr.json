@@ -547,5 +547,6 @@
   "play.chat.channel.shout": "Cri",
   "play.chat.channel.guild": "Guilde",
   "play.level": "Niveau {0}",
-  "play.gold": "{0} pièces d'or"
+  "play.gold": "{0} pièces d'or",
+  "play.stamina": "Endurance"
 }

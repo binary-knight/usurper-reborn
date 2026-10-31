@@ -100,15 +100,20 @@ test('chat while the drawer is closed marks the Chat button; opening chat clears
   assert.strictEqual(p.el('chat-list').children.length, 1);
 });
 
-test('vitals, level and gold come from GMCP; stamina is not drawn', async () => {
+test('vitals, fight stamina, level and gold come from GMCP; the Stamina stat (sp) is not drawn', async () => {
   const p = await load();
   assert.strictEqual(p.el('hp-meter').hidden, true);
   frame(p, 'Char.Vitals', { hp: 38, maxHp: 44, mp: 0, maxMp: 0, sp: 13 });
   frame(p, 'Char.Status', { level: 2, gold: 3073 });
   assert.strictEqual(p.el('hp-meter').hidden, false);
   assert.strictEqual(p.el('mp-meter').hidden, true, 'no MP bar without max MP');
+  assert.strictEqual(p.el('sp-wrap').hidden, true, 'a server without combatSp leaves stamina hidden');
   assert.strictEqual(p.el('hp-num').textContent, '38/44');
   assert.strictEqual(p.el('level').textContent, 'Level 2');
+  assert.ok(!p.el('vitals').textContent.includes('13'));
+  frame(p, 'Char.Vitals', { hp: 38, maxHp: 44, mp: 0, maxMp: 0, sp: 13, combatSp: 100, maxCombatSp: 99 });
+  assert.strictEqual(p.el('sp-wrap').hidden, false);
+  assert.strictEqual(p.el('sp-num').textContent, '100/99');
   assert.ok(!p.el('vitals').textContent.includes('13'));
 });
 

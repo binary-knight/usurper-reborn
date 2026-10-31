@@ -573,5 +573,6 @@
   "play.chat.channel.shout": "Shout",
   "play.chat.channel.guild": "Guild",
   "play.level": "Level {0}",
-  "play.gold": "{0} gold"
+  "play.gold": "{0} gold",
+  "play.stamina": "Stamina"
 }

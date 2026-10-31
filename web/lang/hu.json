@@ -547,5 +547,6 @@
   "play.chat.channel.shout": "Kiáltás",
   "play.chat.channel.guild": "Céh",
   "play.level": "{0}. szint",
-  "play.gold": "{0} arany"
+  "play.gold": "{0} arany",
+  "play.stamina": "Állóképesség"
 }

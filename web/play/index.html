@@ -140,6 +140,7 @@
         <div class="vitals" id="vitals">
             <span class="meter" id="hp-meter" hidden><span class="label" data-i18n="play.hp">HP</span><span class="bar"><i id="hp-fill"></i></span><span id="hp-num"></span></span>
             <span class="meter" id="mp-meter" hidden><span class="label" data-i18n="play.mp">MP</span><span class="bar mp"><i id="mp-fill"></i></span><span id="mp-num"></span></span>
+            <span id="sp-wrap" hidden><span class="label" data-i18n="play.stamina">Stamina</span> <span id="sp-num"></span></span>
             <span id="level" hidden></span>
             <span id="gold" hidden></span>
             <span id="room" class="room"></span>
@@ -289,13 +290,16 @@
         var mpMeter = document.getElementById('mp-meter');
         hpMeter.hidden = !v;
         mpMeter.hidden = !v || !(Number(v.maxMp) > 0);
+        // combatSp and maxCombatSp are the fight stamina (1.3.9); a server without them leaves it hidden.
+        var spWrap = document.getElementById('sp-wrap');
+        spWrap.hidden = !v || !(v.maxCombatSp > 0);
         if (v) {
+            document.getElementById('sp-num').textContent = num(v.combatSp) + '/' + num(v.maxCombatSp);
             document.getElementById('hp-fill').style.width = pct(v.hp, v.maxHp) + '%';
             document.getElementById('hp-num').textContent = num(v.hp) + '/' + num(v.maxHp);
             document.getElementById('mp-fill').style.width = pct(v.mp, v.maxMp) + '%';
             document.getElementById('mp-num').textContent = num(v.mp) + '/' + num(v.maxMp);
         }
-        // Char.Vitals' sp is the Stamina stat, not the fight stamina the game shows, so it is not drawn.
         var st = state.status;
         var level = document.getElementById('level');
         var gold = document.getElementById('gold');
@@ -427,7 +431,8 @@
         var d = obj(data) || {};
         switch (pkg) {
             case 'Char.Vitals':
-                state.vitals = { hp: fin(d.hp), maxHp: fin(d.maxHp), mp: fin(d.mp), maxMp: fin(d.maxMp) };
+                // sp is the Stamina stat, not the fight stamina, so it is not read.
+                state.vitals = { hp: fin(d.hp), maxHp: fin(d.maxHp), mp: fin(d.mp), maxMp: fin(d.maxMp), combatSp: fin(d.combatSp), maxCombatSp: fin(d.maxCombatSp) };
                 renderVitals();
                 break;
             case 'Char.Status':

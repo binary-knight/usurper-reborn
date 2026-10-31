@@ -1079,7 +1079,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 ### Packages Shipped
 | Package | Trigger | Payload |
 |---|---|---|
-| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental }` (v1.1.15: mental and maxMental added, both modes) |
+| `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental, combatSp, maxCombatSp }` (v1.1.15: mental and maxMental added, both modes; 1.3.9: combatSp and maxCombatSp are the fight stamina, while sp stays the Stamina stat) |
 | `Char.Status` | Every location change | `{ name, class, level, race, gold, bank, xp, location }` |
 | `Room.Info` | Every location change | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
@@ -1536,7 +1536,7 @@ Dark-themed responsive page with:
 
 - A full page terminal: xterm.js 5.5.0, always 80 columns, with the font the largest size from 20px down to 12px that fits 80 columns and 25 rows. On a phone the 80 columns stay at 12px and slide sideways.
 - Opens `/ws?gmcp=1`, so the proxy splits the stream (below). Binary frames go to the terminal; text frames are GMCP as `{"gmcp": "Package.Name", "data": ...}`.
-- A status line under the terminal: HP and MP bars (`Char.Vitals`), level and gold (`Char.Status`) and the location name (`Room.Info`). `Char.Vitals.sp` is the Stamina stat, not the fight stamina, so it is not drawn.
+- A status line under the terminal: HP and MP bars and the fight stamina (`Char.Vitals` hp, mp, combatSp and their maximums), level and gold (`Char.Status`) and the location name (`Room.Info`). `Char.Vitals.sp` is the Stamina stat, so it is not drawn.
 - A drawer with Combat and Chat. Combat lists enemies and party (`Char.Combat.Start`, `.Enemies`, `.Party`), marks a killed enemy dead (`Char.Combat.Killed`, since the game sends no enemy update after the last blow) and shows the result (`Char.Combat.End`, `Char.Death`). Chat keeps the last 200 `Comm.Channel.Text` lines; the player's own lines are not sent by the game, and `/history` shows the last 50 messages (`ChatHistoryStore.Capacity`), own lines included.
 - At 1200px and wider the drawer sits beside the terminal and opens on its own when a fight starts. Narrower, it lies over the terminal, so a fight marks the Combat button instead.
 - GMCP values are kept only as strings or finite numbers and drawn with `textContent`; the page script has no HTML sinks (`web/test/play-page.test.js`). UI strings are the `play.*` keys in `web/lang/*.json`.
