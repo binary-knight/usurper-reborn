@@ -262,6 +262,23 @@ public partial class TerminalEmulator
     public TerminalEmulator() { }
 
     /// <summary>
+    /// 1.3.9: runs <paramref name="action"/> holding the writer lock, after flushing any pending text,
+    /// so bytes another thread writes straight to this terminal's stream (a GMCP frame for a grouped
+    /// player) never land inside a text write. The action must not take this lock again from another
+    /// thread or wait on one that does.
+    /// </summary>
+    internal void RunUnderWriterLock(Action action)
+    {
+        lock (_streamWriterLock)
+        {
+            try { _streamWriter?.Flush(); }
+            catch (System.IO.IOException) { }
+            catch (ObjectDisposedException) { }
+            action();
+        }
+    }
+
+    /// <summary>
     /// Create a stream-backed terminal for MUD server sessions.
     /// Each player session gets its own TerminalEmulator connected to their TCP stream.
     /// </summary>

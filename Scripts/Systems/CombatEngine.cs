@@ -2137,6 +2137,7 @@ public partial class CombatEngine
             // HP/MP/SP throughout the fight instead of frozen pre-combat values until
             // the menu redraws. Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);   // 1.3.9: each grouped player, on their own session
             // Emit Char.Combat.Party update if any party member HP/status changed this round.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
@@ -2505,6 +2506,9 @@ public partial class CombatEngine
             // the next location transition.
             UsurperRemake.Server.GmcpBridge.EmitStatusIfChanged(player);
         }
+        // 1.3.9: each grouped player on their own session; outside the leader's IsActive check, since a
+        // follower's client can have GMCP when the leader's does not.
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);
         }
         finally
         {
@@ -2632,6 +2636,7 @@ public partial class CombatEngine
             // Covers single-monster combat (which doesn't go through the multi-monster
             // end-of-round path above). Cheap no-op when GMCP isn't negotiated.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);   // 1.3.9: each grouped player, on their own session
             // Emit Char.Combat.Party if party member HP/status changed since last prompt.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
 
@@ -15047,6 +15052,7 @@ public partial class CombatEngine
             // 1.3.9: GMCP Char.Vitals at each prompt, as GetPlayerAction does for one monster, so a
             // client sees the stamina refilled at combat start before the first round ends.
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);   // 1.3.9: each grouped player, on their own session
 
             // Check if player can act due to status effects
             if (!player.CanAct())
@@ -33190,6 +33196,9 @@ public partial class CombatEngine
             await Pacing.Wait(GetCombatDelay(800));
             return;
         }
+
+        // 1.3.9: the follower's own client gets their vitals as their turn opens, as the leader's does at its prompt
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToFollower(teammate);
 
         // Announce this player's turn to the leader (on their terminal) and other followers
         AnnounceGroupedPlayerTurn(teammate, result);
