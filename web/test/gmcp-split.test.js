@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { wantsGmcp, gmcpEnvelope, createGmcpSplitter, MAX_FRAME_BYTES, MAX_SB_BYTES } = require('../gmcp-split');
+const { wantsGmcp, gmcpEnvelope, createGmcpSplitter, MAX_FRAME_BYTES, MAX_SB_BYTES, MAX_SB_MS } = require('../gmcp-split');
 
 const IAC = 0xff, SE = 0xf0, SB = 0xfa, WILL = 0xfb, WONT = 0xfc, DO = 0xfd, DONT = 0xfe, GMCP = 0xc9;
 
@@ -23,15 +23,16 @@ function run(chunks, opts = {}) {
   const gmcp = [];
   const replies = [];
   const fatal = [];
+  const order = [];
   const s = createGmcpSplitter({
-    onTerminal: (b) => terminal.push(Buffer.from(b)),
+    onTerminal: (b) => { terminal.push(Buffer.from(b)); order.push('terminal'); },
     onGmcp: (j) => gmcp.push(JSON.parse(j)),
     onReply: (b) => replies.push(Buffer.from(b)),
-    onFatal: (r) => fatal.push(r),
+    onFatal: (r) => { fatal.push(r); order.push('fatal'); },
     ...opts,
   });
-  for (const c of chunks) s.push(c);
-  return { terminal: Buffer.concat(terminal), gmcp, replies, fatal, dead: s.dead };
+  for (const c of chunks) { if (opts.tick) opts.tick(); s.push(c); }
+  return { terminal: Buffer.concat(terminal), gmcp, replies, fatal, dead: s.dead, order };
 }
 
 // Every split of a buffer into two chunks, plus one byte at a time.
@@ -133,6 +134,46 @@ test('an unknown IAC command inside a frame closes the session, with nothing aft
   assert.strictEqual(r.terminal.toString(), 'a');
   assert.strictEqual(r.fatal.length, 1);
   assert.strictEqual(r.dead, true);
+  assert.deepStrictEqual(r.order, ['terminal', 'fatal'], 'the text before the error is handed over before the close');
+});
+
+test('payload size boundaries: the game maximum, the proxy cap, one byte over', () => {
+  // A run of digits stays valid JSON when cut short, so a cap that kept one byte too many would show.
+  const payload = (n) => 'Core.N ' + '1'.repeat(n - 7);
+  for (const [n, kept] of [[16379, true], [MAX_FRAME_BYTES, true], [MAX_FRAME_BYTES + 1, false]]) {
+    const r = run([gmcpFrame(payload(n)), Buffer.from('ok')]);
+    assert.strictEqual(r.gmcp.length, kept ? 1 : 0, 'payload ' + n);
+    assert.strictEqual(r.terminal.toString(), 'ok');
+    assert.deepStrictEqual(r.fatal, []);
+  }
+  assert.strictEqual(gmcpFrame(payload(16379)).length, 16384, 'a 16379 byte payload is the game cap of 16384 with framing');
+});
+
+test('an escaped IAC that crosses the cap still resyncs; a bad byte after an escaped IAC closes', () => {
+  const head = Buffer.from('Core.X "');
+  const body = Buffer.concat([head, Buffer.alloc(MAX_FRAME_BYTES - head.length, 0x61)]);
+  const over = Buffer.concat([Buffer.from([IAC, SB, GMCP]), body, Buffer.from([IAC, IAC, 0x22, IAC, SE]), Buffer.from('ok')]);
+  const r = run([over]);
+  assert.deepStrictEqual(r.gmcp, []);
+  assert.strictEqual(r.terminal.toString(), 'ok');
+  const bad = run([Buffer.from([IAC, SB, GMCP, 0x41, IAC, IAC, IAC, 0x41]), Buffer.from('later')]);
+  assert.strictEqual(bad.fatal.length, 1);
+  assert.strictEqual(bad.terminal.length, 0);
+});
+
+test('a short frame left open past the time limit closes the session at the next bytes', () => {
+  let t = 1000;
+  const r = run([Buffer.from([IAC, SB, GMCP, 0x41]), Buffer.from('more text')], { now: () => t, tick: () => { t += MAX_SB_MS / 2; } });
+  assert.deepStrictEqual(r.fatal, []);
+  assert.strictEqual(r.terminal.length, 0);
+  let u = 1000;
+  const late = run([Buffer.from([IAC, SB, GMCP, 0x41]), Buffer.from('more text')], { now: () => u, tick: () => { u += MAX_SB_MS + 1; } });
+  assert.strictEqual(late.fatal.length, 1);
+  assert.strictEqual(late.terminal.length, 0);
+  let v = 1000;
+  const ok = run([Buffer.from([IAC, SB, GMCP]), Buffer.from('Core.Ping'), Buffer.from([IAC, SE, 0x41])], { now: () => v, tick: () => { v += 10; } });
+  assert.deepStrictEqual(ok.gmcp.map((g) => g.gmcp), ['Core.Ping']);
+  assert.strictEqual(ok.terminal.toString(), 'A');
 });
 
 test('a frame that never ends closes the session, and its bytes never reach the terminal', () => {

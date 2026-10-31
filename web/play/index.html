@@ -167,7 +167,7 @@
             <div class="log" id="combat-log"></div>
         </div>
         <div class="pane" id="pane-chat" role="tabpanel" hidden>
-            <p class="hint" data-i18n="play.chat.hint">Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game for the full record.</p>
+            <p class="hint" data-i18n="play.chat.hint">Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game to see the last 50 messages, your own included.</p>
             <div class="chat" id="chat-list"></div>
         </div>
     </aside>
@@ -275,10 +275,13 @@
         b.appendChild(i);
         return b;
     }
+    // GMCP values are checked by type before they are stored: a string or a finite number, else
+    // empty or 0. Nothing else is ever converted, so an odd value cannot throw later.
     function str(v, max) {
-        v = v === undefined || v === null ? '' : String(v);
+        v = typeof v === 'string' ? v : typeof v === 'number' && isFinite(v) ? String(v) : '';
         return v.length > max ? v.slice(0, max) : v;
     }
+    function fin(v) { return typeof v === 'number' && isFinite(v) ? v : 0; }
 
     function renderVitals() {
         var v = state.vitals;
@@ -413,9 +416,9 @@
         return list.slice(0, max).map(function (u) {
             u = obj(u) || {};
             return {
-                name: str(u.name, 60), level: Number(u.level) || 0,
-                hp: Number(u.hp) || 0, maxHp: Number(u.maxHp) || 0,
-                isBoss: u.isBoss === true, alive: u.alive, isAlive: u.isAlive, downed: u.downed === true
+                name: str(u.name, 60), level: fin(u.level),
+                hp: fin(u.hp), maxHp: fin(u.maxHp),
+                isBoss: u.isBoss === true, alive: u.alive !== false, isAlive: u.isAlive !== false, downed: u.downed === true
             };
         });
     }
@@ -424,11 +427,11 @@
         var d = obj(data) || {};
         switch (pkg) {
             case 'Char.Vitals':
-                state.vitals = { hp: d.hp, maxHp: d.maxHp, mp: d.mp, maxMp: d.maxMp };
+                state.vitals = { hp: fin(d.hp), maxHp: fin(d.maxHp), mp: fin(d.mp), maxMp: fin(d.maxMp) };
                 renderVitals();
                 break;
             case 'Char.Status':
-                state.status = { level: d.level, gold: d.gold };
+                state.status = { level: fin(d.level), gold: fin(d.gold) };
                 renderVitals();
                 break;
             case 'Room.Info':
@@ -450,7 +453,7 @@
                 break;
             case 'Char.Combat.Enemies':
                 state.enemies = units(d.enemies, 30);
-                state.round = Number(d.round) || 0;
+                state.round = fin(d.round);
                 renderCombat();
                 break;
             case 'Char.Combat.Party':
@@ -473,7 +476,7 @@
                 break;
             case 'Char.Combat.End':
                 state.inCombat = false;
-                state.result = { outcome: str(d.outcome, 40), kills: d.kills, xpGained: d.xpGained, goldGained: d.goldGained };
+                state.result = { outcome: str(d.outcome, 40), kills: fin(d.kills), xpGained: fin(d.xpGained), goldGained: fin(d.goldGained) };
                 renderCombat();
                 break;
             case 'Char.Death':
@@ -494,7 +497,7 @@
         var msg;
         try { msg = JSON.parse(text); } catch (e) { return; }
         if (!obj(msg) || typeof msg.gmcp !== 'string') return;
-        handleGmcp(msg.gmcp, msg.data);
+        try { handleGmcp(msg.gmcp, msg.data); } catch (e) {}
     }
 
     // ---- Terminal: always 80 columns; the font is the largest from 20px down to 12px that fits ----
@@ -593,7 +596,7 @@
         connect();
     }
 
-    window.UsurperPlay = { handleFrame: handleFrame, state: state, setDrawer: setDrawer };
+    window.UsurperPlay = { handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer };
 
     populateLanguagePicker();
     loadLanguage(lang);

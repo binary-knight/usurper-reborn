@@ -25,6 +25,8 @@ const MAX_FRAME_BYTES = 20 * 1024;
 // A subnegotiation still open after this many bytes has no end the proxy can trust. The
 // session is closed rather than guessing where terminal text starts again.
 const MAX_SB_BYTES = 64 * 1024;
+// The game writes each frame whole, so one still open after this long has lost its end too.
+const MAX_SB_MS = 5000;
 
 const DO_GMCP = Buffer.from([IAC, DO, GMCP]);
 const PACKAGE_NAME = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
@@ -58,14 +60,17 @@ function gmcpEnvelope(payload) {
 //   onGmcp(json)     one JSON text frame for the page
 //   onReply(buf)     bytes to write back to the game (IAC DO GMCP, once)
 //   onFatal(reason)  framing can no longer be trusted; the caller closes the session
-// push(chunk) takes the game's bytes in any chunking; the state carries across chunks.
-function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameBytes = MAX_FRAME_BYTES, maxSbBytes = MAX_SB_BYTES }) {
+// push(chunk) takes the game's bytes in any chunking; the state carries across chunks. Terminal
+// bytes that came before a fatal error are handed over first, then onFatal is called once.
+function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameBytes = MAX_FRAME_BYTES, maxSbBytes = MAX_SB_BYTES, maxSbMs = MAX_SB_MS, now = Date.now }) {
   // States: data, iac (after IAC), opt (after WILL/WONT/DO/DONT), sbopt (after IAC SB),
   // sb (inside a subnegotiation), sbiac (IAC inside a subnegotiation), dead.
   let state = 'data';
   let cmd = 0;
   let sbIsGmcp = false;
   let sbBytes = 0;
+  let sbStart = 0;
+  let fatal = null;
   const frame = Buffer.alloc(maxFrameBytes);
   let frameLen = 0;
   let oversized = false;
@@ -73,7 +78,7 @@ function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameByte
 
   function fail(reason) {
     state = 'dead';
-    onFatal(reason);
+    fatal = reason;
   }
 
   function endFrame() {
@@ -95,6 +100,7 @@ function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameByte
 
   function push(chunk) {
     if (state === 'dead') return;
+    if ((state === 'sbopt' || state === 'sb' || state === 'sbiac') && now() - sbStart > maxSbMs) fail('subnegotiation open over ' + maxSbMs + ' ms');
     const out = [];
     let runStart = -1;
     const flushRun = (end) => {
@@ -111,7 +117,7 @@ function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameByte
         case 'iac':
           if (b === IAC) { out.push(Buffer.of(IAC)); state = 'data'; }
           else if (b === WILL || b === WONT || b === DO || b === DONT) { cmd = b; state = 'opt'; }
-          else if (b === SB) state = 'sbopt';
+          else if (b === SB) { state = 'sbopt'; sbStart = now(); }
           else state = 'data'; // NOP, GA, a stray SE and the rest: one byte, dropped
           break;
         case 'opt':
@@ -141,9 +147,10 @@ function createGmcpSplitter({ onTerminal, onGmcp, onReply, onFatal, maxFrameByte
     }
     flushRun(chunk.length);
     if (out.length) onTerminal(out.length === 1 ? out[0] : Buffer.concat(out));
+    if (fatal !== null) { const reason = fatal; fatal = null; onFatal(reason); }
   }
 
   return { push, get dead() { return state === 'dead'; } };
 }
 
-module.exports = { wantsGmcp, gmcpEnvelope, createGmcpSplitter, MAX_FRAME_BYTES, MAX_SB_BYTES };
+module.exports = { wantsGmcp, gmcpEnvelope, createGmcpSplitter, MAX_FRAME_BYTES, MAX_SB_BYTES, MAX_SB_MS };

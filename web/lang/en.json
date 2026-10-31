@@ -567,7 +567,7 @@
   "play.result.other": "Fight over",
   "play.result.gains": "{0} XP, {1} gold. Kills: {2}",
   "play.death": "Killed by {0}",
-  "play.chat.hint": "Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game for the full record.",
+  "play.chat.hint": "Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game to see the last 50 messages, your own included.",
   "play.chat.channel.tell": "Tell",
   "play.chat.channel.gossip": "Gossip",
   "play.chat.channel.shout": "Shout",

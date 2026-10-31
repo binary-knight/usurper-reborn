@@ -541,7 +541,7 @@
   "play.result.other": "Combattimento finito",
   "play.result.gains": "{0} PE, {1} oro. Uccisioni: {2}",
   "play.death": "Ucciso da {0}",
-  "play.chat.hint": "Messaggi privati, pettegolezzi, grida e messaggi di gilda degli altri giocatori arrivano qui e restano quando lo schermo si ridisegna. I tuoi messaggi non compaiono qui. Scrivi /history nel gioco per la cronologia completa.",
+  "play.chat.hint": "Messaggi privati, pettegolezzi, grida e messaggi di gilda degli altri giocatori arrivano qui e restano quando lo schermo si ridisegna. I tuoi messaggi non compaiono qui. Scrivi /history nel gioco per vedere gli ultimi 50 messaggi, inclusi i tuoi.",
   "play.chat.channel.tell": "Privato",
   "play.chat.channel.gossip": "Pettegolezzi",
   "play.chat.channel.shout": "Grido",

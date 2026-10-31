@@ -541,7 +541,7 @@
   "play.result.other": "A harcnak vége",
   "play.result.gains": "{0} TP, {1} arany. Legyőzve: {2}",
   "play.death": "{0} ölt meg",
-  "play.chat.hint": "A többi játékos privát üzenetei, pletykái, kiáltásai és céhüzenetei ide érkeznek, és itt maradnak, amikor a képernyő újrarajzolódik. A saját üzeneteid itt nem jelennek meg. A teljes naplóhoz írd be a játékban: /history.",
+  "play.chat.hint": "A többi játékos privát üzenetei, pletykái, kiáltásai és céhüzenetei ide érkeznek, és itt maradnak, amikor a képernyő újrarajzolódik. A saját üzeneteid itt nem jelennek meg. Az utolsó 50 üzenet megtekintéséhez, a sajátjaiddal együtt, írd be a játékban: /history.",
   "play.chat.channel.tell": "Privát",
   "play.chat.channel.gossip": "Pletyka",
   "play.chat.channel.shout": "Kiáltás",

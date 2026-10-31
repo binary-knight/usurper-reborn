@@ -121,6 +121,41 @@ test('bad frames are ignored', async () => {
   assert.deepStrictEqual(p.errors, []);
 });
 
+test('odd field types are dropped at the door, and later frames still draw', async () => {
+  const p = await load();
+  const odd = [{ toString: null }, { valueOf: null, toString: null }, [1, 2], { a: 1 }, null, true, 'NaN', Infinity, NaN];
+  // Straight to the handler, past the frame catch, so each field check is what keeps it from throwing.
+  for (const v of odd) {
+    for (const [pkg, data] of [
+      ['Char.Vitals', { hp: v, maxHp: v, mp: v, maxMp: v }],
+      ['Char.Status', { level: v, gold: v }],
+      ['Room.Info', { name: v }],
+      ['Char.Combat.Start', { enemies: [{ name: v, level: v, hp: v, maxHp: v }, v] }],
+      ['Char.Combat.Enemies', { enemies: v, round: v }],
+      ['Char.Combat.Party', { members: [{ name: v, hp: v, maxHp: v, isAlive: v }] }],
+      ['Char.Combat.Killed', { name: v }],
+      ['Char.Combat.End', { outcome: v, kills: v, xpGained: v, goldGained: v }],
+      ['Char.Death', { killer: v }],
+      ['Comm.Channel.Text', { channel: v, talker: v, text: v }],
+    ]) {
+      p.ctx.__p = pkg;
+      p.ctx.__d = data;
+      p.run('UsurperPlay.handleGmcp(__p, __d)');
+    }
+  }
+  // The real path: a frame whose nested value is an object with toString set to null.
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Char.Vitals","data":{"hp":{"toString":null},"maxHp":10}}')`);
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Char.Combat.End","data":{"outcome":{"toString":null},"xpGained":{"valueOf":null,"toString":null}}}')`);
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Comm.Channel.Text","data":{"channel":{"toString":null},"talker":[1],"text":{"a":1}}}')`);
+  assert.deepStrictEqual(p.errors, []);
+  frame(p, 'Char.Vitals', { hp: 5, maxHp: 10, mp: 0, maxMp: 0 });
+  frame(p, 'Room.Info', { name: 'Main Street' });
+  frame(p, 'Char.Combat.End', { outcome: 'Victory', kills: 1, xpGained: 2, goldGained: 3 });
+  assert.strictEqual(p.el('hp-num').textContent, '5/10');
+  assert.strictEqual(p.el('room').textContent, 'Main Street');
+  assert.ok(p.el('combat-result').textContent.includes('2 XP, 3 gold. Kills: 1'));
+});
+
 test('every play key the page uses is in all five languages', () => {
   const html = readPage(PAGE);
   const used = new Set();

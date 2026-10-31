@@ -541,7 +541,7 @@
   "play.result.other": "Combat terminé",
   "play.result.gains": "{0} XP, {1} pièces d'or. Victimes : {2}",
   "play.death": "Tué par {0}",
-  "play.chat.hint": "Les messages privés, les rumeurs, les cris et les messages de guilde des autres joueurs arrivent ici et restent quand l'écran se redessine. Vos propres messages n'apparaissent pas ici. Tapez /history dans le jeu pour l'historique complet.",
+  "play.chat.hint": "Les messages privés, les rumeurs, les cris et les messages de guilde des autres joueurs arrivent ici et restent quand l'écran se redessine. Vos propres messages n'apparaissent pas ici. Tapez /history dans le jeu pour voir les 50 derniers messages, y compris les vôtres.",
   "play.chat.channel.tell": "Privé",
   "play.chat.channel.gossip": "Rumeurs",
   "play.chat.channel.shout": "Cri",
