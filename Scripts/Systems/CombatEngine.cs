@@ -29343,6 +29343,13 @@ public partial class CombatEngine
         }
     }
 
+    /// <summary>O2: the NPC is in the world roster (not a generated opponent or a player stand in).</summary>
+    private static bool IsRosterNpc(NPC npc)
+    {
+        try { return NPCSpawnSystem.Instance?.ActiveNPCs?.ToArray().Any(n => ReferenceEquals(n, npc)) == true; }
+        catch { return false; }
+    }
+
     private async Task DeterminePvPOutcome(CombatResult result)
     {
         // v0.64.1 Slice 18: spared-NPC path. OfferNPCSurrenderAsync sets
@@ -29440,6 +29447,11 @@ public partial class CombatEngine
 
             // Track death for the opponent
             result.Opponent?.Statistics?.RecordDeath(toPlayer: true);
+
+            // O2: a lethal kill of a roster NPC is one death for the hourly world snapshot (a nonlethal duel is not;
+            // a spared opponent never reaches this branch)
+            if (_pvpLethal && result.Opponent is NPC slainNpc && IsRosterNpc(slainNpc))
+                WorldSnapshotCounters.CountNpcDeath(slainNpc);
 
             // Generate death news for the realm
             string location = result.Opponent?.CurrentLocation ?? "battle";

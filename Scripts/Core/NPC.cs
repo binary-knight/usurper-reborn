@@ -85,6 +85,14 @@ public partial class NPC : Character
     public bool IsDead { get; set; } = false;
 
     /// <summary>
+    /// O2: 1 once this death is in the hourly world snapshot's count (WorldSnapshotCounters.CountNpcDeath), so a
+    /// death seen by two paths (a lethal duel, then a world sim kill of the same corpse) counts once. Not saved;
+    /// set back to 0 by WorldSnapshotCounters.NpcRevived wherever the NPC is brought back to life.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int SnapshotDeathCounted;
+
+    /// <summary>
     /// When this NPC was "born" in real time. Used with FamilySystem.DAYS_PER_YEAR to calculate current age.
     /// DateTime.MinValue means not yet set (legacy save migration will compute from Age).
     /// </summary>

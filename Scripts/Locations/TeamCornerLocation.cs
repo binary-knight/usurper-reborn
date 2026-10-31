@@ -2885,6 +2885,7 @@ public class TeamCornerLocation : BaseLocation
         currentPlayer.Gold -= cost;
         live.HP = live.MaxHP / 2; // Resurrect at half HP
         live.IsDead = false; // Clear permanent death flag - IsAlive is computed from HP > 0
+        WorldSnapshotCounters.NpcRevived(live);   // O2: revived here, so its next death counts
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
