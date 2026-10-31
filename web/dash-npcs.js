@@ -98,13 +98,19 @@ function publicNpc(n, g) {
   };
 }
 
-function publicNpcs(npcs, playerNames) {
+// The NPC records of a raw blob (anything that is not an object is skipped) and the guards built
+// from them. Every public endpoint that names a character filters through these guards.
+function buildGuards(npcs, playerNames) {
   const list = arr(npcs).filter((n) => n && typeof n === 'object');
   const npcNames = new Set(list.map((n) => n.name).filter((x) => typeof x === 'string'));
   const npcIdToName = new Map();
   list.forEach((n) => { if (typeof n.id === 'string' && n.id && typeof n.name === 'string') npcIdToName.set(n.id, n.name); });
-  const g = makeGuards(npcNames, playerNames, npcIdToName);
-  return list.map((n) => publicNpc(n, g));
+  return { list, guards: makeGuards(npcNames, playerNames, npcIdToName) };
 }
 
-module.exports = { publicNpcs, TRAITS, MOODS };
+function publicNpcs(npcs, playerNames) {
+  const { list, guards } = buildGuards(npcs, playerNames);
+  return list.map((n) => publicNpc(n, guards));
+}
+
+module.exports = { publicNpcs, buildGuards, TRAITS, MOODS, str, num, bool, arr, obj };
