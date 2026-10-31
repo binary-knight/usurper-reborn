@@ -730,7 +730,25 @@ test('routes: every Observatory endpoint is a public GET with JSON from its allo
     const q = await call('/api/dash/people?x=1');
     assert.strictEqual(q.status, 200, 'a query string does not change the route');
     const post = await call('/api/dash/people', 'POST');
-    assert.strictEqual(post.handled, false, 'GET only');
+    assert.strictEqual(post.status, 404, 'GET only');
+    assert.deepStrictEqual(post.body, { error: 'Not found' }, 'GET only');
+  } finally { fx.close(); }
+});
+
+test('routes: a retired or unknown dash path gets a 404 JSON reply, not an open request', async () => {
+  const fx = makeFixture();
+  try {
+    const { call } = loadRoutes(fx.db);
+    for (const [url, method] of [['/api/dash/npcs', 'GET'], ['/api/dash/summary', 'GET'], ['/api/dash/nosuch', 'GET'],
+      ['/api/dash/', 'GET'], ['/api/dash/people/', 'GET'], ['/api/dash/realm', 'DELETE'], ['/api/dash/history', 'POST']]) {
+      const r = await call(url, method);
+      assert.strictEqual(r.handled, true, url);
+      assert.strictEqual(r.status, 404, method + ' ' + url);
+      assert.strictEqual(r.type, 'application/json', url);
+      assert.deepStrictEqual(r.body, { error: 'Not found' }, url);
+    }
+    const ok = await call('/api/dash/realm');
+    assert.strictEqual(ok.status, 200, 'a live route still answers');
   } finally { fx.close(); }
 });
 
