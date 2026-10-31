@@ -392,6 +392,7 @@
     // terminal, so a fight lights the Combat button instead of opening it.
     function drawerBeside() { return window.matchMedia ? window.matchMedia('(min-width: 1200px)').matches : true; }
     function setDrawer(tab) {
+        if (tab) showPanels();   // an open drawer always has its buttons beside it
         openTab = tab;
         var drawer = document.getElementById('drawer');
         drawer.hidden = !tab;
@@ -539,6 +540,8 @@
         var availW = scroll.clientWidth - (isPhone() ? 24 : 0);
         // Beside a closed drawer, keep its room so opening it never changes the font size.
         if (drawerBeside() && document.getElementById('drawer').hidden) availW -= 341;
+        // Keep the rail's room while it is hidden, so showing it never changes the font size.
+        if (!isPhone() && document.getElementById('rail').hidden) availW -= 45;
         var availH = scroll.clientHeight;
         var fs = MAX_FONT, cell;
         for (; fs >= MIN_FONT; fs--) {
@@ -585,7 +588,14 @@
     }
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
+        state.vitals = null; state.status = null; state.room = null;
         renderCombat();
+        renderVitals();
+        // A new connection starts as the first did: no panels until its own first GMCP frame.
+        setDrawer(null);
+        panelsShown = false;
+        document.getElementById('rail').hidden = true;
+        fitTerminal();
         if (terminal) terminal.reset();
         connect();
     });
