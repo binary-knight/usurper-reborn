@@ -2807,7 +2807,10 @@ async function handleDashRequest(req, res) {
     return true;
   }
 
-  return false; // Not a dash route
+  // Any other /api/dash/ path, including the retired npcs and summary routes, gets a 404
+  // instead of an open request.
+  sendJson(res, 404, { error: 'Not found' });
+  return true;
 }
 
 // --- Dashboard History (O2) ---
