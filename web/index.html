@@ -8,7 +8,6 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
     <style>
         /* Usurper Reborn: woodcut and iron.
            Charcoal ground, bone text, iron rules, one blood red spent only on Steam.
@@ -1053,43 +1052,6 @@
         }
         .stats-error { text-align: center; color: var(--ash); font-size: 16px; padding: 40px 0; }
 
-        /* ---------- Browser terminal ---------- */
-
-        .terminal-section { display: none; padding: 0 0 40px; }
-        .terminal-section.active { display: block; }
-        .terminal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background: var(--bg-card);
-            border: 1px solid var(--iron);
-            border-top: 4px solid var(--iron);
-            border-bottom: none;
-        }
-        .terminal-title { font-family: var(--mono); font-size: 14px; color: var(--ash); }
-        .terminal-dots { display: flex; gap: 6px; }
-        .terminal-dots span { width: 10px; height: 10px; background: var(--iron); }
-        .terminal-close {
-            background: none;
-            border: none;
-            color: var(--ash);
-            cursor: pointer;
-            font-size: 18px;
-            padding: 0 4px;
-        }
-        .terminal-close:hover { color: var(--bone); }
-        #terminal-container { border: 1px solid var(--iron); overflow: hidden; height: 500px; }
-        .terminal-status {
-            text-align: center;
-            padding: 8px;
-            font-family: var(--mono);
-            font-size: 14px;
-            color: var(--ash);
-        }
-        .terminal-status.connected { color: var(--bone); }
-        .terminal-status.error { color: var(--blood-text); }
-
         /* ---------- Footer ---------- */
 
         footer {
@@ -1210,7 +1172,7 @@
         </div>
         <div class="hero-buttons">
             <a class="btn btn-steam btn-hero-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
-            <button class="btn btn-secondary" id="play-btn" onclick="openTerminal()" data-i18n="r1.cta_play">▶ Play Now (Free, In Your Browser)</button>
+            <a class="btn btn-secondary" id="play-btn" href="/play/" target="_blank" rel="noopener" data-i18n="r1.cta_play">▶ Play Now (Free, In Your Browser)</a>
         </div>
         <p class="hero-cta-note" data-i18n="r1.cta_note">Play free in your browser. There's nothing to download or install.</p>
         <p class="hero-alt-links">
@@ -1223,23 +1185,6 @@
             <img src="img/class-warrior.webp" width="192" height="192" alt="" decoding="async">
             <figcaption data-i18n="r1.cl_warrior">Warrior: stronger basic attacks and taunts</figcaption>
         </figure>
-    </div>
-</section>
-
-<!-- Terminal (hidden by default) -->
-<section class="terminal-section" id="terminal-section">
-    <div class="container">
-        <div class="terminal-header">
-            <div class="terminal-dots">
-                <span class="dot-red"></span>
-                <span class="dot-yellow"></span>
-                <span class="dot-green"></span>
-            </div>
-            <span class="terminal-title">usurper-reborn.net</span>
-            <button class="terminal-close" onclick="closeTerminal()" title="Close terminal">&times;</button>
-        </div>
-        <div id="terminal-container"></div>
-        <div class="terminal-status" id="terminal-status" data-i18n="terminal.status.default">Click "Play Now" to connect...</div>
     </div>
 </section>
 
@@ -1470,8 +1415,8 @@
         <div class="connect-methods">
             <div class="connect-card">
                 <h3 data-i18n-html="connect.browser_title">&#9658; Play in Browser</h3>
-                <p data-i18n="connect.browser_desc">The browser option opens a terminal right in the page with no installation needed.</p>
-                <button class="btn btn-primary" onclick="openTerminal()" data-i18n="connect.browser_btn">Play Now</button>
+                <p data-i18n="connect.browser_desc">The browser option opens a full-page terminal in a new tab, with no installation needed.</p>
+                <a class="btn btn-primary" href="/play/" target="_blank" rel="noopener" data-i18n="connect.browser_btn">Play Now</a>
             </div>
             <div class="connect-card">
                 <h3 data-i18n-html="connect.ssh_title">&#9658; SSH (Recommended)</h3>
@@ -1521,7 +1466,7 @@
         <p class="finale-line2" data-i18n="r1.finale_line2">Your choices decide the ending. Townspeople and their relatives remember what you did to them.</p>
         <div class="hero-buttons">
             <a class="btn btn-steam finale-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" rel="noopener" data-i18n="connect.steam_btn">Get on Steam</a>
-            <button class="btn btn-secondary" onclick="openTerminal();window.scrollTo({top:0,behavior:'smooth'});" data-i18n="r1.finale_cta">&#9658; Begin</button>
+            <a class="btn btn-secondary" href="/play/" target="_blank" rel="noopener" data-i18n="r1.finale_cta">&#9658; Begin</a>
         </div>
         <p class="hero-cta-note"><a href="#story" data-i18n="r1.finale_alt">or read the story first</a></p>
     </div>
@@ -2037,133 +1982,7 @@
     populateLanguagePicker();
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
 <script>
-    let terminal = null;
-    let ws = null;
-    let fitAddon = null;
-    let onDataDispose = null;
-    let onResizeDispose = null;
-
-    function openTerminal() {
-        const section = document.getElementById('terminal-section');
-        const status = document.getElementById('terminal-status');
-        section.classList.add('active');
-        section.scrollIntoView({ behavior: 'smooth' });
-
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            if (terminal) terminal.focus();
-            return;
-        }
-
-        if (!terminal) {
-            terminal = new Terminal({
-                cursorBlink: true,
-                fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Courier New', monospace",
-                theme: {
-                    background: '#0c0b0a',
-                    foreground: '#e8e0d0',
-                    cursor: '#e8e0d0',
-                    cursorAccent: '#0c0b0a',
-                    selectionBackground: '#4a4640',
-                    black: '#000000',
-                    red: '#ff4444',
-                    green: '#00ff88',
-                    yellow: '#ffaa00',
-                    blue: '#4488ff',
-                    magenta: '#aa66ff',
-                    cyan: '#00e5ff',
-                    white: '#e0e0e0',
-                    brightBlack: '#666666',
-                    brightRed: '#ff6666',
-                    brightGreen: '#66ffaa',
-                    brightYellow: '#ffcc44',
-                    brightBlue: '#66aaff',
-                    brightMagenta: '#cc88ff',
-                    brightCyan: '#33eeff',
-                    brightWhite: '#ffffff'
-                },
-                scrollback: 1000,
-                convertEol: true
-            });
-
-            fitAddon = new FitAddon.FitAddon();
-            terminal.loadAddon(fitAddon);
-            terminal.open(document.getElementById('terminal-container'));
-            fitAddon.fit();
-
-            window.addEventListener('resize', () => {
-                if (fitAddon) fitAddon.fit();
-            });
-        }
-
-        terminal.clear();
-        status.textContent = t('terminal.status.connecting');
-        status.className = 'terminal-status';
-
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${proto}//${location.host}/ws`);
-        ws.binaryType = 'arraybuffer';
-
-        ws.onopen = () => {
-            status.textContent = t('terminal.status.connected');
-            status.className = 'terminal-status connected';
-            terminal.focus();
-
-            if (fitAddon) {
-                const dims = fitAddon.proposeDimensions();
-                if (dims) {
-                    ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
-                }
-            }
-        };
-
-        ws.onmessage = (event) => {
-            if (event.data instanceof ArrayBuffer) {
-                terminal.write(new Uint8Array(event.data));
-            } else {
-                terminal.write(event.data);
-            }
-        };
-
-        ws.onclose = () => {
-            status.textContent = t('terminal.status.disconnected');
-            status.className = 'terminal-status';
-            terminal.write('\r\n\x1b[90m--- Connection closed ---\x1b[0m\r\n');
-        };
-
-        ws.onerror = () => {
-            status.textContent = t('terminal.status.error');
-            status.className = 'terminal-status error';
-        };
-
-        // Dispose previous handlers to prevent duplicate keystroke sends on reconnect
-        if (onDataDispose) onDataDispose.dispose();
-        if (onResizeDispose) onResizeDispose.dispose();
-
-        onDataDispose = terminal.onData((data) => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(data);
-            }
-        });
-
-        onResizeDispose = terminal.onResize(({ cols, rows }) => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-            }
-        });
-    }
-
-    function closeTerminal() {
-        if (ws) {
-            ws.close();
-            ws = null;
-        }
-        document.getElementById('terminal-section').classList.remove('active');
-    }
-
     function copyCommand(el) {
         const text = el.textContent.replace('click to copy', '').trim();
         navigator.clipboard.writeText(text).then(() => {
