@@ -349,7 +349,7 @@
   "connect.steam_desc": "You can get Usurper Reborn on Steam with a terminal and the fonts bundled in.",
   "connect.steam_btn": "Get on Steam",
   "connect.observatory_title": "&#9658; The Observatory",
-  "connect.observatory_desc": "The Observatory is a live dashboard of the town's NPCs. It displays personality charts, relationship maps, population figures, and live events.",
+  "connect.observatory_desc": "The Observatory is a live view of the realm: who rules, what is happening, where everyone is, and who is worth knowing.",
   "connect.observatory_btn": "Open Dashboard",
   "bbs.title": "BBS LIST",
   "bbs.subtitle": "BBSes that are running Usurper Reborn as a door game right now.",
