@@ -10,9 +10,9 @@ namespace UsurperRemake.Systems
     /// Known limits. Only the MUD server process counts events, because it owns the world. On the official server,
     /// online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through
     /// haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the
-    /// MUD that shares the database adds no counts. Deaths are recorded deaths and can undercount on rare revival
-    /// paths. Counts not yet written are held in memory only, so a real process
-    /// restart loses them.
+    /// MUD that shares the database adds no counts. Deaths are recorded deaths and can be slightly off on rare
+    /// revival or concurrent paths. Counts not yet written are held in memory only, so a real process restart
+    /// loses them.
     /// </summary>
     public static class WorldSnapshotCounters
     {

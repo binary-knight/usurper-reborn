@@ -1580,7 +1580,7 @@ Public dashboard at `/dashboard`. Real-time observation of the NPC simulation:
 - 6 endpoints under `/api/dash/` (feed, npcs, summary, events, events/hourly, history)
 - Hourly history: the MUD's world sim writes one `world_snapshots` row per UTC hour (NPCs alive, dead and married, children, treasury, players online, and the births, NPC deaths and marriages since the previous row), kept 90 days; `/api/dash/history?hours=24|168|720` reads it
 
-**Known limit of the history counts.** Only the MUD server process counts events, because it owns the world. On the official server, online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the MUD that shares the database adds no counts. Deaths are recorded deaths and can undercount on rare revival paths.
+**Known limit of the history counts.** Only the MUD server process counts events, because it owns the world. On the official server, online play reaches it three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases there. A process other than the MUD that shares the database adds no counts. Deaths are recorded deaths and can be slightly off on rare revival or concurrent paths.
 
 ---
 
