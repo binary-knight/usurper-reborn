@@ -219,7 +219,7 @@ public class RelayToken128Tests
         mud.Lines.Last().Should().Be(line, "the relay forwards the token line byte for byte");
         result.Should().Be(true, "a session ran");
         stdout.Should().Be("OK\r\n");
-        stderr.Should().Contain("Connected as '(token)'");
+        stderr.Should().BeEmpty("1.3.9: a successful login prints nothing on stderr, which an SSH player would see");
         stderr.Should().NotContain(verifier).And.NotContain(token).And.NotContain("TOKEN1");
     }
 
