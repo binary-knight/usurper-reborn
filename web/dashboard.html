@@ -789,10 +789,21 @@
             b.setAttribute('title', (on ? 'Stop watching ' : 'Watch ') + name);
             return b;
         }
+        // Matches a message naming any watched NPC or team as a whole word.
         function watchMatcher() {
             var names = W.npcs.concat(W.teams).filter(Boolean);
             if (!names.length) return null;
-            return new RegExp('(^|[^A-Za-z0-9])(' + names.map(reEsc).join('|') + ')(?![A-Za-z0-9])');
+            var wordChar = /[A-Za-z0-9]/;
+            return {
+                test: function (msg) {
+                    return names.some(function (n) {
+                        for (var i = msg.indexOf(n); i !== -1; i = msg.indexOf(n, i + 1)) {
+                            if ((i === 0 || !wordChar.test(msg.charAt(i - 1))) && !wordChar.test(msg.charAt(i + n.length))) return true;
+                        }
+                        return false;
+                    });
+                }
+            };
         }
 
         // ------------------------------------------------------------ fetching

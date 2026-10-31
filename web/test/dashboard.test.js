@@ -322,6 +322,22 @@ test('watch list: a profile and a team can be watched, saved in localStorage, an
   noErrors(p, 'watch');
 });
 
+test('watch list: a watched name matches only as a whole word', async () => {
+  const routes = world('Ann');
+  const t = routes['/api/dash/events'][0].time;
+  routes['/api/dash/events'] = [
+    { id: 4, message: 'Annabel has been training hard at the Gym!', category: 'npc', playerName: null, time: t },
+    { id: 3, message: 'DeAnn has been training hard at the Gym!', category: 'npc', playerName: null, time: t },
+    { id: 2, message: 'Ann has been training hard at the Gym!', category: 'npc', playerName: null, time: t },
+    { id: 1, message: 'Several townsfolk witnessed Bram brawl with Ann at the Inn', category: 'npc', playerName: null, time: t },
+  ];
+  const p = await open(routes, { storage: { 'usurper.observatory.watch': JSON.stringify({ npcs: ['Ann'], teams: [] }) } });
+  const watched = [...p.el('chron').querySelectorAll('.ev.watch')].map((e) => e.textContent);
+  assert.strictEqual(watched.length, 2, 'only the two rows naming Ann');
+  assert.ok(watched.every((x) => !/Annabel|DeAnn/.test(x)));
+  noErrors(p, 'whole word');
+});
+
 test('watch list: blocked or broken storage never breaks the page', async () => {
   const broken = await open(world('Alice'), { storage: { 'usurper.observatory.watch': '{not json' } });
   noErrors(broken, 'broken json');
