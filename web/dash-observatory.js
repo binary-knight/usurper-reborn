@@ -4,9 +4,12 @@
 // returns an allow-list: the fields the page draws and nothing else. Login keys (usernames, sellers,
 // buyers, world_boss_damage.player_name) are never selected. A name of another character is sent
 // only when it is an NPC that no player shares (the guards in dash-npcs.js); player display names
-// appear only as the realm's boss leaders and the fallen heroes' names. A missing table, a missing
-// column or an unreadable world_state row gives empty values, never a throw.
+// appear only as the realm's boss leaders, the ruler, the god of the week and the fallen heroes'
+// names, and a login key nowhere. An NPC whose name a player shares is left out everywhere, and
+// with no player list no name of anyone is sent. A missing table, a missing column or an
+// unreadable world_state row gives empty values, never a throw.
 const { buildGuards, str, num, bool, arr, obj } = require('./dash-npcs');
+const MONSTERS = require('./dash-monster-names');
 
 // WorldBossData.cs definition id to boss name (pinned by a test against the C#).
 const BOSS_NAMES = Object.freeze({
@@ -24,6 +27,10 @@ const BOSS_NAMES = Object.freeze({
 const GOD_RULE = 'followers get 5% more XP';
 const MARRIAGE_GOAL = 'Look for Marriage Partner';
 const DAYS = 7;
+// GameConfig.MaxDungeonLevel: the dungeon is 100 floors deep.
+const MAX_FLOOR = 100;
+// A boss window longer than a week is not a schedule the game writes.
+const MAX_WINDOW_HOURS = 168;
 
 // Cache periods in milliseconds.
 const TTL = Object.freeze({
@@ -48,7 +55,49 @@ function parseUtc(v) {
   return Date.parse(zoned);
 }
 
-const isoOf = (ms) => (isFinite(ms) ? new Date(ms).toISOString() : '');
+// Milliseconds as ISO 8601, or '' outside the years 2000 to 2999.
+const ISO_MIN = Date.UTC(2000, 0, 1);
+const ISO_MAX = Date.UTC(3000, 0, 1);
+const isoOf = (ms) => (typeof ms === 'number' && isFinite(ms) && ms >= ISO_MIN && ms < ISO_MAX ? new Date(ms).toISOString() : '');
+
+// The player name set every dashboard list filters with: lower-cased logins and display names, with
+// loginToDisplay (lower-cased login to lower-cased display name) attached. rows: players rows.
+function playerNameSet(rows) {
+  const names = new Set();
+  const loginToDisplay = new Map();
+  arr(rows).forEach((r) => {
+    if (!r || typeof r !== 'object') return;
+    const login = r.username ? String(r.username).toLowerCase() : '';
+    const display = r.display_name ? String(r.display_name).toLowerCase() : '';
+    if (login) { names.add(login); loginToDisplay.set(login, display); }
+    if (display) names.add(display);
+  });
+  names.loginToDisplay = loginToDisplay;
+  return names;
+}
+
+// A stored ruler or god name, sent as it is unless it is a player's login and not that player's
+// display name. Without the player list (or its login map) nothing is sent.
+function notALogin(name, playerNames) {
+  const n = str(name);
+  if (!n || !playerNames || !(playerNames.loginToDisplay instanceof Map)) return '';
+  const k = n.toLowerCase();
+  const m = playerNames.loginToDisplay;
+  return m.has(k) && m.get(k) !== k ? '' : n;
+}
+
+// A killer text that is a monster or boss name from the game's data, with the generator's name
+// templates (champion, leader, caster, elite) taken off, up to four deep.
+const MONSTER_SET = new Set(MONSTERS.NAMES);
+const OTHER_KILLERS = new Set(MONSTERS.OTHER);
+const AFFIX_PARTS = MONSTERS.AFFIXES.map((t) => { const i = t.indexOf('{0}'); return [t.slice(0, i), t.slice(i + 3)]; });
+function isMonsterName(text, depth = 0) {
+  if (typeof text !== 'string' || !text) return false;
+  if (MONSTER_SET.has(text)) return true;
+  if (depth >= 4) return false;
+  return AFFIX_PARTS.some(([pre, post]) => text.length > pre.length + post.length && text.startsWith(pre) && text.endsWith(post)
+    && isMonsterName(text.slice(pre.length, text.length - post.length), depth + 1));
+}
 
 // A world_state value as an object, {} when missing, unreadable or not an object.
 function readWorldState(db, key, log) {
@@ -70,7 +119,8 @@ function query(db, log, what, fn, fallback) {
 
 function buildPeople(npcs, playerNames) {
   const { list, guards: g } = buildGuards(npcs, playerNames);
-  return list.map((n) => ({
+  // Only NPCs no player shares a name with; none without the player list.
+  return list.filter((n) => typeof n.name === 'string' && g.isSafeNpc(n.name)).map((n) => ({
     name: str(n.name),
     level: num(n.level),
     class: num(n.class),
@@ -88,10 +138,14 @@ function buildPeople(npcs, playerNames) {
   }));
 }
 
-// The public list (dash-npcs publicNpcs) by name; the first entry of a name wins.
-function profileMap(publicList) {
+// The public list (dash-npcs publicNpcs) by name; the first entry of a name wins. A name a player
+// shares (login or display name) is left out, and without the player list the map is empty.
+function profileMap(publicList, playerNames) {
   const map = new Map();
-  arr(publicList).forEach((n) => { if (n && typeof n.name === 'string' && n.name && !map.has(n.name)) map.set(n.name, n); });
+  if (!playerNames) return map;
+  arr(publicList).forEach((n) => {
+    if (n && typeof n.name === 'string' && n.name && !playerNames.has(n.name.toLowerCase()) && !map.has(n.name)) map.set(n.name, n);
+  });
   return map;
 }
 
@@ -129,12 +183,13 @@ function buildRealm(db, npcs, playerNames, nowMs, log = noop) {
   const week = db ? readWorldState(db, 'god_of_week', log) : {};
   const sched = db ? readWorldState(db, 'world_boss_schedule', log) : {};
 
-  let rulerName = str(court.kingName) || str(econ.kingName);
-  if (rulerName === 'None') rulerName = '';
+  // The ruler's name as stored, as /api/stats sends it, but never a login key.
+  let rulerStored = str(court.kingName) || str(econ.kingName);
+  if (rulerStored === 'None') rulerStored = '';
   const ruler = {
-    name: rulerName,
+    name: notALogin(rulerStored, playerNames),
     // King.cs: Female (2) is Queen; any other value is King.
-    title: rulerName ? (court.kingSex === 2 ? 'Queen' : 'King') : '',
+    title: rulerStored ? (court.kingSex === 2 ? 'Queen' : 'King') : '',
     reignDays: num(court.totalReign),
     since: isoOf(parseUtc(court.coronationDate)),
   };
@@ -147,7 +202,8 @@ function buildRealm(db, npcs, playerNames, nowMs, log = noop) {
     members: num(econ.cityControlMembers),
   };
 
-  const godName = str(week.god);
+  // The god as stored (a player god's divine name is public in /api/stats), but never a login key.
+  const godName = notALogin(week.god, playerNames);
   const god = { name: godName, week: num(week.week), rule: godName ? GOD_RULE : '' };
 
   const active = db ? query(db, log, 'world_bosses active', () => db.prepare(
@@ -164,15 +220,20 @@ function buildRealm(db, npcs, playerNames, nowMs, log = noop) {
       hpPct: max > 0 ? Math.max(0, Math.min(100, Math.round((num(active.current_hp) * 100) / max))) : 0,
       endsAt: sqlToIso(active.expires_at),
     };
-  } else if (num(sched.spawnedBossId) === 0 && typeof sched.definitionId === 'string' && sched.definitionId) {
+  } else if (sched.spawnedBossId === 0 && typeof sched.definitionId === 'string' && sched.definitionId) {
+    // A window of 1 to 168 whole hours and dates that format; anything else is no coming boss.
+    const hours = sched.windowHours;
     const start = parseUtc(sched.spawnUtc);
-    const end = start + Math.max(0, num(sched.windowHours)) * 3600000;
-    if (isFinite(start) && end > nowMs) {
+    const okHours = typeof hours === 'number' && Number.isInteger(hours) && hours >= 1 && hours <= MAX_WINDOW_HOURS;
+    const end = okHours ? start + hours * 3600000 : NaN;
+    const startsAt = isoOf(start);
+    const endsAt = isoOf(end);
+    if (startsAt && endsAt && end > nowMs) {
       next = {
         name: Object.prototype.hasOwnProperty.call(BOSS_NAMES, sched.definitionId) ? BOSS_NAMES[sched.definitionId] : '',
         level: num(sched.bossLevel),
-        startsAt: isoOf(start),
-        endsAt: isoOf(end),
+        startsAt,
+        endsAt,
       };
     }
   }
@@ -212,11 +273,13 @@ function buildRealm(db, npcs, playerNames, nowMs, log = noop) {
 const MOVERS_SQL = `SELECT npc_name, SUM(xp_delta) AS xp, SUM(gold_delta) AS gold FROM npc_decision_log
   WHERE created_at >= datetime('now', '-${DAYS} days') GROUP BY +npc_name`;
 
-// Logged gains over the last 7 days, kept only for names in the public NPC list.
-function buildMovers(db, publicNames, log = noop) {
+// Logged gains over the last 7 days, kept only for names in the public NPC list that no player
+// shares; none without the player list.
+function buildMovers(db, publicNames, playerNames, log = noop) {
   const names = publicNames instanceof Set ? publicNames : new Set();
+  if (!playerNames) return { days: DAYS, xp: [], gold: [] };
   const rows = db ? query(db, log, 'npc_decision_log', () => db.prepare(MOVERS_SQL).all(), []) : [];
-  const kept = rows.filter((r) => typeof r.npc_name === 'string' && names.has(r.npc_name));
+  const kept = rows.filter((r) => typeof r.npc_name === 'string' && names.has(r.npc_name) && !playerNames.has(r.npc_name.toLowerCase()));
   const top = (field) => kept
     .filter((r) => num(r[field]) > 0)
     .sort((a, b) => num(b[field]) - num(a[field]) || a.npc_name.localeCompare(b.npc_name))
@@ -228,22 +291,19 @@ function buildMovers(db, publicNames, log = noop) {
 const DEPTHS_SQL = `SELECT floor_actual AS floor, COUNT(*) AS n FROM combat_events
   WHERE outcome = 'death' AND created_at >= datetime('now', '-${DAYS} days') GROUP BY +floor_actual`;
 
-// Deaths in 10-floor bands over the last 7 days; a death with no floor counts as unknown.
+// Deaths in the ten 10-floor bands of floors 1 to 100 over the last 7 days; any other floor value
+// (none, 0, negative, a fraction, deeper than the dungeon) counts as unknown.
 function buildDepths(db, log = noop) {
   const rows = db ? query(db, log, 'combat_events', () => db.prepare(DEPTHS_SQL).all(), []) : [];
-  const counts = new Map();
+  const counts = new Array(MAX_FLOOR / 10).fill(0);
   let unknown = 0;
-  let top = 10;
   rows.forEach((r) => {
     const f = r.floor;
     const n = num(r.n);
-    if (typeof f !== 'number' || !Number.isInteger(f) || f < 1) { unknown += n; return; }
-    const band = Math.floor((f - 1) / 10);
-    counts.set(band, (counts.get(band) || 0) + n);
-    top = Math.max(top, band + 1);
+    if (typeof f !== 'number' || !Number.isInteger(f) || f < 1 || f > MAX_FLOOR) { unknown += n; return; }
+    counts[Math.floor((f - 1) / 10)] += n;
   });
-  const bands = [];
-  for (let b = 0; b < top; b++) bands.push({ band: `${b * 10 + 1}-${b * 10 + 10}`, deaths: counts.get(b) || 0 });
+  const bands = counts.map((deaths, b) => ({ band: `${b * 10 + 1}-${b * 10 + 10}`, deaths }));
   return { days: DAYS, bands, unknown };
 }
 
@@ -263,8 +323,18 @@ function buildMarket(db, log = noop) {
 
 const FALLEN_SQL = 'SELECT display_name, level, class_name, killer, died_at FROM fallen_legacy ORDER BY died_at DESC LIMIT 20';
 
-// The 20 latest fallen heroes. Never the username or heirloom gold; the killer only when no player
-// name or login appears in it (a PvP death).
+// The 20 latest fallen heroes. Never the username or heirloom gold. The killer only when it is
+// positively known: an NPC no player shares a name with, or a monster or boss name from the game's
+// data (or the game's no-monster text) with no player name in it. Anything else (a player, a player
+// since renamed or deleted, unknown text) is '', and without the player list every killer is ''.
+function safeKiller(killer, g, playerNames) {
+  const k = str(killer);
+  if (!k || !playerNames) return '';
+  if (g.isSafeNpc(k)) return g.resolve(k);
+  if ((isMonsterName(k) || OTHER_KILLERS.has(k)) && !g.mentionsPlayer(k)) return k;
+  return '';
+}
+
 function buildFallen(db, npcs, playerNames, log = noop) {
   if (!db) return [];
   const { guards: g } = buildGuards(npcs, playerNames);
@@ -273,7 +343,7 @@ function buildFallen(db, npcs, playerNames, log = noop) {
       name: str(r.display_name),
       level: num(r.level),
       className: str(r.class_name),
-      killer: g.mentionsPlayer(r.killer) ? '' : str(r.killer),
+      killer: safeKiller(r.killer, g, playerNames),
       diedAt: sqlToIso(r.died_at),
     }));
 }
@@ -297,12 +367,12 @@ function createObservatory({ getDb, getNpcs, getPublicNpcs, getPlayerNames, now 
   return {
     people: () => cached('people', () => buildPeople(getNpcs(), getPlayerNames())),
     profile: (name) => {
-      const map = cached('profile', () => profileMap(getPublicNpcs()));
+      const map = cached('profile', () => profileMap(getPublicNpcs(), getPlayerNames()));
       return typeof name === 'string' && map.has(name) ? map.get(name) : null;
     },
     ties: () => cached('ties', () => buildTies(getPublicNpcs(), getPlayerNames())),
     realm: () => cached('realm', (t) => buildRealm(getDb(), getNpcs(), getPlayerNames(), t, log)),
-    movers: () => cached('movers', () => buildMovers(getDb(), publicNames(), log)),
+    movers: () => cached('movers', () => buildMovers(getDb(), publicNames(), getPlayerNames(), log)),
     depths: () => cached('depths', () => buildDepths(getDb(), log)),
     market: () => cached('market', () => buildMarket(getDb(), log)),
     fallen: () => cached('fallen', () => buildFallen(getDb(), getNpcs(), getPlayerNames(), log)),
@@ -310,7 +380,8 @@ function createObservatory({ getDb, getNpcs, getPublicNpcs, getPlayerNames, now 
 }
 
 module.exports = {
-  BOSS_NAMES, TTL, GOD_RULE, MARRIAGE_GOAL,
+  BOSS_NAMES, TTL, GOD_RULE, MARRIAGE_GOAL, MAX_FLOOR, MAX_WINDOW_HOURS,
+  playerNameSet, notALogin, isMonsterName, safeKiller,
   buildPeople, profileMap, buildTies, buildRealm, buildMovers, buildDepths, buildMarket, buildFallen,
   createObservatory, sqlToIso, parseUtc,
   MOVERS_SQL, DEPTHS_SQL, MARKET_SQL, MARKET_COUNT_SQL, FALLEN_SQL,
