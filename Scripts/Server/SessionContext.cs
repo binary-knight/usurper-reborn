@@ -64,6 +64,9 @@ public class SessionContext : IDisposable
     /// MaxCombatStamina), part of the same Char.Vitals change check. sp stays the Stamina stat.</summary>
     public long LastGmcpCombatStamina { get; set; } = -1;
     public long LastGmcpMaxCombatStamina { get; set; } = -1;
+    /// <summary>1.3.9: held around the Char.Vitals change check and its frame write, so a send from the
+    /// leader's thread for a grouped follower and the follower's own send cannot reorder.</summary>
+    internal readonly object GmcpVitalsLock = new();
     /// <summary>v1.1.15: last emitted Mental value, part of the same Char.Vitals change check.</summary>
     public int LastGmcpMental { get; set; } = -1;
 

@@ -2499,7 +2499,6 @@ public partial class CombatEngine
             UsurperRemake.Server.GmcpBridge.EmitItemsList(player);
             UsurperRemake.Server.GmcpBridge.EmitSkillsList(player);
             UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
-            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);   // 1.3.9: each grouped player, on their own session
             // Final party state at combat end (captures deaths, full heals on victory, etc.)
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(result.Teammates);
             // Gold and XP always change after combat — push Char.Status so the
@@ -2507,6 +2506,9 @@ public partial class CombatEngine
             // the next location transition.
             UsurperRemake.Server.GmcpBridge.EmitStatusIfChanged(player);
         }
+        // 1.3.9: each grouped player on their own session; outside the leader's IsActive check, since a
+        // follower's client can have GMCP when the leader's does not.
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);
         }
         finally
         {

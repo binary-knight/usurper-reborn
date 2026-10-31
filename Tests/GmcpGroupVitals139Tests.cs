@@ -22,10 +22,12 @@ public class GmcpGroupVitals139Tests
     private sealed class ProbeStream : MemoryStream
     {
         public object? TerminalLock;
+        public object? VitalsLock;
         public bool Throw;
-        public readonly List<(string op, bool term, bool stream, int length)> Events = new();
+        public readonly List<(string op, bool term, bool stream, int length, bool vitals)> Events = new();
         private void Record(string op, int length) =>
-            Events.Add((op, TerminalLock != null && Monitor.IsEntered(TerminalLock), Monitor.IsEntered(this), length));
+            Events.Add((op, TerminalLock != null && Monitor.IsEntered(TerminalLock), Monitor.IsEntered(this), length,
+                VitalsLock != null && Monitor.IsEntered(VitalsLock)));
         public override void Write(byte[] buffer, int offset, int count)
         {
             Record("write", count);
@@ -60,7 +62,8 @@ public class GmcpGroupVitals139Tests
             RemoteTerminal = term, GroupPlayerUsername = username,
         };
         c.CurrentCombatStamina = 70;
-        var ctx = new SessionContext { OutputStream = stream, GmcpEnabled = true, Username = username };
+        var ctx = new SessionContext { OutputStream = stream, GmcpEnabled = true, Username = username, Terminal = term };
+        stream.VitalsLock = ctx.GmcpVitalsLock;
         return (c, ctx, stream);
     }
 
@@ -204,6 +207,41 @@ public class GmcpGroupVitals139Tests
     }
 
     [Fact]
+    public void ANewLoginUnderTheSameNameGetsNothingForTheOldCharacter()
+    {
+        WithLeader(leaderStream =>
+        {
+            var (ana, _, oldStream) = Follower("ana", 61);
+            var (_, newCtx, newStream) = Follower("ana", 99);   // the replacement session has its own terminal
+            GmcpBridge.EmitVitalsToFollower(ana, _ => newCtx);
+            newStream.Length.Should().Be(0);
+            oldStream.Length.Should().Be(0);
+            leaderStream.Length.Should().Be(0);
+            return 0;
+        });
+    }
+
+    [Fact]
+    public void TheChangeCheckAndTheWriteHappenUnderTheSessionVitalsLock_OnBothPaths()
+    {
+        // Follower path (from the leader's thread).
+        WithLeader(_ =>
+        {
+            var (ana, anaCtx, anaStream) = Follower("ana", 61);
+            GmcpBridge.EmitVitalsToFollower(ana, n => anaCtx);
+            anaStream.Events.Where(e => e.op == "write" && e.length > 3).Should().OnlyContain(e => e.vitals);
+            return 0;
+        });
+        // The session's own path (the follower's loop after the group, or any player).
+        var (me, meCtx, meStream) = Follower("me", 50);
+        var saved = SessionContext.Current;
+        SessionContext.Current = meCtx;
+        try { GmcpBridge.EmitVitalsIfChanged(me); }
+        finally { SessionContext.Current = saved; }
+        meStream.Events.Where(e => e.op == "write" && e.length > 3).Should().NotBeEmpty().And.OnlyContain(e => e.vitals);
+    }
+
+    [Fact]
     public void CallSitesSendToTheGroupBesideEveryLeaderVitalsSend()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -211,11 +249,17 @@ public class GmcpGroupVitals139Tests
         string combat = File.ReadAllText(Path.Combine(root!.FullName, "Scripts", "Systems", "CombatEngine.cs"));
         string dungeon = File.ReadAllText(Path.Combine(root.FullName, "Scripts", "Locations", "DungeonLocation.cs"));
 
-        // Every leader-side Char.Vitals send in combat is followed by the group send.
-        int leader = CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);");
-        int group = CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);\n            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);");
-        leader.Should().Be(4);
-        group.Should().Be(leader);
+        // Three leader-side Char.Vitals sends in combat are followed by the group send; the fourth, at
+        // combat end, sits inside the leader's IsActive check, so the group send comes after that block.
+        CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);").Should().Be(4);
+        CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);\n            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);").Should().Be(3);
+        int end = combat.IndexOf("GmcpBridge.Emit(\"Char.Combat.End\"");
+        end.Should().BeGreaterThan(0);
+        int blockClose = combat.IndexOf("\n        }\n", end);
+        int groupAtEnd = combat.IndexOf("GmcpBridge.EmitVitalsToGroup(result.Teammates);", end);
+        groupAtEnd.Should().BeGreaterThan(blockClose, "the combat-end group send is outside the leader's GMCP check");
+        groupAtEnd.Should().BeLessThan(combat.IndexOf("finally", end));
+        CountOf(combat, "GmcpBridge.EmitVitalsToGroup(result.Teammates);").Should().Be(4);
         // The follower's own turn, and the two shared rests.
         int turn = combat.IndexOf("private async Task ProcessGroupedPlayerTurn(");
         combat.IndexOf("GmcpBridge.EmitVitalsToFollower(teammate);", turn).Should().BeGreaterThan(turn);

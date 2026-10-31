@@ -114,21 +114,34 @@ public static class GmcpBridge
 
     internal static void EmitVitalsToFollower(global::Character? teammate, Func<string, SessionContext?> resolve)
     {
-        if (teammate == null || !teammate.IsGroupedPlayer || string.IsNullOrEmpty(teammate.GroupPlayerUsername)) return;
+        if (teammate == null) return;
+        // Read once: group cleanup clears both when the follower leaves or drops.
+        var terminal = teammate.RemoteTerminal;
+        var name = teammate.GroupPlayerUsername;
+        if (terminal == null || string.IsNullOrEmpty(name)) return;
         SessionContext? ctx;
-        try { ctx = resolve(teammate.GroupPlayerUsername); }
+        try { ctx = resolve(name); }
         catch { return; }
         // A follower who disconnected has no session, no stream or GMCP off: nothing is sent.
         if (ctx == null || !ctx.GmcpEnabled || ctx.OutputStream == null) return;
-        EmitVitalsIfChangedFor(ctx, teammate, teammate.GroupPlayerUsername, teammate.RemoteTerminal);
+        // A new login under the same name has its own terminal; this character's terminal is not its.
+        if (!ReferenceEquals(ctx.Terminal, terminal)) return;
+        EmitVitalsIfChangedFor(ctx, teammate, name, terminal);
     }
 
-    // The change check runs on the receiving session's own LastGmcp* fields. For a follower they are
-    // written from the leader's thread while the follower's own loop is parked in the group; a race
-    // there can only repeat a frame, never lose a change, so it is left unlocked.
-    // When terminal is given (a follower), the frame is written under that terminal's writer lock,
-    // taken before the stream lock, so it never lands inside text the follower's terminal is writing.
+    // The change check runs on the receiving session's own LastGmcp* fields. For a follower the leader's
+    // thread and, after the group, the follower's own loop both send on that session, so the check, the
+    // baseline update and the write all happen under the session's GmcpVitalsLock and cannot reorder.
+    // Lock order: GmcpVitalsLock, then the terminal's writer lock (a follower only), then the stream lock.
+    // When terminal is given, the frame is written under that terminal's writer lock so it never lands
+    // inside text the follower's terminal is writing.
     private static void EmitVitalsIfChangedFor(SessionContext ctx, global::Character player, string label, TerminalEmulator? terminal)
+    {
+        lock (ctx.GmcpVitalsLock)
+            EmitVitalsIfChangedLocked(ctx, player, label, terminal);
+    }
+
+    private static void EmitVitalsIfChangedLocked(SessionContext ctx, global::Character player, string label, TerminalEmulator? terminal)
     {
         long hp = player.HP, maxHp = player.MaxHP;
         long mana = player.Mana, maxMana = player.MaxMana;

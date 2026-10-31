@@ -1085,7 +1085,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
 
-In group play (1.3.9), `EmitVitalsToGroup` and `EmitVitalsToFollower` send each grouped player's `Char.Vitals` to that player's own session, beside every leader vitals send in combat, when a follower's turn opens and at the shared rests. The change check uses that session's own baseline, and the frame is written under the follower terminal's writer lock (`TerminalEmulator.RunUnderWriterLock`) before the stream lock. `Char.Combat.Party` and `Char.Combat.Enemies` still go to the leader only.
+In group play (1.3.9), `EmitVitalsToGroup` and `EmitVitalsToFollower` send each grouped player's `Char.Vitals` to that player's own session, beside every leader vitals send in combat, when a follower's turn opens and at the shared rests. The change check uses that session's own baseline and runs, with the write, under that session's `GmcpVitalsLock`; the frame is written under the follower terminal's writer lock (`TerminalEmulator.RunUnderWriterLock`) before the stream lock, and only when the session still owns that terminal. The combat-end send to the group does not depend on the leader having GMCP. `Char.Combat.Party` and `Char.Combat.Enemies` still go to the leader only.
 
 Strict opt-in: SSH-relayed, BBS and Electron sessions and the landing page terminal skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. The play page (`/play/`) gets GMCP because the web proxy answers the offer for it (Section 36). Synchronous per-stream lock prevents interleaved frames.
 
