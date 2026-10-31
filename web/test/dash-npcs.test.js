@@ -113,6 +113,18 @@ test('the raw and public NPC lists are not served whole; the Observatory reads t
   assert.match(src, /SELECT username, display_name FROM players/);
 });
 
+test('the children list is not served; only its count reaches the stats', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'ssh-proxy.js'), 'utf8');
+  const read = "SELECT value FROM world_state WHERE key = 'children'";
+  const at = src.indexOf(read);
+  assert.ok(at > 0, 'the count read is there');
+  assert.strictEqual(src.indexOf(read, at + 1), -1, 'one children read only');
+  const body = src.slice(at, src.indexOf('} catch', at));
+  assert.match(body, /childrenCount = childData\.count \|\| 0;/);
+  assert.ok(!/childData\.children|childrenRaw/.test(body), 'no child rows leave this read');
+  assert.ok(!src.includes('publicChildren'), 'no children projection is served');
+});
+
 test('a team name that holds a player name is left out; others stay', () => {
   const out = publicNpcs([{ name: 'Sir Galahad', team: 'HrothgarZq guard' }, { name: 'Mord Necro', team: 'The Wave Guild' }], PLAYERS);
   assert.deepStrictEqual(out.map((n) => n.team), ['', 'The Wave Guild']);
