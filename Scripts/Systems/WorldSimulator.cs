@@ -763,19 +763,7 @@ public class WorldSimulator
                 SocialInfluenceSystem.Instance?.ProcessPlayerReputationSpread(npcs, currentPlayer.Name, _currentTick);
         }
 
-        // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
-        // Skip age-dead and perma-dead NPCs - they don't come back
-        // 1.3.3 party survival: an NPC ally Downed in a player's fight is at 0 HP but not dead; the sim leaves it alone
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsDowned && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
-        {
-            var respawnKey = npc.Id ?? npc.Name;
-            if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
-            {
-                deadNPCRespawnTimers[respawnKey] = NPC_RESPAWN_TICKS;
-                if (!IsCatchUpMode)
-                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
-            }
-        }
+        TrackDeadNPCsForRespawn();   // O2: moved into its own method, unchanged, with the death marks cleared
 
         // Tick counter (always incremented, even during catch-up, for rate-limiters)
         _currentTick++;
@@ -1020,6 +1008,7 @@ public class WorldSimulator
             return false;
         }
 
+        WorldSnapshotCounters.CountNpcDeath(npc);   // O2: one death for the hourly world snapshot
         npc.IsDead = true;
         npc.HP = 0;
         npc.PregnancyDueDate = null;
@@ -1297,6 +1286,32 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// The dead scan of each step: every dead NPC that can come back is queued for respawn once. It counts no
+    /// death (O2: the death was counted where it happened); it sets SnapshotDeathCounted back to 0 on an NPC that
+    /// lives again, so its next death counts.
+    /// </summary>
+    internal void TrackDeadNPCsForRespawn()
+    {
+        // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
+        // Skip age-dead and perma-dead NPCs: they don't come back
+        // 1.3.3 party survival: an NPC ally Downed in a player's fight is at 0 HP but not dead; the sim leaves it alone
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsDowned && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
+        {
+            var respawnKey = npc.Id ?? npc.Name;
+            if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
+            {
+                deadNPCRespawnTimers[respawnKey] = NPC_RESPAWN_TICKS;
+                if (!IsCatchUpMode)
+                    UsurperRemake.Systems.DebugLogger.Instance.LogDebug("NPC", $"{npc.Name} added to respawn queue ({NPC_RESPAWN_TICKS} ticks)");
+            }
+        }
+
+        foreach (var npc in npcs.ToList())
+            if (npc != null && npc.SnapshotDeathCounted != 0 && npc.IsAlive && !npc.IsDead)
+                UsurperRemake.Systems.WorldSnapshotCounters.ClearNpcDeathMark(npc);
+    }
+
+    /// <summary>
     /// Process NPC respawns - resurrect dead NPCs after a cooldown period
     /// </summary>
     private void ProcessNPCRespawns()
@@ -1544,6 +1559,7 @@ public class WorldSimulator
                     }
 
                     // Natural death - permanent, no respawn
+                    WorldSnapshotCounters.CountNpcDeath(npc);   // O2: a death of old age for the hourly world snapshot
                     npc.IsDead = true;
                     npc.IsAgedDeath = true;
                     npc.DeathDate = DateTime.UtcNow; // for PrunePermanentlyDeadNPCs grace window

@@ -2801,8 +2801,75 @@ async function handleDashRequest(req, res) {
     return true;
   }
 
+  // O2: the hourly world snapshots for the Observatory trends
+  if (method === 'GET' && dashHistory.matches(url)) {
+    dashHistory.handle(req, res);
+    return true;
+  }
+
   return false; // Not a dash route
 }
+
+// --- Dashboard History (O2) ---
+// GET /api/dash/history?hours=24|168|720: the world_snapshots rows of the last 24 hours, 7 days or 30 days,
+// oldest first, with the table's columns only. Any other hours value (or none) is 24. The game's world sim
+// writes one row per UTC hour, keyed 'yyyy-MM-ddTHH:00:00Z', so the window is a primary key range on
+// that string. Cached 5 minutes per window. A database without the table (a game not yet upgraded) gives [].
+const DASH_HISTORY_HOURS = [24, 168, 720];
+const DASH_HISTORY_CACHE_MS = 5 * 60 * 1000;
+const DASH_HISTORY_COLUMNS = ['taken_at', 'npcs_alive', 'npcs_dead', 'npcs_married', 'children', 'treasury',
+  'players_online', 'births', 'deaths', 'marriages'];
+const DASH_HISTORY_SQL = `SELECT ${DASH_HISTORY_COLUMNS.join(', ')} FROM world_snapshots
+  WHERE taken_at > ? AND taken_at <= ? ORDER BY taken_at ASC`;
+
+// The hours asked for when it is one of the three windows, else 24.
+function dashHistoryHours(url) {
+  let raw = null;
+  try { raw = new URL(url, 'http://localhost').searchParams.get('hours'); } catch { raw = null; }
+  const n = /^[0-9]{1,4}$/.test(raw || '') ? Number(raw) : NaN;
+  return DASH_HISTORY_HOURS.includes(n) ? n : 24;
+}
+
+// The row key of the UTC hour that holds the instant: 'yyyy-MM-ddTHH:00:00Z', as the game writes it.
+function dashHistoryHourKey(ms) {
+  return new Date(ms).toISOString().slice(0, 13) + ':00:00Z';
+}
+
+// deps: getDb() gives the read only game database (or null), now() the clock, sendJson the reply.
+function createDashHistory(deps) {
+  const cache = new Map();   // hours -> { at, rows }
+
+  function matches(url) {
+    return url === '/api/dash/history' || (typeof url === 'string' && url.startsWith('/api/dash/history?'));
+  }
+
+  // The window's rows: after the hour that held now minus hours, up to the hour that holds now (hours rows at most).
+  function rows(hours) {
+    const t = deps.now();
+    const hit = cache.get(hours);
+    if (hit && t - hit.at < DASH_HISTORY_CACHE_MS) return hit.rows;
+    const db = deps.getDb();
+    if (!db) return [];
+    try {
+      const found = db.prepare(DASH_HISTORY_SQL)
+        .all(dashHistoryHourKey(t - hours * 60 * 60 * 1000), dashHistoryHourKey(t))
+        .map((r) => Object.fromEntries(DASH_HISTORY_COLUMNS.map((c) => [c, r[c]])));
+      cache.set(hours, { at: t, rows: found });
+      return found;
+    } catch (err) {
+      return hit ? hit.rows : [];
+    }
+  }
+
+  function handle(req, res) {
+    deps.sendJson(res, 200, rows(dashHistoryHours(req.url)));
+  }
+
+  return { matches, rows, handle };
+}
+
+const dashHistory = createDashHistory({ getDb: () => db, now: () => Date.now(), sendJson: (res, status, data) => sendJson(res, status, data) });
+// --- End Dashboard History ---
 
 // --- Admin Dashboard API ---
 const ADMIN_SERVICES = ['usurper-mud', 'sshd-usurper', 'usurper-web', 'nginx'];

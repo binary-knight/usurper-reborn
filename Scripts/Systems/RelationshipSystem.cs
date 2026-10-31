@@ -473,6 +473,7 @@ public partial class RelationshipSystem
         character2.IsMarried = true;
         character2.SpouseName = character1.Name2;
         character2.MarriedTimes++;
+        WorldSnapshotCounters.AddMarriage();   // O2: one wedding for the hourly world snapshot
         GodDeedSystem.Record(character1, GodAct.Marriage);   // 1.2.0 Temple gods: Love deed, Chaos taboo (NPCs are skipped)
         GodDeedSystem.Record(character2, GodAct.Marriage);
         

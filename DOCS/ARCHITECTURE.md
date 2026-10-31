@@ -1576,7 +1576,10 @@ Public page at `/dashboard`, in the site theme, with four tabs (Now, Town, Power
 - Power: the crown, factions, teams, movers, deaths by depth, the market
 - People: directory with filters, wealthiest, highest level, feuds and friendships, seeking a partner, fallen heroes, leaderboard and PvP from `/api/stats`
 - Watched NPCs and teams are kept in the viewer's localStorage
-- Endpoints under `/api/dash/`: people, profile, ties, realm, movers, depths, market, fallen (`web/dash-observatory.js`), events, events/hourly, feed (SSE, `news` only)
+- Endpoints under `/api/dash/`: people, profile, ties, realm, movers, depths, market, fallen (`web/dash-observatory.js`), history, events, events/hourly, feed (SSE, `news` only)
+- Hourly history: the MUD's world sim writes one `world_snapshots` row per UTC hour (NPCs alive, dead and married, children, treasury, players online, and the births, NPC deaths and marriages since the previous row), kept 90 days; `/api/dash/history?hours=24|168|720` reads it
+
+Known limit of the history counts: events only count in the MUD server process, which owns the world. Online play reaches the MUD process three ways: the web client direct, the SSH relay into the MUD, and telnet through haproxy to port 4001. BBS doors and standalone play keep their own databases, and the Observatory never reads those.
 
 ---
 
