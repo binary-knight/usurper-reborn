@@ -1020,6 +1020,7 @@ public class WorldSimulator
             return false;
         }
 
+        if (!npc.IsDead) WorldSnapshotCounters.AddDeath();   // O2: one death for the hourly world snapshot
         npc.IsDead = true;
         npc.HP = 0;
         npc.PregnancyDueDate = null;
@@ -1545,6 +1546,7 @@ public class WorldSimulator
 
                     // Natural death - permanent, no respawn
                     npc.IsDead = true;
+                    WorldSnapshotCounters.AddDeath();   // O2: a death of old age for the hourly world snapshot
                     npc.IsAgedDeath = true;
                     npc.DeathDate = DateTime.UtcNow; // for PrunePermanentlyDeadNPCs grace window
                     npc.HP = 0;

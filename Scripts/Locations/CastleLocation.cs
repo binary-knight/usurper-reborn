@@ -1746,6 +1746,7 @@ public class CastleLocation : BaseLocation
             var npc = NPCSpawnSystem.Instance?.GetNPCByName(name);
             if (npc != null)
             {
+                if (!npc.IsDead) WorldSnapshotCounters.AddDeath();   // O2: an execution for the hourly world snapshot
                 npc.IsDead = true;
                 // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
                 npc.DaysInPrison = 0;
@@ -4744,6 +4745,7 @@ public class CastleLocation : BaseLocation
             candidate.IsMarried = true;
             candidate.SpouseName = currentPlayer.Name2; // v1.1.1: identity key, see RelationshipSystem
             candidate.MarriedTimes++;
+            WorldSnapshotCounters.AddMarriage();   // O2: the royal wedding for the hourly world snapshot
 
             // Register with marriage registry and romance tracker
             NPCMarriageRegistry.Instance.RegisterMarriage(currentPlayer.ID, candidate.ID, currentPlayer.DisplayName, candidate.DisplayName);

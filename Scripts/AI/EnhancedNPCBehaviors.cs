@@ -670,6 +670,7 @@ public static class EnhancedNPCBehaviors
         npc2.IsMarried = true;
         npc2.SpouseName = npc1.Name2;
         npc2.MarriedTimes++;
+        UsurperRemake.Systems.WorldSnapshotCounters.AddMarriage();   // O2: one wedding for the hourly world snapshot
 
         // Store spouse IDs for tracking (using existing memory system)
         npc1.Brain?.Memory?.AddMemory($"I married {npc2.Name2}!", "marriage", DateTime.Now);

@@ -45,6 +45,10 @@ namespace UsurperRemake.Systems
         // while another process holds the lock: no ticks, no world state writes, no final save
         private readonly bool _pauseWithoutLock;
 
+        // O2: only the MUD's world sim writes the hourly world_snapshots row; the hour key of the last attempt
+        private readonly bool _writeWorldSnapshots;
+        private string? _lastSnapshotHour;
+
         /// <summary>v1.1.14: this sim lost the lock and is paused until a heartbeat takes it back.</summary>
         internal bool PausedWithoutLock => _pauseWithoutLock && _heartbeatOwnerId != null && !_heldWorldSimLock;
 
@@ -68,7 +72,8 @@ namespace UsurperRemake.Systems
             float npcXpMultiplier = 0.25f,
             int saveIntervalMinutes = 5,
             string? heartbeatOwnerId = null,
-            bool pauseWithoutLock = false)
+            bool pauseWithoutLock = false,
+            bool writeWorldSnapshots = false)
         {
             this.sqlBackend = backend;
             this.simIntervalSeconds = simIntervalSeconds;
@@ -76,6 +81,7 @@ namespace UsurperRemake.Systems
             this.saveIntervalMinutes = saveIntervalMinutes;
             this._heartbeatOwnerId = heartbeatOwnerId;
             this._pauseWithoutLock = pauseWithoutLock;
+            this._writeWorldSnapshots = writeWorldSnapshots;
         }
 
         /// <summary>
@@ -171,7 +177,47 @@ namespace UsurperRemake.Systems
                 await SaveWorldState();
                 lastSaveTime = DateTime.UtcNow;
             }
+
+            // O2: the hourly world_snapshots row (the MUD's world sim only)
+            if (_writeWorldSnapshots) WriteHourlySnapshotIfDue(DateTime.UtcNow);
             return true;
+        }
+
+        /// <summary>
+        /// O2: the world_snapshots row of the current UTC hour, written once: the first call in an hour tries it, later
+        /// calls in that hour do nothing. Gauges (NPCs alive, dead and married, children, treasury, players online)
+        /// as of now; births, deaths and marriages since the previous row, taken from WorldSnapshotCounters and given
+        /// back when the row is not added (the hour already had one after a restart, or the write failed), so they
+        /// reach the next row. Returns whether this call added the row. A sim paused without the lock writes nothing.
+        /// </summary>
+        internal bool WriteHourlySnapshotIfDue(DateTime utcNow)
+        {
+            if (PausedWithoutLock) return false;
+            string hour = SqlSaveBackend.WorldSnapshotHourKey(utcNow);
+            if (hour == _lastSnapshotHour) return false;
+            _lastSnapshotHour = hour;
+
+            long alive = 0, dead = 0, married = 0, children = 0, treasury = 0, online = 0;
+            try
+            {
+                var npcs = NPCSpawnSystem.Instance?.ActiveNPCs?.ToList() ?? new List<NPC>();   // sessions add NPCs mid-tick
+                alive = npcs.Count(n => n != null && n.IsAlive && !n.IsDead);
+                dead = npcs.Count(n => n != null && (!n.IsAlive || n.IsDead) && !n.IsDowned);   // as the tick log counts
+                married = npcs.Count(n => n != null && n.IsMarried);   // as the dashboard summary counts
+                children = FamilySystem.Instance?.AllChildren?.ToList().Count(c => c != null && !c.Deleted) ?? 0;
+                treasury = CastleLocation.GetCurrentKing()?.Treasury ?? 0;
+                online = sqlBackend.GetOnlinePlayerCount();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("WORLDSIM", $"World snapshot gauges not read in full: {ex.Message}");
+            }
+
+            var (births, deaths, marriages) = WorldSnapshotCounters.TakeAndReset();
+            bool added = sqlBackend.WriteWorldSnapshot(utcNow,
+                new WorldSnapshotRow(alive, dead, married, children, treasury, online, births, deaths, marriages));
+            if (!added) WorldSnapshotCounters.GiveBack(births, deaths, marriages);
+            return added;
         }
 
         /// <summary>The loop's end: the final save (v1.1.14: skipped by a sim paused without the lock), then the lock released.</summary>

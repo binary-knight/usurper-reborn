@@ -57,6 +57,7 @@ namespace UsurperRemake.Systems
                 child.Name = NPCSpawnSystem.Instance.DisambiguateNPCName(child.Name, keepSurname: true, sex: child.Sex);
 
             _children.Add(child);
+            WorldSnapshotCounters.AddBirth();   // O2: a birth for the hourly world snapshot
 
             // v0.63.0 follow-up: record FamilyMemberBorn in the memory of every
             // living relative (existing parents, siblings via shared parent name).

@@ -332,7 +332,8 @@ public class MudServer
             simIntervalSeconds: UsurperRemake.BBS.DoorMode.SimIntervalSeconds,
             npcXpMultiplier: UsurperRemake.BBS.DoorMode.NpcXpMultiplier,
             saveIntervalMinutes: UsurperRemake.BBS.DoorMode.SaveIntervalMinutes,
-            heartbeatOwnerId: worldSimOwnerId
+            heartbeatOwnerId: worldSimOwnerId,
+            writeWorldSnapshots: true   // O2: the hourly world_snapshots row, from the process that owns the world
         );
         _worldSimService = worldSimService;
         var worldSimTask = Task.Run(() => worldSimService.RunAsync(_cts.Token));
