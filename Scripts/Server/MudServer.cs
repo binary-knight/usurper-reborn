@@ -973,10 +973,10 @@ public class MudServer
             {
                 // v1.2.5: the box is 79 columns wide (it was 80); AuthBoxRows, shared with the SSH relay.
                 await WriteAnsiAsync(stream, "\u001b[2J\u001b[H", isCp437); // Clear screen
-                var entries = new List<(string, string, string)> { ("1;36", "L", L("auth.login")), ("1;32", "R", L("auth.register")) };
-                if (offerForgot) entries.Add(("1;33", "F", L("auth.forgot")));
-                entries.Add(("1;35", "G", $"{L("auth.language")} ({langName})"));
-                entries.Add(("1;31", "Q", L("auth.quit")));
+                var entries = new List<(string, string, string)> { (AuthMenuColor, "L", L("auth.login")), (AuthMenuColor, "R", L("auth.register")) };
+                if (offerForgot) entries.Add((AuthMenuColor, "F", L("auth.forgot")));
+                entries.Add((AuthMenuColor, "G", $"{L("auth.language")} ({langName})"));
+                entries.Add((AuthQuitColor, "Q", L("auth.quit")));
                 foreach (var row in AuthBoxRows(L("auth.title"), entries))
                     await WriteAnsiAsync(stream, row + "\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[0m", isCp437);
@@ -1836,10 +1836,18 @@ public class MudServer
     internal static List<string> IdleWarningRows(string lang, int minutesLeft) =>
         NoticeRows($"*** {Loc.GetIn(lang, minutesLeft == 1 ? "mud.idle_warning_one" : "mud.idle_warning_many", minutesLeft)} ***");
 
+    /// <summary>1.3.9: the login box colours (his pick): the border and title bright purple, the menu
+    /// bright green, and the whole Quit entry red.</summary>
+    internal const string AuthBoxColor = "1;35";
+    internal const string AuthMenuColor = "1;32";
+    internal const string AuthQuitColor = "1;31";
+
     /// <summary>
     /// v1.2.5: the login box of the direct connection gate and the SSH relay: 79 columns wide (77 inside),
-    /// a centred title, a blank row, one row per menu entry and a blank row. Each row starts with its
-    /// colour; the colour of an entry sits on its hotkey only. The caller resets the colour after.
+    /// a centred title, a blank row, one row per menu entry and a blank row. 1.3.9: every border segment
+    /// and the title are drawn in AuthBoxColor, each with its own colour code so no row inherits the
+    /// colour of the one before; an entry's hotkey and label are both drawn in the entry's colour.
+    /// The caller resets the colour after.
     /// </summary>
     internal static List<string> AuthBoxRows(string title, IEnumerable<(string Color, string Hotkey, string Label)> entries)
     {
@@ -1847,12 +1855,13 @@ public class MudServer
         if (title.Length > inner) title = title.Substring(0, inner);
         int tpad = inner - title.Length;
         int tleft = tpad / 2;
+        string box = $"\u001b[{AuthBoxColor}m";
         var rows = new List<string>
         {
-            "\u001b[1;36m\u2554" + new string('\u2550', inner) + "\u2557",
-            "\u001b[1;37m\u2551" + new string(' ', tleft) + title + new string(' ', tpad - tleft) + "\u2551",
-            "\u001b[1;36m\u2560" + new string('\u2550', inner) + "\u2563",
-            "\u001b[0;37m\u2551" + new string(' ', inner) + "\u2551",
+            box + "\u2554" + new string('\u2550', inner) + "\u2557",
+            box + "\u2551" + new string(' ', tleft) + title + new string(' ', tpad - tleft) + "\u2551",
+            box + "\u2560" + new string('\u2550', inner) + "\u2563",
+            box + "\u2551" + new string(' ', inner) + "\u2551",
         };
         foreach (var (color, hotkey, label) in entries)
         {
@@ -1860,10 +1869,10 @@ public class MudServer
             int room = inner - $"  [{hotkey}] ".Length;
             if (text.Length > room) text = text.Substring(0, room);
             int pad = room - text.Length;
-            rows.Add($"\u2551  \u001b[{color}m[{hotkey}]\u001b[0;37m {text}{new string(' ', pad)}\u2551");
+            rows.Add($"{box}\u2551  \u001b[{color}m[{hotkey}] {text}{new string(' ', pad)}{box}\u2551");
         }
-        rows.Add("\u2551" + new string(' ', inner) + "\u2551");
-        rows.Add("\u001b[1;36m\u255a" + new string('\u2550', inner) + "\u255d");
+        rows.Add(box + "\u2551" + new string(' ', inner) + "\u2551");
+        rows.Add(box + "\u255a" + new string('\u2550', inner) + "\u255d");
         return rows;
     }
 

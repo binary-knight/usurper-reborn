@@ -429,8 +429,8 @@ public class LoginScreen_PwReset134Tests : IDisposable
             foreach (var key in new[] { "auth.forgot_name", "auth.reg_email", "auth.err_email_invalid", "auth.reg_email_sent" })
                 rows.Add("  " + L(lang, key) + " ");
             rows.AddRange(MudServer.AuthBoxRows(L(lang, "auth.title"), new[] {
-                ("1;36", "L", L(lang, "auth.login")), ("1;32", "R", L(lang, "auth.register")), ("1;33", "F", L(lang, "auth.forgot")),
-                ("1;35", "G", $"{L(lang, "auth.language")} (Magyar)"), ("1;31", "Q", L(lang, "auth.quit")) }).Select(Visible));
+                (MudServer.AuthMenuColor, "L", L(lang, "auth.login")), (MudServer.AuthMenuColor, "R", L(lang, "auth.register")), (MudServer.AuthMenuColor, "F", L(lang, "auth.forgot")),
+                (MudServer.AuthMenuColor, "G", $"{L(lang, "auth.language")} (Magyar)"), (MudServer.AuthQuitColor, "Q", L(lang, "auth.quit")) }).Select(Visible));
             rows.Add("[F] " + L(lang, "auth.forgot"));
             rows.Add(" " + L(lang, "email.prompt_title"));
             rows.AddRange(L(lang, "email.prompt_body").Split('\n').Select(l => " " + l));
@@ -445,7 +445,7 @@ public class LoginScreen_PwReset134Tests : IDisposable
             foreach (var row in rows)
                 row.Length.Should().BeLessOrEqualTo(MaxWidth, $"[{lang}] {row}");
             // the box keeps the whole label
-            MudServer.AuthBoxRows("t", new[] { ("1;33", "F", L(lang, "auth.forgot")) }).Select(Visible).Should().Contain(r => r.Contains(L(lang, "auth.forgot")));
+            MudServer.AuthBoxRows("t", new[] { (MudServer.AuthMenuColor, "F", L(lang, "auth.forgot")) }).Select(Visible).Should().Contain(r => r.Contains(L(lang, "auth.forgot")));
         }
     }
 }
