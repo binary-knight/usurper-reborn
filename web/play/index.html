@@ -628,6 +628,8 @@
             if (!isPhone() && document.getElementById('rail').hidden) availW -= 45;
             availH = scroll.clientHeight;
         }
+        var buf = terminal.buffer && terminal.buffer.active;
+        var atBottom = !buf || !(buf.viewportY < buf.baseY);
         var fs = MAX_FONT, cell;
         for (; fs >= minFont; fs = Math.round((fs - step) * 100) / 100) {
             terminal.options.fontSize = fs;
@@ -637,8 +639,9 @@
         if (fs < minFont) { fs = minFont; terminal.options.fontSize = fs; cell = cellSize(); }
         var rows = Math.max(MIN_ROWS, Math.floor((availH - 14) / cell.h));
         terminal.resize(COLS, rows);
-        // A new font or size can leave xterm showing the top of its scrollback; the game is at the bottom.
-        terminal.scrollToBottom();
+        // A new font or size can leave xterm showing the top of its scrollback. A player who was at the
+        // bottom stays there; one reading back is left where they were.
+        if (atBottom) terminal.scrollToBottom();
         var bw = Math.ceil(cell.w * COLS) + pad;
         box.style.width = bw + 'px';
         box.style.height = Math.ceil(cell.h * rows) + 14 + 'px';
@@ -777,9 +780,10 @@
         document.getElementById('pad-keys').setAttribute('aria-pressed', padKeys ? 'true' : 'false');
         if (padKeys) { renderKeyboard(box); return; }
         if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
-        // The compass shows only when the game sent compass exits and this screen offers one of them.
+        // The compass shows only on a menu screen, when the game sent compass exits and this screen
+        // offers one of them. A yes or no question in a room keeps its own two buttons.
         var keys = {};
-        cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
+        if (p.kind === 'menu') cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
         var shown = DIRS.filter(function (x) { return state.exits[x.d] && keys[x.k]; });
         if (shown.length) {
             var row = el('div', 'compass-row');
@@ -915,6 +919,11 @@
         terminal.open(document.getElementById('terminal'));
         terminal.onData(sendToGame);
         document.getElementById('terminal').addEventListener('click', function () { if (!isTouch()) terminal.focus(); });
+        // xterm focuses its textarea on mousedown, and a tap sends one, which would raise the phone
+        // keyboard over the pad. On a touch screen only Type opens it; scrolling uses touch events.
+        document.getElementById('terminal').addEventListener('mousedown', function (e) {
+            if (isTouch() && !document.body.classList.contains('typing')) { e.preventDefault(); e.stopPropagation(); }
+        }, true);
         // The pad comes back when the phone keyboard goes away.
         if (terminal.textarea && terminal.textarea.addEventListener) {
             terminal.textarea.addEventListener('blur', function () {

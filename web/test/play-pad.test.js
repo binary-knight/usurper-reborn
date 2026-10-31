@@ -253,3 +253,37 @@ test('the pad labels are drawn in the page language', async () => {
   pad(p, ['Est-ce correct ? (O/N)']);
   assert.deepStrictEqual(chips(p), ['O, Oui', 'N, Non']);
 });
+
+test('a yes or no question in a dungeon room keeps its buttons; the compass waits for the menu', async () => {
+  const sent = [];
+  const p = await load({ matchMedia: TOUCH, WebSocket: socket(sent) });
+  p.run(`UsurperPlay.handleFrame('{"gmcp":"Room.Info","data":{"name":"Burial Chamber","exits":{"north":"room_9","south":"room_0"}}}')`);
+  pad(p, ['¿Beber la poción? (S/N)']);
+  assert.deepStrictEqual(chips(p), ['S, Yes', 'N, No']);
+  assert.strictEqual(p.el('pad-scroll').querySelectorAll('.dir').length, 0);
+  p.click(p.el('pad-scroll').querySelectorAll('.chip')[0]);
+  assert.deepStrictEqual(sent, ['S\r']);
+  pad(p, ROOM);
+  assert.ok(p.el('pad-scroll').querySelectorAll('.dir').length > 0, 'the room menu still has its compass');
+});
+
+test('a tap on the terminal does not raise the phone keyboard; Type does, and a mouse is untouched', async () => {
+  const tapped = async (opts, typing) => {
+    const p = await load(opts);
+    if (typing) p.click(p.el('pad-type'));
+    let prevented = false, stopped = false;
+    p.doc.dispatch(p.el('terminal'), 'mousedown', { preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+    return [prevented, stopped];
+  };
+  assert.deepStrictEqual(await tapped({ matchMedia: TOUCH }, false), [true, true], 'a touch tap stops xterm focusing');
+  assert.deepStrictEqual(await tapped({ matchMedia: TOUCH }, true), [false, false], 'after Type the keyboard may stay');
+  assert.deepStrictEqual(await tapped({ matchMedia: MOUSE }, false), [false, false], 'a mouse click goes to xterm as before');
+  assert.deepStrictEqual(await tapped({}, false), [false, false]);
+});
+
+test('a refit scrolls to the bottom only for a player who was already there', () => {
+  const html = readPage(PAGE);
+  assert.match(html, /var atBottom = !buf \|\| !\(buf\.viewportY < buf\.baseY\);/);
+  assert.match(html, /if \(atBottom\) terminal\.scrollToBottom\(\);/);
+  assert.ok(!/\n\s*terminal\.scrollToBottom\(\);/.test(html), 'no unconditional scroll');
+});
