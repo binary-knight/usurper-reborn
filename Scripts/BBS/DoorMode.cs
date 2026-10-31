@@ -392,7 +392,6 @@ namespace UsurperRemake.BBS
                 else if (arg == "--mud-relay")
                 {
                     _mudRelayMode = true;
-                    Console.Error.WriteLine("[RELAY] MUD relay mode enabled");
                 }
                 // --admin <username> adds a MUD server admin user (can be repeated)
                 else if (arg == "--admin" && i + 1 < args.Length)
@@ -478,7 +477,6 @@ namespace UsurperRemake.BBS
                         _sessionInfo.UserName = _onlineUsername;
                         _sessionInfo.UserAlias = _onlineUsername;
                     }
-                    Console.Error.WriteLine($"[RELAY] User: {_onlineUsername ?? "(none)"}, Port: {_mudPort}");
                     return true;
                 }
 
