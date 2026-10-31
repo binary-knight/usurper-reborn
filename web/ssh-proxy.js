@@ -22,6 +22,8 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const { wantsGmcp, createGmcpSplitter } = require('./gmcp-split');
+const { publicNpcs } = require('./dash-npcs');
+const { createObservatory, playerNameSet } = require('./dash-observatory');
 
 let bcrypt;
 try {
@@ -1148,6 +1150,48 @@ function getDashNpcs() {
     return dashNpcCache || [];
   }
 }
+
+// Lower-cased player character names and login names, read at most once per NPC cache period, or
+// null when they could not be read. Every public dashboard list uses this one set only to keep
+// players out of it; it is never sent.
+let dashPlayerNamesCache = null;
+let dashPlayerNamesCacheTime = 0;
+function getDashPlayerNames() {
+  const now = Date.now();
+  if (dashPlayerNamesCacheTime && (now - dashPlayerNamesCacheTime) < DASH_NPC_CACHE_TTL) return dashPlayerNamesCache;
+  let names = null;
+  try {
+    names = playerNameSet(db.prepare('SELECT username, display_name FROM players').all());
+  } catch (err) {
+    // Without the player list nothing about other characters can be checked, so none is sent.
+    console.error(`[usurper-web] Dashboard player name query error: ${err.message}`);
+    names = null;
+  }
+  dashPlayerNamesCache = names;
+  dashPlayerNamesCacheTime = now;
+  return names;
+}
+
+// The public NPC list for /api/dash/npcs (dash-npcs.js), rebuilt at most once per NPC cache period.
+let dashPublicNpcCache = null;
+let dashPublicNpcCacheTime = 0;
+function getDashPublicNpcs() {
+  const now = Date.now();
+  if (dashPublicNpcCache && (now - dashPublicNpcCacheTime) < DASH_NPC_CACHE_TTL) return dashPublicNpcCache;
+  dashPublicNpcCache = publicNpcs(getDashNpcs(), getDashPlayerNames());
+  dashPublicNpcCacheTime = now;
+  return dashPublicNpcCache;
+}
+
+// The Observatory endpoints (dash-observatory.js), each cached for its own period.
+const dashObservatory = createObservatory({
+  getDb: () => db,
+  getNpcs: getDashNpcs,
+  getPublicNpcs: getDashPublicNpcs,
+  getPlayerNames: getDashPlayerNames,
+  now: () => Date.now(),
+  log: (msg) => console.error(`[usurper-web] Observatory query error: ${msg}`),
+});
 
 // Read royal court data from world_state (the authoritative source).
 // The world sim maintains the 'royal_court' key 24/7. Player sessions write to it
@@ -2943,9 +2987,35 @@ async function handleDashRequest(req, res) {
 
   // Data endpoints
   if (method === 'GET' && url === '/api/dash/npcs') {
-    const npcs = getDashNpcs();
-    sendJson(res, 200, npcs);
+    sendJson(res, 200, getDashPublicNpcs());
     return true;
+  }
+
+  // Observatory endpoints: public, allow-listed, cached (dash-observatory.js).
+  if (method === 'GET') {
+    let parsed = null;
+    try { parsed = new URL(url, 'http://localhost'); } catch (e) { parsed = null; }
+    const route = parsed ? parsed.pathname : '';
+    const simple = {
+      '/api/dash/people': dashObservatory.people,
+      '/api/dash/ties': dashObservatory.ties,
+      '/api/dash/realm': dashObservatory.realm,
+      '/api/dash/movers': dashObservatory.movers,
+      '/api/dash/depths': dashObservatory.depths,
+      '/api/dash/market': dashObservatory.market,
+      '/api/dash/fallen': dashObservatory.fallen,
+    };
+    if (Object.prototype.hasOwnProperty.call(simple, route)) {
+      sendJson(res, 200, simple[route]());
+      return true;
+    }
+    if (route === '/api/dash/profile') {
+      const name = parsed.searchParams.get('name');
+      const entry = name && name.length <= 100 ? dashObservatory.profile(name) : null;
+      if (entry) sendJson(res, 200, entry);
+      else sendJson(res, 404, { error: 'Not found' });
+      return true;
+    }
   }
 
   if (method === 'GET' && url === '/api/dash/summary') {
