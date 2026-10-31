@@ -402,7 +402,7 @@ function pageScripts(html) {
 }
 
 // Loads a page into a vm context. options.fetch(url, init) returns a body (object)
-// or { status, body }. options.storage seeds localStorage.
+// or { status, body }. options.storage seeds localStorage; options.localStorage replaces it.
 async function loadPage(name, options = {}) {
   const html = readPage(name);
   const bodyStart = html.search(/<body[\s>]/i);
@@ -414,7 +414,7 @@ async function loadPage(name, options = {}) {
   const ctx = {
     console: { log() {}, warn() {}, info() {}, error: (...a) => errors.push(a.map(String).join(' ')) },
     document: doc,
-    localStorage: {
+    localStorage: options.localStorage || {
       getItem: (k) => (k in storage ? storage[k] : null),
       setItem: (k, v) => { storage[k] = String(v); },
       removeItem: (k) => { delete storage[k]; },

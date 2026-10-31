@@ -1,5 +1,6 @@
 'use strict';
-// The public NPC list behind /api/dash/npcs. world_state 'npcs' holds everything the game keeps
+// The public NPC list behind the Observatory endpoints (/api/dash/profile, ties, movers and the
+// guards of the others). world_state 'npcs' holds everything the game keeps
 // about each NPC, including memories, goals and feelings about player characters, a spouse or
 // child's other parent who may be a player, and internal flags. The dashboard gets an allow-list:
 // the fields its page reads, with every entry about another character kept only when that

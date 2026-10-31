@@ -1570,14 +1570,13 @@ Dark-themed responsive page with:
 ### NPC Analytics Dashboard ("The Observatory")
 **File**: `web/dashboard.html`
 
-Public dashboard at `/dashboard`. Real-time observation of the NPC simulation:
-- World Map: location grid with NPC dots colored by faction, sized by level
-- NPC Detail: personality radar (13 traits), emotional state bars, goals, memories, relationships
-- Demographics: class / race / faction doughnut charts, level histogram (Chart.js)
-- Relationship Network: D3.js force-directed graph
-- Live Event Timeline: SSE feed via `/api/dash/feed`
-- Trend Charts: events/hour, alive/dead breakdown
-- 5 endpoints under `/api/dash/` (feed, npcs, summary, events, events/hourly)
+Public page at `/dashboard`, in the site theme, with four tabs (Now, Town, Power, People) and a full-width NPC profile. Every value is drawn with textContent; no chart library.
+- Now: headline numbers (NPCs alive, players online, treasury, ruler, god of the week, world boss), hourly trend sparklines when `/api/dash/history` answers, the Chronicle (`/api/dash/events` plus the SSE `news` event of `/api/dash/feed`) with kind chips and watched names, players online from `/api/stats`
+- Town: living NPCs by place as a ranked list and a tile map shaded in five steps; unknown places grouped as Elsewhere
+- Power: the crown, factions, teams, movers, deaths by depth, the market
+- People: directory with filters, wealthiest, highest level, feuds and friendships, seeking a partner, fallen heroes, leaderboard and PvP from `/api/stats`
+- Watched NPCs and teams are kept in the viewer's localStorage
+- Endpoints under `/api/dash/`: people, profile, ties, realm, movers, depths, market, fallen (`web/dash-observatory.js`), events, events/hourly, feed (SSE, `news` only)
 
 ---
 
@@ -2029,7 +2028,7 @@ Scripts/
 
 web/
 ├── index.html                      Landing page + stats
-├── dashboard.html                  NPC Analytics Dashboard
+├── dashboard.html                  The Observatory (public town dashboard)
 ├── admin.html                      Admin console (bots, bans, settings, players)
 ├── steam.html                      Steam landing page
 ├── play/index.html                 Full page terminal at /play/ with GMCP panels
