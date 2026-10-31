@@ -881,6 +881,22 @@ namespace UsurperRemake.Systems
                     -- marriages, throne) that the owner process re-applies after stale writes. See WorldEditLog.
                     CREATE TABLE IF NOT EXISTS world_edits (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), created_by TEXT, applied_at TEXT, applied_by TEXT);
                     CREATE INDEX IF NOT EXISTS idx_world_edits_created ON world_edits(created_at);
+
+                    -- O2: one row per UTC hour for the public Observatory page's trends, written by the MUD's world
+                    -- sim (WriteWorldSnapshot). taken_at is the top of the hour, 'yyyy-MM-ddTHH:00:00Z'. Gauges as of
+                    -- that hour; births, deaths and marriages counted since the previous row. Kept 90 days.
+                    CREATE TABLE IF NOT EXISTS world_snapshots (
+                        taken_at TEXT PRIMARY KEY,
+                        npcs_alive INTEGER,
+                        npcs_dead INTEGER,
+                        npcs_married INTEGER,
+                        children INTEGER,
+                        treasury INTEGER,
+                        players_online INTEGER,
+                        births INTEGER,
+                        deaths INTEGER,
+                        marriages INTEGER
+                    );
                 ";
                 cmd.ExecuteNonQuery();
             }
