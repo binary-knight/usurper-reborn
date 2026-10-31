@@ -5869,7 +5869,7 @@ wss.on('connection', (ws, req) => {
     const clientType = origin.startsWith('file://') || origin.startsWith('app://') ? 'Electron' : 'Web';
     // The /play page opens /ws?gmcp=1: the proxy answers the game's GMCP offer for it and
     // sends GMCP frames as JSON text, terminal bytes as binary (gmcp-split.js). Every other
-    // connection, the landing page and the Electron client included, keeps the byte pipe.
+    // connection, the Electron client included, keeps the byte pipe.
     const splitter = wantsGmcp(req.url) ? createGmcpSplitter({
       onTerminal: (buf) => { if (ws.readyState === ws.OPEN) ws.send(buf); },
       onGmcp: (json) => { if (ws.readyState === ws.OPEN) ws.send(json); },
