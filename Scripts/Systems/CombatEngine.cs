@@ -15044,6 +15044,10 @@ public partial class CombatEngine
     {
         while (true)  // Loop until valid action is chosen
         {
+            // 1.3.9: GMCP Char.Vitals at each prompt, as GetPlayerAction does for one monster, so a
+            // client sees the stamina refilled at combat start before the first round ends.
+            UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+
             // Check if player can act due to status effects
             if (!player.CanAct())
             {

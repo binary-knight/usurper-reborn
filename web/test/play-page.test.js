@@ -115,6 +115,12 @@ test('vitals, fight stamina, level and gold come from GMCP; the Stamina stat (sp
   assert.strictEqual(p.el('sp-wrap').hidden, false);
   assert.strictEqual(p.el('sp-num').textContent, '100/99');
   assert.ok(!p.el('vitals').textContent.includes('13'));
+  frame(p, 'Char.Vitals', { hp: 38, maxHp: 44, combatSp: 5, maxCombatSp: 0 });
+  assert.strictEqual(p.el('sp-wrap').hidden, true, 'a zero maximum hides it');
+  frame(p, 'Char.Vitals', { hp: 38, maxHp: 44, combatSp: 80, maxCombatSp: 99 });
+  assert.strictEqual(p.el('sp-wrap').hidden, false);
+  frame(p, 'Char.Vitals', { hp: 38, maxHp: 44 });
+  assert.strictEqual(p.el('sp-wrap').hidden, true, 'a frame without the maximum hides it again');
 });
 
 test('bad frames are ignored', async () => {
@@ -132,7 +138,7 @@ test('odd field types are dropped at the door, and later frames still draw', asy
   // Straight to the handler, past the frame catch, so each field check is what keeps it from throwing.
   for (const v of odd) {
     for (const [pkg, data] of [
-      ['Char.Vitals', { hp: v, maxHp: v, mp: v, maxMp: v }],
+      ['Char.Vitals', { hp: v, maxHp: v, mp: v, maxMp: v, combatSp: v, maxCombatSp: v }],
       ['Char.Status', { level: v, gold: v }],
       ['Room.Info', { name: v }],
       ['Char.Combat.Start', { enemies: [{ name: v, level: v, hp: v, maxHp: v }, v] }],
