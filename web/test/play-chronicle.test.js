@@ -345,6 +345,7 @@ test('the compass draws nothing the frame does not say: no exits, odd keys, and 
   frame(p, 'Room.Info', { num: 'room_1', name: 'Crypt', area: 'Dungeon Floor 2', exits: { north: 'r2', west: 'r3' } });
   frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { exits: [{ key: 'X', stateLabel: 'odd' }, { key: 'north', stateLabel: 'odd' }, { key: 'n', stateLabel: 'odd' }, null, 5] }));
   const cells = p.el('c-body').querySelector('.ccomp').children;
+  assert.strictEqual(p.run('UsurperPlay.chron.detail.exits.length'), 0, 'only N, S, E and W are kept');
   assert.strictEqual(cells.filter((c) => c.classList.contains('on')).length, 0);
   assert.ok(!p.el('c-body').querySelector('.ccomp').textContent.includes('odd'));
   frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { exits: [{ key: 'W' }] }));
@@ -548,6 +549,8 @@ test('the high contrast variant: its own choice, or the system asking for more c
   assert.ok(!plain.doc.documentElement.classList.contains('hc'));
   change(hc, 'classic');
   assert.ok(!hc.doc.documentElement.classList.contains('hc'));
+  change(sys, 'classic');
+  assert.ok(!sys.doc.documentElement.classList.contains('hc'), 'back to Classic drops it even when the system asks for contrast');
   const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
   assert.match(css, /html\.hc \.chron \.frame, html\.hc \.chron \.scene, html\.hc \.chron \.portrait, html\.hc \.chron img \{ display: none !important; \}/);
   assert.match(css, /html\.hc \.chron \.rule \{ display: none; \}/);
@@ -556,7 +559,7 @@ test('the high contrast variant: its own choice, or the system asking for more c
   assert.match(css, /html\.hc \.chron button:focus-visible[^{]*\{ outline: 4px solid #ffe14d/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.chron, \.chron \* \{ transition: none !important; animation: none !important;/);
   assert.match(css, /\.chron button:focus-visible, \.chron \[tabindex\]:focus-visible \{ outline: 2px solid var\(--st-ink\); outline-offset: 2px; \}/);
-  assert.match(css, /\.chron \.kc\.off \{ border-style: dashed;/, 'disabled is dashed, not only dim');
+  assert.match(css, /^\.chron \.kc\.off \{ border-style: dashed;/m, 'disabled is dashed, not only dim');
   assert.match(css, /\.chron \.card\.out \.nm \{ text-decoration: line-through/, 'a dead foe is struck through as well as marked');
 });
 
