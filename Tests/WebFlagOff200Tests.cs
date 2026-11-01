@@ -19,12 +19,12 @@ namespace UsurperReborn.Tests;
 /// the classic layout (and the classic compact rows), the dungeon room view for two rooms (one quiet with treasure,
 /// stairs, an event, features and three kinds of exit; one with monsters), the dungeon fight prompt against one foe and
 /// against two, and the PvP fight prompt. Terminal text and GMCP frames go to one stream, as they do on a live
-/// connection. The run is made for five sessions that are not a web client: a door or stdio game (no session), a
-/// telnet MUD session with GMCP on, an SSH session, a screen reader session with GMCP on, and a web terminal session
+/// connection. The run is made for six sessions that are not a web client: a door or stdio game (no session), the same
+/// in the compact (BBS) layout, a telnet MUD session with GMCP on, an SSH session, a screen reader session with GMCP on, and a web terminal session
 /// that did not negotiate GMCP.
 ///
 /// The expected bytes in Tests/Fixtures/web200 were written by this same test on origin/main at 0a3b1855, before the
-/// change, with USURPER_WEB200_CAPTURE set to the fixture folder. The test reads only methods that existed there, by
+/// change, with USURPER_WEB200_CAPTURE set to the fixture folder (door_compact.bin later, from the same Scripts tree). The test reads only methods that existed there, by
 /// reflection, so it builds and runs on both trees. A byte match therefore says the old code and the new code wrote the
 /// same terminal text and the same GMCP frames (Room.Info, Char.Vitals and the rest) for these sessions, and that no new
 /// package (Client.Menu, Room.Detail) appeared. The second test says the same without the fixtures, so a later text
@@ -36,7 +36,7 @@ public class WebFlagOff200Tests
 {
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
 
-    internal static readonly string[] Kinds = { "door", "mud_gmcp", "ssh", "screenreader", "web_nogmcp" };
+    internal static readonly string[] Kinds = { "door", "door_compact", "mud_gmcp", "ssh", "screenreader", "web_nogmcp" };
 
     private static string RepoRoot()
     {
@@ -106,6 +106,7 @@ public class WebFlagOff200Tests
     internal static SessionContext? Session(string kind, Stream stream, Character hero) => kind switch
     {
         "door" => null,
+        "door_compact" => null,
         "mud_gmcp" => new SessionContext { Username = "webtest", CharacterKey = "webtest", OutputStream = stream, ConnectionType = "MUD", GmcpEnabled = true, Player = hero },
         "ssh" => new SessionContext { Username = "webtest", CharacterKey = "webtest", OutputStream = stream, ConnectionType = "SSH", GmcpEnabled = false, Player = hero },
         "screenreader" => new SessionContext { Username = "webtest", CharacterKey = "webtest", OutputStream = stream, ConnectionType = "MUD", GmcpEnabled = true, Player = hero },
@@ -128,8 +129,10 @@ public class WebFlagOff200Tests
         var savedCtx = SessionContext.Current;
         string savedLang = GameConfig.Language;
         bool savedSrGlobal = GameConfig.ScreenReaderMode;
+        bool savedCompact = GameConfig.CompactMode;
         try
         {
+            GameConfig.CompactMode = kind == "door_compact"; // the compact (BBS) room view and fight menus
             var hero = Hero(sr, classic: false);
             SessionContext.Current = Session(kind, stream, hero);
             GameConfig.Language = "en";
@@ -199,6 +202,7 @@ public class WebFlagOff200Tests
             SessionContext.Current = savedCtx;
             GameConfig.Language = savedLang;
             GameConfig.ScreenReaderMode = savedSrGlobal;
+            GameConfig.CompactMode = savedCompact;
         }
     }
 
@@ -219,6 +223,7 @@ public class WebFlagOff200Tests
 
     [Theory]
     [InlineData("door")]
+    [InlineData("door_compact")]
     [InlineData("mud_gmcp")]
     [InlineData("ssh")]
     [InlineData("screenreader")]
@@ -245,6 +250,7 @@ public class WebFlagOff200Tests
 
     [Theory]
     [InlineData("door")]
+    [InlineData("door_compact")]
     [InlineData("mud_gmcp")]
     [InlineData("ssh")]
     [InlineData("screenreader")]
