@@ -252,6 +252,8 @@ cd /opt/usurper/web && sudo -u usurper npm install
 # Install nginx config
 sudo mkdir -p /etc/nginx/snippets
 sudo cp scripts-server/nginx-csp.conf /etc/nginx/snippets/usurper-csp.conf
+sudo cp scripts-server/nginx-cache.conf /etc/nginx/snippets/usurper-cache.conf
+sudo cp scripts-server/nginx-cache-map.conf /etc/nginx/conf.d/usurper-cache-map.conf
 sudo cp scripts-server/nginx-usurper.conf /etc/nginx/sites-available/usurper
 sudo ln -sf /etc/nginx/sites-available/usurper /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
