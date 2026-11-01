@@ -580,6 +580,7 @@ public class WebMenu200Tests
         var hero = Hero();
         using var s = new Scope("web", hero);
         var t = s.Term();
+        s.Ctx!.Terminal = t; // the session's own terminal, the one a spectator is attached to
         var spectatorStream = new MemoryStream();
         var spectator = new TerminalEmulator(new MemoryStream(), spectatorStream);
         t.AddSpectatorStream(spectator);
@@ -592,6 +593,7 @@ public class WebMenu200Tests
         var mirrored = spectatorStream.ToArray();
         Plain(mirrored).Should().Contain("Room q1", "the spectator does see the screen");
         Frames(mirrored).Should().BeEmpty("no GMCP frame is mirrored to a spectator");
+        Encoding.UTF8.GetString(mirrored).Should().NotContain("Client.Menu").And.NotContain("Room.Detail");
     }
 
     [Fact]
