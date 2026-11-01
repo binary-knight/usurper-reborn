@@ -154,13 +154,28 @@ public class WebClient3aTests
     [InlineData("screenreader")]
     [InlineData("web_nogmcp")]
     [InlineData("door")]
-    public void TheNewEmitters_SendNothing_ToASessionThatIsNotTheWebClient(string kind)
+    public async Task TheNewEmitters_SendNothing_ToASessionThatIsNotTheWebClient(string kind)
     {
         var hero = Hero();
-        using var s = new Scope(kind, hero);
-        GmcpBridge.EmitWebEnemies(WebFlagOff3aTests.Foes(), fightStart: true);
-        GmcpBridge.EmitWebFooterIfChanged(1, 2, 3, 3, "lives", 4);
-        s.Stream.Length.Should().Be(0);
+        using (var s = new Scope(kind, hero))
+        {
+            GmcpBridge.EmitWebEnemies(WebFlagOff3aTests.Foes(), fightStart: true);
+            GmcpBridge.EmitWebFooterIfChanged(1, 2, 3, 3, "lives", 4);
+            s.Stream.Length.Should().Be(0);
+        }
+        // and the screens themselves, drawn for a session whose engine plays this hero, send none of the new packages
+        using (var s = new Scope(kind, hero))
+        {
+            var t = s.Term(Enters + Enters);
+            var street = Street(hero, t);
+            Invoke(street, typeof(BaseLocation), "ShowStatusLine");
+            await Await(Invoke(street, typeof(BaseLocation), "ShowStatus"));
+            var (d, _) = WebFlagOff200Tests.Dungeon(hero, t);
+            await Await(Invoke(d, typeof(DungeonLocation), "ShowDungeonMap"));
+            var packages = WebFlagOff200Tests.Packages(s.Bytes(t));
+            foreach (var p in WebFlagOff3aTests.NewPackages) packages.Should().NotContain(p);
+            Plain(s.Bytes(t)).Should().Contain(Loc.Get("base.basic_information"), "the screens were drawn");
+        }
     }
 
     // ------------------------------------------------------------------ Room.Detail themeId
@@ -202,7 +217,9 @@ public class WebClient3aTests
         foes.Add(new Monster { Name = "Nameless Thing", Level = 8, HP = 200, MaxHP = 200, Strength = 30, Defence = 5, Experience = 1, IsActive = true });
         var bytes = await Fight("web", Hero(), foes);
         var frames = WebMenu200Tests.Frames(bytes);
-        var start = frames.First(f => f.Package == "Char.Combat.Start").Json;
+        int at = frames.FindIndex(f => f.Package == "Char.Combat.Start");
+        var start = frames[at].Json;
+        frames[at + 1].Package.Should().Be("Client.Enemies", "the families come with the fight's start, before any round");
         var first = Of(bytes, "Client.Enemies").First();
         Names(first, "enemies").Should().Equal(Names(start, "enemies"), "the same members in the same order as the fight's own list");
         first.GetProperty("enemies").EnumerateArray().Select(e => e.TryGetProperty("family", out var f) ? f.GetString() : null)
