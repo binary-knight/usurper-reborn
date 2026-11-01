@@ -2682,6 +2682,10 @@ public partial class CombatEngine
                 ShowCombatTipIfNeeded(player);
             }
 
+            // 2.0: the PvP prompt's Client.Menu, web client only (a monster here is the retired single foe path)
+            if (!GameConfig.ElectronMode && isPvP)
+                WebClientMenu.Emit(WebClientMenu.CombatPvp, () => PvpMenuGroups(player));
+
             // Prompt text only when terminal is the user's primary surface.
             if (!GameConfig.ElectronMode)
             {
@@ -15119,6 +15123,10 @@ public partial class CombatEngine
                 // Combat tip is visual-only.
                 ShowCombatTipIfNeeded(player);
             }
+
+            // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
+            if (!GameConfig.ElectronMode)
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered));
 
             if (!GameConfig.ElectronMode)
             {

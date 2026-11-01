@@ -31154,5 +31154,15 @@
   "oath_mark.memory": "{0} fell in the deep when the oath-mark broke.",
   "oath_mark.lifts": "The oath-mark lifts from {0}.",
   "oath_mark.lifts_team": "The oath-mark lifts from those who stay behind.",
-  "oath_mark.years_return": "Their years will find them again in {0} days."
+  "oath_mark.years_return": "Their years will find them again in {0} days.",
+  "web.menu.places": "Places",
+  "web.menu.districts": "Districts",
+  "web.menu.system": "System",
+  "web.menu.actions": "Actions",
+  "web.menu.exits": "Exits",
+  "web.menu.tactics": "Tactics",
+  "web.menu.quickbar": "Quickbar",
+  "web.menu.options": "Options",
+  "web.menu.miracle": "Miracle",
+  "web.menu.quick_heal": "Quick Heal"
 }

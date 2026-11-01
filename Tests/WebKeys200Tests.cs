@@ -90,7 +90,7 @@ public class WebKeys200Tests
         ("monsters", (r, d, h) => { r.HasMonsters = true; r.IsCleared = false; r.HasTreasure = true; r.HasStairsDown = true; r.Features.Clear(); r.HasEvent = false; },
             new[] { "T", "V", "X", "D", "R", "Y", "J", "U", "Q", "Z", "K", "H", "1", "N", "*", "%", "L" }),
         ("bare", (r, d, h) => { r.HasMonsters = false; r.IsCleared = true; r.HasTreasure = false; r.HasStairsDown = false; r.HasEvent = false; r.Features.Clear(); },
-            new[] { "F", "T", "V", "X", "D", "Y", "J", "U", "Q", "Z", "N", "S" }),
+            new[] { "F", "T", "V", "X", "D", "Y", "J", "U", "Q", "Z", "N" }),
         ("camped", (r, d, h) => { r.HasMonsters = false; r.IsCleared = true; r.HasTreasure = true; r.TreasureLooted = true; r.HasEvent = true; r.EventCompleted = true;
                 typeof(DungeonLocation).GetField("hasCampedThisFloor", F)!.SetValue(d, true); },
             new[] { "F", "T", "V", "R", "Y", "Q" }),

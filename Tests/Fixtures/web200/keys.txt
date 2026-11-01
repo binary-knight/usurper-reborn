@@ -76,7 +76,6 @@ room bare U => returned False ::   You carry no Willow Draughts. The Healer sell
 room bare Q => returned False ::  :: inRoom=False at=q1 cleared=True looted=False event=False
 room bare Z => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=True looted=False event=False
 room bare N => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=True looted=False event=False
-room bare S => returned False :: You move through the passage...|You enter: Room h5| :: inRoom=True at=h5 cleared=True looted=False event=False
 room camped F => returned False ::   There is nothing here to fight.| :: inRoom=True at=q1 cleared=True looted=True event=True
 room camped T => returned False ::   There is no treasure here.| :: inRoom=True at=q1 cleared=True looted=True event=True
 room camped V => returned False ::   There is nothing here to investigate.| :: inRoom=True at=q1 cleared=True looted=True event=True

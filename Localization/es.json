@@ -31152,5 +31152,15 @@
   "permadeath.contact_admin2": "en un plazo de 7 días para una posible restauración.",
   "permadeath.restore_hint": "Si fue un error, escribe /restore en un plazo de 7 días para recuperarlo,",
   "permadeath.restore_hint2": "o contacta con un sysop en Discord.",
-  "permadeath.disconnecting": "Desconectando."
+  "permadeath.disconnecting": "Desconectando.",
+  "web.menu.places": "Lugares",
+  "web.menu.districts": "Distritos",
+  "web.menu.system": "Sistema",
+  "web.menu.actions": "Acciones",
+  "web.menu.exits": "Salidas",
+  "web.menu.tactics": "Tácticas",
+  "web.menu.quickbar": "Barra rápida",
+  "web.menu.options": "Opciones",
+  "web.menu.miracle": "Milagro",
+  "web.menu.quick_heal": "Curación rápida"
 }

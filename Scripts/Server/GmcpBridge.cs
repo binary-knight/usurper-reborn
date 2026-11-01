@@ -452,6 +452,34 @@ public static class GmcpBridge
     }
 
     /// <summary>
+    /// 2.0: true when the current session is the web client (SessionContext.WebClient). Display only:
+    /// a caller may skip building a web client payload on it, and nothing else.
+    /// </summary>
+    public static bool IsWebClientActive
+    {
+        get
+        {
+            var ctx = SessionContext.Current;
+            return ctx != null && ctx.WebClient && ctx.OutputStream != null;
+        }
+    }
+
+    /// <summary>2.0: the packages only EmitWebClient sends, to the current session.</summary>
+    internal static bool IsWebClientPackage(string? package) => package == "Client.Menu" || package == "Room.Detail";
+
+    /// <summary>
+    /// 2.0: emit a web client package (Client.Menu, Room.Detail) to the CURRENT session only, and only when
+    /// that session is the web client. There is no form of this that takes another session: these packages
+    /// describe the screen the current session drew, so EmitTo refuses them.
+    /// </summary>
+    public static void EmitWebClient(string package, object? payload)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null || !ctx.WebClient) return;
+        TryWriteFrame(ctx, package, payload, ctx.Username);
+    }
+
+    /// <summary>
     /// Emit a GMCP frame to a specific session's output stream regardless of which
     /// session is "current." Used by chat fan-out paths where the sender's
     /// SessionContext is current but the GMCP frame needs to reach the recipient.
@@ -460,6 +488,8 @@ public static class GmcpBridge
     public static void EmitTo(PlayerSession? session, string package, object? payload)
     {
         if (session?.Context == null || !session.Context.GmcpEnabled) return;
+        // 2.0: the web client packages describe the screen the current session drew; they never go to another session
+        if (IsWebClientPackage(package)) return;
         TryWriteFrame(session.Context, package, payload, session.Username);
     }
 

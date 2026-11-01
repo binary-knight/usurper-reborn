@@ -465,6 +465,7 @@ public partial class MainStreetLocation : BaseLocation
             if (IsScreenReader) WriteStreetMenuPlain(streetLines);
             else WriteStreetMenuCompact(streetLines);
         }
+        EmitWebMenu(); // 2.0: Client.Menu, web client only
 
         // Blank line
         terminal.WriteLine("");
@@ -722,6 +723,7 @@ public partial class MainStreetLocation : BaseLocation
         {
             if (currentPlayer.ScreenReaderMode) ShowClassicLayoutScreenReaderMenu();
             else ShowClassicLayoutMenu();
+            EmitWebMenu(); // 2.0: Client.Menu, web client only
             return;
         }
         if (currentPlayer.ScreenReaderMode)
@@ -732,6 +734,7 @@ public partial class MainStreetLocation : BaseLocation
         {
             ShowClassicMenu();
         }
+        EmitWebMenu(); // 2.0: Client.Menu, web client only
     }
 
     /// <summary>
