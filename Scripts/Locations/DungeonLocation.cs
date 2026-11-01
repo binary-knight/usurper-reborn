@@ -2598,6 +2598,9 @@ public class DungeonLocation : BaseLocation
             // room, after a teleport or a load, and when the room is drawn again after a fight
             EmitRoomInfo(room);
             DisplayRoomView(room);
+            // 2.0: the web client's room detail and room menu, from this session's own draw only
+            EmitRoomDetail(room);
+            EmitRoomMenu(room);
         }
         else
         {
@@ -2625,6 +2628,68 @@ public class DungeonLocation : BaseLocation
             name = room.Name ?? "Dungeon Room",
             area = $"Dungeon Floor {currentDungeonLevel}",
             exits
+        });
+    }
+
+    /// <summary>
+    /// 2.0 phase 1: GMCP Room.Detail for the web client: what this session's room text shows and nothing more. The
+    /// header's level and theme ("Level 6 | Catacombs") and danger rating out of 3 (ShowDangerIndicators prints both),
+    /// the cleared, danger and boss tags it prints, each exit with the state its line shows (no target room, nothing
+    /// about rooms not yet seen), and the features listed under "You notice". No trap: the text names one only on a
+    /// random roll. The compact (BBS) view prints no exit descriptions and no "Level 6 | theme" line, so for it those
+    /// are left out and the exit state is the compact line's. Web client sessions only.
+    /// </summary>
+    private void EmitRoomDetail(DungeonRoom room)
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || currentFloor == null) return;
+        bool compact = IsBBSSession;
+        // fully cleared shows on the screen reader exit list, and on the other lists under the global screen reader mode
+        bool fullyClearedShown = compact ? GameConfig.ScreenReaderMode : IsScreenReader || GameConfig.ScreenReaderMode;
+        var exits = room.Exits.Select(e =>
+        {
+            var state = ShownExitState(room, e.Value, fullyClearedShown);
+            return new
+            {
+                key = GetDirectionKey(e.Key),
+                description = compact ? null : e.Value.Description,
+                state = state switch
+                {
+                    ExitShown.FullyCleared => "fully_cleared",
+                    ExitShown.Cleared => "cleared",
+                    ExitShown.Explored => "explored",
+                    ExitShown.Unknown => "unknown",
+                    _ => null,
+                },
+                stateLabel = state == ExitShown.Nothing ? null : compact ? BbsExitStateLabel(state) : ExitStateLabel(state),
+            };
+        }).ToList();
+        string theme = GetThemeShortName(currentFloor.Theme);
+        UsurperRemake.Server.GmcpBridge.EmitWebClient("Room.Detail", new
+        {
+            name = room.Name,
+            level = currentDungeonLevel,
+            theme,
+            header = compact ? null : $"{Loc.Get("dungeon.bbs_level")} {currentDungeonLevel} | {theme}",
+            danger = new { rating = room.DangerRating, max = 3 },
+            status = room.IsCleared ? "cleared" : room.HasMonsters ? "danger" : null,
+            boss = room.IsBossRoom,
+            exits,
+            features = ExaminableFeatures(room).Select(ResolveFeatureName).ToList(),
+        });
+    }
+
+    /// <summary>
+    /// 2.0 phase 1: the room's Client.Menu: its exits, then RoomActions (the list the room key handler reads). An exit
+    /// is labelled with the description its line shows; the compact (BBS) view shows none, so there it is the direction.
+    /// </summary>
+    private void EmitRoomMenu(DungeonRoom room)
+    {
+        bool compact = IsBBSSession;
+        UsurperRemake.Server.WebClientMenu.Emit(UsurperRemake.Server.WebClientMenu.DungeonRoom, () => new List<UsurperRemake.Server.WebMenuGroup>
+        {
+            new(Loc.Get("web.menu.exits"), room.Exits.Select(e => new UsurperRemake.Server.WebMenuItem(GetDirectionKey(e.Key),
+                compact ? Loc.Get($"dungeon.dir_{e.Key.ToString().ToLowerInvariant()}") : e.Value.Description)).ToList()),
+            new(Loc.Get("web.menu.actions"), RoomActions(room).Select(a => new UsurperRemake.Server.WebMenuItem(a.Key, a.Label, a.Enabled)).ToList()),
         });
     }
 
@@ -2809,17 +2874,8 @@ public class DungeonLocation : BaseLocation
         terminal.Write(Loc.Get("dungeon.bbs_exits"));
         foreach (var exit in room.Exits)
         {
-            var targetRoom = currentFloor.GetRoom(exit.Value.TargetRoomId);
             var dirKey = GetDirectionKey(exit.Key);
-            string status;
-            if (targetRoom == null)
-                status = "";
-            else if (targetRoom.IsCleared)
-                status = GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id) ? Loc.Get("dungeon.exit_all_clear") : Loc.Get("dungeon.exit_cleared");
-            else if (targetRoom.IsExplored)
-                status = Loc.Get("dungeon.exit_explored");
-            else
-                status = "(?)";
+            string status = BbsExitStateLabel(ShownExitState(room, exit.Value, GameConfig.ScreenReaderMode));
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_cyan");
@@ -2845,21 +2901,22 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
 
-        // Actions - context-sensitive rows
+        // Actions - context-sensitive rows; 2.0: what shows is decided by RoomActions, the list the key handler reads
+        var acts = RoomActions(room).ToDictionary(a => a.Key);
         var row1 = new List<(string key, string color, string label)>();
-        if (room.HasMonsters && !room.IsCleared)
+        if (acts["F"].Drawn)
             row1.Add(("F", "bright_yellow", Loc.Get("dungeon.bbs_fight")));
-        if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
+        if (acts["T"].Drawn)
             row1.Add(("T", "bright_yellow", Loc.Get("dungeon.bbs_treasure")));
-        if (room.HasEvent && !room.EventCompleted)
+        if (acts["V"].Drawn)
             row1.Add(("V", "bright_yellow", Loc.Get("dungeon.bbs_investigate")));
-        if (uninteractedFeatures.Any())
+        if (acts["X"].Drawn)
             row1.Add(("X", "bright_yellow", Loc.Get("dungeon.bbs_examine")));
-        if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
+        if (acts["D"].Drawn)
             row1.Add(("D", "bright_yellow", Loc.Get("dungeon.bbs_descend")));
-        if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
+        if (acts["R"].Drawn)
             row1.Add(("R", "bright_yellow", Loc.Get("dungeon.bbs_camp")));
-        if (player.WillowDraughts > 0)
+        if (acts["U"].Drawn)
             row1.Add(("U", "bright_yellow", Loc.Get("dungeon.bbs_willow", player.WillowDraughts)));
 
         if (row1.Count > 0)
@@ -3185,6 +3242,41 @@ public class DungeonLocation : BaseLocation
         };
     }
 
+    /// <summary>2.0: what an exit's line says about the room behind it. Nothing: the target room is not on the floor.</summary>
+    internal enum ExitShown { Nothing, Unknown, Explored, Cleared, FullyCleared }
+
+    /// <summary>
+    /// 2.0: the state an exit line shows, as the room text decides it: fully cleared only where that text says it
+    /// (fullyClearedShown), else cleared, explored or unknown. The room text and Room.Detail both read this.
+    /// </summary>
+    private ExitShown ShownExitState(DungeonRoom room, RoomExit exit, bool fullyClearedShown)
+    {
+        var targetRoom = currentFloor.GetRoom(exit.TargetRoomId);
+        if (targetRoom == null) return ExitShown.Nothing;
+        if (targetRoom.IsCleared)
+            return fullyClearedShown && IsDirectionFullyCleared(exit.TargetRoomId, room.Id) ? ExitShown.FullyCleared : ExitShown.Cleared;
+        return targetRoom.IsExplored ? ExitShown.Explored : ExitShown.Unknown;
+    }
+
+    /// <summary>2.0: the status the compact (BBS) exit line prints after the key.</summary>
+    private static string BbsExitStateLabel(ExitShown state) => state switch
+    {
+        ExitShown.FullyCleared => Loc.Get("dungeon.exit_all_clear"),
+        ExitShown.Cleared => Loc.Get("dungeon.exit_cleared"),
+        ExitShown.Explored => Loc.Get("dungeon.exit_explored"),
+        ExitShown.Unknown => "(?)",
+        _ => "",
+    };
+
+    private static string ExitStateLabel(ExitShown state) => state switch
+    {
+        ExitShown.FullyCleared => Loc.Get("dungeon.fully_cleared"),
+        ExitShown.Cleared => Loc.Get("dungeon.cleared"),
+        ExitShown.Explored => Loc.Get("dungeon.explored"),
+        ExitShown.Unknown => Loc.Get("dungeon.unknown"),
+        _ => "",
+    };
+
     private void ShowExits(DungeonRoom room)
     {
         terminal.SetColor("white");
@@ -3192,21 +3284,12 @@ public class DungeonLocation : BaseLocation
 
         foreach (var exit in room.Exits)
         {
-            var targetRoom = currentFloor.GetRoom(exit.Value.TargetRoomId);
             var dirKey = GetDirectionKey(exit.Key);
 
             if (IsScreenReader)
             {
-                string status = "";
-                if (targetRoom != null)
-                {
-                    if (targetRoom.IsCleared)
-                        status = IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id) ? $" ({Loc.Get("dungeon.fully_cleared")})" : $" ({Loc.Get("dungeon.cleared")})";
-                    else if (targetRoom.IsExplored)
-                        status = $" ({Loc.Get("dungeon.explored")})";
-                    else
-                        status = $" ({Loc.Get("dungeon.unknown")})";
-                }
+                var state = ShownExitState(room, exit.Value, fullyClearedShown: true);
+                string status = state == ExitShown.Nothing ? "" : $" ({ExitStateLabel(state)})";
                 terminal.WriteLine($"{dirKey}. {exit.Value.Description}{status}");
             }
             else
@@ -3222,26 +3305,11 @@ public class DungeonLocation : BaseLocation
                 terminal.Write(exit.Value.Description);
 
                 // Show target room status
-                if (targetRoom != null)
+                var state = ShownExitState(room, exit.Value, GameConfig.ScreenReaderMode);
+                if (state != ExitShown.Nothing)
                 {
-                    if (targetRoom.IsCleared)
-                    {
-                        terminal.SetColor("green");
-                        if (GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id))
-                            terminal.Write($" ({Loc.Get("dungeon.fully_cleared")})");
-                        else
-                            terminal.Write($" ({Loc.Get("dungeon.cleared")})");
-                    }
-                    else if (targetRoom.IsExplored)
-                    {
-                        terminal.SetColor("yellow");
-                        terminal.Write($" ({Loc.Get("dungeon.explored")})");
-                    }
-                    else
-                    {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($" ({Loc.Get("dungeon.unknown")})");
-                    }
+                    terminal.SetColor(state == ExitShown.Explored ? "yellow" : state == ExitShown.Unknown ? "darkgray" : "green");
+                    terminal.Write($" ({ExitStateLabel(state)})");
                 }
 
                 terminal.WriteLine("");
@@ -3250,210 +3318,97 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
     }
 
+    /// <summary>
+    /// 2.0: one action of the room menu. Key is the key the room handler takes (ProcessRoomChoice); DrawKey is the key the
+    /// visual and screen reader menus print (the global * and % for I and =). Enabled is the handler's own condition for
+    /// doing the action (otherwise it says why not); Drawn is whether the menus show it; Contextual actions get a line each.
+    /// </summary>
+    internal sealed record RoomAction(string Key, string DrawKey, string Label, string Color, bool Enabled, bool Drawn, bool Contextual);
+
+    /// <summary>
+    /// 2.0: the room's actions, in menu order. The one list the room menus (visual, screen reader, BBS), the room key
+    /// handler and the web client's Client.Menu read, so the keys shown and the keys taken cannot drift apart.
+    /// </summary>
+    internal List<RoomAction> RoomActions(DungeonRoom room)
+    {
+        bool monstersHere = room.HasMonsters && !room.IsCleared;
+        bool safe = room.IsCleared || !room.HasMonsters;
+        bool treasure = room.HasTreasure && !room.TreasureLooted && safe;
+        bool roomEvent = room.HasEvent && !room.EventCompleted;
+        bool examine = HasExaminableFeatures(room);
+        bool stairs = room.HasStairsDown && safe;
+        bool camp = safe && !hasCampedThisFloor;
+        int herbs = currentPlayer.TotalHerbCount;
+        int willow = currentPlayer.WillowDraughts;
+        bool party = teammates.Count > 0;
+        RoomAction Here(string key, string labelKey, bool can) => new(key, key, Loc.Get(labelKey), "white", can, can, true);
+        RoomAction Always(string key, string drawKey, string labelKey) => new(key, drawKey, Loc.Get(labelKey), "white", true, true, false);
+        return new List<RoomAction>
+        {
+            Here("F", "dungeon.fight", monstersHere),
+            Here("T", "dungeon.collect_treasure", treasure),
+            Here("V", "dungeon.investigate", roomEvent),
+            Here("X", "dungeon.examine", examine),
+            Here("D", "dungeon.descend_stairs", stairs),
+            Here("R", "dungeon.make_camp", camp),
+            Always("M", "M", "dungeon.map"),
+            Always("G", "G", "dungeon.guide"),
+            Always("I", "*", "dungeon.inventory"),
+            Always("P", "P", "dungeon.potions"),
+            // J and U are taken with none carried too; the herb pouch and DrinkWillowDraught then say so
+            new("J", "J", Loc.Get("dungeon.herbs", herbs.ToString()), "bright_green", herbs > 0, herbs > 0, false),
+            new("U", "U", Loc.Get("dungeon.willow", willow.ToString()), "bright_cyan",
+                willow > 0 && currentPlayer.Mental < MentalSystem.GetCap(currentPlayer), willow > 0, false),
+            new("Y", "Y", Loc.Get("dungeon.party"), "white", party, party, false),
+            Always("=", "%", "dungeon.status"),
+            Always("Q", "Q", "dungeon.leave_dungeon"),
+        };
+    }
+
     private void ShowRoomActions(DungeonRoom room)
     {
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("dungeon.actions"));
 
+        var drawn = RoomActions(room).Where(a => a.Drawn).ToList();
+
         if (IsScreenReader)
         {
             // Screen reader: plain text menu
-            if (room.HasMonsters && !room.IsCleared)
-                WriteSRMenuOption("F", Loc.Get("dungeon.fight"));
-            if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
-                WriteSRMenuOption("T", Loc.Get("dungeon.collect_treasure"));
-            if (room.HasEvent && !room.EventCompleted)
-                WriteSRMenuOption("V", Loc.Get("dungeon.investigate"));
-            if (HasExaminableFeatures(room))
-                WriteSRMenuOption("X", Loc.Get("dungeon.examine"));
-            if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
-                WriteSRMenuOption("D", Loc.Get("dungeon.descend_stairs"));
-            if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
-                WriteSRMenuOption("R", Loc.Get("dungeon.make_camp"));
-            WriteSRMenuOption("M", Loc.Get("dungeon.map"));
-            WriteSRMenuOption("G", Loc.Get("dungeon.guide"));
-            WriteSRMenuOption("*", Loc.Get("dungeon.inventory"));
-            WriteSRMenuOption("P", Loc.Get("dungeon.potions"));
-            if (currentPlayer.TotalHerbCount > 0)
-                WriteSRMenuOption("J", Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString()));
-            if (currentPlayer.WillowDraughts > 0)
-                WriteSRMenuOption("U", Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString()));
-            if (teammates.Count > 0)
-                WriteSRMenuOption("Y", Loc.Get("dungeon.party"));
-            WriteSRMenuOption("%", Loc.Get("dungeon.status"));
-            WriteSRMenuOption("Q", Loc.Get("dungeon.leave_dungeon"));
+            foreach (var a in drawn)
+                WriteSRMenuOption(a.DrawKey, a.Label);
             terminal.WriteLine("");
             return;
         }
 
-        // Fight monsters
-        if (room.HasMonsters && !room.IsCleared)
+        // The room's own actions (fight, treasure, event, examine, stairs, camp), a line each
+        foreach (var a in drawn.Where(a => a.Contextual))
         {
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_yellow");
-            terminal.Write("F");
+            terminal.Write(a.DrawKey);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.fight"));
+            terminal.SetColor(a.Color);
+            terminal.WriteLine(a.Label);
         }
 
-        // Search for treasure (available if room is cleared OR has no monsters)
-        if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
+        // General options, on one line
+        var general = drawn.Where(a => !a.Contextual).ToList();
+        for (int i = 0; i < general.Count; i++)
         {
+            var a = general[i];
             terminal.SetColor("darkgray");
-            terminal.Write("  [");
+            terminal.Write(i == 0 ? "  [" : "[");
             terminal.SetColor("bright_yellow");
-            terminal.Write("T");
+            terminal.Write(a.DrawKey);
             terminal.SetColor("darkgray");
             terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.collect_treasure"));
+            terminal.SetColor(a.Color);
+            if (i == general.Count - 1) terminal.WriteLine(a.Label);
+            else terminal.Write($"{a.Label}  ");
         }
-
-        // Interact with event
-        if (room.HasEvent && !room.EventCompleted)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("V");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.investigate"));
-        }
-
-        // Examine features
-        if (HasExaminableFeatures(room))
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("X");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.examine"));
-        }
-
-        // Use stairs (available if room is cleared OR has no monsters)
-        if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("D");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.descend_stairs"));
-        }
-
-        // Camp (if safe - room cleared or no monsters)
-        if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("dungeon.make_camp"));
-        }
-
-        // General options
-        terminal.SetColor("darkgray");
-        terminal.Write("  [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("M");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("dungeon.map")}  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("G");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("dungeon.guide")}  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("*");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("dungeon.inventory")}  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("P");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("dungeon.potions")}  ");
-
-        if (currentPlayer.TotalHerbCount > 0)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("J");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_green");
-            terminal.Write($"{Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString())}  ");
-        }
-
-        if (currentPlayer.WillowDraughts > 0)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("U");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("bright_cyan");
-            terminal.Write($"{Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString())}  ");
-        }
-
-        if (teammates.Count > 0)
-        {
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("Y");
-            terminal.SetColor("darkgray");
-            terminal.Write("] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("dungeon.party")}  ");
-        }
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("%");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("dungeon.status")}  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("Q");
-        terminal.SetColor("darkgray");
-        terminal.Write("] ");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("dungeon.leave_dungeon"));
 
         terminal.WriteLine("");
     }
@@ -4742,12 +4697,21 @@ public class DungeonLocation : BaseLocation
             return false;
         }
 
+        // 2.0: the room's actions are RoomActions, the list the room menus draw; a key that is not one is not a room key
+        var act = RoomActions(room).FirstOrDefault(a => a.Key == choice);
+        if (act == null)
+        {
+            terminal.WriteLine(Loc.Get("dungeon.invalid_choice"), "red");
+            await Pacing.Wait(1000);
+            return false;
+        }
+
         // Action-based commands
         switch (choice)
         {
             // v1.1.13: an action that cannot be done here says why, instead of doing nothing
             case "F":
-                if (room.HasMonsters && !room.IsCleared)
+                if (act.Enabled)
                 {
                     await FightRoomMonsters(room);
                 }
@@ -4755,7 +4719,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "T":
-                if (room.HasTreasure && !room.TreasureLooted && (room.IsCleared || !room.HasMonsters))
+                if (act.Enabled)
                 {
                     await CollectTreasure(room);
                 }
@@ -4763,7 +4727,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "V":
-                if (room.HasEvent && !room.EventCompleted)
+                if (act.Enabled)
                 {
                     await HandleRoomEvent(room);
                     RequestRedisplay();
@@ -4772,7 +4736,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "X":
-                if (HasExaminableFeatures(room))
+                if (act.Enabled)
                 {
                     await ExamineFeatures(room);
                     RequestRedisplay();
@@ -4781,7 +4745,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "D":
-                if (room.HasStairsDown && (room.IsCleared || !room.HasMonsters))
+                if (act.Enabled)
                 {
                     await DescendStairs();
                 }
@@ -4789,7 +4753,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "R":
-                if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
+                if (act.Enabled)
                 {
                     await RestInRoom();
                     RequestRedisplay();
@@ -4825,7 +4789,7 @@ public class DungeonLocation : BaseLocation
                 return false;
 
             case "Y":
-                if (teammates.Count > 0)
+                if (act.Enabled)
                 {
                     await ManagePartyInDungeon();
                     RequestRedisplay();

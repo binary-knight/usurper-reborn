@@ -31154,5 +31154,15 @@
   "permadeath.contact_admin2": "7 napon belül a visszaállítás reményében.",
   "permadeath.restore_hint": "Ha ez tévedés volt, 7 napon belül a /restore paranccsal visszaállíthatod,",
   "permadeath.restore_hint2": "vagy keress egy sysopot a Discordon.",
-  "permadeath.disconnecting": "Kapcsolat bontása."
+  "permadeath.disconnecting": "Kapcsolat bontása.",
+  "web.menu.places": "Helyek",
+  "web.menu.districts": "Kerületek",
+  "web.menu.system": "Rendszer",
+  "web.menu.actions": "Akciók",
+  "web.menu.exits": "Kijáratok",
+  "web.menu.tactics": "Taktika",
+  "web.menu.quickbar": "Képességek",
+  "web.menu.options": "Beállítások",
+  "web.menu.miracle": "Csoda",
+  "web.menu.quick_heal": "Gyors gyógyítás"
 }

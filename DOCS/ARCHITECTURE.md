@@ -1084,8 +1084,12 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 | `Room.Info` | Every location change, every dungeon room move and every dungeon room view | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
+| `Client.Menu` | Web client sessions only (2.0). Sent when a screen draws its menu, never per keystroke: Main Street (both layouts, `MainStreetWebMenu.cs`), the dungeon room view (`EmitRoomMenu`), the combat owner's dungeon fight prompt and the PvP prompt (`CombatEngine.WebMenu.cs`) | `{ screen, groups: [{ label, items: [{ key, label, enabled }] }] }`; screen is `main_street`, `main_street_classic`, `dungeon_room`, `combat` or `combat_pvp`. Built from the list the screen's key handler reads (`MainStreetLines`, `RoomActions`, the handler's cases); `enabled` is false where the handler takes the key but refuses it. Labels in the session's language |
+| `Room.Detail` | Web client sessions only (2.0). Each dungeon room view (`EmitRoomDetail`) | `{ name, level, theme, header, danger: { rating, max }, status, boss, exits: [{ key, description, state, stateLabel }], features }`: what the room text shows. Exit state is `cleared`, `fully_cleared` (only where the text says it), `explored` or `unknown`; no target room, no trap |
 
 In group play (1.3.9), `EmitVitalsToGroup` and `EmitVitalsToFollower` send each grouped player's `Char.Vitals` to that player's own session, beside every leader vitals send in combat, when a follower's turn opens and at the shared rests. The change check uses that session's own baseline and runs, with the write, under that session's `GmcpVitalsLock`; the frame is written under the follower terminal's writer lock (`TerminalEmulator.RunUnderWriterLock`) before the stream lock, and only when the session still owns that terminal. The combat-end send to the group does not depend on the leader having GMCP. `Char.Combat.Party` and `Char.Combat.Enemies` still go to the leader only.
+
+The web client capability (`SessionContext.WebClient`, 2.0) is true only for a session whose `ConnectionType` is `Web` and that has `GmcpEnabled`. It is a display preference only: `X-Client` is not limited to loopback, so any client can claim it, and no game rule reads it. `GmcpBridge.EmitWebClient` writes to the current session only; `EmitTo` refuses `Client.Menu` and `Room.Detail`.
 
 Strict opt-in: SSH-relayed, BBS and Electron sessions and any other websocket client skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. The play page (`/play/`) gets GMCP because the web proxy answers the offer for it (Section 36). Synchronous per-stream lock prevents interleaved frames.
 
@@ -1867,6 +1871,7 @@ Scripts/
 │   ├── GroupSystem.cs              Cooperative dungeon parties
 │   ├── BotDetectionSystem.cs       Combat-input cadence tracking
 │   ├── GmcpBridge.cs               GMCP wire-format and emit
+│   ├── WebClientMenu.cs            2.0 Client.Menu payload, web client sessions only
 │   ├── RelayClient.cs              --mud-relay implementation
 │   ├── RoomRegistry.cs             Per-location presence
 │   ├── WizNet.cs                   Wizard / admin tooling

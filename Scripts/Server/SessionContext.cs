@@ -50,6 +50,14 @@ public class SessionContext : IDisposable
     /// </summary>
     public bool GmcpEnabled { get; set; }
 
+    /// <summary>
+    /// 2.0: the session is the web client (ConnectionType "Web", from the X-Client header or the AUTH line) and
+    /// negotiated GMCP, so it is sent the web client's GMCP packages (Client.Menu, Room.Detail). Computed, so it
+    /// follows GmcpEnabled when repeated emit errors turn GMCP off. A DISPLAY PREFERENCE ONLY: X-Client is not
+    /// limited to loopback, so any raw client can claim it. No game rule may read it.
+    /// </summary>
+    public bool WebClient => GmcpEnabled && ConnectionType == "Web";
+
     // v0.60.3: per-session delta tracking for GMCP Char.Vitals so the bridge can
     // emit only when something actually changed. Previously these lived as instance
     // fields on BaseLocation, which meant combat (which doesn't re-enter LocationLoop

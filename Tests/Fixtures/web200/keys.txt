@@ -1,0 +1,84 @@
+street districts D => exit Dungeons :: Heading to Dungeons...|
+street districts I => exit TheInn :: Heading to The Inn...|
+street districts E => exit Wilderness :: Heading to Wilderness...|
+street districts A => exit DarkAlley :: You head to the Dark Alley...|
+street districts W => returned False :: Invalid choice! Type ? for help.|
+street districts M => returned False :: ╔══════════════════════════════════════════════════════════════════════════════╗|║                                 Merchant Row                                 ║|╚══════════════════════════════════════════════════════════════════════════════╝||  Painted signs creak over the stalls; steel, cloth, spells and songs all have a price here.||  [W] Weapon Shop|  [A] Armor Shop|  [M] Magic Shop|  [U] Music Shop|  [J] Auctions||  [R] Return to Main Street||Your choice: 
+street districts U => returned False :: Invalid choice! Type ? for help.|
+street districts J => returned False :: Invalid choice! Type ? for help.|
+street districts H => returned False :: ╔══════════════════════════════════════════════════════════════════════════════╗|║                                Home & Hearth                                 ║|╚══════════════════════════════════════════════════════════════════════════════╝||  Lamplit lanes of doorsteps and warm windows, where the day ends and some nights begin.||  [H] Home|  [L] Lodging|  [X] Love Street||  [R] Return to Main Street||Your choice: 
+street districts B => returned False :: Invalid choice! Type ? for help.|
+street districts V => returned False :: Invalid choice! Type ? for help.|
+street districts T => exit TeamCorner :: You head to the Adventurers Team Corner...|Heading to Team Corner...|
+street districts O => returned False :: Invalid choice! Type ? for help.|
+street districts L => returned False :: Invalid choice! Type ? for help.|
+street districts X => returned False :: Invalid choice! Type ? for help.|
+street districts K => returned False :: Invalid choice! Type ? for help.|
+street districts C => returned False :: ╔══════════════════════════════════════════════════════════════════════════════╗|║                                Castle Grounds                                ║|╚══════════════════════════════════════════════════════════════════════════════╝||  Banners snap above the walls; the crown, its challengers and the faithful gather in their shadow.||  [K] Castle|  [C] Challenges|  [S] The Sanctum||  [R] Return to Main Street||Your choice: 
+street districts Y => returned False :: Invalid choice! Type ? for help.|
+street districts + => returned False :: Invalid choice! Type ? for help.|
+street districts 1 => returned False :: Invalid choice! Type ? for help.|
+street districts 2 => returned False :: Invalid choice! Type ? for help.|
+street districts Z => returned False :: Invalid choice! Type ? for help.|
+street districts 9 => returned False :: Invalid choice! Type ? for help.|
+street districts > => returned False :: Invalid choice! Type ? for help.|
+street districts @ => returned False :: Invalid choice! Type ? for help.|
+street districts 6 => returned False :: Invalid choice! Type ? for help.|
+street districts G => returned False :: ╔══════════════════════════════════════════════════════════════════════════════╗|║                                  Guild Row                                   ║|╚══════════════════════════════════════════════════════════════════════════════╝||  Stone halls of healers, priests, bankers and masters, where the town keeps its oldest trades.||  [H] Healer|  [T] Temple|  [O] Old Church|  [B] Bank|  [V] Level Master|  [U] Quest Hall||  [R] Return to Main Street||Your choice: 
+street classic D => exit Dungeons :: Heading to Dungeons...|
+street classic I => exit TheInn :: Heading to The Inn...|
+street classic E => exit Wilderness :: Heading to Wilderness...|
+street classic A => exit ArmorShop :: Heading to Armor Shop...|
+street classic W => exit WeaponShop :: Heading to Weapon Shop...|
+street classic U => exit MusicShop :: Heading to Music Shop...|
+street classic B => exit Bank :: Heading to Bank...|
+street classic V => exit Master :: Heading to Level Master...|
+street classic T => exit Temple :: You enter the Temple of the Gods...|
+street classic O => exit Church :: Heading to Church...|
+street classic L => exit Dormitory :: Heading to Dormitory...|
+street classic X => exit RoyalOrphanage :: You head to Love Street...|
+street classic K => exit Castle :: Heading to Royal Castle...|
+street classic C => exit AnchorRoad :: Heading to Anchor Road...|
+street classic Y => exit DarkAlley :: You head to the Dark Alley...|
+street classic + => exit Sanctum :: You step toward The Sanctum...|
+street classic 1 => exit Healer :: Heading to Healer...|
+street classic 2 => exit QuestHall :: Heading to Quest Hall...|
+street classic Z => exit TeamCorner :: You head to the Adventurers Team Corner...|Heading to Team Corner...|
+street classic 9 => returned False :: 
+street classic > => returned False :: 
+street classic @ => returned False :: Invalid choice! Type ? for help.|
+street classic 6 => returned False :: 
+room monsters T => returned False ::   Monsters are in the way. Deal with them first.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters V => returned False ::   There is nothing here to investigate.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters X => returned False ::   There is nothing left here to examine.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters D => returned False ::   Monsters are in the way. Deal with them first.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters R => returned False ::   You cannot rest with monsters in the room.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters Y => returned False ::  :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters J => returned False :: Your herb pouch is empty. Gather herbs from your garden at home.|Press Enter to continue... :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters U => returned False ::   You carry no Willow Draughts. The Healer sells them.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters Q => returned False ::  :: inRoom=False at=q1 cleared=False looted=False event=False
+room monsters Z => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters K => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters H => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters 1 => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters N => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters * => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters % => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room monsters L => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=False looted=False event=False
+room bare F => returned False ::   There is nothing here to fight.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare T => returned False ::   There is no treasure here.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare V => returned False ::   There is nothing here to investigate.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare X => returned False ::   There is nothing left here to examine.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare D => returned False ::   There are no stairs down in this room.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare Y => returned False ::  :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare J => returned False :: Your herb pouch is empty. Gather herbs from your garden at home.|Press Enter to continue... :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare U => returned False ::   You carry no Willow Draughts. The Healer sells them.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare Q => returned False ::  :: inRoom=False at=q1 cleared=True looted=False event=False
+room bare Z => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room bare N => returned False :: Invalid choice.| :: inRoom=True at=q1 cleared=True looted=False event=False
+room camped F => returned False ::   There is nothing here to fight.| :: inRoom=True at=q1 cleared=True looted=True event=True
+room camped T => returned False ::   There is no treasure here.| :: inRoom=True at=q1 cleared=True looted=True event=True
+room camped V => returned False ::   There is nothing here to investigate.| :: inRoom=True at=q1 cleared=True looted=True event=True
+room camped R => returned False ::   You can rest once per floor, at a sanctuary or by making camp. Descend to rest again.| :: inRoom=True at=q1 cleared=True looted=True event=True
+room camped Y => returned False ::  :: inRoom=True at=q1 cleared=True looted=True event=True
+room camped Q => returned False ::  :: inRoom=False at=q1 cleared=True looted=True event=True

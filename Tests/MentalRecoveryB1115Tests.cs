@@ -325,9 +325,13 @@ public class MentalRecoveryB1115Tests
     [Fact]
     public void The_dungeon_room_menus_list_the_drink_key()
     {
+        // 2.0: the room actions are one list (RoomActions) that the screen reader and visual menus draw from
+        var src = Dungeon();
+        src.Substring(src.IndexOf("internal List<RoomAction> RoomActions(", StringComparison.Ordinal)).Should().Contain("new(\"U\", \"U\", Loc.Get(\"dungeon.willow\", willow.ToString())");
         var sr = Method(Dungeon(), "ShowRoomActions");
-        sr.Should().Contain("WriteSRMenuOption(\"U\", Loc.Get(\"dungeon.willow\"");
-        sr.Should().Contain("terminal.Write(\"U\");");
+        sr.Should().Contain("RoomActions(room).Where(a => a.Drawn)");
+        sr.Should().Contain("WriteSRMenuOption(a.DrawKey, a.Label);");
+        sr.Should().Contain("terminal.Write(a.DrawKey);");
         Method(Dungeon(), "DisplayRoomViewBBS").Should().Contain("row1.Add((\"U\", \"bright_yellow\", Loc.Get(\"dungeon.bbs_willow\"");
     }
 

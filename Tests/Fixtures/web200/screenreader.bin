@@ -1,0 +1,174 @@
+Main Street Menu
+  D - Dungeons
+  I - Inn
+  E - Explore
+  T - Team Corner
+  A - Dark Alley
+  M - Merchant Row
+  G - Guild Row
+  H - Home & Hearth
+  C - Castle Grounds
+  S - Status
+  N - Notice Board
+  ~ - Settings
+  ? - Help
+  Q - Quit Game
+
+
+Main Street Menu
+
+Locations:
+  D - Dungeons
+  I - Inn
+  T - Temple
+  K - Castle
+  H - Home
+  O - Church
+  L - Lodging (Dormitory)
+
+Shops:
+  W - Weapon Shop
+  A - Armor Shop
+  M - Magic Shop
+  U - Music Shop
+  J - Auctions
+  B - Bank
+  1 - Healer
+
+Services:
+  V - Level Master
+  2 - Quest Hall
+  C - Challenges
+  Z - Team Corner
+
+Information:
+  S - Status
+  N - News
+  F - Fame
+  $ - World Events
+  = - Stats Record
+  P - Progress
+
+Exploration:
+  E - The Wilderness
+
+Other:
+  Y - Dark Alley
+  + - The Sanctum
+  X - Love Street
+  Q - Quit
+  ? - Help
+  ! - Report Bug
+
+ [D] Dungeons   [W] Weapon Shop[A] Armor Shop [M] Magic Shop [U]Music Shop
+ [I] Inn        [1]Healer     [2]Quest Hall [V]Master
+ [B] Bank       [T] Temple     [K]Castle     [H] Home
+ [N] News       [F] Fame       [E] Explore    [$] World Events
+ [Y]Dark Alley [+]Sanctum [X]Love St    [O] Old Church [J]Auction
+ [C] Challenges [L] Lodging    [=]Stats      [P] Progress
+ [Z]Team Corner
+[Q] Quit       [~]Settings
+
+---
+
+ÿúÉRoom.Info {"num":"q1","name":"Room q1","area":"Dungeon Floor 6","exits":{"north":"c2","east":"u3","west":"e4","south":"h5"}}ÿğRoom q1
+Level 6 | Catacombs | Danger 2 of 3 
+
+A cold stone room.
+
+Water drips somewhere.
+
+>> Something valuable glints in the darkness! <<
+>> A strange altar radiates energy <<
+>> Stairs lead down to a deeper level <<
+
+You notice:
+  - a cracked altar
+  - a rusted lever
+
+Exits:
+N. a stone arch (fully cleared)
+E. a dark tunnel (unknown)
+W. a narrow stair (explored)
+S. a crack in the wall (unknown)
+
+Actions:
+T. Collect treasure
+V. Investigate the event
+X. Examine features
+D. Descend stairs
+R. Make camp and recover
+M. Map
+G. Guide
+*. Inventory
+P. Potions
+%. Status
+Q. Leave dungeon
+
+HP:  400/400  Potions: 3/31  Gold: 1,234  Lv 12  XP 0/40900
+
+---
+
+ÿúÉRoom.Info {"num":"m6","name":"Room m6","area":"Dungeon Floor 6","exits":{"south":"q1"}}ÿğRoom m6
+Level 6 | Catacombs | Danger 3 of 3 
+
+A cold stone room.
+
+Water drips somewhere.
+
+You hear hostile sounds from the darkness...
+
+Exits:
+S. a stone arch (cleared)
+
+Actions:
+F. Fight the monsters
+M. Map
+G. Guide
+*. Inventory
+P. Potions
+%. Status
+Q. Leave dungeon
+
+HP:  400/400  Potions: 3/31  Gold: 1,234  Lv 12  XP 0/40900
+ÿúÉChar.Vitals {"hp":400,"maxHp":400,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":100,"maxCombatSp":306}ÿğ
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+Combat Menu
+
+Your HP: 400 of 400
+Opponent: Rival, HP: 400 of 400
+
+Actions:
+  A - Attack
+  D - Defend, reduces damage by 50 percent
+
+  H - Heal, Potions: 3 of 31
+  I - Disarm, remove weapon bonus
+  T - Taunt, lower enemy defense
+  L - Hide, attempt to slip away
+  R - Flee Combat
+  S - View Status
+  SPD - Combat Speed, currently Instant
+
+Choose action: 
