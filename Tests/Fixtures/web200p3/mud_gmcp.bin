@@ -1,0 +1,348 @@
+[90m[90mHP: [92m[92m400[90m[90m/[92m[92m400[90m[90m | Gold: [33m[33m1,234[90m[90m | Stamina: [33m[33m100[90m[90m/[33m[33m306[90m[90m | Level [36m[36m12[90m[90m | Revives: [91m[91m0[90m[90m/3[90m[90m ([37m[37m0%[90m[90m)
+
+[2J[H[96m[96m╔══════════════════════════════════════════════════════════════════════════════╗
+[0m[96m║                               CHARACTER STATUS                               ║
+[0m[96m╚══════════════════════════════════════════════════════════════════════════════╝
+[0m
+[33m[33m═══ BASIC INFORMATION ═══
+[0m[37m[37mName: [97m[97mWebtest
+[0m[37m[37mClass: [92m[92mWarrior[37m[37m  |  Race: [92m[92mHuman[37m[37m  |  Sex: [92m[92mFemale
+[0m[37m[37mAge: [36m[36m22[37m[37m  |  Height: [36m[36m180cm[37m[37m  |  Weight: [36m[36m80kg
+[0m
+[33m[33m═══ LEVEL & EXPERIENCE ═══
+[0m[37m[37mCurrent Level: [93m[93m12
+[0m[37m[37mExperience: [96m[96m1,500
+[0m[37m[37mXP to Next Level: [95m[95m39,400[90m[90m (Need 40900 total)
+[0m
+[33m[33m═══ COMBAT STATISTICS ═══
+[0m[37m[37mHP: [91m[91m400[37m[37m/[31m[31m400
+[0m[37m[37mStrength: [92m[92m60[37m[37m  |  Defense: [92m[92m20[37m[37m  |  Agility: [92m[92m20
+[0m[37m[37mDexterity: [36m[36m30[37m[37m  |  Stamina: [36m[36m100[37m[37m  |  Wisdom: [36m[36m20
+[0m[37m[37mIntelligence: [36m[36m20[37m[37m  |  Charisma: [36m[36m15[37m[37m  |  Constitution: [36m[36m30
+[0m[37m[37mFatigue: [92m[92mWell-Rested[90m[90m (0/100)
+[0m[37m[37mDifficulty: [96m[96mNormal
+[0m
+[90m[97mPress Enter to continue...
+[33m[33m═══ EQUIPMENT ═══
+[0m[37m[37mCombat Style: [90m[90mOne-Handed
+[0m
+[91m[91mMain Hand:  [90m[90mEmpty
+[0m[91m[91mOff Hand:   [90m[90mEmpty
+[0m
+[96m[96mHead:       [90m[90mEmpty
+[0m[96m[96mBody:       [90m[90mEmpty
+[0m[96m[96mArms:       [90m[90mEmpty
+[0m[96m[96mHands:      [90m[90mEmpty
+[0m[96m[96mLegs:       [90m[90mEmpty
+[0m[96m[96mFeet:       [90m[90mEmpty
+[0m[96m[96mWaist:      [90m[90mEmpty
+[0m[96m[96mFace:       [90m[90mEmpty
+[0m[96m[96mCloak:      [90m[90mEmpty
+[0m
+[95m[95mNeck:       [90m[90mEmpty
+[0m[95m[95mLeft Ring:  [90m[90mEmpty
+[0m[95m[95mRight Ring: [90m[90mEmpty
+[0m
+[33m[33mEquipment Totals:
+[0m[37m[37m    Weapon Power: [91m[91m0[37m[37m  |  Armor Power: [96m[96m0
+[0m
+[35m[35m  Awakening: Dormant (0/7)
+[0m[90m[90m  (your Ocean Journal: Main Street, Status [S], Progress [P])
+[0m[37m
+[90m[90m┌─── TIP ────────────────────────────────────────────────────────────────────┐
+[0m[96m[96m│ Your Awakening
+[0m[37m[37m│ Something within you is waking. Loss, mercy and wonder deepen it:
+[0m[37m│ companions, sparing a beaten foe, dreams, visions, discoveries and the
+[0m[37m│ songs of the Old Gods. Each stage brings a small lasting boon. See Main
+[0m[37m│ Street, Status [S], Progress [P] for your Ocean Journal.
+[0m[90m[90m└────────────────────────────────────────────────────────────────────────────┘
+[0m
+
+[33m[33m═══ WEALTH ═══
+[0m[37m[37mGold on Hand: [93m[93m1,234
+[0m[37m[37mGold in Bank: [33m[33m0
+[0m[37m[37mTotal Wealth: [93m[93m1,234
+[0m
+[90m[97mPress Enter to continue...
+[33m[33m═══ RELATIONSHIPS ═══
+[0m[37m[37mMarital Status: [90m[90mSingle
+[0m[37m[37mTeam: [90m[90mNone
+[0m
+[33m[33m═══ ALIGNMENT & REPUTATION ═══
+[0m[37m[37mAlignment: [90m[90mNeutral
+[0m[37m[37mChivalry: [92m[92m0/1000[37m[37m  |  Darkness: [31m[31m0/1000
+[0m[90m[90m    Holy [92m[92m[90m[90m░░░░░░░░░░[90m | [31m[31m[90m[90m░░░░░░░░░░[90m  Evil
+[0m[36m[36m  Alignment Abilities:
+[0m[37m[37m    - Diplomatic Immunity - No alignment restrictions
+[0m[37m    - Balanced Path - Access all locations freely
+[0m[36m[36mWhat this means:
+[0m[37m[37m    Combat: attack normal, defense normal
+[0m[37m    Prices: black market normal, honest shops normal
+[0m[37m    Most folk treat you as just another stranger.
+[0m[37m    Faction: unaffiliated -- you owe no oath; free to take any work.
+[0m
+[37m[37mLoyalty: [36m[36m0%[37m[37m  |  Mental Health: [92m[92m80/100 (Stable)
+[0m
+[33m[33m═══ FACTION ═══
+[0m[90m[90mYou have not pledged allegiance to any faction.
+[0m[90m[90m  Visit the Castle, Temple, or Dark Alley to learn more.
+[0m
+[37m[37mFaction Standing:
+[0m[90m[90m  [93m[93mThe Crown      [37m[37m: [90m[90m   0[90m[90m ( (Neutral))
+[0m[90m[90m  [96m[96mThe Faith      [37m[37m: [90m[90m   0[90m[90m ( (Neutral))
+[0m[90m[90m  [95m[95mThe Shadows    [37m[37m: [90m[90m   0[90m[90m ( (Neutral))
+[0m
+[90m[97mPress Enter to continue...
+[33m[33m═══ BATTLE RECORD ═══
+[0m[37m[37mMonster Kills: [92m[92m25[37m[37m  |  Monster Defeats: [31m[31m0
+[0m[37m[37mPlayer Kills: [93m[93m0[37m[37m  |  Player Defeats: [31m[31m0
+[0m[37m[37mMonster Win Rate: [36m[36m100.0%
+[0m
+[33m[33m═══ DUNGEON PROGRESS ═══
+[0m[37m[37mDeepest Floor Reached: [95m[95m0 / 100
+[0m[37m[37mOld Gods: [90m[90mNone encountered
+[37m[37mAncient Seals: [90m[90m0/7 collected
+[0m
+[33m[33m═══ DIVINE STATUS ═══
+[0m[37m[37mWorshipped God: [90m[90mNone (Agnostic)
+[0m
+[90m[90m────────────────────────────────────────────────────────────────────────────────
+[0m
+[97mPress Enter to continue...[2J[H[90m[90m DUNGEON MAP ── Level 6 (Catacombs)  [4/6 explored, 2/6 cleared]
+[0m[90m[90m──────────────────────────────────────────────────────────────────────────────
+[0m[90m  [90m   [90m   [32m[32m#[32m    
+[32m  [32m   [32m    [32m    [37m[37m  Legend:
+[37m  [37m  [36m[36m·[90m[90m───[93m[93m@[93m   [90m[90m?
+[90m  [90m   [90m[90m   │[90m    [93m[93m  @ [90m[90mYou
+[90m  [90m   [90m   [90m[90m?[90m    [32m[32m  # [90m[90mCleared
+[90m                                                  [31m[31m  █ [90m[90mMonsters
+[90m                                                  [34m[34m  > [90m[90mStairs
+[90m                                                  [91m[91m  B [90m[90mBoss
+[90m                                                  [36m[36m  · [90m[90mSafe
+[90m                                                  [90m[90m  ? [90m[90mUnknown
+[90m                                                  
+[90m[90m──────────────────────────────────────────────────────────────────────────────
+[0m[37m[37m Location: [33m[33mRoom q1
+
+[90m[90m   [P] Persistent mini-map: OFF
+[0m[90m   Press Enter to continue...
+[0m[97m���Char.Combat.Start {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false},{"name":"Bone Guard B","level":8,"hp":260,"maxHp":260,"isBoss":false}],"ambush":false}��[2J[H[91m[91m═══ COMBAT ═══
+[0m
+
+
+
+[90m[90m┌─── TIP ────────────────────────────────────────────────────────────────────┐
+[0m[96m[96m│ Combat Tip
+[0m[37m[37m│ Press [A] to Attack, [R] to Retreat, [H] to use a Healing Potion, or [S] to
+[0m[37m│ check your Status.
+[0m[90m[90m└────────────────────────────────────────────────────────────────────────────┘
+[0m
+
+[90m[90m  Round 1
+[0m[96m[96m╔══════════════════════════════════════════════════════════╗
+[0m[96m║                      COMBAT STATUS                       ║
+[0m[96m╠══════════════════════════════════════════════════════════╣
+[0m[33m[33m║ [1] [37m[37mBone Guard A       [32m[32m████████████ [37m[37m  260/260  
+[33m[33m║ [2] [37m[37mBone Guard B       [32m[32m████████████ [37m[37m  260/260  
+[96m[96m╠══════════════════════════════════════════════════════════╣
+[0m[96m[96m║ [97m[97mWebtest            [92m[92mHP:████████████░░░ [37m[37m  400/484  
+[96m[96m║ [95m[95mPotions: [37m[37m3/31
+[0m[96m[96m║ [93m[93mST:██████████ [33m[33m 306/306 
+[0m[96m[96m║ [90m[90mStatus: [92m[92mLast Stand ready[92m  [92m[92mDeath's Door ready
+[96m[96m║ [90m[90mATK: [93m[93m60    [90m[90mDEF: [96m[96m23[96m 
+[96m[96m╚══════════════════════════════════════════════════════════╝
+[0m
+���Char.Vitals {"hp":400,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}��[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[33m[33mTarget which monster? (1-2, ENTER=random, Q=cancel): [97m
+[92m[92mYou attack Bone Guard B!
+[0m[90m[90m[You roll a natural 20: always a hit]
+[0m[91mCRITICAL HIT!
+[0m[90mYou obliterate Bone Guard B for [91m170[0m damage!
+[0m
+[31m[31m[31m[31mBone Guard A attacks you!
+[0m[90m[90m[Bone Guard A rolls: 12 + 14 = 26 vs DC 17]
+[0m[90m[37mBone Guard A[0m hits you!
+[0m[90m[90m[60 damage vs 23 defense]
+[0m[91m[91m37 damage gets through your defenses!
+[0m
+[31m[31m[31m[31mBone Guard B attacks you!
+[0m[90m[90m[Bone Guard B rolls: 13 + 14 = 27 vs DC 17]
+[0m[90m[37mBone Guard B[0m attacks you!
+[0m[90m[90m[66 damage vs 23 defense]
+[0m[91m[91m43 damage gets through your defenses!
+[0m���Char.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"alive":true}],"round":1}��
+[90m[90m  Round 2
+[0m[96m[96m╔══════════════════════════════════════════════════════════╗
+[0m[96m║                      COMBAT STATUS                       ║
+[0m[96m╠══════════════════════════════════════════════════════════╣
+[0m[33m[33m║ [1] [37m[37mBone Guard A       [32m[32m████████████ [37m[37m  260/260  
+[33m[33m║ [2] [37m[37mBone Guard B       [33m[33m████░░░░░░░░ [37m[37m   90/260  
+[96m[96m╠══════════════════════════════════════════════════════════╣
+[0m[96m[96m║ [97m[97mWebtest            [92m[92mHP:█████████░░░░░░ [37m[37m  320/484  
+[96m[96m║ [95m[95mPotions: [37m[37m3/31
+[0m[96m[96m║ [93m[93mST:██████████ [33m[33m 306/306 
+[0m[96m[96m║ [90m[90mStatus: [92m[92mLast Stand ready[92m  [92m[92mDeath's Door ready
+[96m[96m║ [90m[90mATK: [93m[93m60    [90m[90mDEF: [96m[96m23[96m 
+[96m[96m╚══════════════════════════════════════════════════════════╝
+[0m
+[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[33m[33mTarget which monster? (1-2, ENTER=random, Q=cancel): [97m
+[92m[92mYou attack Bone Guard B!
+[0m[90m[90m[You roll 3; you need 2 or more]
+[0m[90mYou smash Bone Guard B for [31m107[0m damage!
+[0m[90m[37mBone Guard B[0m [91mfalls[0m in combat!
+[0m
+[31m[31m[31m[31mBone Guard A attacks you!
+[0m[90m[90m[Bone Guard A rolls: 18 + 14 = 32 vs DC 17]
+[0m[96m[96mYou dodge Bone Guard A's attack! (10% dodge)
+[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":2}��
+[90m[90m  Round 3
+[0m[96m[96m╔══════════════════════════════════════════════════════════╗
+[0m[96m║                      COMBAT STATUS                       ║
+[0m[96m╠══════════════════════════════════════════════════════════╣
+[0m[33m[33m║ [1] [37m[37mBone Guard A       [32m[32m████████████ [37m[37m  260/260  
+[96m[96m╠══════════════════════════════════════════════════════════╣
+[0m[96m[96m║ [97m[97mWebtest            [92m[92mHP:█████████░░░░░░ [37m[37m  320/484  
+[96m[96m║ [95m[95mPotions: [37m[37m3/31
+[0m[96m[96m║ [93m[93mST:██████████ [33m[33m 306/306 
+[0m[96m[96m║ [90m[90mStatus: [92m[92mLast Stand ready[92m  [92m[92mDeath's Door ready
+[96m[96m║ [90m[90mATK: [93m[93m60    [90m[90mDEF: [96m[96m23[96m 
+[96m[96m╚══════════════════════════════════════════════════════════╝
+[0m
+[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m
+[92m[92mYou attack Bone Guard A!
+[0m[90m[90m[You roll 15; you need 2 or more]
+[0m[90mYou maul Bone Guard A for [31m99[0m damage!
+[0m
+[31m[31m[31m[31mBone Guard A attacks you!
+[0m[90m[90m[Bone Guard A rolls: 6 + 14 = 20 vs DC 17]
+[0m[90m[37mBone Guard A[0m grazes you!
+[0m[90m[90m[41 damage vs 23 defense]
+[0m[91m[91m18 damage gets through your defenses!
+[0m���Char.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":3}��
+[90m[90m  Round 4
+[0m[96m[96m╔══════════════════════════════════════════════════════════╗
+[0m[96m║                      COMBAT STATUS                       ║
+[0m[96m╠══════════════════════════════════════════════════════════╣
+[0m[33m[33m║ [1] [37m[37mBone Guard A       [32m[32m███████░░░░░ [37m[37m  161/260  
+[96m[96m╠══════════════════════════════════════════════════════════╣
+[0m[96m[96m║ [97m[97mWebtest            [92m[92mHP:█████████░░░░░░ [37m[37m  302/484  
+[96m[96m║ [95m[95mPotions: [37m[37m3/31
+[0m[96m[96m║ [93m[93mST:██████████ [33m[33m 306/306 
+[0m[96m[96m║ [90m[90mStatus: [92m[92mLast Stand ready[92m  [92m[92mDeath's Door ready
+[96m[96m║ [90m[90mATK: [93m[93m60    [90m[90mDEF: [96m[96m23[96m 
+[96m[96m╚══════════════════════════════════════════════════════════╝
+[0m
+[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m
+[92m[92mYou attack Bone Guard A!
+[0m[90m[90m[You roll 12; you need 2 or more]
+[0m[90mYou crush Bone Guard A for [31m107[0m damage!
+[0m
+[31m[31m[31m[31mBone Guard A attacks you!
+[0m[90m[90m[Bone Guard A rolls: 8 + 14 = 22 vs DC 17]
+[0m[96m[96mYou dodge Bone Guard A's attack! (10% dodge)
+[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":4}��
+[90m[90m  Round 5
+[0m[96m[96m╔══════════════════════════════════════════════════════════╗
+[0m[96m║                      COMBAT STATUS                       ║
+[0m[96m╠══════════════════════════════════════════════════════════╣
+[0m[33m[33m║ [1] [37m[37mBone Guard A       [31m[31m██░░░░░░░░░░ [37m[37m   54/260  
+[96m[96m╠══════════════════════════════════════════════════════════╣
+[0m[96m[96m║ [97m[97mWebtest            [92m[92mHP:█████████░░░░░░ [37m[37m  302/484  
+[96m[96m║ [95m[95mPotions: [37m[37m3/31
+[0m[96m[96m║ [93m[93mST:██████████ [33m[33m 306/306 
+[0m[96m[96m║ [90m[90mStatus: [92m[92mLast Stand ready[92m  [92m[92mDeath's Door ready
+[96m[96m║ [90m[90mATK: [93m[93m60    [90m[90mDEF: [96m[96m23[96m 
+[96m[96m╚══════════════════════════════════════════════════════════╝
+[0m
+[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m
+[92m[92mYou attack Bone Guard A!
+[0m[90m[90m[You roll 5; you need 2 or more]
+[0m[90mYou maul Bone Guard A for [31m101[0m damage!
+[0m[90m[37mBone Guard A[0m [91mfalls[0m in combat!
+[0m���Char.Combat.Killed {"name":"Bone Guard B","level":8,"isBoss":false}�����Char.Combat.Killed {"name":"Bone Guard A","level":8,"isBoss":false}��
+[92m[92m═══════════════════════════
+[0m[92m    Double kill!
+[0m[92m═══════════════════════════
+[0m
+[33m[33mDefeated 2 monster(s)!
+[0m[33mExperience gained: 36
+[0m[90m[90m  (Other modifiers, included above: x1.8 from early levels)
+[0m[90mGold gained: 0
+[0m
+���Char.Combat.End {"outcome":"Victory","kills":2,"xpGained":36,"goldGained":0}�����Char.Items.List {"inventory":[],"equipped":{},"count":0,"max":50}�����Char.Skills.List {"abilities":[{"id":"power_strike","name":"Power Strike","type":"Attack","cooldown":0,"staminaCost":15,"manaCost":0,"requiresLevel":1},{"id":"second_wind","name":"Second Wind","type":"Heal","cooldown":5,"staminaCost":25,"manaCost":0,"requiresLevel":1},{"id":"focus","name":"Focus","type":"Buff","cooldown":2,"staminaCost":15,"manaCost":0,"requiresLevel":5},{"id":"shield_wall","name":"Shield Wall","type":"Defense","cooldown":3,"staminaCost":25,"manaCost":0,"requiresLevel":8}],"spells":[],"mana":0,"maxMana":0,"stamina":100}�����Char.Status {"name":"Webtest","class":"Warrior","level":12,"race":"Human","gold":1234,"bank":0,"xp":1536,"location":""}��
