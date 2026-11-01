@@ -1081,7 +1081,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 |---|---|---|
 | `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental, combatSp, maxCombatSp }` (v1.1.15: mental and maxMental added, both modes; 1.3.9: combatSp and maxCombatSp are the fight stamina, while sp stays the Stamina stat) |
 | `Char.Status` | Every location change | `{ name, class, level, race, gold, bank, xp, location }` |
-| `Room.Info` | Every location change | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
+| `Room.Info` | Every location change, every dungeon room move and every dungeon room view | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
 
@@ -1542,7 +1542,7 @@ Dark-themed responsive page with:
   - A tap pad sits under the terminal, or beside it when the stage is wider than 1.3 times its height. It shows the options of the current screen as buttons: `[K] Label`, `[E]nter`, `[AUTO]` and the like, read from the xterm buffer from the cursor up to the row where the player last pressed Enter (an xterm marker), the previous game prompt, or the top of the screen.
   - A tap sends the key and Enter, since the game reads lines. A yes or no question offers the two letters its `(x/y)` prompt shows, so (S/N) and (O/N) work. A question ending in a colon offers the keyboard; a screen with nothing to pick lights Enter.
   - Fixed keys: Enter, Back (0x7f), Keys (every key, one character per tap) and Type (focuses the terminal to raise the phone keyboard; the pad steps aside until it closes).
-  - A compass shows the `Room.Info` exits that are compass directions when the screen also offers that key. The dungeon sends `Room.Info` when the player moves to a room, so it appears from the first step.
+  - A compass shows the `Room.Info` exits that are compass directions when the screen also offers that key. The dungeon sends `Room.Info` when the player moves to a room and each time it draws a room, so it shows in a level's first room, after a teleport or a load, and after a fight. A grouped follower's screen is redrawn without an Enter, so a follower's compass can still show the room before.
   - The terminal is not focused on connect or on a tap, so the phone keyboard opens only from Type.
 - Opens `/ws?gmcp=1`, so the proxy splits the stream (below). Binary frames go to the terminal; text frames are GMCP as `{"gmcp": "Package.Name", "data": ...}`.
 - A status line under the terminal: HP and MP bars and the fight stamina (`Char.Vitals` hp, mp, combatSp and their maximums), level and gold (`Char.Status`) and the location name (`Room.Info`). `Char.Vitals.sp` is the Stamina stat, so it is not drawn.
