@@ -696,11 +696,12 @@ public class WebMenu200Tests
         // watchdog code, which write to other sessions.
         var allowed = new Dictionary<string, string[]>
         {
-            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient" },
+            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient", "EmitWebEnemies", "EmitWebFooterIfChanged", "EmitCombatEnemiesIfChanged" },
             ["Scripts/Server/WebClientMenu.cs"] = new[] { "Emit" },
             ["Scripts/Locations/MainStreetWebMenu.cs"] = new[] { "EmitWebMenu" },
-            ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu" },
-            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster" },
+            ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu", "EmitWebMap" },
+            ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter" },
+            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters" },
         };
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "Scripts"), "*.cs", SearchOption.AllDirectories))
         {
@@ -710,8 +711,9 @@ public class WebMenu200Tests
             {
                 string callee = call.Expression.ToString();
                 bool sends = callee.EndsWith("EmitWebClient") || callee.EndsWith("WebClientMenu.Emit")
-                    || (callee.EndsWith("Emit") || callee.EndsWith("EmitTo")) && call.ArgumentList.ToString().Contains("\"Client.Menu\"")
-                    || (callee.EndsWith("Emit") || callee.EndsWith("EmitTo")) && call.ArgumentList.ToString().Contains("\"Room.Detail\"");
+                    || callee.EndsWith("EmitWebEnemies") || callee.EndsWith("EmitWebFooterIfChanged")   // 2.0 phase 3a
+                    || (callee.EndsWith("Emit") || callee.EndsWith("EmitTo"))
+                        && GmcpBridge.WebClientPackages.Any(pkg => call.ArgumentList.ToString().Contains("\"" + pkg + "\""));
                 if (!sends) continue;
                 var method = call.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault()?.Identifier.Text ?? "";
                 allowed.ContainsKey(rel).Should().BeTrue("{0} sends a web client package from {1}", rel, method);
@@ -722,6 +724,8 @@ public class WebMenu200Tests
         {
             var src = Source(rel);
             src.Should().NotContain("Client.Menu").And.NotContain("Room.Detail").And.NotContain("EmitWebClient").And.NotContain("WebClientMenu");
+            foreach (var pkg in GmcpBridge.WebClientPackages) src.Should().NotContain(pkg);   // 2.0 phase 3a
+            src.Should().NotContain("EmitWebEnemies").And.NotContain("EmitWebFooter").And.NotContain("EmitWebSheet").And.NotContain("EmitWebMap");
         }
     }
 

@@ -52,7 +52,7 @@ public class SessionContext : IDisposable
 
     /// <summary>
     /// 2.0: the session is the web client (ConnectionType "Web", from the X-Client header or the AUTH line) and
-    /// negotiated GMCP, so it is sent the web client's GMCP packages (Client.Menu, Room.Detail). Computed, so it
+    /// negotiated GMCP, so it is sent the web client's GMCP packages (GmcpBridge.WebClientPackages). Computed, so it
     /// follows GmcpEnabled when repeated emit errors turn GMCP off. A DISPLAY PREFERENCE ONLY: X-Client is not
     /// limited to loopback, so any raw client can claim it. No game rule may read it.
     /// </summary>
@@ -94,6 +94,11 @@ public class SessionContext : IDisposable
     // as the party tracker. Round number is intentionally NOT part of the snapshot --
     // including it would force an emit every round and defeat the change-detection.
     public string LastGmcpEnemiesSnapshot { get; set; } = "";
+
+    /// <summary>2.0 phase 3a: the last Client.Enemies names and families, and the last Client.Footer values, sent to
+    /// this session (web client only), so each is sent again only when it changed.</summary>
+    public string LastWebEnemiesSnapshot { get; set; } = "";
+    public string LastWebFooterSnapshot { get; set; } = "";
 
     // v1.0 release prep (B1a): once-per-session gate for the reached_town
     // onboarding-funnel write so Main Street entry doesn't fire a DB write on

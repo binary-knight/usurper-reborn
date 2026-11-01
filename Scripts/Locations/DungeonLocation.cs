@@ -2637,7 +2637,8 @@ public class DungeonLocation : BaseLocation
     /// the cleared, danger and boss tags it prints, each exit with the state its line shows (no target room, nothing
     /// about rooms not yet seen), and the features listed under "You notice". No trap: the text names one only on a
     /// random roll. The compact (BBS) view prints no exit descriptions and no "Level 6 | theme" line, so for it those
-    /// are left out and the exit state is the compact line's. Web client sessions only.
+    /// are left out and the exit state is the compact line's. Phase 3a adds themeId, the DungeonTheme name, which is
+    /// the same in every language (theme is the translated short name). Web client sessions only.
     /// </summary>
     private void EmitRoomDetail(DungeonRoom room)
     {
@@ -2669,6 +2670,7 @@ public class DungeonLocation : BaseLocation
             name = room.Name,
             level = currentDungeonLevel,
             theme,
+            themeId = currentFloor.Theme.ToString(),   // 2.0 phase 3a: the language neutral theme, for the scene art
             header = compact ? null : $"{Loc.Get("dungeon.bbs_level")} {currentDungeonLevel} | {theme}",
             danger = new { rating = room.DangerRating, max = 3 },
             status = room.IsCleared ? "cleared" : room.HasMonsters ? "danger" : null,
@@ -13949,6 +13951,8 @@ public class DungeonLocation : BaseLocation
             terminal.Write(GameConfig.ScreenReaderMode ? $"  * {Loc.Get("dungeon.boss_defeated_label")}" : $"  \u2605 {Loc.Get("dungeon.boss_defeated_label")}");
         }
         terminal.WriteLine("");
+        // 2.0 phase 3a: the web client's map, the rooms and corridors just drawn (web client sessions only)
+        EmitWebMap(roomPositions, explored, total, cleared);
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -13972,6 +13976,66 @@ public class DungeonLocation : BaseLocation
         }
 
         await terminal.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: GMCP Client.Map for the web client, sent from the map screen (M) as it draws. Rooms at their
+    /// BuildRoomPositionMap places, each with the symbol the text map prints (GetRoomMapChar), and the corridors the text
+    /// map draws (from an explored room, west or south, to the room placed beside it). Only explored rooms and the room
+    /// the player stands in are listed: an unexplored room, which the text map marks with a "?", is left out, and so is
+    /// any corridor through an exit that is hidden and not yet revealed, so the frame names no room the player has not
+    /// seen and no secret way. The header's counts (explored, total, cleared), the floor and the location line as the
+    /// text prints them; room is the current room's id, as Room.Info sends it. Web client sessions only.
+    /// </summary>
+    private void EmitWebMap(Dictionary<string, (int x, int y)> roomPositions, int explored, int total, int cleared)
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || currentFloor == null) return;
+        var listed = new Dictionary<string, (DungeonRoom room, int x, int y)>();
+        foreach (var (id, pos) in roomPositions)
+        {
+            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == id);
+            if (room != null && (room.IsExplored || room.Id == currentFloor.CurrentRoomId)) listed[id] = (room, pos.x, pos.y);
+        }
+        static bool Open(RoomExit e) => !(e.IsHidden && !e.IsRevealed);
+        var links = new List<object>();
+        foreach (var (room, x, y) in listed.Values)
+        {
+            if (!room.IsExplored) continue;   // the text draws a corridor only from an explored room
+            foreach (var (dir, dx, dy) in new[] { (Direction.West, -1, 0), (Direction.South, 0, 1) })
+            {
+                if (room.Exits.TryGetValue(dir, out var exit) && Open(exit)
+                    && listed.TryGetValue(exit.TargetRoomId, out var to) && to.x == x + dx && to.y == y + dy)
+                    links.Add(new { x1 = x, y1 = y, x2 = to.x, y2 = to.y });
+            }
+        }
+        var current = currentFloor.GetCurrentRoom();
+        UsurperRemake.Server.GmcpBridge.EmitWebClient("Client.Map", new
+        {
+            level = currentDungeonLevel,
+            theme = GetThemeShortName(currentFloor.Theme),
+            themeId = currentFloor.Theme.ToString(),
+            explored,
+            total,
+            cleared,
+            room = currentFloor.CurrentRoomId,
+            location = current?.Name ?? Loc.Get("dungeon.unknown"),
+            bossDefeated = currentFloor.BossDefeated,
+            rooms = listed.Values.Select(r => new
+            {
+                x = r.x,
+                y = r.y,
+                kind = GetRoomMapChar(r.room) switch
+                {
+                    '@' => "here",
+                    'B' => "boss",
+                    '>' => "stairs",
+                    '#' => "cleared",
+                    '\u2588' => "monsters",
+                    _ => "safe",
+                },
+            }).ToList(),
+            links,
+        });
     }
 
     private async Task ShowDungeonMapScreenReader()
