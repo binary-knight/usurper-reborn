@@ -251,7 +251,7 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron .scene, .chron .scene.s-fight { height: 104px; background-size: 384px 192px; }
   .chron .scene.s-room { height: 150px; }
   .chron .scene.s-street { height: 132px; }
-  .chron .portrait, .chron .portrait img { width: 96px; height: 96px; }
+  .chron .portrait, .chron .portrait img { width: 192px; height: 192px; }
   .chron .plate-cap { font-size: 12px; letter-spacing: .12em; }
   .chron .plate-cap::before, .chron .plate-cap::after { width: 18px; margin: 0 8px; }
   .chron .hud.h-fight { gap: 6px; }

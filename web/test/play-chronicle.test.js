@@ -503,6 +503,9 @@ test('art comes only from language neutral data: location id, dungeon floor, cla
   const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
   assert.match(css, /\.chron \.scene \{[^}]*image-rendering: pixelated/);
   assert.match(css, /\.chron \.portrait img \{[^}]*image-rendering: pixelated/);
+  const sizes = [...css.matchAll(/\.chron \.portrait(?:, \.chron \.portrait img)? \{[^}]*?width: (\d+)px; height: (\d+)px/g)].map((m) => [m[1], m[2]]);
+  assert.ok(sizes.length >= 2);
+  for (const [w, h] of sizes) assert.ok(w === h && ['192', '384'].includes(w), 'portraits at 1x or 2x only: ' + w);
   for (const m of css.matchAll(/background-size: (\d+)px (\d+)px/g)) assert.ok([384, 768].includes(Number(m[1])) && Number(m[2]) * 2 === Number(m[1]), m[0]);
 });
 
