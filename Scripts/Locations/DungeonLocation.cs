@@ -2594,12 +2594,38 @@ public class DungeonLocation : BaseLocation
 
         if (room != null && inRoomMode)
         {
+            // 1.3.9: every room view carries its exits, so a client knows them in a level's first
+            // room, after a teleport or a load, and when the room is drawn again after a fight
+            EmitRoomInfo(room);
             DisplayRoomView(room);
         }
         else
         {
             DisplayFloorOverview();
         }
+    }
+
+    /// <summary>
+    /// GMCP Room.Info for a dungeon room: id, name, floor and its cardinal exits.
+    /// Cheap no-op when GMCP isn't negotiated.
+    /// </summary>
+    private void EmitRoomInfo(DungeonRoom room)
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsActive)
+            return;
+        var exits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (room.Exits != null)
+        {
+            foreach (var (direction, exit) in room.Exits)
+                exits[direction.ToString().ToLowerInvariant()] = exit.TargetRoomId;
+        }
+        UsurperRemake.Server.GmcpBridge.Emit("Room.Info", new
+        {
+            num = room.Id,
+            name = room.Name ?? "Dungeon Room",
+            area = $"Dungeon Floor {currentDungeonLevel}",
+            exits
+        });
     }
 
     /// <summary>
@@ -4957,24 +4983,8 @@ public class DungeonLocation : BaseLocation
 
         // v0.60.3: GMCP Room.Info push so MUD client mappers (Mudlet etc.) see the
         // new room with its real cardinal exits the moment the player crosses the
-        // threshold, not just at top-level location entry. Cheap no-op when GMCP
-        // isn't negotiated.
-        if (UsurperRemake.Server.GmcpBridge.IsActive)
-        {
-            var exits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (targetRoom.Exits != null)
-            {
-                foreach (var (direction, exit) in targetRoom.Exits)
-                    exits[direction.ToString().ToLowerInvariant()] = exit.TargetRoomId;
-            }
-            UsurperRemake.Server.GmcpBridge.Emit("Room.Info", new
-            {
-                num = targetRoom.Id,
-                name = targetRoom.Name ?? "Dungeon Room",
-                area = $"Dungeon Floor {currentDungeonLevel}",
-                exits
-            });
-        }
+        // threshold, not just at top-level location entry.
+        EmitRoomInfo(targetRoom);
 
         // Auto-clear rooms without monsters on entry (even if already explored from
         // knowledge events or floor respawn — IsCleared resets on respawn but IsExplored persists)
