@@ -1,0 +1,360 @@
+/* The Chronicle view of /play/ (2.0 phase 2): a dark bound book in an iron frame. Every rule is scoped to .chron or
+   body.chron, so the Classic view is untouched. Values follow the approved reference pages (SPEC.md, sections 2 and 3):
+   desktop over 1180px, tablet 601 to 1180px, phone 600px and under. Colours are text on the page at 5.78:1 or more. */
+
+.chron {
+  --page: #1a1612; --page-edge: #120f0c; --rule: #3d362e;
+  --ink-0: #e8e0d0; --ink-1: #d6cdbb; --ink-2: #c4baa6; --ink-3: #b3a993; --ink-4: #9a9182;
+  --rubric: #e8706a; --rubric-cap: #c9a45a; --hp-ink: #c43a32; --st-ink: #c9a45a; --foe-ink: #8a847a; --iron-hi: #6a645a;
+  --book: 'EB Garamond', Garamond, Georgia, serif;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .91 0 0 0 0 .84 0 0 0 0 .72 0 0 0 1.4 -.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* The stage holds the book. The terminal stays in the page with its keyboard, out of sight. */
+body.chron .stage { padding: 0; gap: 0; align-items: stretch; min-height: 0; }
+body.chron .vitals { display: none; }
+body.chron .term-scroll { position: absolute; top: 0; left: 0; width: 1px; height: 1px; flex: none; padding: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+body.chron #view-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+.chron { flex: 1; min-height: 0; min-width: 0; width: 100%; overflow: hidden; padding: 14px; color: var(--ink-0); font-family: var(--book);
+  background: radial-gradient(ellipse at 50% 40%, #15120f, var(--bg-ink) 70%); }
+.chron * { box-sizing: border-box; }
+.chron button { font: inherit; color: inherit; }
+
+/* Iron frame, the spread and the pages */
+.chron .book { height: 100%; padding: 12px; border-radius: 4px; position: relative;
+  background: linear-gradient(160deg, #57524a 0%, #34312c 18%, #4a4640 46%, #2c2925 70%, #45413a 100%);
+  box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 3px rgba(0,0,0,.6), 0 20px 50px rgba(0,0,0,.7); }
+.chron .book::before { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 4px;
+  background:
+    radial-gradient(circle at 7px 7px, #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 7px) 7px, #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px),
+    radial-gradient(circle at 7px calc(100% - 7px), #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 7px) calc(100% - 7px), #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px),
+    radial-gradient(circle at 50% 7px, #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px),
+    radial-gradient(circle at 50% calc(100% - 7px), #8a847a 0 2px, #1c1a17 2.5px, transparent 3.5px); }
+.chron .spread { height: 100%; display: grid; grid-template-columns: 1fr 1fr; background: #000; box-shadow: 0 0 0 1px #000; }
+.chron .page { position: relative; min-width: 0; min-height: 0; background: var(--page); padding: 20px 40px 18px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.chron .page::before { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .07; pointer-events: none; }
+.chron .page::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.chron .verso::after { background: linear-gradient(90deg, rgba(0,0,0,.35), transparent 6%, transparent 88%, rgba(0,0,0,.55) 100%); }
+.chron .recto::after { background: linear-gradient(90deg, rgba(0,0,0,.6) 0%, transparent 11%, transparent 95%, rgba(0,0,0,.3)); }
+.chron .page > * { position: relative; z-index: 1; }
+/* The terminal has the keyboard: a ring on the right page, since the terminal itself is out of sight */
+.chron.tfocus .recto { outline: 2px solid var(--st-ink); outline-offset: -4px; }
+
+/* Running heads */
+.chron .rh { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+  font-family: var(--display); color: var(--ink-3); font-size: 15px; letter-spacing: .14em; min-height: 26px; }
+.chron .rh .t { color: var(--ink-1); }
+.chron .rh.end { justify-content: flex-end; }
+.chron .text-toggle { margin-left: auto; font-family: var(--display); font-size: 13px; letter-spacing: .1em; color: var(--ink-1); cursor: pointer;
+  border: 1px solid var(--iron); border-radius: 2px; padding: 2px 9px 1px; background: linear-gradient(#211d19, #161310); }
+.chron .text-toggle[aria-pressed="true"] { border-color: var(--st-ink); color: var(--st-ink); box-shadow: inset 0 0 0 1px var(--st-ink); }
+.chron .only-phone { display: none; }
+
+/* The plate: pixel art at whole number scales, cropped by its box, never stretched */
+.chron .plate { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: auto 0 0; }
+.chron[data-layout="text"] .plate { margin: auto 0; }
+.chron .plate-row { display: flex; align-items: center; width: 100%; justify-content: center; }
+.chron .frame { position: relative; padding: 5px; flex: 1 1 auto; min-width: 0;
+  background: linear-gradient(150deg, #615b51, #2c2925 32%, #4a4640 64%, #24211d); box-shadow: 0 0 0 1px #000, 0 8px 22px rgba(0,0,0,.55); }
+.chron .frame.fp { flex: none; }
+.chron .frame::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 2.5px 2.5px, #a89f90 0 1.4px, transparent 2px),
+    radial-gradient(circle at calc(100% - 2.5px) 2.5px, #a89f90 0 1.4px, transparent 2px),
+    radial-gradient(circle at 2.5px calc(100% - 2.5px), #a89f90 0 1.4px, transparent 2px),
+    radial-gradient(circle at calc(100% - 2.5px) calc(100% - 2.5px), #a89f90 0 1.4px, transparent 2px); }
+.chron .scene { position: relative; height: 240px; background-color: #000; background-repeat: no-repeat; background-position: center; background-size: 768px 384px;
+  image-rendering: pixelated; box-shadow: inset 0 0 0 1px rgba(0,0,0,.9), inset 0 0 60px rgba(0,0,0,.65); overflow: hidden; }
+.chron .scene::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 55%, transparent 45%, rgba(0,0,0,.45) 100%); }
+.chron .scene.blank { background: radial-gradient(ellipse at 50% 58%, #2c261f, #120f0c 72%); }
+.chron .scene.s-fight { height: 344px; }
+.chron .scene.s-room { height: 320px; background-position: center 55%; }
+.chron .scene.s-street { height: 320px; background-position: center 60%; }
+.chron .portrait { width: 384px; max-width: 100%; height: 384px; margin: 0 auto; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 58%, #2c261f, #120f0c 72%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.9), inset 0 0 50px rgba(0,0,0,.6); }
+.chron .portrait img { width: 384px; height: 384px; image-rendering: pixelated; }
+.chron .plate-cap { font-family: var(--display); color: var(--ink-2); font-size: 15px; letter-spacing: .16em; text-align: center; }
+.chron .plate-cap:empty { display: none; }
+.chron .plate-cap::before, .chron .plate-cap::after { content: ""; display: inline-block; width: 34px; height: 1px; background: var(--rule); vertical-align: middle; margin: 0 12px; }
+
+/* Panels: party and enemies */
+.chron .hud { display: grid; grid-template-columns: 1fr; gap: 7px; width: 100%; margin-bottom: auto; }
+.chron .hud.h-fight { grid-template-columns: 1fr 1fr; gap: 14px; }
+.chron .hud:empty { display: none; }
+.chron .hcol { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.chron .kh { font-family: var(--display); color: var(--ink-3); font-size: 13px; letter-spacing: .16em; }
+.chron .card { border: 1px solid var(--iron); background: rgba(0,0,0,.24); padding: 8px 11px; display: flex; flex-direction: column; gap: 7px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03); min-width: 0; }
+.chron .card.out { border-style: dashed; background: transparent; }
+.chron .card.out .nm { text-decoration: line-through 1px; color: var(--ink-3); }
+.chron .vit, .chron .tgt { display: grid; grid-template-columns: 1fr; gap: 4px; min-width: 0; }
+.chron .who { font-family: var(--display); font-size: 17px; letter-spacing: .05em; color: var(--ink-0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chron .who small { font-family: var(--book); font-style: italic; font-size: 13.5px; letter-spacing: 0; color: var(--ink-3); margin-left: 8px; }
+.chron .m { display: grid; grid-template-columns: 30px minmax(30px, 1fr) auto; gap: 8px; align-items: center; font-family: var(--display); font-size: 13px; letter-spacing: .08em; color: var(--ink-3); min-width: 0; }
+.chron .m b { font-family: var(--term); font-size: 14px; font-weight: 400; letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--ink-1); }
+.chron .rule { height: 3px; background: var(--rule); position: relative; min-width: 30px; }
+.chron .rule > i { position: absolute; inset: 0 auto 0 0; background: var(--hp-ink); }
+.chron .rule.st > i { background: var(--st-ink); }
+.chron .rule.foe > i { background: var(--foe-ink); }
+.chron .cchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chron .chipc { display: inline-block; border: 1px solid var(--iron-hi); border-radius: 2px; padding: 1px 7px 0; background: rgba(0,0,0,.25);
+  font-family: var(--display); font-size: 13px; letter-spacing: .05em; color: var(--ink-1); line-height: 1.5; white-space: nowrap; }
+
+/* The right page body */
+.chron .cbody { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
+.chron .screen { margin: 0; flex: 1; min-height: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--term);
+  font-size: clamp(13px, calc(100cqi / 49), 15px); line-height: 1.38; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+body.chron-read .chron .screen { font-size: 15px; }
+.chron .screen .ln { display: block; min-height: 1.38em; }
+.chron .screen.mini { flex: none; overflow: visible; font-size: clamp(13px, calc(100cqi / 52), 14px); }
+.chron .screen:focus-visible { outline: 2px solid var(--st-ink); outline-offset: 2px; }
+.chron .k-gold { color: var(--st-ink); } .chron .k-grn { color: #8cc46a; } .chron .k-cyn { color: #6cc7d4; } .chron .k-pur { color: #b9a3e0; }
+.chron .k-red { color: var(--rubric); } .chron .k-gry { color: var(--ink-4); } .chron .k-wht { color: var(--ink-0); }
+
+.chron .prose { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.chron .prose.fight { overflow: hidden; }
+.chron .opener { flex: none; padding-bottom: 4px; }
+.chron .chap { margin: 0; font-family: var(--display); font-weight: 400; font-size: 30px; letter-spacing: .04em; color: var(--ink-0); line-height: 1.05; }
+.chron .chap-sub { font-family: var(--display); font-size: 15px; letter-spacing: .16em; color: var(--ink-3); margin: 6px 0 12px; }
+.chron .chap-sub .d { color: var(--rubric); }
+.chron .note { font-style: italic; color: var(--ink-2); font-size: 16px; line-height: 1.35; margin-bottom: 10px; }
+.chron .note .mh { font-family: var(--display); font-style: normal; color: var(--st-ink); letter-spacing: .14em; font-size: 13px; margin-right: 8px; }
+
+/* The fight log: newest line largest at the foot, older lines smaller and quieter */
+.chron .clog { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; --ls: 1.03; }
+.chron .clog > :first-child { margin-top: auto; }
+.chron .ev { line-height: 1.32; margin-top: .18em; overflow-wrap: anywhere; }
+.chron .ev.a4 { font-size: calc(17px * var(--ls)); color: var(--ink-4); }
+.chron .ev.a3 { font-size: calc(18.5px * var(--ls)); color: var(--ink-3); }
+.chron .ev.a2 { font-size: calc(20px * var(--ls)); color: var(--ink-2); }
+.chron .ev.a1 { font-size: calc(23px * var(--ls)); color: var(--ink-1); }
+.chron .ev.a0 { font-size: calc(27px * var(--ls)); color: var(--ink-0); line-height: 1.2; }
+.chron .ev.aside { font-family: var(--term); font-variant-numeric: tabular-nums; letter-spacing: -.01em; font-size: 14px; }
+.chron .rd { font-family: var(--display); letter-spacing: .2em; text-align: center; color: var(--st-ink); margin: .55em 0 .2em; font-size: 18px; }
+.chron .rd::before, .chron .rd::after { content: ""; display: inline-block; width: 46px; height: 1px; background: var(--st-ink); vertical-align: middle; margin: 0 12px; }
+
+/* Exit compass: a solid cell with its state word for each exit the room sends, a dashed dim cell otherwise */
+.chron .cbody.b-room { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 18px; }
+.chron .cbody.b-room > .prose { max-height: 100%; }
+.chron .compcard { flex: none; align-items: center; }
+.chron .ccomp { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 46px); gap: 5px; }
+.chron .cdir { display: grid; place-items: center; align-content: center; border: 1px dashed var(--rule); color: var(--ink-4); font-family: var(--display); font-size: 18px; line-height: 1; }
+.chron .cdir.dn { grid-column: 2; grid-row: 1; } .chron .cdir.dw { grid-column: 1; grid-row: 2; } .chron .cdir.mid { grid-column: 2; grid-row: 2; }
+.chron .cdir.de { grid-column: 3; grid-row: 2; } .chron .cdir.ds { grid-column: 2; grid-row: 3; }
+.chron .cdir.on { border: 1px solid var(--iron-hi); color: var(--ink-0); background: rgba(0,0,0,.32); }
+.chron .cdir small { display: block; margin-top: 3px; font-family: var(--book); font-style: italic; font-size: 13px; letter-spacing: 0; color: var(--ink-2); }
+.chron .cdir.mid { border: 0; background: none; font-family: var(--book); font-style: italic; font-size: 14px; color: var(--ink-3); }
+
+/* The dock: key groups, the Enter key, the footer */
+.chron .dock { flex: none; display: flex; flex-direction: column; gap: 10px; margin-top: auto; position: relative; z-index: 2; }
+.chron .kgroups { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.chron .kgroups[hidden] { display: none; }
+.chron .kgroup .kh { margin-bottom: 5px; }
+.chron .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chron .khint { margin-top: 5px; font-style: italic; font-size: 14px; color: var(--ink-3); }
+.chron[data-layout="fight"] .kgroups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.chron[data-layout="fight"] .kgroups[hidden] { display: none; }
+.chron[data-layout="fight"] .kgroup, .chron[data-layout="fight"] .kgroup .grid { display: contents; }
+.chron[data-layout="fight"] .kgroup .kh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.chron[data-layout="fight"] .khint { grid-column: 1 / -1; margin-top: 0; }
+.chron .kc { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 9px; width: 100%; min-height: 42px; padding: 5px 10px 5px 5px; text-align: left; cursor: pointer;
+  border: 1px solid var(--iron); border-radius: 3px; background: linear-gradient(#211d19, #161310); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 0 #000; }
+.chron .kc .cap { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--iron-hi); border-radius: 2px;
+  background: linear-gradient(#0f0d0b, #1a1714); box-shadow: inset 0 1px 2px rgba(0,0,0,.8), 0 0 0 1px #000;
+  font-family: var(--display); font-size: 21px; line-height: 1; color: var(--rubric-cap); padding-top: 2px; }
+.chron .kc .cap.swash { font-size: 17px; justify-items: start; padding: 0 0 2px 1px; }
+.chron .kc .cap.wide { width: auto; min-width: 30px; padding: 0 3px; font-family: var(--term); font-size: 13px; letter-spacing: -.02em; }
+.chron .kc .lb { font-family: var(--display); font-size: 15px; letter-spacing: .04em; color: var(--ink-0); line-height: 1.12; min-width: 0; overflow-wrap: anywhere; }
+.chron .kc:hover { border-color: var(--iron-hi); background: linear-gradient(#2a2520, #1c1814); }
+.chron .kc:hover .cap { border-color: #8a847a; }
+.chron .kc.off { border-style: dashed; background: transparent; box-shadow: none; cursor: default; }
+.chron .kc.off .cap { color: var(--ink-4); }
+.chron .kc.off .lb { font-family: var(--book); font-style: italic; letter-spacing: 0; color: var(--ink-4); }
+.chron .enterbar { display: flex; justify-content: flex-end; border-top: 1px solid var(--rule); padding-top: 10px; }
+.chron .enterbar[hidden] { display: none; }
+.chron .kc.enter { width: auto; grid-template-columns: auto auto; gap: 10px; padding-right: 14px; }
+.chron .kc.enter .cap { width: auto; padding: 2px 9px 0; font-family: var(--term); font-size: 14px; color: var(--st-ink); }
+.chron button:focus-visible, .chron [tabindex]:focus-visible { outline: 2px solid var(--st-ink); outline-offset: 2px; }
+
+.chron .foot { display: flex; flex-wrap: wrap; align-items: baseline; row-gap: 2px; border-top: 3px double var(--rule); padding-top: 8px;
+  font-family: var(--term); font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.chron .foot:empty { display: none; }
+.chron .foot .f { white-space: nowrap; }
+.chron .foot .fl { margin-right: .5em; }
+.chron .foot .sep { margin: 0 7px; }
+.chron .foot b { font-weight: 400; color: var(--ink-0); }
+.chron .foot .brk { flex-basis: 100%; height: 0; }
+.chron .foot .bn, .chron .foot .sn { display: none; }
+
+/* Tablet: still a spread, tighter measures */
+@media (max-width: 1180px) {
+  .chron { padding: 10px; }
+  .chron .screen { font-size: clamp(12px, calc(100cqi / 49), 15px); }
+  .chron .screen.mini { font-size: clamp(12px, calc(100cqi / 52), 14px); }
+  .chron .kc .cap.wide { font-size: 12px; }
+  .chron .book { padding: 10px; }
+  .chron .page { padding: 16px 26px 14px; gap: 10px; }
+  .chron .rh { font-size: 13px; }
+  .chron .scene { height: 200px; }
+  .chron .scene.s-fight { height: 300px; }
+  .chron .scene.s-room, .chron .scene.s-street { height: 264px; }
+  .chron .portrait, .chron .portrait img { width: 192px; height: 192px; }
+  .chron .plate-cap { font-size: 13px; }
+  .chron .hud.h-fight { gap: 10px; }
+  .chron .card { padding: 6px 8px; gap: 5px; }
+  .chron .who { font-size: 15px; }
+  .chron .chap { font-size: 25px; }
+  .chron .chap-sub { font-size: 13px; margin-bottom: 8px; }
+  .chron .note { font-size: 14.5px; }
+  .chron .clog { --ls: .89; }
+  .chron .ev.aside { font-size: 13.5px; }
+  .chron .rd { font-size: 15.5px; }
+  .chron .ccomp { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 40px); gap: 4px; }
+  .chron .cdir small { font-size: 12px; }
+  .chron .grid, .chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid, .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .chron .kc { grid-template-columns: auto 1fr; gap: 7px; min-height: 38px; padding: 4px 8px 4px 4px; }
+  .chron .kc .cap { width: 26px; height: 26px; font-size: 18px; }
+  .chron .kc .cap.swash { font-size: 15px; }
+  .chron .kc .lb { font-size: 13.5px; letter-spacing: .03em; }
+  .chron .foot { font-size: 12.5px; padding-top: 6px; }
+  .chron .foot .bd, .chron .foot .sd { display: none; }
+  .chron .foot .bn { display: block; }
+  .chron .foot .sn { display: inline; }
+  .chron .dock { gap: 7px; }
+}
+
+/* Phone: one page that scrolls, the dock held at the bottom */
+@media (max-width: 600px) {
+  .chron { padding: 6px; overflow-y: auto; }
+  .chron .book { padding: 6px; height: auto; min-height: 100%; display: flex; flex-direction: column; }
+  .chron .book::before { display: none; }
+  .chron .spread { flex: 1 0 auto; height: auto; min-height: 0; display: flex; flex-direction: column; gap: 9px; background: var(--page); padding: 10px 14px 12px; position: relative; }
+  .chron .spread::before { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .07; pointer-events: none; }
+  .chron .page { display: contents; }
+  .chron .page::before, .chron .page::after { display: none; }
+  .chron .verso .rh { order: 1; font-size: 13px; }
+  .chron .recto .rh { display: none; }
+  .chron .only-phone { display: block; }
+  .chron .hide-phone { display: none !important; }
+  .chron .plate { order: 2; gap: 6px; margin: 0; }
+  .chron .hud { order: 3; margin: 0; }
+  .chron .cbody { order: 4; flex: none; min-height: 40vh; }
+  .chron .dock { order: 5; position: sticky; bottom: 0; z-index: 5; margin: auto -14px -12px; padding: 6px 10px 10px; gap: 6px;
+    background: var(--page-edge); border-top: 3px double var(--rule); }
+  .chron .dock > .foot { order: 1; border-top: 0; padding-top: 0; font-size: 12px; }
+  .chron .dock > .kgroups, .chron .dock > .enterbar { order: 2; border: 0; padding: 0; }
+  .chron .frame { padding: 4px; }
+  .chron .scene, .chron .scene.s-fight { height: 104px; background-size: 384px 192px; }
+  .chron .scene.s-room { height: 150px; }
+  .chron .scene.s-street { height: 132px; }
+  .chron .portrait, .chron .portrait img { width: 192px; height: 192px; }
+  .chron .plate-cap { font-size: 12px; letter-spacing: .12em; }
+  .chron .plate-cap::before, .chron .plate-cap::after { width: 18px; margin: 0 8px; }
+  .chron .hud.h-fight { gap: 6px; }
+  .chron .hcol { gap: 4px; }
+  .chron .card { padding: 4px 6px; gap: 3px; }
+  .chron .who { font-size: 13.5px; }
+  .chron .who small { font-size: 12px; }
+  .chron .m { grid-template-columns: 26px minmax(14px, 1fr) auto; gap: 4px; font-size: 12px; }
+  .chron .m b { font-size: 12px; }
+  .chron .chipc { font-size: 12px; }
+  .chron .chap { font-size: 21px; }
+  .chron .chap-sub { font-size: 12px; margin: 3px 0 6px; letter-spacing: .12em; }
+  .chron .note { font-size: 14px; }
+  .chron .screen { font-size: 12px; overflow: visible; }
+  .chron .prose, .chron .prose.fight { overflow: visible; }
+  .chron .clog { --ls: .95; }
+  .chron .ev.a4, .chron .ev.a3 { font-size: 14px; } .chron .ev.a2 { font-size: 14.5px; } .chron .ev.a1 { font-size: 15.5px; } .chron .ev.a0 { font-size: 17.5px; }
+  .chron .ev.aside { font-size: 12.5px; }
+  .chron .rd { font-size: 14px; }
+  .chron .ccomp { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 30px); gap: 3px; }
+  .chron .cdir { font-size: 13px; } .chron .cdir small { font-size: 12px; margin-top: 1px; } .chron .cdir.mid { font-size: 12px; }
+  .chron .compcard { align-self: stretch; }
+  .chron .grid, .chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid, .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .chron .cbody.b-room { display: flex; }
+  .chron .kc { grid-template-columns: 1fr; justify-items: center; gap: 3px; min-height: 48px; padding: 4px 2px; text-align: center; }
+  .chron .kc .cap { width: 24px; height: 24px; font-size: 16px; }
+  .chron .kc .cap.swash { font-size: 12.5px; }
+  .chron .kc .lb { font-size: 12px; letter-spacing: .02em; }
+  .chron .kc.enter { width: 100%; min-height: 48px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; }
+  .chron .enterbar { justify-content: stretch; }
+  .chron .kc .cap.wide { min-width: 24px; }
+  /* Room keys: three a row, the cap beside its label */
+  .chron[data-layout="room"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chron[data-layout="room"] .kc { grid-template-columns: auto 1fr; justify-items: start; text-align: left; gap: 5px; min-height: 44px; padding: 4px 5px 4px 4px; }
+  .chron[data-layout="room"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
+  /* The fight fills the screen: the log takes what the panels and the dock leave, whole lines only. A fight with
+     more cards than fit scrolls, with the dock held at the bottom. */
+  .chron[data-layout="fight"] .cbody { flex: 1 1 0; min-height: 96px; }
+  .chron[data-layout="fight"] .prose.fight { overflow: hidden; }
+  .chron[data-layout="fight"] .kc { min-height: 44px; padding: 2px; gap: 1px; }
+  .chron[data-layout="fight"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
+  .chron[data-layout="fight"] .kc .cap.wide { width: auto; min-width: 22px; font-size: 12px; }
+}
+
+/* Touch screens: the tap pad sits under the book. On a layout screen the dock holds the keys, so the pad keeps only
+   its fixed row (Enter, Back, Keys, Type), and its keyboard when Keys is on. */
+body.touch.chron .stage { display: flex; flex-direction: column; gap: 0; padding: 0; }
+body.touch.chron .chron { flex: 1 1 auto; }
+body.touch.chron .pad { flex: none; max-height: 42vh; border-left: 0; border-top: 1px solid var(--iron-dark); }
+body.touch.chron.chron-lay .pad:not(.keys-open) .pad-scroll { display: none; }
+body.touch.chron .chron[data-layout="text"] .kgroups, body.touch.chron .chron[data-layout="text"] .enterbar { display: none; }
+
+/* High contrast (html.hc: the "Chronicle, high contrast" view, or the system asking for more contrast): pure black,
+   white text, no art, numbers instead of rules, dashed for disabled, struck through for a missing exit. */
+html.hc .chron { --ink-0: #fff; --ink-1: #fff; --ink-2: #fff; --ink-3: #fff; --ink-4: #fff; --rubric: #fff; --rubric-cap: #ffe14d; --st-ink: #ffe14d; --rule: #fff;
+  --book: var(--mono); background: #000; font-family: var(--mono); font-size: 18px; overflow-y: auto; }
+html.hc .chron .book { background: #000; box-shadow: none; padding: 0; height: auto; min-height: 100%; }
+html.hc .chron .book::before, html.hc .chron .page::before, html.hc .chron .page::after, html.hc .chron .spread::before { display: none; }
+html.hc .chron .spread { background: #000; height: auto; min-height: 100%; box-shadow: none; }
+html.hc .chron .page { background: #000; overflow: visible; padding: 20px 28px; gap: 18px; }
+html.hc .chron .recto { border-left: 2px solid #fff; }
+html.hc .chron .rh, html.hc .chron .plate-cap, html.hc .chron .kh, html.hc .chron .chap-sub, html.hc .chron .who, html.hc .chron .m,
+html.hc .chron .chipc, html.hc .chron .rd, html.hc .chron .cdir, html.hc .chron .kc .lb, html.hc .chron .note .mh { font-family: var(--mono); letter-spacing: 0; font-size: 18px; font-style: normal; color: #fff; }
+html.hc .chron .frame, html.hc .chron .scene, html.hc .chron .portrait, html.hc .chron img { display: none !important; }
+html.hc .chron .plate { margin: 0; align-items: stretch; }
+html.hc .chron .plate-cap { text-align: left; }
+html.hc .chron .plate-cap::before, html.hc .chron .plate-cap::after, html.hc .chron .rd::before, html.hc .chron .rd::after { display: none; }
+html.hc .chron .rule { display: none; }
+html.hc .chron .m { grid-template-columns: auto auto; justify-content: start; }
+html.hc .chron .m b, html.hc .chron .who small, html.hc .chron .foot, html.hc .chron .foot b { color: #fff; font-size: 18px; font-style: normal; }
+html.hc .chron .card { background: #000; border: 2px solid #fff; padding: 10px 12px; }
+html.hc .chron .card.out { border-style: dashed; }
+html.hc .chron .chap { font-family: var(--mono); font-size: 28px; }
+html.hc .chron .screen, html.hc .chron .screen.mini, html.hc .chron .ev, html.hc .chron .ev.aside, html.hc .chron .note { font-family: var(--mono); font-size: 18px; font-style: normal; color: #fff; line-height: 1.45; }
+html.hc .chron .ev.a0 { font-weight: 600; font-size: 20px; }
+html.hc .chron .screen span { color: #fff; }
+html.hc .chron .prose, html.hc .chron .clog, html.hc .chron .screen { overflow: visible; }
+html.hc .chron .cbody { flex: none; }
+html.hc .chron .rd { text-align: left; text-decoration: underline; }
+html.hc .chron .kgroups, html.hc .chron .enterbar, html.hc .chron .foot { border-top: 2px solid #fff; }
+html.hc .chron .grid, html.hc .chron[data-layout] .grid, html.hc .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+html.hc .chron .text-toggle { font-family: var(--mono); font-size: 16px; letter-spacing: 0; background: #000; border: 2px solid #fff; color: #fff; }
+html.hc .chron .text-toggle[aria-pressed="true"] { border-width: 4px; color: #ffe14d; }
+html.hc .chron .kc, html.hc .chron .kc.off { background: #000; border: 2px solid #fff; box-shadow: none; min-height: 48px; grid-template-columns: auto 1fr; gap: 10px; padding: 6px 10px 6px 6px; }
+html.hc .chron .kc.off { border-style: dashed; }
+html.hc .chron .kc .cap { width: 34px; height: 34px; border: 2px solid #fff; background: #000; color: #ffe14d; box-shadow: none; font-family: var(--mono); font-size: 18px; }
+html.hc .chron .kc.enter .cap { width: auto; padding: 0 10px; }
+html.hc .chron .cdir { border: 2px dashed #fff; text-decoration: line-through; }
+html.hc .chron .cdir.on { border-style: solid; text-decoration: none; background: #000; }
+html.hc .chron .cdir.mid { border: 0; text-decoration: none; }
+html.hc .chron .cdir small { color: #fff; font-family: var(--mono); font-style: normal; font-size: 13px; }
+html.hc .chron .ccomp { grid-template-columns: repeat(3, 88px); grid-template-rows: repeat(3, 56px); }
+html.hc .chron button:focus-visible, html.hc .chron [tabindex]:focus-visible, html.hc .chron.tfocus .recto { outline: 4px solid #ffe14d; outline-offset: 3px; }
+html.hc .chron.tfocus .recto { outline-offset: -6px; }
+@media (max-width: 600px) {
+  html.hc .chron .spread { padding: 12px; gap: 14px; }
+  html.hc .chron .dock { background: #000; }
+}
+
+/* A key longer than one letter (AUTO, SPD) widens its cap to fit, at every size and in high contrast */
+.chron .kc .cap.wide { width: auto !important; white-space: nowrap; }
+
+/* No motion in this view; anything added later stops for a reader who asks for less */
+@media (prefers-reduced-motion: reduce) {
+  .chron, .chron * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

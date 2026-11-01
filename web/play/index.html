@@ -7,7 +7,7 @@
     <title data-i18n="play.page_title">Play Usurper Reborn</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231a0a2e'/%3E%3Ctext x='16' y='22' font-family='serif' font-weight='bold' font-size='16' fill='%23ffaa00' text-anchor='middle'%3EUR%3C/text%3E%3Cpolygon points='10,7 16,3 22,7' fill='%23ffaa00'/%3E%3Cpolygon points='12,7 16,4.5 20,7' fill='%231a0a2e'/%3E%3Crect x='11' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3Crect x='15' y='5' width='2' height='4' fill='%23ffaa00'/%3E%3Crect x='19' y='6' width='2' height='3' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IBM+Plex+Mono:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
     <style>
         :root {
@@ -94,6 +94,9 @@
         .chat-ch.tell { color: #cc88ff; }
         .chat-who { color: var(--bone); font-weight: 600; }
         .chat-text { color: #d8d0c0; }
+        .views { display: grid; gap: 10px; }
+        .view-opt { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
+        .view-opt input { accent-color: var(--gold); width: 18px; height: 18px; margin: 0; }
 
         /* Rail: opens the drawer */
         .rail { flex: none; width: var(--rail-w); display: flex; flex-direction: column; gap: 2px; padding: 16px 0; border-left: 1px solid var(--iron-dark); background: var(--bg-ink); }
@@ -171,6 +174,7 @@
             body.touch .vitals { font-size: 14px; }
         }
     </style>
+    <link rel="stylesheet" href="/play/chronicle.css">
 </head>
 <body>
 <header class="top">
@@ -187,6 +191,27 @@
 
 <main class="play">
     <section class="stage">
+        <div class="chron" id="chron" role="region" hidden>
+            <div class="book"><div class="spread">
+                <section class="page verso" id="c-verso">
+                    <header class="rh"><span class="t">Usurper Reborn</span><span class="only-phone" id="c-rh-phone"></span><button id="text-toggle" class="text-toggle" type="button" aria-pressed="false" data-i18n="play.chron.text">Text page</button><button id="classic-back" class="text-toggle" type="button" data-i18n="play.view.classic">Classic</button></header>
+                    <figure class="plate">
+                        <div class="plate-row"><div class="frame" id="c-frame"></div></div>
+                        <figcaption class="plate-cap" id="c-cap"></figcaption>
+                    </figure>
+                    <div class="hud" id="c-hud"></div>
+                </section>
+                <section class="page recto" id="c-recto">
+                    <header class="rh end"><span id="c-rh"></span></header>
+                    <div class="cbody" id="c-body"></div>
+                    <div class="dock" id="c-dock">
+                        <div class="kgroups" id="c-keys"></div>
+                        <div class="enterbar" id="c-enterbar" hidden></div>
+                        <footer class="foot" id="c-foot"></footer>
+                    </div>
+                </section>
+            </div></div>
+        </div>
         <div class="vitals" id="vitals">
             <span class="meter" id="hp-meter" hidden><span class="label" data-i18n="play.hp">HP</span><span class="bar"><i id="hp-fill"></i></span><span id="hp-num"></span></span>
             <span class="meter" id="mp-meter" hidden><span class="label" data-i18n="play.mp">MP</span><span class="bar mp"><i id="mp-fill"></i></span><span id="mp-num"></span></span>
@@ -211,6 +236,7 @@
         <div class="tabs" role="tablist">
             <button class="tab" type="button" role="tab" id="tab-combat" data-tab="combat" aria-selected="true" data-i18n="play.tab.combat">Combat</button>
             <button class="tab" type="button" role="tab" id="tab-chat" data-tab="chat" aria-selected="false" data-i18n="play.tab.chat">Chat</button>
+            <button class="tab" type="button" role="tab" id="tab-view" data-tab="view" aria-selected="false" data-i18n="play.view.label">View</button>
             <button class="tab-close" type="button" id="drawer-close" data-i18n="play.close">Close</button>
         </div>
         <div class="pane" id="pane-combat" role="tabpanel">
@@ -226,6 +252,14 @@
             <div class="result" id="combat-result" hidden></div>
             <div class="log" id="combat-log"></div>
         </div>
+        <div class="pane" id="pane-view" role="tabpanel" hidden>
+            <p class="hint" data-i18n="play.view.hint">Classic is the terminal page. Chronicle draws the game as a book; the terminal keeps working underneath it. The choice is kept in this browser.</p>
+            <div class="views" id="view-choice" role="radiogroup">
+                <label class="view-opt"><input type="radio" name="play-view" value="classic"> <span data-i18n="play.view.classic">Classic</span></label>
+                <label class="view-opt"><input type="radio" name="play-view" value="chronicle"> <span data-i18n="play.view.chronicle">Chronicle</span></label>
+                <label class="view-opt"><input type="radio" name="play-view" value="contrast"> <span data-i18n="play.view.contrast">Chronicle, high contrast</span></label>
+            </div>
+        </div>
         <div class="pane" id="pane-chat" role="tabpanel" hidden>
             <p class="hint" data-i18n="play.chat.hint">Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game to see the last 50 messages, your own included.</p>
             <div class="chat" id="chat-list"></div>
@@ -235,6 +269,7 @@
     <nav class="rail" id="rail" aria-label="Panels" hidden>
         <button type="button" id="rail-combat" data-tab="combat" aria-pressed="false" data-i18n="play.tab.combat">Combat</button>
         <button type="button" id="rail-chat" data-tab="chat" aria-pressed="false" data-i18n="play.tab.chat">Chat</button>
+        <button type="button" id="rail-view" data-tab="view" aria-pressed="false" data-i18n="play.view.label">View</button>
     </nav>
 </main>
 
@@ -267,8 +302,11 @@
         fitBtn.setAttribute('aria-label', t('play.fit.bigger'));
         fitBtn.setAttribute('title', t('play.fit.bigger'));
         document.getElementById('pad').setAttribute('aria-label', t('play.pad.region'));
+        document.getElementById('view-choice').setAttribute('aria-label', t('play.view.label'));
+        document.getElementById('chron').setAttribute('aria-label', t('play.view.chronicle'));
         renderAll();
         renderPadNow();
+        renderChronNow();
     }
     function loadLanguage(code) {
         return fetch('/lang/' + code + '.json')
@@ -460,7 +498,7 @@
         openTab = tab;
         var drawer = document.getElementById('drawer');
         drawer.hidden = !tab;
-        ['combat', 'chat'].forEach(function (name) {
+        ['combat', 'chat', 'view'].forEach(function (name) {
             var on = tab === name;
             document.getElementById('pane-' + name).hidden = !on;
             document.getElementById('tab-' + name).setAttribute('aria-selected', on ? 'true' : 'false');
@@ -475,7 +513,7 @@
         if (isTouch()) queueFit();
     }
     function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal && !isTouch()) terminal.focus(); }
-    ['combat', 'chat'].forEach(function (name) {
+    ['combat', 'chat', 'view'].forEach(function (name) {
         document.getElementById('rail-' + name).addEventListener('click', function () { toggleTab(name); });
         document.getElementById('tab-' + name).addEventListener('click', function () { setDrawer(name); });
     });
@@ -490,7 +528,8 @@
             return {
                 name: str(u.name, 60), level: fin(u.level),
                 hp: fin(u.hp), maxHp: fin(u.maxHp),
-                isBoss: u.isBoss === true, alive: u.alive !== false, isAlive: u.isAlive !== false, downed: u.downed === true
+                isBoss: u.isBoss === true, alive: u.alive !== false, isAlive: u.isAlive !== false, downed: u.downed === true,
+                isPlayer: u.isPlayer === true
             };
         });
     }
@@ -502,10 +541,12 @@
                 // sp is the Stamina stat, not the fight stamina, so it is not read.
                 state.vitals = { hp: fin(d.hp), maxHp: fin(d.maxHp), mp: fin(d.mp), maxMp: fin(d.maxMp), combatSp: fin(d.combatSp), maxCombatSp: fin(d.maxCombatSp) };
                 renderVitals();
+                chronFrame();
                 break;
             case 'Char.Status':
-                state.status = { level: fin(d.level), gold: fin(d.gold) };
+                state.status = { level: fin(d.level), gold: fin(d.gold), xp: fin(d.xp), name: str(d.name, 60), cls: str(d['class'], 30) };
                 renderVitals();
+                chronFrame();
                 break;
             case 'Room.Info':
                 state.room = str(d.name, 80);
@@ -513,6 +554,7 @@
                 roomEnter = Object.keys(state.exits).length ? enterCount : -1;
                 renderVitals();
                 schedulePad();
+                chronRoomInfo(d);
                 break;
             case 'Char.Combat.Start':
                 state.inCombat = true;
@@ -523,18 +565,22 @@
                 state.death = null;
                 state.log = [];
                 renderCombat();
+                setLayout('fight');
                 if (openTab === 'combat') break;
-                if (drawerBeside()) setDrawer('combat');
+                // The Chronicle fight layout shows the same panels, so there the drawer does not open on its own.
+                if (drawerBeside() && !chronOn()) setDrawer('combat');
                 else document.getElementById('rail-combat').classList.add('new');
                 break;
             case 'Char.Combat.Enemies':
                 state.enemies = units(d.enemies, 30);
                 state.round = fin(d.round);
                 renderCombat();
+                chronFrame();
                 break;
             case 'Char.Combat.Party':
                 state.party = units(d.members, 30);
                 renderCombat();
+                chronFrame();
                 break;
             case 'Char.Combat.Killed':
                 // The game sends no enemy update after the killing blow, so the first living
@@ -549,21 +595,30 @@
                 state.log.push(str(d.name, 60));
                 if (state.log.length > LOG_MAX) state.log.shift();
                 renderCombat();
+                chronFrame();
                 break;
             case 'Char.Combat.End':
                 state.inCombat = false;
                 state.result = { outcome: str(d.outcome, 40), kills: fin(d.kills), xpGained: fin(d.xpGained), goldGained: fin(d.goldGained) };
                 renderCombat();
+                setLayout('text');
                 break;
             case 'Char.Death':
                 state.death = { killer: str(d.killer, 60) };
                 renderCombat();
+                chronFrame();
                 break;
             case 'Comm.Channel.Text':
                 state.chat.push({ channel: str(d.channel, 20).toLowerCase(), talker: str(d.talker, 60), text: str(d.text, 1000) });
                 if (state.chat.length > CHAT_MAX) state.chat.shift();
                 if (openTab === 'chat') renderChat();
                 else document.getElementById('rail-chat').classList.add('new');
+                break;
+            case 'Client.Menu':
+                chronMenu(d);
+                break;
+            case 'Room.Detail':
+                chronDetail(d);
                 break;
             default:
                 break;
@@ -603,6 +658,7 @@
 
     function fitTerminal() {
         if (!terminal) return;
+        if (chronOn()) { chronFit(); return; }
         var touch = applyTouch();
         var scroll = document.getElementById('term-scroll');
         var box = document.getElementById('terminal');
@@ -685,7 +741,7 @@
         if (!ws || ws.readyState !== 1) return;
         ws.send(data);
         // Whatever the game prints after an Enter is the next screen, so the pad reads only below it.
-        if (typeof data === 'string' && data.indexOf('\r') !== -1) enterCount++;
+        if (typeof data === 'string' && data.indexOf('\r') !== -1) { enterCount++; drawStarted(1500); }
         if (typeof data === 'string' && data.indexOf('\r') !== -1 && terminal) {
             try {
                 if (inputMark) inputMark.dispose();
@@ -805,6 +861,7 @@
         var p = promptOf(rows, cmds);
         document.getElementById('pad-enter').classList.toggle('hot', p.kind === 'enter');
         document.getElementById('pad-keys').setAttribute('aria-pressed', padKeys ? 'true' : 'false');
+        document.getElementById('pad').classList.toggle('keys-open', padKeys);
         if (padKeys) { renderKeyboard(box); return; }
         if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
         // The compass shows only on the room screen itself: a menu drawn since the last Enter, no fight
@@ -888,6 +945,649 @@
         fitTerminal();
     });
 
+    // ---- Chronicle: the book view beside Classic. Classic (the terminal page above) is the default; the choice is
+    // kept per browser as playView. The terminal keeps every byte and the keyboard in both views: in Chronicle it sits
+    // out of sight but stays in the page, never hidden from assistive tech, and the book draws what it holds. That is
+    // the game's own text page on every screen, or a layout for the fight, a dungeon room or Main Street while their
+    // GMCP data says that screen is up. A panel with no data stays out; nothing in the book is invented.
+    var VIEWS = ['classic', 'chronicle', 'contrast'];
+    var view = 'classic';
+    try { var savedView = localStorage.getItem('playView'); if (VIEWS.indexOf(savedView) > 0) view = savedView; } catch (e) {}
+    var CHRON_ROWS = 50, LOG_LINES = 16;
+    var chron = {
+        layout: 'text',   // text, fight, room or street, from the GMCP frames
+        textOnly: false,  // the Text page button: the game's text on every screen
+        menu: null,       // the last Client.Menu
+        detail: null,     // the last Room.Detail
+        place: null,      // Room.Info: num (a town location id) and whether area names a dungeon floor
+        rows: [],         // the terminal screen as last read: one list of {t, c} runs per row
+        start: 0,         // the row where the current screen begins (after the last Enter or prompt)
+        cursorText: '',   // the row the cursor is on
+        seq: 0,           // draws so far: each Enter sent and each screen clear starts one
+        open: false,      // the current draw has not ended yet
+        menuAt: -1,       // the draw each frame arrived in
+        detailAt: -1
+    };
+    var chronTimer = 0, drawTimer = 0;
+    var STREET = { main_street: 1, main_street_classic: 1 }, FIGHT = { combat: 1, combat_pvp: 1 }, DIRS4 = { N: 1, S: 1, E: 1, W: 1 };
+    // Scene art by Room.Info num, the game's location id (GameLocation), which is the same in every language.
+    var TOWN = { 1: 'main-street', 2: 'inn', 4: 'temple', 5: 'weapon-shop', 8: 'dungeon', 19: 'bank', 21: 'healer', 47: 'temple', 70: 'castle', 504: 'wilderness' };
+    // Portraits by Char.Status class, the CharacterClass name.
+    var CLASSES = ['Alchemist', 'Assassin', 'Barbarian', 'Bard', 'Cleric', 'Jester', 'Magician', 'Paladin', 'Ranger', 'Sage', 'Warrior',
+        'Tidesworn', 'Wavecaller', 'Cyclebreaker', 'Abysswarden', 'Voidreaver', 'MysticShaman'];
+    // The game's 16 colours on the book page: black and grey are the quiet ink, blue reads as cyan, white is body ink.
+    var PAL = ['k-gry', 'k-red', 'k-grn', 'k-gold', 'k-cyn', 'k-pur', 'k-cyn', '', 'k-gry', 'k-red', 'k-grn', 'k-gold', 'k-cyn', 'k-pur', 'k-cyn', 'k-wht'];
+    var KEY_OK = /^[\x21-\x7e]{1,8}$/;
+    var BOX_ONLY = /^[\s─-▟=*+_~-]*$/;
+
+    function chronOn() { return view !== 'classic'; }
+    function layoutNow() { return chron.textOnly ? 'text' : chron.layout; }
+    function prefersContrast() { return window.matchMedia ? window.matchMedia('(prefers-contrast: more)').matches : false; }
+
+    function applyView() {
+        var on = chronOn();
+        document.body.classList.toggle('chron', on);
+        document.documentElement.classList.toggle('hc', on && (view === 'contrast' || prefersContrast()));
+        document.getElementById('chron').hidden = !on;
+        markView();
+        if (on) renderChronNow();
+        else document.body.classList.remove('chron-lay', 'chron-read');
+        fitTerminal();
+        renderPadNow();
+    }
+    function setView(v) {
+        view = VIEWS.indexOf(v) > 0 ? v : 'classic';
+        try { localStorage.setItem('playView', view); } catch (e) {}
+        applyView();
+    }
+    // The switch lives in the View panel of the drawer (its button sits with Combat and Chat), so Classic's top bar and
+    // terminal keep their room; in Chronicle the book's running head also has a Classic button.
+    function markView() {
+        document.querySelectorAll('#view-choice input').forEach(function (r) { r.checked = r.value === view; });
+    }
+    markView();
+    document.querySelectorAll('#view-choice input').forEach(function (r) {
+        r.addEventListener('change', function () { if (this.checked) setView(this.value); });
+    });
+    document.getElementById('classic-back').addEventListener('click', function () { setView('classic'); if (terminal && !isTouch()) terminal.focus(); });
+    document.getElementById('text-toggle').addEventListener('click', function () {
+        chron.textOnly = !chron.textOnly;
+        renderChronNow();
+    });
+
+    // Out of sight the terminal is not fitted: it keeps 80 columns and a fixed height, so a screen the game draws
+    // without clearing still fits, and Classic fits it again when it comes back.
+    function chronFit() {
+        applyTouch();
+        document.body.classList.remove('pad-side');
+        document.body.classList.toggle('chron-read', fitMode === 'read');
+        if (terminal.rows !== CHRON_ROWS || terminal.cols !== COLS) terminal.resize(COLS, CHRON_ROWS);
+        schedulePad();
+        // Read what the terminal already holds, so a switch in the middle of a screen shows it at once, and draw
+        // again since a new size can change how many log lines fit.
+        readScreen();
+        renderChronNow();
+    }
+
+    // A draw starts at each Enter sent and at each screen clear, and ends at the game's prompt or after a quiet
+    // spell. A screen's frames arrive inside its draw, before or after its text. The layout stays up while a draw is
+    // open, so nothing flashes; when it ends, a room or street layout whose frame did not come in it gives way to
+    // the text page. The fight layout lasts from Char.Combat.Start to Char.Combat.End.
+    function drawStarted(wait) {
+        chron.seq++;
+        chron.open = true;
+        drawQuiet(wait);
+    }
+    function drawQuiet(wait) { clearTimeout(drawTimer); drawTimer = setTimeout(drawEnded, wait); }
+    function current(at) { return at === chron.seq; }
+    function drawEnded() {
+        clearTimeout(drawTimer);
+        if (!chron.open) return;
+        chron.open = false;
+        if (chron.layout === 'room' && !current(chron.detailAt)) chron.layout = 'text';
+        if (chron.layout === 'street' && !(chron.menu && STREET[chron.menu.screen] && current(chron.menuAt))) chron.layout = 'text';
+        renderChronNow();
+    }
+    function afterWrite(seq) {
+        if (!chronOn()) return;
+        clearTimeout(chronTimer);
+        chronTimer = setTimeout(function () {
+            readScreen();
+            if (chron.open && seq === chron.seq && PREV_PROMPT.test(chron.cursorText)) drawEnded();
+            else renderChronNow();
+        }, 40);
+    }
+    function setLayout(l) { chron.layout = l; renderChronNow(); }
+    function chronFrame() { renderChronNow(); }
+    function chronReset() {
+        chron.layout = 'text'; chron.menu = null; chron.detail = null; chron.place = null;
+        chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1;
+        clearTimeout(drawTimer); clearTimeout(chronTimer);
+        renderChronNow();
+    }
+
+    // ---- The frames the book reads, checked by type like every other GMCP value ----
+    function readMenu(d) {
+        var groups = [];
+        (Array.isArray(d.groups) ? d.groups : []).slice(0, 8).forEach(function (g) {
+            g = obj(g);
+            if (!g) return;
+            var items = [];
+            (Array.isArray(g.items) ? g.items : []).slice(0, 40).forEach(function (it) {
+                it = obj(it);
+                var key = it && typeof it.key === 'string' ? it.key : '';
+                if (KEY_OK.test(key)) items.push({ key: key, label: str(it.label, 60), enabled: it.enabled !== false });
+            });
+            if (items.length) groups.push({ label: str(g.label, 40), items: items });
+        });
+        var h = obj(d.hint);
+        return { screen: str(d.screen, 40), groups: groups, hint: h ? { text: str(h.text, 200), label: str(h.label, 40) } : null };
+    }
+    function readDetail(d) {
+        var dg = obj(d.danger) || {}, exits = [];
+        (Array.isArray(d.exits) ? d.exits : []).slice(0, 8).forEach(function (x) {
+            x = obj(x);
+            var key = x && typeof x.key === 'string' ? x.key : '';
+            if (DIRS4[key] === 1) exits.push({ key: key, description: str(x.description, 120), state: str(x.state, 20), stateLabel: str(x.stateLabel, 40) });
+        });
+        var status = str(d.status, 20);
+        return {
+            name: str(d.name, 80), level: fin(d.level), theme: str(d.theme, 40), header: str(d.header, 100),
+            rating: fin(dg.rating), max: fin(dg.max), status: status === 'danger' || status === 'cleared' ? status : '',
+            boss: d.boss === true, exits: exits,
+            features: (Array.isArray(d.features) ? d.features : []).slice(0, 12).map(function (f) { return str(f, 60); }).filter(Boolean)
+        };
+    }
+    function chronMenu(d) {
+        chron.menu = readMenu(d);
+        chron.menuAt = chron.seq;
+        var s = chron.menu.screen;
+        if (STREET[s] === 1) setLayout('street');
+        else if (FIGHT[s] === 1 && state.inCombat) setLayout('fight');
+        else if (s === 'dungeon_room' && current(chron.detailAt) && !state.inCombat) setLayout('room');
+        else if (FIGHT[s] !== 1 && s !== 'dungeon_room' && chron.layout !== 'fight') setLayout('text');
+        else renderChronNow();
+    }
+    function chronDetail(d) {
+        chron.detail = readDetail(d);
+        chron.detailAt = chron.seq;
+        if (!state.inCombat) setLayout('room');
+        else renderChronNow();
+    }
+    function chronRoomInfo(d) {
+        chron.place = { num: typeof d.num === 'number' && isFinite(d.num) ? d.num : null, dungeon: /^Dungeon Floor \d{1,4}$/.test(str(d.area, 40)) };
+        // A new place ends a layout that belongs to another: Main Street is location 1, a room is on a dungeon floor.
+        if ((chron.layout === 'street' && chron.place.num !== 1) || (chron.layout === 'room' && !chron.place.dungeon)) setLayout('text');
+        else renderChronNow();
+    }
+
+    // ---- Reading the terminal: each row as runs of text with the game's colour ----
+    function runsOf(line) {
+        var out = [], cur = null, cell;
+        if (!line) return out;
+        if (typeof line.getCell !== 'function') {
+            var plain = typeof line.translateToString === 'function' ? String(line.translateToString(true)) : '';
+            return plain ? [{ t: plain, c: '' }] : out;
+        }
+        var n = Math.min(Number(line.length) || 0, 400);
+        for (var x = 0; x < n; x++) {
+            cell = line.getCell(x, cell);
+            if (!cell || cell.getWidth() === 0) continue;
+            var ch = cell.getChars() || ' ', c = '';
+            if (cell.isFgPalette()) {
+                var i = cell.getFgColor();
+                if (i < 8 && cell.isBold()) i += 8;
+                c = PAL[i] || '';
+            }
+            if (cur && cur.c === c) cur.t += ch;
+            else { cur = { t: ch, c: c }; out.push(cur); }
+        }
+        while (out.length) {
+            var last = out[out.length - 1];
+            last.t = last.t.replace(/\s+$/, '');
+            if (last.t) break;
+            out.pop();
+        }
+        return out;
+    }
+    function readScreen() {
+        var buf = terminal && terminal.buffer && terminal.buffer.active;
+        if (!buf || typeof buf.getLine !== 'function') return;
+        var top = Number(buf.baseY) || 0, cy = Number(buf.cursorY) || 0, rows = [], last = cy;
+        for (var y = 0; y < CHRON_ROWS; y++) {
+            var line = buf.getLine(top + y);
+            if (!line) break;
+            var r = runsOf(line);
+            rows.push(r);
+            if (r.length && y > last) last = y;
+        }
+        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
+        var screen = rowsFromBuffer(buf, mark);
+        chron.rows = rows.slice(0, last + 1);
+        chron.start = Math.max(0, cy - screen.length + 1);
+        chron.cursorText = screen.length ? screen[screen.length - 1] : '';
+    }
+    function segsOf(row) {
+        if (typeof row === 'string') return row ? [{ t: row, c: '' }] : [];
+        if (!Array.isArray(row)) return [];
+        return row.filter(function (r) { return r && typeof r.t === 'string'; })
+            .map(function (r) { return { t: r.t, c: PAL.indexOf(r.c) !== -1 ? r.c : '' }; });
+    }
+    function rowText(segs) { return segs.map(function (r) { return r.t; }).join(''); }
+    // Draws the book from rows given as strings or runs, as if the terminal held them (the current screen is all of them).
+    function renderChron(rows) {
+        chron.rows = Array.isArray(rows) ? rows.map(segsOf) : [];
+        chron.start = 0;
+        chron.cursorText = chron.rows.length ? rowText(chron.rows[chron.rows.length - 1]) : '';
+        renderChronNow();
+    }
+
+    // ---- Drawing the book ----
+    function menuFor(lay) {
+        var m = chron.menu;
+        if (!m || !current(chron.menuAt)) return null;
+        if ((lay === 'fight' && FIGHT[m.screen] === 1) || (lay === 'room' && m.screen === 'dungeon_room') || (lay === 'street' && STREET[m.screen] === 1)) return m;
+        return null;
+    }
+    function screenKeys(rows) {
+        var cmds = scanCommands(rows), p = promptOf(rows, cmds);
+        if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
+        return { cmds: cmds, prompt: p };
+    }
+    function sceneOf(lay) {
+        if (lay === 'street') return 'main-street';
+        var p = chron.place;
+        if (!p) return '';
+        if (p.dungeon) return 'dungeon';
+        return p.num !== null && Object.prototype.hasOwnProperty.call(TOWN, p.num) ? TOWN[p.num] : '';
+    }
+    function portraitOf() {
+        var c = state.status ? state.status.cls : '';
+        if (CLASSES.indexOf(c) === -1) return '';
+        return c === 'MysticShaman' ? 'mystic-shaman' : c.toLowerCase();
+    }
+    function inRoom(lay) { return (lay === 'room' || lay === 'fight') && chron.detail && chron.place && chron.place.dungeon; }
+
+    // A redraw replaces the text page and the keys, so the element that had focus is found again in the new ones, and
+    // a reader scrolled back in the text page stays where they were.
+    function focusMark() {
+        var a = document.activeElement;
+        if (!a || typeof a.closest !== 'function' || !a.closest('.chron')) return null;
+        if (a.getAttribute('id') === 'c-screen') return { screen: true };
+        if (a.classList.contains('kc')) return { key: a.getAttribute('data-key') };
+        return null;
+    }
+    function focusAgain(mark) {
+        if (!mark) return;
+        var target = null;
+        if (mark.screen) target = document.getElementById('c-screen');
+        else document.querySelectorAll('.chron .kc').forEach(function (b) { if (!target && b.getAttribute('data-key') === mark.key) target = b; });
+        if (target) target.focus({ preventScroll: true });
+        else if (terminal && !isTouch()) terminal.focus();
+    }
+    function renderChronNow() {
+        if (!chronOn()) return;
+        var mark = focusMark();
+        renderChronBook();
+        focusAgain(mark);
+    }
+    function renderChronBook() {
+        var lay = layoutNow();
+        var texts = chron.rows.map(rowText);
+        var screen = texts.slice(chron.start);
+        var menu = menuFor(lay), keys = screenKeys(screen), known = Object.create(null);
+        (menu ? [].concat.apply([], menu.groups.map(function (g) { return g.items; })) : keys.cmds).forEach(function (c) { known[c.key.toUpperCase()] = 1; });
+        document.getElementById('chron').setAttribute('data-layout', lay);
+        document.body.classList.toggle('chron-lay', lay !== 'text');
+        document.getElementById('text-toggle').setAttribute('aria-pressed', chron.textOnly ? 'true' : 'false');
+        renderPlate(lay);
+        renderHud(lay);
+        renderBody(lay, known);
+        renderDock(menu, keys, screen);
+        renderFoot();
+    }
+
+    function renderPlate(lay) {
+        var frame = document.getElementById('c-frame'), d = chron.detail, where = state.room || '';
+        var scene = sceneOf(lay), portrait = lay === 'text' && !scene ? portraitOf() : '';
+        var cap = inRoom(lay) ? t('play.chron.plate_level', [d.theme || where, num(d.level)])
+            : portrait ? t('play.chron.plate', [state.status.name || where])
+            : where ? t('play.chron.plate', [where]) : '';
+        clear(frame);
+        frame.className = 'frame' + (portrait ? ' fp' : '');
+        if (portrait) {
+            var box = el('div', 'portrait'), img = el('img', 'px');
+            img.setAttribute('src', '/play/art/classes/' + portrait + '.png');
+            img.setAttribute('alt', state.status.name);
+            box.appendChild(img);
+            frame.appendChild(box);
+        } else {
+            var sc = el('div', 'scene s-' + lay + (scene ? '' : ' blank'));
+            if (scene) {
+                sc.style.backgroundImage = 'url("/play/art/scenes/' + scene + '.png")';
+                sc.setAttribute('role', 'img');
+                sc.setAttribute('aria-label', cap || where);
+            }
+            frame.appendChild(sc);
+        }
+        document.getElementById('c-cap').textContent = cap;
+        var head = inRoom(lay) ? (d.theme ? d.theme + ' · ' : '') + t('play.chron.sub_level', [num(d.level)]) : where;
+        document.getElementById('c-rh').textContent = head;
+        document.getElementById('c-rh-phone').textContent = lay === 'fight' && state.round > 0 ? t('play.combat.round', [num(state.round)]) : head;
+    }
+
+    function meter(label, cls, a, b) {
+        var m = el('span', 'm'), r = el('span', 'rule' + (cls ? ' ' + cls : '')), i = el('i');
+        i.style.width = pct(a, b) + '%';
+        r.appendChild(i);
+        m.appendChild(el('span', 'ml', label));
+        m.appendChild(r);
+        m.appendChild(el('b', null, num(a) + '/' + num(b)));
+        return m;
+    }
+    function chipsOf(tags) {
+        var ch = el('div', 'cchips');
+        tags.forEach(function (x) { ch.appendChild(el('span', 'chipc', x)); });
+        return ch;
+    }
+    function vitCard(name, note, hp, maxHp, st, tags, out) {
+        var card = el('div', 'card' + (out ? ' out' : '')), vit = el('div', 'vit'), who = el('span', 'who');
+        who.appendChild(el('span', 'nm', name));
+        if (note) who.appendChild(el('small', null, note));
+        vit.appendChild(who);
+        vit.appendChild(meter(t('play.hp'), '', hp, maxHp));
+        if (st) vit.appendChild(meter(t('play.chron.st'), 'st', st[0], st[1]));
+        card.appendChild(vit);
+        if (tags.length) card.appendChild(chipsOf(tags));
+        return card;
+    }
+    function playerSt() {
+        var v = state.vitals;
+        return v && v.maxCombatSp > 0 ? [v.combatSp, v.maxCombatSp] : null;
+    }
+    function renderHud(lay) {
+        var hud = document.getElementById('c-hud'), v = state.vitals, st = state.status;
+        clear(hud);
+        hud.className = 'hud h-' + lay;
+        var me = v ? vitCard(st ? st.name : '', t('play.chron.you'), v.hp, v.maxHp, playerSt(), [], false) : null;
+        if (lay === 'room' || lay === 'street') {
+            if (me) { hud.appendChild(el('div', 'kh hide-phone', t('play.combat.party'))); hud.appendChild(me); }
+            return;
+        }
+        if (lay !== 'fight') return;
+        var pc = el('div', 'hcol'), ec = el('div', 'hcol');
+        pc.appendChild(el('div', 'kh hide-phone', t('play.combat.party')));
+        if (state.party.length) {
+            state.party.forEach(function (u) {
+                var out = !u.isAlive;
+                pc.appendChild(vitCard(u.name, u.isPlayer ? t('play.chron.you') : u.level > 0 ? t('play.combat.level', [num(u.level)]) : '',
+                    u.hp, u.maxHp, u.isPlayer ? playerSt() : null, u.downed ? [t('play.combat.downed')] : out ? [t('play.combat.dead')] : [], out));
+            });
+        } else if (me) pc.appendChild(me);
+        ec.appendChild(el('div', 'kh hide-phone', t('play.combat.enemies')));
+        state.enemies.forEach(function (m) {
+            var out = m.alive === false, card = el('div', 'card' + (out ? ' out' : '')), tg = el('div', 'tgt'), who = el('span', 'who');
+            who.appendChild(el('span', 'nm', m.name));
+            if (m.level > 0) who.appendChild(el('small', null, t('play.combat.level', [num(m.level)])));
+            tg.appendChild(who);
+            tg.appendChild(meter(t('play.hp'), 'foe', m.hp, m.maxHp));
+            card.appendChild(tg);
+            var tags = [];
+            if (m.isBoss) tags.push(t('play.combat.boss'));
+            if (out) tags.push(t('play.combat.dead'));
+            if (tags.length) card.appendChild(chipsOf(tags));
+            ec.appendChild(card);
+        });
+        hud.appendChild(pc);
+        hud.appendChild(ec);
+    }
+
+    function unbox(s) { return s.replace(/^[\s─-╿]+|[\s─-╿]+$/g, ''); }
+    function menuLine(text, known) {
+        var c = scanCommands([text]);
+        return c.length > 0 && c.every(function (x) { return known[x.key.toUpperCase()] === 1; });
+    }
+    // The screen's lines a layout does not place itself. Left out: menu lines whose every key is on the dock, box
+    // rules, and the lines the frame names (the room name, the level header). Runs of blank lines become one.
+    // With headings on (a room whose keys came from Client.Menu), a heading line ("Exits:") whose next line went to the
+    // dock goes too, and so does a line that opens with the level header the chapter line already shows. Only a line
+    // that went to the dock takes its heading along; a heading left out this way never takes the line above it.
+    function proseRows(rows, known, drop, headings) {
+        var out = [], blank = true, kind = rows.map(function (segs) {
+            var text = rowText(segs), core = unbox(text);
+            if (!core || BOX_ONLY.test(text)) return 'blank';
+            if (menuLine(text, known)) return 'menu';
+            if (drop && drop[core] === 1) return 'gone';
+            if (headings && headings.header && core.indexOf(headings.header) === 0) return 'gone';
+            return 'keep';
+        });
+        if (headings) for (var i = kind.length - 1; i >= 0; i--) {
+            if (kind[i] !== 'keep' || !/:\s*$/.test(unbox(rowText(rows[i])))) continue;
+            var j = i + 1;
+            while (j < kind.length && kind[j] === 'blank') j++;
+            if (j < kind.length && kind[j] === 'menu') kind[i] = 'gone';
+        }
+        rows.forEach(function (segs, i) {
+            if (kind[i] === 'blank') { if (!blank) out.push([]); blank = true; return; }
+            if (kind[i] === 'gone' || kind[i] === 'menu') return;
+            out.push(segs);
+            blank = false;
+        });
+        while (out.length && !out[out.length - 1].length) out.pop();
+        return out;
+    }
+    function screenPre(rows, cls) {
+        var pre = el('pre', cls);
+        rows.forEach(function (segs) {
+            var ln = el('span', 'ln');
+            if (!segs.length) ln.textContent = ' ';
+            segs.forEach(function (r) { ln.appendChild(el('span', r.c || null, r.t)); });
+            pre.appendChild(ln);
+        });
+        return pre;
+    }
+    function subLine(d) {
+        var sub = el('div', 'chap-sub'), dot = function () { sub.appendChild(el('span', 'dot', ' · ')); };
+        sub.appendChild(el('span', null, t('play.chron.sub_level', [num(d.level)])));
+        if (d.theme) { dot(); sub.appendChild(el('span', null, d.theme)); }
+        if (d.rating > 0) { dot(); sub.appendChild(el('span', 'd', t('play.chron.danger', [num(d.rating), num(d.max)]))); }
+        if (d.status === 'cleared') { dot(); sub.appendChild(el('span', null, t('play.chron.cleared'))); }
+        if (d.boss) { dot(); sub.appendChild(el('span', 'd', t('play.combat.boss'))); }
+        return sub;
+    }
+    function compass(d) {
+        var card = el('div', 'card compcard'), g = el('div', 'ccomp'), at = {};
+        card.appendChild(el('div', 'kh', t('play.pad.exits')));
+        g.setAttribute('role', 'list');
+        g.setAttribute('aria-label', t('play.pad.exits'));
+        d.exits.forEach(function (x) { at[x.key] = x; });
+        ['N', 'W', '', 'E', 'S'].forEach(function (k) {
+            if (!k) {
+                var mid = el('span', 'cdir mid', t('play.chron.you'));
+                mid.setAttribute('aria-hidden', 'true');
+                g.appendChild(mid);
+                return;
+            }
+            var x = at[k], c = el('span', 'cdir d' + k.toLowerCase() + (x ? ' on' : ''));
+            if (x) {
+                c.setAttribute('role', 'listitem');
+                c.appendChild(el('span', 'dk', k));
+                if (x.stateLabel) c.appendChild(el('small', null, x.stateLabel));
+            } else {
+                c.setAttribute('aria-hidden', 'true');
+                c.textContent = k;
+            }
+            g.appendChild(c);
+        });
+        card.appendChild(g);
+        return card;
+    }
+    function renderBody(lay, known) {
+        var body = document.getElementById('c-body'), d = chron.detail, drop = Object.create(null);
+        var old = document.getElementById('c-screen');
+        var oldTop = old ? Number(old.scrollTop) || 0 : 0;
+        var atEnd = !old || !(oldTop + (Number(old.clientHeight) || 0) < (Number(old.scrollHeight) || 0) - 4);
+        clear(body);
+        body.className = 'cbody b-' + lay;
+        if (lay === 'text') {
+            var pre = screenPre(chron.rows, 'screen');
+            pre.id = 'c-screen';
+            pre.setAttribute('tabindex', '0');
+            pre.setAttribute('aria-label', t('play.chron.screen'));
+            body.appendChild(pre);
+            pre.scrollTop = atEnd ? pre.scrollHeight : oldTop;
+            return;
+        }
+        if (lay === 'fight') {
+            var pr = el('div', 'prose fight'), log = el('div', 'clog');
+            if (inRoom(lay)) {
+                var op = el('div', 'opener hide-phone');
+                op.appendChild(el('h1', 'chap', d.name));
+                op.appendChild(subLine(d));
+                pr.appendChild(op);
+            }
+            log.setAttribute('aria-label', t('play.chron.log'));
+            var lines = proseRows(chron.rows, known, null).filter(function (s) { return s.length; }).slice(-LOG_LINES);
+            lines.forEach(function (segs, i) {
+                var text = unbox(rowText(segs));
+                log.appendChild(el('div', 'ev a' + Math.min(4, lines.length - 1 - i) + (/^[\[(]/.test(text) ? ' aside' : ''), text));
+            });
+            if (state.round > 0) log.appendChild(el('div', 'rd now', t('play.combat.round', [num(state.round)])));
+            pr.appendChild(log);
+            body.appendChild(pr);
+            // Never a line cut at the top: the oldest go until the rest fit.
+            while (log.children.length > 1 && log.scrollHeight > log.clientHeight + 1) log.removeChild(log.firstChild);
+            return;
+        }
+        var prose = el('div', 'prose croom' + (lay === 'street' ? ' town' : ''));
+        if (lay === 'room' && d) {
+            prose.appendChild(el('h1', 'chap', d.name));
+            prose.appendChild(subLine(d));
+            drop[d.name] = 1;
+            if (d.header) drop[d.header] = 1;
+            if (d.features.length) {
+                var note = el('div', 'note');
+                note.appendChild(el('span', 'mh', t('play.chron.notice')));
+                note.appendChild(el('span', null, d.features.join(', ')));
+                prose.appendChild(note);
+            }
+        } else if (state.room) {
+            prose.appendChild(el('h1', 'chap', state.room));
+            drop[state.room] = 1;
+        }
+        var heads = lay === 'room' && d && menuFor(lay) ? { header: d.header } : null;
+        prose.appendChild(screenPre(proseRows(chron.rows.slice(chron.start), known, drop, heads), 'screen mini'));
+        body.appendChild(prose);
+        if (lay === 'room' && d) body.appendChild(compass(d));
+    }
+
+    // A key cap sends what a typed key does: the key, then Enter, as the pad's buttons do. After a click with the
+    // mouse the terminal takes the keyboard again, so the next key typed goes to the game.
+    function keyCap(key, label, enabled) {
+        var b = el('button', 'kc' + (enabled ? '' : ' off'));
+        b.type = 'button';
+        b.setAttribute('data-key', key);
+        b.setAttribute('aria-label', key + ', ' + label);
+        if (!enabled) b.setAttribute('aria-disabled', 'true');
+        b.appendChild(el('span', 'cap' + (key.length > 2 ? ' wide' : key === 'Q' ? ' swash' : ''), key));
+        b.appendChild(el('span', 'lb', label));
+        b.addEventListener('click', function (e) {
+            if (!enabled) return;
+            sendToGame(key + '\r');
+            if (terminal && !isTouch() && e && e.detail > 0) terminal.focus();
+        });
+        return b;
+    }
+    function renderDock(menu, keys, screen) {
+        var box = document.getElementById('c-keys'), bar = document.getElementById('c-enterbar');
+        var groups = menu ? menu.groups : keys.cmds.length
+            ? [{ label: t('play.pad.on_screen'), items: keys.cmds.map(function (c) { return { key: c.key, label: c.label, enabled: true }; }) }] : [];
+        clear(box);
+        box.setAttribute('aria-label', t('play.chron.actions'));
+        groups.forEach(function (g) {
+            var grp = el('div', 'kgroup'), grid = el('div', 'grid');
+            grp.setAttribute('role', 'group');
+            if (g.label) { grp.setAttribute('aria-label', g.label); grp.appendChild(el('div', 'kh', g.label)); }
+            g.items.forEach(function (it) { grid.appendChild(keyCap(it.key, it.label, it.enabled)); });
+            grp.appendChild(grid);
+            if (menu && menu.hint && menu.hint.text && menu.hint.label === g.label) grp.appendChild(el('div', 'khint', menu.hint.text));
+            box.appendChild(grp);
+        });
+        box.hidden = !groups.length;
+        var said = screen.filter(function (r) { return r.trim(); });
+        var enter = !menu && keys.prompt.kind === 'enter' && said.length > 0;
+        clear(bar);
+        bar.hidden = !enter;
+        if (enter) {
+            var b = el('button', 'kc enter');
+            b.type = 'button';
+            b.setAttribute('data-key', '\r');
+            b.appendChild(el('span', 'cap', t('play.pad.enter')));
+            b.appendChild(el('span', 'lb', said[said.length - 1].trim().slice(0, 80)));
+            b.addEventListener('click', function (e) {
+                sendToGame('\r');
+                if (terminal && !isTouch() && e && e.detail > 0) terminal.focus();
+            });
+            bar.appendChild(b);
+        }
+    }
+
+    // The footer: only the fields the game sends today (HP, Gold, Stamina, Level, XP), in one order on every screen.
+    // Desktop rows: HP Gold Stamina / Level XP. Narrower: HP Gold / Stamina Level / XP.
+    function renderFoot() {
+        var f = document.getElementById('c-foot'), v = state.vitals, st = state.status, fields = [];
+        clear(f);
+        f.setAttribute('aria-label', t('play.chron.vitals'));
+        if (v) fields.push({ l: t('play.hp'), v: num(v.hp) + '/' + num(v.maxHp), d: 0, n: 0 });
+        if (st) fields.push({ l: t('play.chron.gold'), v: num(st.gold), d: 0, n: 0 });
+        if (v && v.maxCombatSp > 0) fields.push({ l: t('play.stamina'), v: num(v.combatSp) + '/' + num(v.maxCombatSp), d: 0, n: 1 });
+        if (st) {
+            fields.push({ l: t('play.chron.level'), v: num(st.level), d: 1, n: 1 });
+            fields.push({ l: t('play.chron.xp'), v: num(st.xp), d: 1, n: 2 });
+        }
+        fields.forEach(function (x, i) {
+            if (i) {
+                var p = fields[i - 1], bd = x.d !== p.d, bn = x.n !== p.n;
+                if (!(bd && bn)) {
+                    var dot = el('span', 'sep' + (bd ? ' sn' : bn ? ' sd' : ''), '·');
+                    dot.setAttribute('aria-hidden', 'true');
+                    f.appendChild(dot);
+                }
+                if (bd || bn) {
+                    var br = el('span', 'brk' + (bd && bn ? '' : bd ? ' bd' : ' bn'));
+                    br.setAttribute('aria-hidden', 'true');
+                    f.appendChild(br);
+                }
+            }
+            var s = el('span', 'f');
+            s.appendChild(el('span', 'fl', x.l));
+            s.appendChild(el('b', null, x.v));
+            f.appendChild(s);
+        });
+    }
+
+    // Keys pressed while the book has focus go to the game as the terminal would send them. A button keeps Enter and
+    // Space for itself; Tab and the arrows keep moving focus.
+    document.getElementById('chron').addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+        var k = e.key, tag = e.target && e.target.tagName, data = null;
+        if (tag === 'BUTTON' && (k === 'Enter' || k === ' ')) return;
+        if (k === 'Enter') data = '\r';
+        else if (k === 'Backspace') data = '\x7f';
+        else if (k === 'Escape') data = '\x1b';
+        else if (typeof k === 'string' && k.length === 1) data = k;
+        if (data === null) return;
+        if (e.preventDefault) e.preventDefault();
+        sendToGame(data);
+    });
+    // A click on the page (not on a key, and not after selecting text to copy) gives the terminal the keyboard.
+    document.getElementById('chron').addEventListener('click', function (e) {
+        var tg = e.target;
+        if (tg && typeof tg.closest === 'function' && tg.closest('button')) return;
+        if (typeof window.getSelection === 'function' && String(window.getSelection())) return;
+        if (terminal && !isTouch()) terminal.focus();
+    });
+
     function setConn(key, cls) {
         var c = document.getElementById('conn');
         c.setAttribute('data-i18n', key);
@@ -908,8 +1608,10 @@
             if (typeof event.data === 'string') handleFrame(event.data);
             else if (terminal) {
                 var bytes = new Uint8Array(event.data);
-                if (seesClear(bytes)) screenCleared();
-                terminal.write(bytes, schedulePad);
+                if (seesClear(bytes)) { screenCleared(); drawStarted(300); }
+                else if (chron.open) drawQuiet(300);
+                var seq = chron.seq;
+                terminal.write(bytes, function () { schedulePad(); afterWrite(seq); });
             }
         };
         ws.onclose = function () {
@@ -923,6 +1625,7 @@
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
         state.vitals = null; state.status = null; state.room = null; state.exits = {};
         roomEnter = -1; clearMatched = 0; screenCleared();
+        chronReset();
         renderCombat();
         renderVitals();
         // A new connection starts as the first did: no panels until its own first GMCP frame.
@@ -958,6 +1661,11 @@
         document.getElementById('terminal').addEventListener('mousedown', function (e) {
             if (isTouch() && !document.body.classList.contains('typing')) { e.preventDefault(); e.stopPropagation(); }
         }, true);
+        // In the Chronicle view the terminal is out of sight, so the book shows a ring while it has the keyboard.
+        if (terminal.textarea && terminal.textarea.addEventListener) {
+            terminal.textarea.addEventListener('focus', function () { document.getElementById('chron').classList.add('tfocus'); });
+            terminal.textarea.addEventListener('blur', function () { document.getElementById('chron').classList.remove('tfocus'); });
+        }
         // The pad comes back when the phone keyboard goes away.
         if (terminal.textarea && terminal.textarea.addEventListener) {
             terminal.textarea.addEventListener('blur', function () {
@@ -974,10 +1682,13 @@
         handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer,
         scanCommands: scanCommands, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad, roomFresh: roomFresh, seesClear: seesClear,
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
-        applyTouch: applyTouch, fitMode: function () { return fitMode; }
+        applyTouch: applyTouch, fitMode: function () { return fitMode; },
+        view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
+        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron
     };
 
     populateLanguagePicker();
+    if (chronOn()) applyView();
     loadLanguage(lang);
     var fontsReady = document.fonts && document.fonts.load
         ? document.fonts.load('16px "JetBrains Mono"').catch(function () {})
