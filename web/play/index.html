@@ -1207,7 +1207,7 @@
         var target = null;
         if (mark.screen) target = document.getElementById('c-screen');
         else document.querySelectorAll('.chron .kc').forEach(function (b) { if (!target && b.getAttribute('data-key') === mark.key) target = b; });
-        if (target) target.focus();
+        if (target) target.focus({ preventScroll: true });
         else if (terminal && !isTouch()) terminal.focus();
     }
     function renderChronNow() {
