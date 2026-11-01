@@ -57,3 +57,9 @@ test('the install comments copy both files where the includes expect them', () =
   assert.match(SNIPPET, /^# Install: sudo cp nginx-cache\.conf \/etc\/nginx\/snippets\/usurper-cache\.conf$/m);
   assert.match(MAP, /^# Install: sudo cp nginx-cache-map\.conf \/etc\/nginx\/conf\.d\/usurper-cache-map\.conf$/m);
 });
+
+test('the server deployment guide installs both files', () => {
+  const guide = read('DOCS', 'SERVER_DEPLOYMENT.md');
+  assert.match(guide, /^sudo cp scripts-server\/nginx-cache\.conf \/etc\/nginx\/snippets\/usurper-cache\.conf$/m);
+  assert.match(guide, /^sudo cp scripts-server\/nginx-cache-map\.conf \/etc\/nginx\/conf\.d\/usurper-cache-map\.conf$/m);
+});
