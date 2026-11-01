@@ -1,0 +1,347 @@
+HP: 400/400, Gold: 1,234, Stamina: 100/306, Level 12, XP: 0% to next level, Revives: 0/3
+
+
+---
+
+CHARACTER STATUS
+
+BASIC INFORMATION
+Name: Webtest
+Class: Warrior  |  Race: Human  |  Sex: Female
+Age: 22  |  Height: 180cm  |  Weight: 80kg
+
+LEVEL & EXPERIENCE
+Current Level: 12
+Experience: 1,500
+XP to Next Level: 39,400 (Need 40900 total)
+
+COMBAT STATISTICS
+HP: 400/400
+Strength: 60  |  Defense: 20  |  Agility: 20
+Dexterity: 30  |  Stamina: 100  |  Wisdom: 20
+Intelligence: 20  |  Charisma: 15  |  Constitution: 30
+Fatigue: Well-Rested (0/100)
+Difficulty: Normal
+
+Press Enter to continue...
+EQUIPMENT
+Combat Style: One-Handed
+
+Main Hand:  Empty
+Off Hand:   Empty
+
+Head:       Empty
+Body:       Empty
+Arms:       Empty
+Hands:      Empty
+Legs:       Empty
+Feet:       Empty
+Waist:      Empty
+Face:       Empty
+Cloak:      Empty
+
+Neck:       Empty
+Left Ring:  Empty
+Right Ring: Empty
+
+Equipment Totals:
+    Weapon Power: 0  |  Armor Power: 0
+
+  Awakening: Dormant (0/7)
+  (your Ocean Journal: Main Street, Status , Progress )
+
+TIP: Your Awakening
+  Something within you is waking. Loss, mercy and wonder deepen it:
+  companions, sparing a beaten foe, dreams, visions, discoveries and the
+  songs of the Old Gods. Each stage brings a small lasting boon. See Main
+  Street, Status , Progress  for your Ocean Journal.
+
+
+WEALTH
+Gold on Hand: 1,234
+Gold in Bank: 0
+Total Wealth: 1,234
+
+Press Enter to continue...
+RELATIONSHIPS
+Marital Status: Single
+Team: None
+
+ALIGNMENT & REPUTATION
+Alignment: Neutral
+Chivalry: 0/1000  |  Darkness: 0/1000
+  Alignment Abilities:
+    - Diplomatic Immunity - No alignment restrictions
+    - Balanced Path - Access all locations freely
+What this means:
+    Combat: attack normal, defense normal
+    Prices: black market normal, honest shops normal
+    Most folk treat you as just another stranger.
+    Faction: unaffiliated -- you owe no oath; free to take any work.
+
+Loyalty: 0%Stable, Mental Health 80 of 100
+
+FACTION
+You have not pledged allegiance to any faction.
+  Visit the Castle, Temple, or Dark Alley to learn more.
+
+Faction Standing:
+  The Crown      :    0 ( (Neutral))
+  The Faith      :    0 ( (Neutral))
+  The Shadows    :    0 ( (Neutral))
+
+Press Enter to continue...
+BATTLE RECORD
+Monster Kills: 25  |  Monster Defeats: 0
+Player Kills: 0  |  Player Defeats: 0
+Monster Win Rate: 100.0%
+
+DUNGEON PROGRESS
+Deepest Floor Reached: 0 / 100
+Old Gods: None encountered
+Ancient Seals: 0/7 collected
+
+DIVINE STATUS
+Worshipped God: None (Agnostic)
+
+
+Press Enter to continue...
+---
+
+Dungeon Guide - Level 6, Catacombs
+You are in: Room q1 (Stairs down, cleared)
+Exits: North, South, East, West
+4/6 explored, 2/6 cleared.
+
+Directions to:
+   Nearest unexplored room - Secret Treasury, 1 rooms away
+   Return to dungeon
+
+Navigate to: ���Char.Combat.Start {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false},{"name":"Bone Guard B","level":8,"hp":260,"maxHp":260,"isBoss":false}],"ambush":false}��
+---
+
+--- COMBAT ---
+
+
+
+
+TIP: Combat Tip
+  Press  to Attack,  to Retreat,  to use a Healing Potion, or  to
+  check your Status.
+
+
+  Round 1
++----------------------------------------------------------+
+|                      COMBAT STATUS                       |
++----------------------------------------------------------+
+| [1] Bone Guard A       ████████████   260/260  
+| [2] Bone Guard B       ████████████   260/260  
++----------------------------------------------------------+
+| Webtest            HP:████████████░░░   400/484  
+| Potions: 3/31
+| ST:██████████  306/306 
+| Status: Last Stand ready  Death's Door ready
+| ATK: 60    DEF: 23 
++----------------------------------------------------------+
+
+���Char.Vitals {"hp":400,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}��
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: Target which monster? (1-2, ENTER=random, Q=cancel): 
+You attack Bone Guard B!
+[You roll a natural 20: always a hit]
+CRITICAL HIT!
+You obliterate Bone Guard B for 170 damage!
+
+Bone Guard A attacks you!
+[Bone Guard A rolls: 12 + 14 = 26 vs DC 17]
+Bone Guard A hits you!
+[60 damage vs 23 defense]
+37 damage gets through your defenses!
+
+Bone Guard B attacks you!
+[Bone Guard B rolls: 13 + 14 = 27 vs DC 17]
+Bone Guard B attacks you!
+[66 damage vs 23 defense]
+43 damage gets through your defenses!
+���Char.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"alive":true}],"round":1}��
+  Round 2
++----------------------------------------------------------+
+|                      COMBAT STATUS                       |
++----------------------------------------------------------+
+| [1] Bone Guard A       ████████████   260/260  
+| [2] Bone Guard B       ████░░░░░░░░    90/260  
++----------------------------------------------------------+
+| Webtest            HP:█████████░░░░░░   320/484  
+| Potions: 3/31
+| ST:██████████  306/306 
+| Status: Last Stand ready  Death's Door ready
+| ATK: 60    DEF: 23 
++----------------------------------------------------------+
+
+
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: Target which monster? (1-2, ENTER=random, Q=cancel): 
+You attack Bone Guard B!
+[You roll 3; you need 2 or more]
+You smash Bone Guard B for 107 damage!
+Bone Guard B falls in combat!
+
+Bone Guard A attacks you!
+[Bone Guard A rolls: 18 + 14 = 32 vs DC 17]
+You dodge Bone Guard A's attack! (10% dodge)
+���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":2}��
+  Round 3
++----------------------------------------------------------+
+|                      COMBAT STATUS                       |
++----------------------------------------------------------+
+| [1] Bone Guard A       ████████████   260/260  
++----------------------------------------------------------+
+| Webtest            HP:█████████░░░░░░   320/484  
+| Potions: 3/31
+| ST:██████████  306/306 
+| Status: Last Stand ready  Death's Door ready
+| ATK: 60    DEF: 23 
++----------------------------------------------------------+
+
+
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+You attack Bone Guard A!
+[You roll 15; you need 2 or more]
+You maul Bone Guard A for 99 damage!
+
+Bone Guard A attacks you!
+[Bone Guard A rolls: 6 + 14 = 20 vs DC 17]
+Bone Guard A grazes you!
+[41 damage vs 23 defense]
+18 damage gets through your defenses!
+���Char.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":3}��
+  Round 4
++----------------------------------------------------------+
+|                      COMBAT STATUS                       |
++----------------------------------------------------------+
+| [1] Bone Guard A       ███████░░░░░   161/260  
++----------------------------------------------------------+
+| Webtest            HP:█████████░░░░░░   302/484  
+| Potions: 3/31
+| ST:██████████  306/306 
+| Status: Last Stand ready  Death's Door ready
+| ATK: 60    DEF: 23 
++----------------------------------------------------------+
+
+
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+You attack Bone Guard A!
+[You roll 12; you need 2 or more]
+You crush Bone Guard A for 107 damage!
+
+Bone Guard A attacks you!
+[Bone Guard A rolls: 8 + 14 = 22 vs DC 17]
+You dodge Bone Guard A's attack! (10% dodge)
+���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":4}��
+  Round 5
++----------------------------------------------------------+
+|                      COMBAT STATUS                       |
++----------------------------------------------------------+
+| [1] Bone Guard A       ██░░░░░░░░░░    54/260  
++----------------------------------------------------------+
+| Webtest            HP:█████████░░░░░░   302/484  
+| Potions: 3/31
+| ST:██████████  306/306 
+| Status: Last Stand ready  Death's Door ready
+| ATK: 60    DEF: 23 
++----------------------------------------------------------+
+
+
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+Dungeon Combat Menu
+
+Actions:
+  A - Attack
+D - Defend, reduces damage by 50 percent
+I - Use Item, Potions: HP:3
+R - Retreat, attempt to flee
+AUTO - Auto-Combat Mode
+SPD - Combat Speed, currently Instant
+
+Choose action: 
+You attack Bone Guard A!
+[You roll 5; you need 2 or more]
+You maul Bone Guard A for 101 damage!
+Bone Guard A falls in combat!
+���Char.Combat.Killed {"name":"Bone Guard B","level":8,"isBoss":false}�����Char.Combat.Killed {"name":"Bone Guard A","level":8,"isBoss":false}��
+    Double kill!
+
+Defeated 2 monster(s)!
+Experience gained: 36
+  (Other modifiers, included above: x1.8 from early levels)
+Gold gained: 0
+
+
+* 5 ACHIEVEMENTS UNLOCKED! *
+   Untouchable
+   First Blood
+   Adventurer
+   Seasoned
+   Getting Started
+  Total Rewards: +50 Gold +600 XP
+
+���Char.Combat.End {"outcome":"Victory","kills":2,"xpGained":36,"goldGained":0}�����Char.Items.List {"inventory":[],"equipped":{},"count":0,"max":50}�����Char.Skills.List {"abilities":[{"id":"power_strike","name":"Power Strike","type":"Attack","cooldown":0,"staminaCost":15,"manaCost":0,"requiresLevel":1},{"id":"second_wind","name":"Second Wind","type":"Heal","cooldown":5,"staminaCost":25,"manaCost":0,"requiresLevel":1},{"id":"focus","name":"Focus","type":"Buff","cooldown":2,"staminaCost":15,"manaCost":0,"requiresLevel":5},{"id":"shield_wall","name":"Shield Wall","type":"Defense","cooldown":3,"staminaCost":25,"manaCost":0,"requiresLevel":8}],"spells":[],"mana":0,"maxMana":0,"stamina":100}�����Char.Status {"name":"Webtest","class":"Warrior","level":12,"race":"Human","gold":1284,"bank":0,"xp":2136,"location":""}��

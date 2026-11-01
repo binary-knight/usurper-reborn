@@ -1143,6 +1143,7 @@ public partial class CombatEngine
                 enemies = enemyData,
                 ambush = isAmbush
             });
+            UsurperRemake.Server.GmcpBridge.EmitWebEnemies(monsters, fightStart: true);   // 2.0 phase 3a: their families, web client only
             // Seed initial party state so MUD clients can render party panes
             // without waiting for the first round-end update.
             UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.3.8 H: as the fight's list, no waiting ally

@@ -436,6 +436,7 @@ public static class GmcpBridge
         ctx.LastGmcpEnemiesSnapshot = snapshot;
 
         EmitCombatEnemiesInternal(monsters, currentRound);
+        EmitWebEnemies(monsters, fightStart: false);   // 2.0 phase 3a: the families beside it, for the web client
     }
 
     /// <summary>
@@ -464,11 +465,60 @@ public static class GmcpBridge
         }
     }
 
-    /// <summary>2.0: the packages only EmitWebClient sends, to the current session.</summary>
-    internal static bool IsWebClientPackage(string? package) => package == "Client.Menu" || package == "Room.Detail";
+    /// <summary>2.0: the packages only EmitWebClient sends, to the current session (phase 1: Client.Menu, Room.Detail;
+    /// phase 3a: Client.Enemies, Client.Footer, Client.Sheet, Client.Map).</summary>
+    internal static readonly string[] WebClientPackages =
+        { "Client.Menu", "Room.Detail", "Client.Enemies", "Client.Footer", "Client.Sheet", "Client.Map" };
+
+    /// <summary>2.0: true for a package only EmitWebClient sends.</summary>
+    internal static bool IsWebClientPackage(string? package) => package != null && Array.IndexOf(WebClientPackages, package) >= 0;
 
     /// <summary>
-    /// 2.0: emit a web client package (Client.Menu, Room.Detail) to the CURRENT session only, and only when
+    /// 2.0 phase 3a: true when <paramref name="c"/> is the character this session plays (its engine's current player).
+    /// Client.Sheet and Client.Footer describe that character only, never another player's.
+    /// </summary>
+    internal static bool IsSessionsOwnCharacter(global::Character? c)
+    {
+        var own = SessionContext.Current?.Engine?.CurrentPlayer;
+        return c != null && own != null && ReferenceEquals(own, c);
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: Client.Enemies, {enemies:[{name, family}]}, the same members in the same order as Char.Combat.Start
+    /// and Char.Combat.Enemies, with each foe's monster family (Monster.FamilyName, empty when it has none) so the web
+    /// client can pick its art. Sent at the fight's start, and beside Char.Combat.Enemies when the names or families
+    /// changed since the last Client.Enemies of the fight. Web client only.
+    /// </summary>
+    public static void EmitWebEnemies(System.Collections.Generic.List<global::Monster>? monsters, bool fightStart)
+    {
+        if (monsters == null || !IsWebClientActive) return;
+        var ctx = SessionContext.Current!;
+        var sb = new StringBuilder();
+        foreach (var m in monsters) sb.Append(m.Name).Append('|').Append(m.FamilyName).Append(';');
+        string snapshot = sb.ToString();
+        if (!fightStart && snapshot == ctx.LastWebEnemiesSnapshot) return;
+        ctx.LastWebEnemiesSnapshot = snapshot;
+        EmitWebClient("Client.Enemies", new { enemies = monsters.Select(m => new { name = m.Name, family = m.FamilyName }).ToList() });
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: Client.Footer, the status line's values the other packages do not carry: potions (as the potion
+    /// line prints them, Healing out of MaxPotions), the lives or revives counter and the XP percent. A null field is
+    /// one the status line leaves out on this session, and is left out of the frame. Sent when the status line draws
+    /// and a value changed since the last Client.Footer on this session. Web client only.
+    /// </summary>
+    public static void EmitWebFooterIfChanged(long potions, long maxPotions, int? lives, int? maxLives, string? livesKind, int? xpPercent)
+    {
+        if (!IsWebClientActive) return;
+        var ctx = SessionContext.Current!;
+        string snapshot = $"{potions}|{maxPotions}|{lives}|{maxLives}|{livesKind}|{xpPercent}";
+        if (snapshot == ctx.LastWebFooterSnapshot) return;
+        ctx.LastWebFooterSnapshot = snapshot;
+        EmitWebClient("Client.Footer", new { potions, maxPotions, lives, maxLives, livesKind, xpPercent });
+    }
+
+    /// <summary>
+    /// 2.0: emit a web client package (WebClientPackages) to the CURRENT session only, and only when
     /// that session is the web client. There is no form of this that takes another session: these packages
     /// describe the screen the current session drew, so EmitTo refuses them.
     /// </summary>

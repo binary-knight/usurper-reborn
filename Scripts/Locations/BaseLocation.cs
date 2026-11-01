@@ -2386,17 +2386,8 @@ public abstract class BaseLocation
                 ? $"{Loc.Get("status.mana")}: {currentPlayer.Mana}/{currentPlayer.MaxMana}"
                 : $"{Loc.Get("status.stamina")}: {currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}";
             string xpInfo = "";
-            if (currentPlayer.Level < GameConfig.MaxLevel)
-            {
-                long currentXP = currentPlayer.Experience;
-                long nextLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
-                long prevLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
-                long xpIntoLevel = currentXP - prevLevelXP;
-                long xpNeeded = nextLevelXP - prevLevelXP;
-                int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
-                xpPercent = Math.Clamp(xpPercent, 0, 100);
+            if (StatusLineXpPercent(currentPlayer) is int xpPercent)
                 xpInfo = $", {Loc.Get("status.xp_to_next", xpPercent)}";
-            }
             // v0.65.6: show remaining lives in online permadeath mode so the
             // stake is always visible, not just on death screens.
             // v1.0.5: single-player consumes the same counter (free revive at the death
@@ -2408,10 +2399,9 @@ public abstract class BaseLocation
             // reflects the last character loaded. permadeathLives short-circuits it there
             // while online permadeath is on, and the same global already drives the
             // XP/gold multipliers, so this is no worse than the existing behaviour.)
-            bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
-            bool showLives = permadeathLives || !DifficultySystem.IsPermadeath();
-            string livesInfo = showLives
-                ? $", {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: {Math.Max(0, currentPlayer.Resurrections)}/{Math.Max(1, currentPlayer.MaxResurrections)}"
+            // 2.0 phase 3a: the rule is StatusLineLives, which Client.Footer reads too.
+            string livesInfo = StatusLineLives(currentPlayer) is { } lives
+                ? $", {Loc.Get(lives.Permadeath ? "status.lives" : "status.revives")}: {lives.Left}/{lives.Max}"
                 : "";
             terminal.SetColor("white");
             terminal.WriteLine($"{Loc.Get("status.hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}, {Loc.Get("status.gold_label")}: {currentPlayer.Gold:N0}, {resource}, {Loc.Get("ui.level")} {currentPlayer.Level}{xpInfo}{livesInfo}");
@@ -2465,30 +2455,21 @@ public abstract class BaseLocation
             // v1.0.5: also shown in single-player under a "Revives" label, except on
             // Nightmare where no resurrection is offered; see the screen-reader branch
             // above for why the label differs.
-            bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
-            if (permadeathLives || !DifficultySystem.IsPermadeath())
+            if (StatusLineLives(currentPlayer) is { } lives)
             {
-                int livesLeft = Math.Max(0, currentPlayer.Resurrections);
-                int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
+                int livesLeft = lives.Left;
+                int livesMax = lives.Max;
                 segments.Add(new List<ChromeRun>
                 {
-                    new("gray", $" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: "),
+                    new("gray", $" | {Loc.Get(lives.Permadeath ? "status.lives" : "status.revives")}: "),
                     new(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green", $"{livesLeft}"),
                     new("gray", $"/{livesMax}"),
                 });
             }
 
             // XP progress to next level; it is drawn after the segment before it and never starts a row
-            if (currentPlayer.Level < GameConfig.MaxLevel)
+            if (StatusLineXpPercent(currentPlayer) is int xpPercent)
             {
-                long currentXP = currentPlayer.Experience;
-                long nextLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level + 1);
-                long prevLevelXP = GameConfig.GetExperienceForLevel(currentPlayer.Level);
-                long xpIntoLevel = currentXP - prevLevelXP;
-                long xpNeeded = nextLevelXP - prevLevelXP;
-                int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
-                xpPercent = Math.Clamp(xpPercent, 0, 100);
-
                 segments[^1].AddRange(new ChromeRun[]
                 {
                     new("gray", " ("), new(xpPercent >= 90 ? "bright_green" : "white", $"{xpPercent}%"), new("gray", ")"),
@@ -2501,8 +2482,51 @@ public abstract class BaseLocation
             terminal.WriteLine("");
         } // end else (non-SR status line)
 
+        EmitWebFooter();   // 2.0 phase 3a: web client sessions only
+
         // Quick command bar
         ShowQuickCommandBar();
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: the XP percent the status line prints after its last segment, or null where it prints none (at
+    /// the level cap). One rule for both forms of the line and for Client.Footer.
+    /// </summary>
+    internal static int? StatusLineXpPercent(Character p)
+    {
+        if (p.Level >= GameConfig.MaxLevel) return null;
+        long currentXP = p.Experience;
+        long nextLevelXP = GameConfig.GetExperienceForLevel(p.Level + 1);
+        long prevLevelXP = GameConfig.GetExperienceForLevel(p.Level);
+        long xpIntoLevel = currentXP - prevLevelXP;
+        long xpNeeded = nextLevelXP - prevLevelXP;
+        int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
+        return Math.Clamp(xpPercent, 0, 100);
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: the lives counter the status line prints, or null where it prints none (permadeath difficulty
+    /// with online permadeath off). Permadeath picks the "Lives" label over "Revives". One rule for both forms of the
+    /// line and for Client.Footer.
+    /// </summary>
+    internal static (int Left, int Max, bool Permadeath)? StatusLineLives(Character p)
+    {
+        bool permadeathLives = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
+        if (!permadeathLives && DifficultySystem.IsPermadeath()) return null;
+        return (Math.Max(0, p.Resurrections), Math.Max(1, p.MaxResurrections), permadeathLives);
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: Client.Footer for the status line just drawn: potions as the potion line prints them (Healing out
+    /// of MaxPotions), and the lives counter and XP percent only where the line printed them. Sent only to a web client
+    /// session, only for the character that session plays, and only when a value changed.
+    /// </summary>
+    private void EmitWebFooter()
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(currentPlayer)) return;
+        var lives = StatusLineLives(currentPlayer);
+        UsurperRemake.Server.GmcpBridge.EmitWebFooterIfChanged(currentPlayer.Healing, currentPlayer.MaxPotions,
+            lives?.Left, lives?.Max, lives == null ? null : lives.Value.Permadeath ? "lives" : "revives", StatusLineXpPercent(currentPlayer));
     }
 
     /// <summary>
@@ -6855,6 +6879,7 @@ public abstract class BaseLocation
         }
 
         terminal.ClearScreen();
+        EmitWebSheet();   // 2.0 phase 3a: web client sessions only
 
         // Header
         WriteBoxHeader(Loc.Get("base.character_status"), "bright_cyan");
@@ -8439,6 +8464,150 @@ public abstract class BaseLocation
         }
 
         terminal.WriteLine("");
+    }
+
+    /// <summary>2.0 phase 3a: the equipment slots in the order the status sheet prints them, with their label keys.</summary>
+    internal static readonly (EquipmentSlot Slot, string LabelKey)[] SheetSlots =
+    {
+        (EquipmentSlot.MainHand, "base.slot_main_hand"), (EquipmentSlot.OffHand, "base.slot_off_hand"),
+        (EquipmentSlot.Head, "base.slot_head"), (EquipmentSlot.Body, "base.slot_body"), (EquipmentSlot.Arms, "base.slot_arms"),
+        (EquipmentSlot.Hands, "base.slot_hands"), (EquipmentSlot.Legs, "base.slot_legs"), (EquipmentSlot.Feet, "base.slot_feet"),
+        (EquipmentSlot.Waist, "base.slot_waist"), (EquipmentSlot.Face, "base.slot_face"), (EquipmentSlot.Cloak, "base.slot_cloak"),
+        (EquipmentSlot.Neck, "base.slot_neck"), (EquipmentSlot.LFinger, "base.slot_left_ring"), (EquipmentSlot.RFinger, "base.slot_right_ring"),
+    };
+
+    /// <summary>2.0 phase 3a: a label as the sheet prints it, without the padding, the "|" separator and the colon around it.</summary>
+    internal static string SheetLabel(string printed) => printed.Trim().TrimStart('|').Trim().TrimEnd(':').Trim();
+
+    /// <summary>
+    /// 2.0 phase 3a: GMCP Client.Sheet for the web client, sent as ShowStatus draws: the sections of the Character Status
+    /// sheet the G2 layout shows (basic information, level and experience, combat statistics, the equipment with each
+    /// slot's item name and stats as printed, the equipment totals). Every label is the Loc string the text prints,
+    /// without its padding and colon, and every value is the text's own string. Rows the text prints only in some
+    /// cases (Mana, Royal Authority, fatigue and difficulty, the dual wield line, the bonuses) are in the frame only
+    /// then. Sent only to a web client session, and only for the character that session plays.
+    /// </summary>
+    private void EmitWebSheet()
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(currentPlayer)) return;
+        var p = currentPlayer;
+        object Row(string labelKey, string value, string? extra = null) => new { label = SheetLabel(Loc.Get(labelKey)), value, extra };
+
+        var basic = new List<object>
+        {
+            Row("base.stat_name", p.DisplayName),
+            Row("base.stat_class", $"{p.ClassName}"),
+            Row("base.stat_race", $"{p.Race}"),
+            Row("base.stat_sex", p.Sex == CharacterSex.Male ? Loc.Get("base.male") : Loc.Get("base.female")),
+            Row("base.stat_age", $"{p.Age}"),
+            Row("base.stat_height", Loc.Get("base.height_cm", p.Height)),
+            Row("base.stat_weight", Loc.Get("base.weight_kg", p.Weight)),
+        };
+
+        long nextLevelXP = GameConfig.GetExperienceForLevel(p.Level + 1);
+        long xpNeeded = nextLevelXP - p.Experience;
+
+        var stats = new List<object>
+        {
+            Row("ui.stat_strength", $"{p.Strength}"), Row("ui.stat_defense", $"{p.Defence}"), Row("ui.stat_agility", $"{p.Agility}"),
+            Row("ui.stat_dexterity", $"{p.Dexterity}"), Row("ui.stat_stamina", $"{p.Stamina}"), Row("ui.stat_wisdom", $"{p.Wisdom}"),
+            Row("ui.stat_intelligence", $"{p.Intelligence}"), Row("ui.stat_charisma", $"{p.Charisma}"), Row("ui.stat_constitution", $"{p.Constitution}"),
+        };
+        var more = new List<object>();
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
+            var (fatigueLabel, _) = p.GetFatigueTier();
+            if (string.IsNullOrEmpty(fatigueLabel)) fatigueLabel = Loc.Get("status.fatigue_normal");
+            more.Add(Row("status.fatigue", fatigueLabel, $"({p.Fatigue}/100)"));
+            more.Add(Row("status.difficulty", DifficultySystem.GetLocalizedName(p.Difficulty)));
+        }
+
+        string style = p.IsTwoHanding ? Loc.Get("base.style_two_handed")
+            : p.IsDualWielding ? Loc.Get("base.style_dual_wield")
+            : p.HasShieldEquipped ? Loc.Get("base.style_sword_board")
+            : Loc.Get("base.style_one_handed");
+        string? hands = p.IsTwoHanding || !p.IsDualWielding ? null
+            : Loc.Get("base.style_dual_wield_hands", p.SwingWeapPow(offHand: false), p.SwingWeapPow(offHand: true));
+
+        var slots = SheetSlots.Select(s =>
+        {
+            var item = p.GetEquipment(s.Slot);
+            string? stats = item == null ? null : GetEquipmentStatSummary(item);
+            string text = item != null ? ItemNames.Display(item)
+                : s.Slot == EquipmentSlot.OffHand && p.GetEquipment(EquipmentSlot.MainHand)?.Handedness == WeaponHandedness.TwoHanded
+                    ? Loc.Get("base.using_2h_weapon") : Loc.Get("ui.empty");
+            return new
+            {
+                slot = s.Slot.ToString(),
+                label = SheetLabel(Loc.Get(s.LabelKey)),
+                item = text,
+                stats = string.IsNullOrEmpty(stats) ? null : $"({stats})",
+                empty = item == null,
+            };
+        }).ToList();
+
+        // The totals as DisplayEquipmentTotals adds them up and prints them
+        int totalWeapPow = 0, totalArmPow = 0;
+        var sums = new long[11];
+        foreach (var slot in Enum.GetValues<EquipmentSlot>())
+        {
+            var item = p.GetEquipment(slot);
+            if (item == null) continue;
+            totalWeapPow += item.WeaponPower;
+            totalArmPow += item.ArmorClass + item.ShieldBonus;
+            sums[0] += item.StrengthBonus; sums[1] += item.DexterityBonus; sums[2] += item.AgilityBonus; sums[3] += item.ConstitutionBonus;
+            sums[4] += item.IntelligenceBonus; sums[5] += item.WisdomBonus; sums[6] += item.CharismaBonus; sums[7] += item.MaxHPBonus;
+            sums[8] += item.MaxManaBonus; sums[9] += item.DefenceBonus; sums[10] += item.StaminaBonus;
+        }
+        string[] bonusLabels =
+        {
+            Loc.Get("ui.stat_str"), Loc.Get("ui.stat_dex"), Loc.Get("ui.stat_agi"), Loc.Get("ui.stat_con"), Loc.Get("ui.stat_int"),
+            Loc.Get("ui.stat_wis"), Loc.Get("ui.stat_cha"), Loc.Get("base.bonus_maxhp"), Loc.Get("base.bonus_maxmp"),
+            Loc.Get("ui.stat_def"), Loc.Get("ui.stat_sta"),
+        };
+        var bonuses = sums.Select((v, i) => (v, i)).Where(b => b.v != 0)
+            .Select(b => new { label = bonusLabels[b.i], value = $"{(int)b.v:+#;-#;0}" }).ToList();
+
+        UsurperRemake.Server.GmcpBridge.EmitWebClient("Client.Sheet", new
+        {
+            title = Loc.Get("base.character_status"),
+            name = p.DisplayName,
+            classId = p.Class.ToString(),
+            basic = new { heading = Loc.Get("base.basic_information"), rows = basic, note = p.King ? Loc.Get("base.stat_royal_authority").Trim() : null },
+            level = new
+            {
+                heading = Loc.Get("base.level_experience"),
+                rows = new List<object>
+                {
+                    Row("base.stat_current_level", $"{p.Level}"),
+                    new { label = Loc.Get("ui.experience"), value = $"{p.Experience:N0}", extra = (string?)null },
+                    Row("base.stat_xp_next", $"{xpNeeded:N0}", Loc.Get("base.stat_xp_need_total", nextLevelXP).Trim()),
+                },
+                xp = p.Experience,
+                xpNext = nextLevelXP,
+            },
+            combat = new
+            {
+                heading = Loc.Get("base.combat_statistics"),
+                hp = new { label = Loc.Get("combat.bar_hp"), value = $"{p.HP}/{p.MaxHP}", now = p.HP, max = p.MaxHP },
+                mana = p.MaxMana > 0 ? new { label = Loc.Get("ui.mana_label"), value = $"{p.Mana}/{p.MaxMana}", now = p.Mana, max = p.MaxMana } : null,
+                stats,
+                more,
+            },
+            equipment = new
+            {
+                heading = Loc.Get("base.equipment"),
+                style = new { label = SheetLabel(Loc.Get("base.stat_combat_style")), value = style, extra = hands },
+                slots,
+            },
+            totals = new
+            {
+                heading = SheetLabel(Loc.Get("base.equipment_totals")),
+                rows = new List<object> { Row("base.weapon_power", $"{totalWeapPow}"), Row("base.armor_class", $"{totalArmPow}") },
+                bonusLabel = bonuses.Count > 0 ? SheetLabel(Loc.Get("base.bonuses")) : null,
+                bonuses,
+            },
+        });
     }
 
     /// <summary>
