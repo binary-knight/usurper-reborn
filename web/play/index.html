@@ -1001,7 +1001,7 @@
     var SPRITES = { Goblinoid: 'goblin', Undead: 'skeleton', Orcish: 'orc', Draconic: 'dragon', Demonic: 'demon', Giant: 'giant', Beast: 'wolf-beast',
         Elemental: 'elemental', Insectoid: 'spider-queen', Construct: 'golem', Fey: 'dark-fairy', Aquatic: 'sea-creature', Celestial: 'fallen-angel',
         Shadow: 'shadow', Aberration: 'wraith' };
-    var MAP_KINDS = { here: 1, boss: 1, stairs: 1, cleared: 1, monsters: 1, safe: 1 };
+    var MAP_KINDS = { here: 1, boss: 1, stairs: 1, cleared: 1, monsters: 1, safe: 1, unknown: 1 };
     // Client.Sheet slots, and where G2 sets each one around the portrait: a top row, a column each side, a bottom row.
     var SLOTS = ['MainHand', 'OffHand', 'Head', 'Body', 'Arms', 'Hands', 'Legs', 'Feet', 'Waist', 'Face', 'Cloak', 'Neck', 'LFinger', 'RFinger'];
     var DOLL = [['drow dt', ['Head', 'Face', 'Neck']], ['dcol dl', ['MainHand', 'Arms', 'Hands', 'LFinger']], null,
@@ -1671,7 +1671,7 @@
     }
 
     // The map from the last Client.Map, shown in the room only while it is the map of this floor drawn from this very
-    // room (Room.Info num): after a move it would be out of date, so it stays out until the map screen is opened again.
+    // room (Room.Info num). The game sends one with each room draw, so after a move the old map stays out until the new one comes.
     function mapOn() {
         var m = chron.map, d = chron.detail, p = chron.place;
         return !!(m && d && p && p.dungeon && p.id && m.room === p.id && m.level === d.level && m.rooms.length);

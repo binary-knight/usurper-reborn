@@ -172,6 +172,7 @@ public class WebClient3aTests
             await Await(Invoke(street, typeof(BaseLocation), "ShowStatus"));
             var (d, _) = WebFlagOff200Tests.Dungeon(hero, t);
             await Await(Invoke(d, typeof(DungeonLocation), "ShowDungeonMap"));
+            Invoke(d, typeof(DungeonLocation), "DisplayLocation");   // the room draw, which sends Client.Map to the web client
             var packages = WebFlagOff200Tests.Packages(s.Bytes(t));
             foreach (var p in WebFlagOff3aTests.NewPackages) packages.Should().NotContain(p);
             Plain(s.Bytes(t)).Should().Contain(Loc.Get("base.basic_information"), "the screens were drawn");
@@ -490,22 +491,64 @@ public class WebClient3aTests
         map.GetProperty("links").EnumerateArray().Select(l => (l.GetProperty("x1").GetInt32(), l.GetProperty("y1").GetInt32(), l.GetProperty("x2").GetInt32(), l.GetProperty("y2").GetInt32())).ToList();
 
     [Fact]
-    public async Task ClientMap_LeavesOutAHiddenExit_AndAnUnvisitedNeighbour()
+    public async Task ClientMap_AnUnvisitedNeighbourThroughAnOpenExit_IsIn_AsUnknown()
     {
         // q1 (the current room) has a visible exit east to u3, never visited, and a hidden, unrevealed exit south to h5
-        var (bytes, text, _, floor) = await MapScreen(Hero());
+        var (bytes, text, _, _) = await MapScreen(Hero());
         var map = Of(bytes, "Client.Map").Should().ContainSingle().Subject;
+        Rooms(map).Should().BeEquivalentTo(new[] { (0, 0, "here"), (0, -1, "cleared"), (-1, 0, "safe"), (1, 0, "unknown") },
+            "the rooms the player has seen, and u3, the \"?\" east of q1 that an open exit leads to");
+        text.Should().Contain("@   ?", "the text map draws u3 as a \"?\", as before");
         string json = map.GetRawText();
-        var rooms = Rooms(map);
-        rooms.Should().BeEquivalentTo(new[] { (0, 0, "here"), (0, -1, "cleared"), (-1, 0, "safe") }, "only the rooms the player has seen");
-        rooms.Should().NotContain(r => r.x == 1 && r.y == 0, "the unvisited neighbour east (u3) is not in the frame");
-        rooms.Should().NotContain(r => r.x == 0 && r.y == 1, "the room behind the hidden exit (h5) is not in the frame");
-        Links(map).Should().NotContain(l => l.Item4 == 1 || l.Item3 == 1, "no corridor to either");
         foreach (var leak in new[] { "u3", "h5", "Secret Treasury", "Room h5", "c2", "e4" }) json.Should().NotContain(leak);
         map.GetProperty("room").GetString().Should().Be("q1", "the current room's id, as Room.Info sends it");
-        // the text map does draw them, as before: a "?" east and south, and the south corridor
-        text.Should().Contain("@   ?");
+    }
+
+    [Fact]
+    public async Task ClientMap_LeavesOutAHiddenExit_AndTheRoomBehindIt()
+    {
+        var (bytes, text, _, _) = await MapScreen(Hero());
+        var map = Of(bytes, "Client.Map").Single();
+        Rooms(map).Should().NotContain(r => r.x == 0 && r.y == 1, "h5 is reached only through the hidden exit");
+        Links(map).Should().NotContain(l => l.Item2 == 1 || l.Item4 == 1, "no corridor through the hidden exit");
+        // the text map does draw them, as before: a \"?\" south and the south corridor
         text.Should().Contain("│");
+    }
+
+    [Fact]
+    public async Task ClientMap_AfterTheHiddenExitIsRevealed_ItAndTheRoomBehindItAreIn()
+    {
+        var (bytes, _, _, _) = await MapScreen(Hero(), f => f.Rooms.Single(r => r.Id == "q1").Exits[Direction.South].IsRevealed = true);
+        var map = Of(bytes, "Client.Map").Single();
+        Rooms(map).Should().Contain((0, 1, "unknown"), "the revealed way leads to h5, not yet visited");
+        Links(map).Should().Contain((0, 0, 0, 1), "the revealed corridor is drawn");
+    }
+
+    [Fact]
+    public async Task ClientMap_ARoomReachedByAnOpenPathToo_IsIn_ButTheHiddenCorridorIsOut()
+    {
+        // e4 (west of q1) also leads to h5 by an open exit; q1's way south to it is still hidden
+        var (bytes, _, _, _) = await MapScreen(Hero(), f => f.Rooms.Single(r => r.Id == "e4").Exits[Direction.South] = new RoomExit("h5", "a low passage"));
+        var map = Of(bytes, "Client.Map").Single();
+        Rooms(map).Should().Contain((0, 1, "unknown"), "an open path reaches h5");
+        Links(map).Should().NotContain((0, 0, 0, 1), "the corridor through the hidden exit stays out");
+    }
+
+    [Fact]
+    public async Task ClientMap_AnUnknownRoom_ReadsUnknown_WhateverIsInIt()
+    {
+        // u3 holds monsters, treasure and a trap; make it the boss room with the stairs as well
+        var (bytes, text, _, _) = await MapScreen(Hero(), f =>
+        {
+            var u3 = f.Rooms.Single(r => r.Id == "u3");
+            u3.IsBossRoom = true;
+            u3.HasStairsDown = true;
+        });
+        var map = Of(bytes, "Client.Map").Single();
+        Rooms(map).Should().Contain((1, 0, "unknown"));
+        var u = map.GetProperty("rooms").EnumerateArray().Single(r => r.GetProperty("x").GetInt32() == 1);
+        u.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(new[] { "x", "y", "kind" }, "nothing else about an unknown room");
+        text.Should().Contain("@   ?", "the text map shows it as a \"?\" too");
     }
 
     [Fact]
@@ -536,7 +579,7 @@ public class WebClient3aTests
         var lines = text.Split('\n');
         int top = Array.FindIndex(lines, l => l.Contains(Loc.Get("dungeon.map_legend_title"))) - 1;   // the first room row
         char At(int x, int y) { string l = lines[top + (y - minY) * 2]; int c = 4 + (x - minX) * 4; return c < l.Length ? l[c] : ' '; }
-        var glyph = new Dictionary<string, char> { ["here"] = '@', ["cleared"] = '#', ["monsters"] = '█', ["safe"] = '·', ["stairs"] = '>', ["boss"] = 'B' };
+        var glyph = new Dictionary<string, char> { ["unknown"] = '?', ["here"] = '@', ["cleared"] = '#', ["monsters"] = '█', ["safe"] = '·', ["stairs"] = '>', ["boss"] = 'B' };
         foreach (var (x, y, kind) in Rooms(map)) At(x, y).Should().Be(glyph[kind], "the room at {0},{1} is drawn as {2}", x, y, kind);
         foreach (var (x1, y1, x2, y2) in Links(map))
         {
@@ -552,16 +595,26 @@ public class WebClient3aTests
     }
 
     [Fact]
-    public async Task ClientMap_IsSentOnlyByTheMapScreen_NotTheScreenReaderNavigator()
+    public async Task ClientMap_IsSentWithEachRoomDraw_AndByTheMapScreen_ButNotForTheScreenReader()
     {
+        using (var s = new Scope("web", Hero()))
+        {
+            var t = s.Term();
+            var (d, _) = WebFlagOff200Tests.Dungeon(Hero(), t);
+            Invoke(d, typeof(DungeonLocation), "DisplayLocation");
+            var map = Of(s.Bytes(t), "Client.Map").Should().ContainSingle("one map with each room draw").Subject;
+            map.GetProperty("room").GetString().Should().Be("q1");
+            Rooms(map).Should().Contain((0, 0, "here"));
+        }
         var hero = Hero(screenReader: true);
         var (bytes, _, _, _) = await MapScreen(hero, screenReader: true);
         Of(bytes, "Client.Map").Should().BeEmpty("the screen reader's map is a text navigator; no map is drawn");
-        // and a room draw sends none
-        using var s = new Scope("web", Hero());
-        var t = s.Term();
-        var (d, _) = WebFlagOff200Tests.Dungeon(Hero(), t);
-        Invoke(d, typeof(DungeonLocation), "DisplayLocation");
-        Of(s.Bytes(t), "Client.Map").Should().BeEmpty();
+        using (var s = new Scope("web", Hero(screenReader: true), screenReader: true))
+        {
+            var t = s.Term(plain: true);
+            var (d, _) = WebFlagOff200Tests.Dungeon(Hero(screenReader: true), t);
+            Invoke(d, typeof(DungeonLocation), "DisplayLocation");
+            Of(s.Bytes(t), "Client.Map").Should().BeEmpty("nor with a room draw for the screen reader");
+        }
     }
 }

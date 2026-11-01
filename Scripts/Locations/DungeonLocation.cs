@@ -2600,6 +2600,7 @@ public class DungeonLocation : BaseLocation
             DisplayRoomView(room);
             // 2.0: the web client's room detail and room menu, from this session's own draw only
             EmitRoomDetail(room);
+            EmitWebMapForRoom();
             EmitRoomMenu(room);
         }
         else
@@ -13979,24 +13980,50 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// 2.0 phase 3a: GMCP Client.Map for the web client, sent from the map screen (M) as it draws. Rooms at their
-    /// BuildRoomPositionMap places, each with the symbol the text map prints (GetRoomMapChar), and the corridors the text
-    /// map draws (from an explored room, west or south, to the room placed beside it). Only explored rooms and the room
-    /// the player stands in are listed: an unexplored room, which the text map marks with a "?", is left out, and so is
-    /// any corridor through an exit that is hidden and not yet revealed, so the frame names no room the player has not
-    /// seen and no secret way. The header's counts (explored, total, cleared), the floor and the location line as the
-    /// text prints them; room is the current room's id, as Room.Info sends it. Web client sessions only.
+    /// 2.0 phase 3a: Client.Map with each room draw, so the web client's map follows the player from room to room.
+    /// Not for the screen reader, whose map screen draws no map. The web client check comes before any position work.
+    /// </summary>
+    private void EmitWebMapForRoom()
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || currentFloor == null || GameConfig.ScreenReaderMode) return;
+        var roomPositions = BuildRoomPositionMap();
+        if (roomPositions.Count == 0) return;
+        EmitWebMap(roomPositions, currentFloor.Rooms.Count(r => r.IsExplored), currentFloor.Rooms.Count, currentFloor.Rooms.Count(r => r.IsCleared));
+    }
+
+    /// <summary>
+    /// 2.0 phase 3a: GMCP Client.Map for the web client, sent from the map screen (M) as it draws and with each room
+    /// draw (EmitWebMapForRoom). Rooms at their BuildRoomPositionMap places, each with the symbol the text map prints
+    /// (GetRoomMapChar), and the corridors the text map draws (from an explored room, west or south, to the room placed
+    /// beside it). Explored rooms and the room the player stands in are always listed. An unexplored room, a "?" on the
+    /// text map, is listed as "unknown" with nothing else about it, but only when it can be reached through exits that
+    /// are not hidden and unrevealed, from the entrance or from a room the player has seen; a corridor through a hidden,
+    /// unrevealed exit is never listed. So the frame names no secret way and no room that only a secret way leads to,
+    /// though the text map draws both. The header's counts (explored, total, cleared), the floor and the location line
+    /// as the text prints them; room is the current room's id, as Room.Info sends it. Web client sessions only.
     /// </summary>
     private void EmitWebMap(Dictionary<string, (int x, int y)> roomPositions, int explored, int total, int cleared)
     {
         if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || currentFloor == null) return;
+        static bool Open(RoomExit e) => !(e.IsHidden && !e.IsRevealed);
+        // the rooms reachable without a secret way: from the entrance and every room the player has seen, over open exits
+        var byId = new Dictionary<string, DungeonRoom>();
+        foreach (var r in currentFloor.Rooms) byId.TryAdd(r.Id, r);
+        var reachable = new HashSet<string>();
+        var queue = new Queue<string>();
+        void Seed(string? id) { if (!string.IsNullOrEmpty(id) && byId.ContainsKey(id) && reachable.Add(id)) queue.Enqueue(id); }
+        Seed(string.IsNullOrEmpty(currentFloor.EntranceRoomId) ? currentFloor.Rooms.FirstOrDefault()?.Id : currentFloor.EntranceRoomId);
+        Seed(currentFloor.CurrentRoomId);
+        foreach (var r in currentFloor.Rooms) if (r.IsExplored) Seed(r.Id);
+        while (queue.Count > 0)
+            foreach (var exit in byId[queue.Dequeue()].Exits.Values)
+                if (Open(exit)) Seed(exit.TargetRoomId);
         var listed = new Dictionary<string, (DungeonRoom room, int x, int y)>();
         foreach (var (id, pos) in roomPositions)
         {
-            var room = currentFloor.Rooms.FirstOrDefault(r => r.Id == id);
-            if (room != null && (room.IsExplored || room.Id == currentFloor.CurrentRoomId)) listed[id] = (room, pos.x, pos.y);
+            if (!byId.TryGetValue(id, out var room)) continue;
+            if (room.IsExplored || room.Id == currentFloor.CurrentRoomId || reachable.Contains(id)) listed[id] = (room, pos.x, pos.y);
         }
-        static bool Open(RoomExit e) => !(e.IsHidden && !e.IsRevealed);
         var links = new List<object>();
         foreach (var (room, x, y) in listed.Values)
         {
@@ -14031,6 +14058,7 @@ public class DungeonLocation : BaseLocation
                     '>' => "stairs",
                     '#' => "cleared",
                     '\u2588' => "monsters",
+                    '?' => "unknown",   // GetRoomMapChar gives '?' before boss, stairs or monsters: nothing else of it
                     _ => "safe",
                 },
             }).ToList(),

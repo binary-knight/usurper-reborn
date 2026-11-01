@@ -164,6 +164,8 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .mroom.k-boss::after { content: "B"; color: var(--rubric); font-size: 11px; }
 .chron .mroom.k-stairs::after { content: ">"; color: var(--ink-0); font-size: 11px; background: var(--page); padding: 0 1px; }
 .chron .mroom.k-here { border: 2px solid var(--st-ink); z-index: 1; }
+.chron .mroom.k-unknown { border-style: dashed; border-color: #b3a993; background: transparent; }
+.chron .mroom.k-unknown::after { content: "?"; color: var(--ink-3); font-size: 10px; }
 .chron .mroom.k-here::after { content: "@"; color: var(--st-ink); font-size: 13px; }
 .chron .mapcard .cap { font-family: var(--display); font-size: 13px; letter-spacing: .1em; color: var(--ink-3); text-align: center; max-width: 9em; }
 .chron .ccomp { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 46px); gap: 5px; }

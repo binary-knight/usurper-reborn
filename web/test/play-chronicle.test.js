@@ -715,7 +715,7 @@ test('the floor scene comes from themeId, the same in every language; the transl
 
 const MAP = {
   level: 6, theme: 'Catacombs', themeId: 'Catacombs', explored: 4, total: 6, cleared: 2, room: 'room_4', location: 'Hall of the Ancestors', bossDefeated: false,
-  rooms: [{ x: 0, y: 0, kind: 'here' }, { x: 0, y: -1, kind: 'cleared' }, { x: -1, y: 0, kind: 'safe' }, { x: -1, y: 1, kind: 'monsters' }],
+  rooms: [{ x: 0, y: 0, kind: 'here' }, { x: 0, y: -1, kind: 'cleared' }, { x: -1, y: 0, kind: 'safe' }, { x: -1, y: 1, kind: 'monsters' }, { x: 1, y: 0, kind: 'unknown' }],
   links: [{ x1: 0, y1: 0, x2: -1, y2: 0 }, { x1: -1, y1: 0, x2: -1, y2: 1 }],
 };
 function inRoomWithMap(p, map) {
@@ -735,19 +735,24 @@ test('the room shows the map beside the exits (D3) while it is the map drawn fro
   const m = nav.querySelector('.cmap');
   assert.strictEqual(m.getAttribute('role'), 'img');
   assert.strictEqual(m.getAttribute('aria-label'), 'Map of the floor, 4 of 6 rooms explored');
-  assert.deepStrictEqual(m.querySelectorAll('.mroom').map((r) => r.getAttribute('class')), ['mroom k-here', 'mroom k-cleared', 'mroom k-safe', 'mroom k-monsters']);
+  assert.deepStrictEqual(m.querySelectorAll('.mroom').map((r) => r.getAttribute('class')), ['mroom k-here', 'mroom k-cleared', 'mroom k-safe', 'mroom k-monsters', 'mroom k-unknown'], 'a room not yet seen is drawn as unknown');
   assert.deepStrictEqual(m.querySelectorAll('.mlink').map((r) => r.getAttribute('class')), ['mlink h', 'mlink v']);
   assert.strictEqual(nav.querySelector('.mapcard .cap').textContent, 'Map: 4/6 explored');
   assert.strictEqual(m.textContent, '', 'the map is a picture with its words in the label');
   // the rooms sit on a grid: the current room east of the safe one, the cleared one above it
   const at = (r) => [parseFloat(r.style.left) + parseFloat(r.style.width) / 2, parseFloat(r.style.top) + parseFloat(r.style.height) / 2];
-  const [here, up, west, down] = m.querySelectorAll('.mroom').map(at);
+  const [here, up, west, down, east] = m.querySelectorAll('.mroom').map(at);
   assert.ok(here[0] === up[0] && up[1] < here[1] && west[1] === here[1] && west[0] < here[0] && down[0] === west[0] && down[1] > west[1]);
-  // a move to another room: the map would be out of date, so it stays out until the map screen is opened again
+  assert.ok(east[1] === here[1] && east[0] > here[0], 'the unknown room east of the current one');
+  // a move to another room: the old map would be out of date, so it stays out until the new room's map comes
   frame(p, 'Room.Info', { num: 'room_5', name: 'Crypt', area: 'Dungeon Floor 6' });
   frame(p, 'Room.Detail', ROOM_DETAIL);
   assert.strictEqual(p.el('c-body').querySelector('.mapcard'), null);
   assert.ok(p.el('c-body').querySelector('.compcard'), 'the exits stay');
+  // the game sends the map with each room draw: the new room's map shows
+  frame(p, 'Client.Map', Object.assign({}, MAP, { room: 'room_5' }));
+  frame(p, 'Room.Detail', ROOM_DETAIL);
+  assert.ok(p.el('c-body').querySelector('.mapcard'), 'the map drawn from the new room');
   // another floor's map is not this floor's
   const q = await chronicle();
   inRoomWithMap(q, Object.assign({}, MAP, { level: 7 }));
@@ -755,15 +760,15 @@ test('the room shows the map beside the exits (D3) while it is the map drawn fro
   assert.deepStrictEqual(p.errors, []);
 });
 
-test('odd Client.Map rooms and corridors are dropped: unknown kinds, broken places, corridors to rooms not listed', async () => {
+test('odd Client.Map rooms and corridors are dropped: kinds the page does not know, broken places, corridors to rooms not listed', async () => {
   const p = await chronicle();
   inRoomWithMap(p, Object.assign({}, MAP, {
-    rooms: MAP.rooms.concat([{ x: 1, y: 0, kind: 'unknown' }, { x: 2.5, y: 0, kind: 'safe' }, { x: '3', y: 0, kind: 'safe' }, { x: 0, y: 0, kind: 'safe' },
+    rooms: MAP.rooms.concat([{ x: 2, y: 0, kind: 'secret' }, { x: 2.5, y: 0, kind: 'safe' }, { x: '3', y: 0, kind: 'safe' }, { x: 0, y: 0, kind: 'safe' },
       { x: 9, y: 9, kind: '__proto__' }, { x: 1e9, y: 0, kind: 'safe' }, null, 5]),
-    links: MAP.links.concat([{ x1: 0, y1: 0, x2: 1, y2: 0 }, { x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: -1, y2: 1 }, { x1: 'a' }, null]),
+    links: MAP.links.concat([{ x1: 1, y1: 0, x2: 2, y2: 0 }, { x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: -1, y2: 1 }, { x1: 'a' }, null]),
   }));
   const m = p.el('c-body').querySelector('.cmap');
-  assert.strictEqual(m.querySelectorAll('.mroom').length, 4, 'only the four good rooms');
+  assert.strictEqual(m.querySelectorAll('.mroom').length, 5, 'only the five good rooms');
   assert.strictEqual(m.querySelectorAll('.mlink').length, 2, 'only corridors between two listed rooms side by side');
   for (const bad of [null, 5, 'x', { rooms: 'x', links: 5 }, { rooms: [{ x: { toString: null } }] }]) {
     p.ctx.__d = bad;
