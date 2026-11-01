@@ -520,8 +520,13 @@ public class WebMenu200Tests
         var parse = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "ParseCombatAction");
         var arms = parse.DescendantNodes().OfType<SwitchExpressionArmSyntax>()
             .Select(a => a.Pattern).OfType<ConstantPatternSyntax>().Select(p => ((LiteralExpressionSyntax)p.Expression).Token.ValueText).ToList();
-        items.Keys.Where(k => k.Length == 1 && !char.IsDigit(k[0]) || k == "SPD").Should().BeEquivalentTo(arms.Append("SPD"),
-            "the menu holds every ParseCombatAction key (S is one) and SPD");
+        // B and J parse as Coat Blade and herbs, but the PvP round has no case for either: they make a plain attack
+        items.Keys.Where(k => k.Length == 1 && !char.IsDigit(k[0]) || k == "SPD").Should().BeEquivalentTo(arms.Except(new[] { "B", "J" }).Append("SPD"),
+            "the menu holds every ParseCombatAction key (S is one) that does what it says in PvP, and SPD");
+        var pvpRound = CSharpSyntaxTree.ParseText(Source("Scripts/Systems/CombatEngine.cs")).GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+            .Single(m => m.Identifier.Text == "ProcessPlayerVsPlayerAction").ToString();
+        pvpRound.Should().NotContain("CombatActionType.CoatBlade").And.NotContain("CombatActionType.UseHerb", "if the PvP round learns them, list B and J");
+        pvpRound.Should().Contain("CombatActionType.Rage").And.Contain("CombatActionType.RangedAttack").And.Contain("CombatActionType.QuickHeal");
         foreach (var k in new[] { "P", "E", "F", "M" })
         {
             items[k].Enabled.Should().BeFalse("{0} is refused in PvP", k);
@@ -529,7 +534,7 @@ public class WebMenu200Tests
             action.Type.Should().Be(CombatActionType.Defend, "{0} was refused and the D after it taken", k);
             text.Should().Contain(Loc.Get("combat.pvp_action_unavailable"));
         }
-        foreach (var k in new[] { "A", "H", "Q", "R", "I", "T", "L", "V", "G", "B", "J" })
+        foreach (var k in new[] { "A", "H", "Q", "R", "I", "T", "L", "V", "G" })
         {
             items[k].Enabled.Should().BeTrue();
             var h = Hero(cls: CharacterClass.Barbarian);
@@ -696,6 +701,44 @@ public class WebMenu200Tests
         features.Should().Equal("a cracked altar", "a rusted lever");
         foreach (var f in features) text.Should().Contain("  - " + f);
         json.Should().NotContain("a used thing", "an examined feature is not listed in the text");
+    }
+
+    [Fact]
+    public void RoomDetail_InTheCompactView_HasNoExitDescriptions_AsItsTextHasNone()
+    {
+        var hero = Hero();
+        using var s = new Scope("web", hero);
+        GameConfig.CompactMode = true; // this session's compact (BBS) layout
+        var t = s.Term();
+        var (d, _) = WebFlagOff200Tests.Dungeon(hero, t);
+        Invoke(d, typeof(DungeonLocation), "DisplayLocation");
+        var bytes = s.Bytes(t);
+        string text = Plain(bytes);
+        foreach (var desc in new[] { "a stone arch", "a dark tunnel", "a narrow stair", "a crack in the wall" })
+            text.Should().NotContain(desc, "the compact exit line prints keys and states only");
+        var detail = Of(bytes, "Room.Detail").Single();
+        string json = detail.GetRawText();
+        foreach (var desc in new[] { "a stone arch", "a dark tunnel", "a narrow stair", "a crack in the wall" })
+            json.Should().NotContain(desc);
+        detail.TryGetProperty("header", out _).Should().BeFalse("the compact view prints no Level and theme line");
+        foreach (var e in detail.GetProperty("exits").EnumerateArray())
+            text.Should().Contain($"[{e.GetProperty("key").GetString()}]{e.GetProperty("stateLabel").GetString()}");
+        var menu = Of(bytes, "Client.Menu").Single();
+        Items(menu).Where(i => i.Group == Loc.Get("web.menu.exits")).Select(i => i.Label).Should().Equal("north", "east", "west", "south");
+    }
+
+    [Fact]
+    public void EmitTo_SendsOtherPackages_ButNeverTheWebClientOnes()
+    {
+        var other = new MemoryStream();
+        var session = new PlayerSession("webother", "Web", null!, other, null!, null!, System.Threading.CancellationToken.None, gmcpEnabled: true);
+        typeof(PlayerSession).GetProperty("Context")!.SetValue(session,
+            new SessionContext { Username = "webother", OutputStream = other, ConnectionType = "Web", GmcpEnabled = true });
+        GmcpBridge.EmitTo(session, "Client.Menu", new { screen = "x" });
+        GmcpBridge.EmitTo(session, "Room.Detail", new { name = "x" });
+        other.Length.Should().Be(0, "a web client package never goes to another session");
+        GmcpBridge.EmitTo(session, "Comm.Channel.Text", new { text = "hi" });
+        Frames(other.ToArray()).Select(f => f.Package).Should().Equal("Comm.Channel.Text");
     }
 
     /// <summary>A Random whose trap detection roll always misses (NextDouble 0.99).</summary>

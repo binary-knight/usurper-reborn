@@ -69,8 +69,9 @@ public partial class CombatEngine
     /// <summary>
     /// 2.0: the PvP prompt's keys (GetPlayerAction with a PvP opponent: S, SPD, the quickbar, then ParseCombatAction).
     /// Power Attack, Precise Strike, Fight to Death and Beg for Mercy are refused in PvP and listed as not enabled.
-    /// G, B and J are listed only while ParseCombatAction reads them as Rage, Coat Blade and the herb pouch; otherwise
-    /// they fall through to its default, a plain attack, as any other key does.
+    /// G is listed only while ParseCombatAction reads it as Rage; otherwise it falls through to its default, a plain
+    /// attack, as any other key does. B and J are not listed: ParseCombatAction reads them as Coat Blade and the herb
+    /// pouch, but ProcessPlayerVsPlayerAction has no case for either, so in PvP they too make a plain attack.
     /// </summary>
     internal List<WebMenuGroup> PvpMenuGroups(Character player)
     {
@@ -82,8 +83,6 @@ public partial class CombatEngine
             new("V", Loc.Get("combat.ranged_short")),
         };
         if (player.Class == CharacterClass.Barbarian && !player.IsRaging) tactics.Add(new("G", Loc.Get("combat.rage_short")));
-        if (player.PoisonVials > 0) tactics.Add(new("B", Loc.Get("combat.coat_blade_short", player.PoisonVials)));
-        if (player.TotalHerbCount > 0) tactics.Add(new("J", Loc.Get("combat.herb_pouch_short", player.TotalHerbCount)));
         tactics.Add(new("P", Loc.Get("combat.power_attack"), false));
         tactics.Add(new("E", Loc.Get("combat.precise_strike"), false));
         tactics.Add(new("F", Loc.Get("combat.fight_death_short"), false));

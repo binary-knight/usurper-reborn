@@ -2636,20 +2636,22 @@ public class DungeonLocation : BaseLocation
     /// header's level and theme ("Level 6 | Catacombs") and danger rating out of 3 (ShowDangerIndicators prints both),
     /// the cleared, danger and boss tags it prints, each exit with the state its line shows (no target room, nothing
     /// about rooms not yet seen), and the features listed under "You notice". No trap: the text names one only on a
-    /// random roll. Web client sessions only.
+    /// random roll. The compact (BBS) view prints no exit descriptions and no "Level 6 | theme" line, so for it those
+    /// are left out and the exit state is the compact line's. Web client sessions only.
     /// </summary>
     private void EmitRoomDetail(DungeonRoom room)
     {
         if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || currentFloor == null) return;
+        bool compact = IsBBSSession;
         // fully cleared shows on the screen reader exit list, and on the other lists under the global screen reader mode
-        bool fullyClearedShown = IsBBSSession ? GameConfig.ScreenReaderMode : IsScreenReader || GameConfig.ScreenReaderMode;
+        bool fullyClearedShown = compact ? GameConfig.ScreenReaderMode : IsScreenReader || GameConfig.ScreenReaderMode;
         var exits = room.Exits.Select(e =>
         {
             var state = ShownExitState(room, e.Value, fullyClearedShown);
             return new
             {
                 key = GetDirectionKey(e.Key),
-                description = e.Value.Description,
+                description = compact ? null : e.Value.Description,
                 state = state switch
                 {
                     ExitShown.FullyCleared => "fully_cleared",
@@ -2658,7 +2660,7 @@ public class DungeonLocation : BaseLocation
                     ExitShown.Unknown => "unknown",
                     _ => null,
                 },
-                stateLabel = state == ExitShown.Nothing ? null : ExitStateLabel(state),
+                stateLabel = state == ExitShown.Nothing ? null : compact ? BbsExitStateLabel(state) : ExitStateLabel(state),
             };
         }).ToList();
         string theme = GetThemeShortName(currentFloor.Theme);
@@ -2667,7 +2669,7 @@ public class DungeonLocation : BaseLocation
             name = room.Name,
             level = currentDungeonLevel,
             theme,
-            header = $"{Loc.Get("dungeon.bbs_level")} {currentDungeonLevel} | {theme}",
+            header = compact ? null : $"{Loc.Get("dungeon.bbs_level")} {currentDungeonLevel} | {theme}",
             danger = new { rating = room.DangerRating, max = 3 },
             status = room.IsCleared ? "cleared" : room.HasMonsters ? "danger" : null,
             boss = room.IsBossRoom,
@@ -2676,12 +2678,17 @@ public class DungeonLocation : BaseLocation
         });
     }
 
-    /// <summary>2.0 phase 1: the room's Client.Menu: its exits, then RoomActions (the list the room key handler reads).</summary>
+    /// <summary>
+    /// 2.0 phase 1: the room's Client.Menu: its exits, then RoomActions (the list the room key handler reads). An exit
+    /// is labelled with the description its line shows; the compact (BBS) view shows none, so there it is the direction.
+    /// </summary>
     private void EmitRoomMenu(DungeonRoom room)
     {
+        bool compact = IsBBSSession;
         UsurperRemake.Server.WebClientMenu.Emit(UsurperRemake.Server.WebClientMenu.DungeonRoom, () => new List<UsurperRemake.Server.WebMenuGroup>
         {
-            new(Loc.Get("web.menu.exits"), room.Exits.Select(e => new UsurperRemake.Server.WebMenuItem(GetDirectionKey(e.Key), e.Value.Description)).ToList()),
+            new(Loc.Get("web.menu.exits"), room.Exits.Select(e => new UsurperRemake.Server.WebMenuItem(GetDirectionKey(e.Key),
+                compact ? Loc.Get($"dungeon.dir_{e.Key.ToString().ToLowerInvariant()}") : e.Value.Description)).ToList()),
             new(Loc.Get("web.menu.actions"), RoomActions(room).Select(a => new UsurperRemake.Server.WebMenuItem(a.Key, a.Label, a.Enabled)).ToList()),
         });
     }
@@ -2868,14 +2875,7 @@ public class DungeonLocation : BaseLocation
         foreach (var exit in room.Exits)
         {
             var dirKey = GetDirectionKey(exit.Key);
-            string status = ShownExitState(room, exit.Value, GameConfig.ScreenReaderMode) switch
-            {
-                ExitShown.FullyCleared => Loc.Get("dungeon.exit_all_clear"),
-                ExitShown.Cleared => Loc.Get("dungeon.exit_cleared"),
-                ExitShown.Explored => Loc.Get("dungeon.exit_explored"),
-                ExitShown.Unknown => "(?)",
-                _ => "",
-            };
+            string status = BbsExitStateLabel(ShownExitState(room, exit.Value, GameConfig.ScreenReaderMode));
             terminal.SetColor("darkgray");
             terminal.Write(" [");
             terminal.SetColor("bright_cyan");
@@ -3257,6 +3257,16 @@ public class DungeonLocation : BaseLocation
             return fullyClearedShown && IsDirectionFullyCleared(exit.TargetRoomId, room.Id) ? ExitShown.FullyCleared : ExitShown.Cleared;
         return targetRoom.IsExplored ? ExitShown.Explored : ExitShown.Unknown;
     }
+
+    /// <summary>2.0: the status the compact (BBS) exit line prints after the key.</summary>
+    private static string BbsExitStateLabel(ExitShown state) => state switch
+    {
+        ExitShown.FullyCleared => Loc.Get("dungeon.exit_all_clear"),
+        ExitShown.Cleared => Loc.Get("dungeon.exit_cleared"),
+        ExitShown.Explored => Loc.Get("dungeon.exit_explored"),
+        ExitShown.Unknown => "(?)",
+        _ => "",
+    };
 
     private static string ExitStateLabel(ExitShown state) => state switch
     {
