@@ -309,7 +309,7 @@
         renderChronNow();
     }
     function loadLanguage(code) {
-        return fetch('/lang/' + code + '.json')
+        return fetch('/lang/' + code + '.json', { cache: 'no-cache' })
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 strings = data || {};
