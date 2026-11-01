@@ -92,7 +92,8 @@ test('every script and json file in the web folder is either loaded by a page or
   (function all(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const f = path.join(dir, e.name);
-      if (e.name === 'node_modules' || f === path.join(WEB, 'test')) continue;
+      // web/wiki is the generated public wiki (tools/wiki-build, gitignored): pages, its scripts and its page list
+      if (e.name === 'node_modules' || f === path.join(WEB, 'test') || f === path.join(WEB, 'wiki')) continue;
       if (e.isDirectory()) all(f); else if (/\.(js|json)$/.test(e.name)) files.push(f);
     }
   })(WEB);
