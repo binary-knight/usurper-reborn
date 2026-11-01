@@ -2659,6 +2659,8 @@ public partial class CombatEngine
                 return new CombatAction { Type = CombatActionType.Status };
             }
 
+            quickbarHintDrawn = false; // 2.0: set by a menu drawer that prints the quickbar ?N hint line
+
             // Display combat menu. Phase 2: Electron mode emits the structured
             // menu state for the graphical client to render and SKIPS the text
             // menu entirely — the buttons are graphical, no need for keys
@@ -2684,7 +2686,7 @@ public partial class CombatEngine
 
             // 2.0: the PvP prompt's Client.Menu, web client only (a monster here is the retired single foe path)
             if (!GameConfig.ElectronMode && isPvP)
-                WebClientMenu.Emit(WebClientMenu.CombatPvp, () => PvpMenuGroups(player));
+                WebClientMenu.Emit(WebClientMenu.CombatPvp, () => PvpMenuGroups(player), QuickbarHintIfDrawn);
 
             // Prompt text only when terminal is the user's primary surface.
             if (!GameConfig.ElectronMode)
@@ -2816,6 +2818,7 @@ public partial class CombatEngine
             }
             terminal.SetColor("darkgray");
             terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_hint")}");
+            quickbarHintDrawn = true; // 2.0: the web client's Client.Menu carries this line as its hint
             terminal.SetColor("white");
         }
         terminal.WriteLine("");
@@ -15103,6 +15106,8 @@ public partial class CombatEngine
             var classInfo = GetClassSpecificActions(player);
             var miracleOffered = MiracleOffered(player, monsters, result);   // 1.2.0 Temple gods piece 5
 
+            quickbarHintDrawn = false; // 2.0: set by a menu drawer that prints the quickbar ?N hint line
+
             // Phase 2: Electron mode emits the structured menu state for the
             // graphical client and skips the text menu entirely.
             if (GameConfig.ElectronMode)
@@ -15126,7 +15131,7 @@ public partial class CombatEngine
 
             // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
             if (!GameConfig.ElectronMode)
-                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered));
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn);
 
             if (!GameConfig.ElectronMode)
             {

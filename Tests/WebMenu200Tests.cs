@@ -396,15 +396,45 @@ public class WebMenu200Tests
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(12)]
-    public void Classic_ClientMenu_ListsTheDrawnKeys_EachOneTheHandlerTakes(int level)
+    public void Classic_ClientMenu_ListsExactlyTheDrawnKeys_EachOneTheHandlerTakes(int level)
     {
         var hero = Hero(level, classic: true);
-        var keys = MenuKeys(hero);
-        var view = new MainStreetLocation.StreetView(MainStreetLocation.TierForLevel(level), false, false);
-        var drawn = MainStreetLocation.ClassicVisualRows.SelectMany(r => MainStreetLocation.ClassicShown(r, view)).Select(i => i.Key).ToList();
-        keys.Should().BeEquivalentTo(drawn, "the classic menu is what its rows draw");
+        string text;
+        List<string> keys;
+        using (var s = new Scope("web", hero))
+        {
+            var t = s.Term();
+            Invoke(Street(hero, t), typeof(MainStreetLocation), "ShowMainStreetMenu");
+            var bytes = s.Bytes(t);
+            keys = Items(Of(bytes, "Client.Menu").Single()).Select(i => i.Key).ToList();
+            text = Plain(bytes);
+        }
+        // listed == drawn: the keys the classic text menu prints as [K], read from the text itself
+        var drawn = Regex.Matches(text, @"\[(.)\]").Select(m => m.Groups[1].Value).ToList();
+        keys.Should().BeEquivalentTo(drawn, "the classic Client.Menu lists exactly what the classic menu draws");
+        keys.Should().OnlyHaveUniqueItems();
+
+        // listed is a subset of accepted
         var handled = CaseLabels("Scripts/Locations/MainStreetClassic.cs", "ProcessClassicChoice").Concat(GlobalKeys).ToHashSet();
         keys.Should().OnlyContain(k => handled.Contains(k), "every listed key is a case of ProcessClassicChoice or a global key");
+
+        // Accepted but intentionally not listed. The classic layout gates only its display (v1.1.14: "every classic key
+        // does what it did, at every level"), so ProcessClassicChoice still takes a place's key below the tier that
+        // draws it, and two keys no classic row has ever drawn: G (Good Deeds) and 9 (does nothing). The menu follows
+        // the screen, not the switch, so these stay out of it.
+        foreach (var hidden in new[] { "G", "9" })
+        {
+            handled.Should().Contain(hidden);
+            keys.Should().NotContain(hidden, "{0} is taken by the handler but never drawn", hidden);
+        }
+        if (level == 1)
+            foreach (var belowTier in new[] { "T", "B", "O", "K", "H", "N", "F" })
+            {
+                handled.Should().Contain(belowTier);
+                keys.Should().NotContain(belowTier, "{0} is taken at level 1 but drawn only from its tier", belowTier);
+                drawn.Should().NotContain(belowTier);
+            }
+
         // online, every online key the row can draw is a case too
         MainStreetLocation.ClassicOnlineItems.Select(o => o.Key).Should().OnlyContain(k => handled.Contains(k));
         var online = MainStreetLocation.ClassicMenuGroups(new MainStreetLocation.StreetView(3, true, false), true).SelectMany(g => g.Items).Select(i => i.Key);
@@ -542,6 +572,51 @@ public class WebMenu200Tests
             var (action, _, _) = await PvpPrompt("door", h, k + "\nD\n");
             action.Type.Should().NotBe(CombatActionType.Defend, "{0} is taken", k);
         }
+    }
+
+    // ------------------------------------------------------------------ the quickbar hint
+
+    private static Character QuickbarHero(bool screenReader, bool filled)
+    {
+        var h = Hero();
+        h.ScreenReaderMode = screenReader;
+        if (filled) h.Quickbar[0] = ClassAbilitySystem.GetAvailableAbilities(h).First().Id;
+        return h;
+    }
+
+    /// <summary>The hint rides on Client.Menu exactly when the text menu printed the quickbar hint line.</summary>
+    private static void HintMatchesText(byte[] bytes, string text, bool expectLine)
+    {
+        string line = "  " + Loc.Get("combat.quickbar_info_hint");
+        text.Contains(line).Should().Be(expectLine, "the text menu {0} the hint line", expectLine ? "prints" : "does not print");
+        var menu = Of(bytes, "Client.Menu").Single();
+        if (expectLine)
+        {
+            var hint = menu.GetProperty("hint");
+            hint.GetProperty("text").GetString().Should().Be(Loc.Get("combat.quickbar_info_hint"));
+            hint.GetProperty("label").GetString().Should().Be(Loc.Get("web.menu.quickbar"));
+        }
+        else
+            menu.TryGetProperty("hint", out _).Should().BeFalse("no hint unless the text drew it");
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]    // the screen reader PvP menu prints the line under a filled quickbar
+    [InlineData(true, false, false)]  // no quickbar, no line
+    [InlineData(false, true, false)]  // the boxed menu has no such line
+    public async Task PvpFight_Hint_IsSentOnlyWhenTheTextDrawsIt(bool screenReader, bool filled, bool expectLine)
+    {
+        var (_, bytes, text) = await PvpPrompt("web", QuickbarHero(screenReader, filled), "D\n");
+        HintMatchesText(bytes, text, expectLine);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DungeonFight_Hint_IsNotSent_AsNoDungeonMenuDrawsTheLine(bool screenReader)
+    {
+        var (_, bytes, text) = await MultiPrompt("web", QuickbarHero(screenReader, filled: true), "D\n");
+        HintMatchesText(bytes, text, expectLine: false);
     }
 
     // ------------------------------------------------------------------ cadence

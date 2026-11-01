@@ -11,6 +11,17 @@ using UsurperRemake.Systems;
 /// </summary>
 public partial class CombatEngine
 {
+    /// <summary>
+    /// 2.0: true when the menu just drawn printed the quickbar hint line ("type ?1-?9 ..."). Cleared before each
+    /// prompt's menu draw and set by the drawer that prints the line, so Client.Menu carries the hint exactly when the
+    /// text shows it.
+    /// </summary>
+    private bool quickbarHintDrawn;
+
+    /// <summary>2.0: the Client.Menu hint for the quickbar line, or null when this draw did not print it.</summary>
+    private WebMenuHint? QuickbarHintIfDrawn() =>
+        quickbarHintDrawn ? new WebMenuHint(Loc.Get("combat.quickbar_info_hint"), Loc.Get("web.menu.quickbar")) : null;
+
     private static string SpeedName(Character player) => player.CombatSpeed switch
     {
         CombatSpeed.Instant => Loc.Get("combat.speed_instant"),
