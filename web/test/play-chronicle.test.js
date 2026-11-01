@@ -38,11 +38,18 @@ function descendants(el, out = []) {
   for (const c of el.children || []) { out.push(c); descendants(c, out); }
   return out;
 }
+// The switch: a radio in the View panel of the drawer.
+const radios = (p) => p.el('view-choice').querySelectorAll('input');
 function change(p, value) {
-  const sel = p.el('view-select');
-  sel.value = value;
-  p.doc.dispatch(sel, 'change');
+  const r = radios(p).find((x) => x.getAttribute('value') === value);
+  if (!r) { p.ctx.__v = value; p.run('UsurperPlay.setView(__v)'); return; }
+  radios(p).forEach((x) => { x.checked = x === r; });
+  p.doc.dispatch(r, 'change');
 }
+const checked = (p) => radios(p).filter((x) => x.checked).map((x) => x.getAttribute('value'));
+// The top bar as it is on main (0a3b1855): the Chronicle work adds nothing to it.
+const MAIN_TOP = ['a.brand', 'span#conn.conn', 'button#reconnect.reconnect', 'button#fit-toggle.fit-toggle', 'nav.top-links', 'a', 'a', 'select#lang-select', 'option'];
+const MAIN_TOP_HTML = "<header class=\"top\">\n    <a class=\"brand\" href=\"/\">Usurper Reborn</a>\n    <span id=\"conn\" class=\"conn\" role=\"status\" data-i18n=\"play.status.connecting\">Connecting...</span>\n    <button id=\"reconnect\" class=\"reconnect\" type=\"button\" hidden data-i18n=\"play.reconnect\">Connect again</button>\n    <button id=\"fit-toggle\" class=\"fit-toggle\" type=\"button\" aria-pressed=\"false\" aria-label=\"Bigger text\" title=\"Bigger text\">Aa</button>\n    <nav class=\"top-links\">\n        <a href=\"/\" data-i18n=\"play.home\">Home</a>\n        <a href=\"/wiki/\" target=\"_blank\" rel=\"noopener\" data-i18n=\"play.wiki\">Wiki</a>\n        <select id=\"lang-select\" aria-label=\"Language\"><option value=\"en\">English</option></select>\n    </nav>\n</header>";
 function player(p) {
   frame(p, 'Char.Vitals', { hp: 40, maxHp: 62, mp: 0, maxMp: 0, combatSp: 100, maxCombatSp: 105 });
   frame(p, 'Char.Status', { name: 'Rowan', class: 'Warrior', level: 3, race: 'Human', gold: 2500, bank: 0, xp: 900, location: 'Main Street' });
@@ -87,7 +94,7 @@ test('Classic is the default for a new viewer: no book, the terminal page as tod
   assert.strictEqual(p.el('text-toggle').closest('.chron'), p.el('chron'), 'the Text page button is in the book');
   assert.ok(!p.doc.body.classList.contains('chron'));
   assert.ok(!p.doc.documentElement.classList.contains('hc'));
-  assert.strictEqual(p.el('view-select').value, 'classic');
+  assert.deepStrictEqual(checked(p), ['classic']);
   assert.strictEqual(p.storage.playView, undefined, 'the default is never written for anyone');
   // The Classic page behaves as before: a fight opens the drawer on a wide screen, and the book stays empty.
   const wide = await load({ matchMedia: (q) => ({ matches: /min-width: 1200px/.test(q) }) });
@@ -141,14 +148,40 @@ test('a storage that throws: the page opens in Classic and the switch still work
   }
 });
 
-test('the switch is in the top bar, the Text page button in the book, both labelled from the language file', async () => {
-  const p = await loadPage(PAGE, { storage: { lang: 'fr', playView: 'chronicle' }, fetch: (url) => (url === '/lang/fr.json' ? lang('fr') : url === '/api/languages' ? LANGS : {}) });
+test('Classic\'s top bar is the one on main: the switch takes no room there at any width', () => {
+  const html = readPage(PAGE);
+  const tree = parseHtml(html);
+  const top = elements(tree).find((e) => e.tag === 'header' && e.attrs.class === 'top');
+  const sig = (e) => e.tag + (e.attrs.id ? '#' + e.attrs.id : '') + (e.attrs.class ? '.' + e.attrs.class.split(/\s+/).join('.') : '');
+  assert.deepStrictEqual(elements(top).map(sig), MAIN_TOP);
+  assert.strictEqual(/<header class="top">[\s\S]*?<\/header>/.exec(html)[0], MAIN_TOP_HTML, 'the top bar markup is byte for byte main\'s');
+  // and the phone rules for the top bar are main's too: nothing narrows the language list
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html)[1];
+  assert.deepStrictEqual(style.match(/\.top-links select \{[^}]*\}/g), ['.top-links select { font: inherit; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--bone); background: var(--card); border: 1px solid var(--iron); padding: 2px 6px; }']);
+  const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
+  assert.doesNotMatch(css, /(^|[\s,}])\.top[\s.{,-]/m, 'the Chronicle stylesheet leaves the top bar alone');
+});
+
+test('the switch is a View panel beside Combat and Chat; the book has a Text page and a Classic button; all from the language file', async () => {
+  const sent = [];
+  const p = await loadPage(PAGE, { storage: { lang: 'fr', playView: 'chronicle' }, WebSocket: socket(sent), fetch: (url) => (url === '/lang/fr.json' ? lang('fr') : url === '/api/languages' ? LANGS : {}) });
   await p.settle();
-  const top = p.doc.querySelector('.top');
-  assert.ok(top.querySelectorAll('select').some((s) => s.getAttribute('id') === 'view-select'));
-  assert.strictEqual(p.el('view-select').getAttribute('aria-label'), 'Affichage');
-  const opts = p.el('view-select').querySelectorAll('option').map((o) => [o.getAttribute('value'), o.textContent]);
-  assert.deepStrictEqual(opts, [['classic', 'Classique'], ['chronicle', 'Chronique'], ['contrast', 'Chronique, contraste élevé']]);
+  assert.strictEqual(p.el('rail-view').textContent, 'Affichage');
+  assert.strictEqual(p.el('tab-view').textContent, 'Affichage');
+  assert.strictEqual(p.el('view-choice').getAttribute('aria-label'), 'Affichage');
+  assert.strictEqual(p.el('view-choice').getAttribute('role'), 'radiogroup');
+  const opts = radios(p).map((o) => [o.getAttribute('value'), o.getAttribute('type'), o.parentElement.textContent.trim()]);
+  assert.deepStrictEqual(opts, [['classic', 'radio', 'Classique'], ['chronicle', 'radio', 'Chronique'], ['contrast', 'radio', 'Chronique, contraste élevé']]);
+  assert.deepStrictEqual(checked(p), ['chronicle']);
+  p.click(p.el('rail-view'));
+  assert.strictEqual(p.el('pane-view').hidden, false);
+  assert.strictEqual(p.el('rail-view').getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(p.el('pane-combat').hidden, true);
+  assert.strictEqual(p.el('classic-back').textContent, 'Classique');
+  p.click(p.el('classic-back'));
+  assert.strictEqual(p.run('UsurperPlay.view()'), 'classic', 'the book has its own way back');
+  assert.deepStrictEqual(checked(p), ['classic']);
+  assert.strictEqual(p.el('chron').hidden, true);
   assert.strictEqual(p.el('text-toggle').textContent, 'Page de texte');
   assert.strictEqual(p.el('text-toggle').getAttribute('type'), 'button');
   assert.ok(p.el('c-verso').querySelector('.rh').querySelectorAll('button').includes(p.el('text-toggle')));
@@ -338,6 +371,53 @@ test('Room.Detail draws the room: its name, level and danger, what you notice, a
   assert.strictEqual(p.el('c-rh').textContent, 'Catacombs · Level 6');
   assert.deepStrictEqual(caps(p), ['E, A dark passage leads east.', 'S, A narrow stair goes down.', 'F, Fight the monsters', 'M, Map']);
   assert.deepStrictEqual(p.errors, []);
+});
+
+const ROOM_SCREEN = ['╔═══════════╗', '║  Hall of the Ancestors  ║', '╚═══════════╝', 'Level 6 | Catacombs   Danger: ** ', '',
+  'A grand hall where skeletal remains sit enthroned.', 'Candles that should have burned out still flicker.', 'Something is watching you from the shadows...', '',
+  'Exits:', '  [E] A dark passage leads east. (cleared)', '  [S] A narrow stair goes down. (unknown)', 'Actions:', '  [F] Fight the monsters  [M] Map', '', '[40hp 100st] Dungeon Fl.6 >'];
+const KEPT = ['A grand hall where skeletal remains sit enthroned.', 'Candles that should have burned out still flicker.', 'Something is watching you from the shadows...', '[40hp 100st] Dungeon Fl.6 >'];
+
+test('with Room.Detail and the room menu, the room text drops the emptied headings and the header line, and keeps the rest', async () => {
+  const p = await chronicle();
+  frame(p, 'Room.Info', { num: 'room_4', name: 'Hall of the Ancestors', area: 'Dungeon Floor 6' });
+  screen(p, ROOM_SCREEN);
+  frame(p, 'Room.Detail', ROOM_DETAIL);
+  frame(p, 'Client.Menu', ROOM_MENU);
+  const lines = p.el('c-body').querySelector('.screen').children.map((l) => l.textContent).filter((t) => t.trim());
+  assert.deepStrictEqual(lines, KEPT);
+});
+
+test('without the room menu the headings and the header line stay; the text page keeps every line', async () => {
+  const p = await chronicle();
+  frame(p, 'Room.Info', { num: 'room_4', name: 'Hall of the Ancestors', area: 'Dungeon Floor 6' });
+  screen(p, ROOM_SCREEN);
+  frame(p, 'Room.Detail', ROOM_DETAIL);
+  const lines = p.el('c-body').querySelector('.screen').children.map((l) => l.textContent).filter((t) => t.trim());
+  for (const kept of ['Level 6 | Catacombs   Danger: **', 'Exits:', 'Actions:', ...KEPT]) assert.ok(lines.some((l) => l.trim() === kept.trim()), kept);
+  // no frames at all: the text page, every row as the game printed it
+  const q = await chronicle();
+  screen(q, ROOM_SCREEN);
+  assert.strictEqual(layout(q), 'text');
+  assert.deepStrictEqual(q.el('c-screen').children.map((l) => l.textContent), ROOM_SCREEN.map((r) => r || ' '));
+  // a heading whose lines stay on the page keeps its heading even with the menu
+  const r = await chronicle();
+  frame(r, 'Room.Info', { num: 'room_4', name: 'Hall', area: 'Dungeon Floor 6' });
+  screen(r, ['Strange marks:', 'A spiral cut into the floor.', 'Exits:', '  [E] A dark passage leads east.']);
+  frame(r, 'Room.Detail', ROOM_DETAIL);
+  frame(r, 'Client.Menu', ROOM_MENU);
+  assert.deepStrictEqual(r.el('c-body').querySelector('.screen').children.map((l) => l.textContent), ['Strange marks:', 'A spiral cut into the floor.']);
+});
+
+test('a key cap is as wide as its key: long keys are marked and never clipped', async () => {
+  const p = await chronicle();
+  screen(p, ['[AUTO] Auto-Combat  [SPD] Speed  [A] Attack', 'Choose action:']);
+  const capsEl = p.el('c-keys').querySelectorAll('.cap');
+  assert.deepStrictEqual(capsEl.map((c) => [c.textContent, c.classList.contains('wide')]), [['AUTO', true], ['SPD', true], ['A', false]]);
+  const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
+  assert.match(css, /^\.chron \.kc \.cap\.wide \{ width: auto !important; white-space: nowrap; \}$/m);
+  for (const m of css.matchAll(/\.kc[^{]*\{[^}]*grid-template-columns: ([^;]+);/g)) assert.doesNotMatch(m[1], /^\d+px 1fr$/, 'the cap column is never a fixed width: ' + m[0].slice(0, 60));
+  for (const m of css.matchAll(/\.cap[^{,]*\{([^}]*)\}/g)) assert.doesNotMatch(m[1], /overflow:\s*hidden/, 'a cap never clips its key');
 });
 
 test('the compass draws nothing the frame does not say: no exits, odd keys, and the Room.Info exits are not used', async () => {

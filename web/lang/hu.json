@@ -564,6 +564,7 @@
   "play.view.classic": "Klasszikus",
   "play.view.chronicle": "Krónika",
   "play.view.contrast": "Krónika, nagy kontraszt",
+  "play.view.hint": "A Klasszikus a terminál oldala. A Krónika könyvként rajzolja meg a játékot; alatta a terminál tovább működik. A választást ez a böngésző megjegyzi.",
   "play.chron.text": "Szöveges oldal",
   "play.chron.plate": "Tábla: {0}",
   "play.chron.plate_level": "Tábla: {0}, {1}. szint",

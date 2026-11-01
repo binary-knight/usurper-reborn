@@ -94,6 +94,9 @@
         .chat-ch.tell { color: #cc88ff; }
         .chat-who { color: var(--bone); font-weight: 600; }
         .chat-text { color: #d8d0c0; }
+        .views { display: grid; gap: 10px; }
+        .view-opt { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
+        .view-opt input { accent-color: var(--gold); width: 18px; height: 18px; margin: 0; }
 
         /* Rail: opens the drawer */
         .rail { flex: none; width: var(--rail-w); display: flex; flex-direction: column; gap: 2px; padding: 16px 0; border-left: 1px solid var(--iron-dark); background: var(--bg-ink); }
@@ -112,7 +115,6 @@
             .brand { font-size: 18px; }
             .top-links { gap: 10px; }
             .top-links a { display: none; }
-            .top-links select { max-width: 88px; padding: 2px 0; }
             .stage { padding: 8px 0 0; gap: 6px; align-items: stretch; }
             .vitals { order: 0; padding: 0 12px; gap: 4px 16px; font-size: 15px; }
             .meter .bar { width: 110px; }
@@ -183,11 +185,6 @@
     <nav class="top-links">
         <a href="/" data-i18n="play.home">Home</a>
         <a href="/wiki/" target="_blank" rel="noopener" data-i18n="play.wiki">Wiki</a>
-        <select id="view-select" aria-label="View">
-            <option value="classic" data-i18n="play.view.classic">Classic</option>
-            <option value="chronicle" data-i18n="play.view.chronicle">Chronicle</option>
-            <option value="contrast" data-i18n="play.view.contrast">Chronicle, high contrast</option>
-        </select>
         <select id="lang-select" aria-label="Language"><option value="en">English</option></select>
     </nav>
 </header>
@@ -197,7 +194,7 @@
         <div class="chron" id="chron" role="region" hidden>
             <div class="book"><div class="spread">
                 <section class="page verso" id="c-verso">
-                    <header class="rh"><span class="t">Usurper Reborn</span><span class="only-phone" id="c-rh-phone"></span><button id="text-toggle" class="text-toggle" type="button" aria-pressed="false" data-i18n="play.chron.text">Text page</button></header>
+                    <header class="rh"><span class="t">Usurper Reborn</span><span class="only-phone" id="c-rh-phone"></span><button id="text-toggle" class="text-toggle" type="button" aria-pressed="false" data-i18n="play.chron.text">Text page</button><button id="classic-back" class="text-toggle" type="button" data-i18n="play.view.classic">Classic</button></header>
                     <figure class="plate">
                         <div class="plate-row"><div class="frame" id="c-frame"></div></div>
                         <figcaption class="plate-cap" id="c-cap"></figcaption>
@@ -239,6 +236,7 @@
         <div class="tabs" role="tablist">
             <button class="tab" type="button" role="tab" id="tab-combat" data-tab="combat" aria-selected="true" data-i18n="play.tab.combat">Combat</button>
             <button class="tab" type="button" role="tab" id="tab-chat" data-tab="chat" aria-selected="false" data-i18n="play.tab.chat">Chat</button>
+            <button class="tab" type="button" role="tab" id="tab-view" data-tab="view" aria-selected="false" data-i18n="play.view.label">View</button>
             <button class="tab-close" type="button" id="drawer-close" data-i18n="play.close">Close</button>
         </div>
         <div class="pane" id="pane-combat" role="tabpanel">
@@ -254,6 +252,14 @@
             <div class="result" id="combat-result" hidden></div>
             <div class="log" id="combat-log"></div>
         </div>
+        <div class="pane" id="pane-view" role="tabpanel" hidden>
+            <p class="hint" data-i18n="play.view.hint">Classic is the terminal page. Chronicle draws the game as a book; the terminal keeps working underneath it. The choice is kept in this browser.</p>
+            <div class="views" id="view-choice" role="radiogroup">
+                <label class="view-opt"><input type="radio" name="play-view" value="classic"> <span data-i18n="play.view.classic">Classic</span></label>
+                <label class="view-opt"><input type="radio" name="play-view" value="chronicle"> <span data-i18n="play.view.chronicle">Chronicle</span></label>
+                <label class="view-opt"><input type="radio" name="play-view" value="contrast"> <span data-i18n="play.view.contrast">Chronicle, high contrast</span></label>
+            </div>
+        </div>
         <div class="pane" id="pane-chat" role="tabpanel" hidden>
             <p class="hint" data-i18n="play.chat.hint">Tells, gossip, shouts and guild lines from other players land here and stay when the screen redraws. Your own lines are not shown here. Type /history in the game to see the last 50 messages, your own included.</p>
             <div class="chat" id="chat-list"></div>
@@ -263,6 +269,7 @@
     <nav class="rail" id="rail" aria-label="Panels" hidden>
         <button type="button" id="rail-combat" data-tab="combat" aria-pressed="false" data-i18n="play.tab.combat">Combat</button>
         <button type="button" id="rail-chat" data-tab="chat" aria-pressed="false" data-i18n="play.tab.chat">Chat</button>
+        <button type="button" id="rail-view" data-tab="view" aria-pressed="false" data-i18n="play.view.label">View</button>
     </nav>
 </main>
 
@@ -295,7 +302,7 @@
         fitBtn.setAttribute('aria-label', t('play.fit.bigger'));
         fitBtn.setAttribute('title', t('play.fit.bigger'));
         document.getElementById('pad').setAttribute('aria-label', t('play.pad.region'));
-        document.getElementById('view-select').setAttribute('aria-label', t('play.view.label'));
+        document.getElementById('view-choice').setAttribute('aria-label', t('play.view.label'));
         document.getElementById('chron').setAttribute('aria-label', t('play.view.chronicle'));
         renderAll();
         renderPadNow();
@@ -491,7 +498,7 @@
         openTab = tab;
         var drawer = document.getElementById('drawer');
         drawer.hidden = !tab;
-        ['combat', 'chat'].forEach(function (name) {
+        ['combat', 'chat', 'view'].forEach(function (name) {
             var on = tab === name;
             document.getElementById('pane-' + name).hidden = !on;
             document.getElementById('tab-' + name).setAttribute('aria-selected', on ? 'true' : 'false');
@@ -506,7 +513,7 @@
         if (isTouch()) queueFit();
     }
     function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal && !isTouch()) terminal.focus(); }
-    ['combat', 'chat'].forEach(function (name) {
+    ['combat', 'chat', 'view'].forEach(function (name) {
         document.getElementById('rail-' + name).addEventListener('click', function () { toggleTab(name); });
         document.getElementById('tab-' + name).addEventListener('click', function () { setDrawer(name); });
     });
@@ -982,7 +989,7 @@
         document.body.classList.toggle('chron', on);
         document.documentElement.classList.toggle('hc', on && (view === 'contrast' || prefersContrast()));
         document.getElementById('chron').hidden = !on;
-        document.getElementById('view-select').value = view;
+        markView();
         if (on) renderChronNow();
         else document.body.classList.remove('chron-lay', 'chron-read');
         fitTerminal();
@@ -993,8 +1000,16 @@
         try { localStorage.setItem('playView', view); } catch (e) {}
         applyView();
     }
-    document.getElementById('view-select').value = view;
-    document.getElementById('view-select').addEventListener('change', function () { setView(this.value); if (terminal && !isTouch()) terminal.focus(); });
+    // The switch lives in the View panel of the drawer (its button sits with Combat and Chat), so Classic's top bar and
+    // terminal keep their room; in Chronicle the book's running head also has a Classic button.
+    function markView() {
+        document.querySelectorAll('#view-choice input').forEach(function (r) { r.checked = r.value === view; });
+    }
+    markView();
+    document.querySelectorAll('#view-choice input').forEach(function (r) {
+        r.addEventListener('change', function () { if (this.checked) setView(this.value); });
+    });
+    document.getElementById('classic-back').addEventListener('click', function () { setView('classic'); if (terminal && !isTouch()) terminal.focus(); });
     document.getElementById('text-toggle').addEventListener('click', function () {
         chron.textOnly = !chron.textOnly;
         renderChronNow();
@@ -1334,12 +1349,25 @@
     }
     // The screen's lines a layout does not place itself. Left out: menu lines whose every key is on the dock, box
     // rules, and the lines the frame names (the room name, the level header). Runs of blank lines become one.
-    function proseRows(rows, known, drop) {
-        var out = [], blank = true;
-        rows.forEach(function (segs) {
+    // With headings on (a room whose keys came from Client.Menu), a heading line ("Exits:") whose own lines all went to
+    // the dock goes too, and so does a line that opens with the level header the chapter line already shows.
+    function proseRows(rows, known, drop, headings) {
+        var out = [], blank = true, kind = rows.map(function (segs) {
             var text = rowText(segs), core = unbox(text);
-            if (!core || BOX_ONLY.test(text)) { if (!blank) out.push([]); blank = true; return; }
-            if (menuLine(text, known) || (drop && drop[core] === 1)) return;
+            if (!core || BOX_ONLY.test(text)) return 'blank';
+            if (menuLine(text, known) || (drop && drop[core] === 1)) return 'gone';
+            if (headings && headings.header && core.indexOf(headings.header) === 0) return 'gone';
+            return 'keep';
+        });
+        if (headings) for (var i = kind.length - 1; i >= 0; i--) {
+            if (kind[i] !== 'keep' || !/:\s*$/.test(unbox(rowText(rows[i])))) continue;
+            var j = i + 1;
+            while (j < kind.length && kind[j] === 'blank') j++;
+            if (j < kind.length && kind[j] === 'gone') kind[i] = 'gone';
+        }
+        rows.forEach(function (segs, i) {
+            if (kind[i] === 'blank') { if (!blank) out.push([]); blank = true; return; }
+            if (kind[i] === 'gone') return;
             out.push(segs);
             blank = false;
         });
@@ -1445,7 +1473,8 @@
             prose.appendChild(el('h1', 'chap', state.room));
             drop[state.room] = 1;
         }
-        prose.appendChild(screenPre(proseRows(chron.rows.slice(chron.start), known, drop), 'screen mini'));
+        var heads = lay === 'room' && d && menuFor(lay) ? { header: d.header } : null;
+        prose.appendChild(screenPre(proseRows(chron.rows.slice(chron.start), known, drop, heads), 'screen mini'));
         body.appendChild(prose);
         if (lay === 'room' && d) body.appendChild(compass(d));
     }

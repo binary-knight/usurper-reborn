@@ -564,6 +564,7 @@
   "play.view.classic": "Clásica",
   "play.view.chronicle": "Crónica",
   "play.view.contrast": "Crónica, alto contraste",
+  "play.view.hint": "Clásica es la página de terminal. Crónica dibuja el juego como un libro; la terminal sigue funcionando debajo. La elección se guarda en este navegador.",
   "play.chron.text": "Página de texto",
   "play.chron.plate": "Lámina: {0}",
   "play.chron.plate_level": "Lámina: {0}, nivel {1}",

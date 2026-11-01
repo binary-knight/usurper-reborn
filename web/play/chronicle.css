@@ -161,9 +161,9 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron[data-layout="fight"] .kgroup, .chron[data-layout="fight"] .kgroup .grid { display: contents; }
 .chron[data-layout="fight"] .kgroup .kh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .chron[data-layout="fight"] .khint { grid-column: 1 / -1; margin-top: 0; }
-.chron .kc { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 9px; width: 100%; min-height: 42px; padding: 5px 10px 5px 5px; text-align: left; cursor: pointer;
+.chron .kc { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 9px; width: 100%; min-height: 42px; padding: 5px 10px 5px 5px; text-align: left; cursor: pointer;
   border: 1px solid var(--iron); border-radius: 3px; background: linear-gradient(#211d19, #161310); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 0 #000; }
-.chron .kc .cap { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--iron-hi); border-radius: 2px; overflow: hidden;
+.chron .kc .cap { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--iron-hi); border-radius: 2px;
   background: linear-gradient(#0f0d0b, #1a1714); box-shadow: inset 0 1px 2px rgba(0,0,0,.8), 0 0 0 1px #000;
   font-family: var(--display); font-size: 21px; line-height: 1; color: var(--rubric-cap); padding-top: 2px; }
 .chron .kc .cap.swash { font-size: 17px; justify-items: start; padding: 0 0 2px 1px; }
@@ -216,7 +216,7 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron .ccomp { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 40px); gap: 4px; }
   .chron .cdir small { font-size: 12px; }
   .chron .grid, .chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid, .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
-  .chron .kc { grid-template-columns: 26px 1fr; gap: 7px; min-height: 38px; padding: 4px 8px 4px 4px; }
+  .chron .kc { grid-template-columns: auto 1fr; gap: 7px; min-height: 38px; padding: 4px 8px 4px 4px; }
   .chron .kc .cap { width: 26px; height: 26px; font-size: 18px; }
   .chron .kc .cap.swash { font-size: 15px; }
   .chron .kc .lb { font-size: 13.5px; letter-spacing: .03em; }
@@ -285,7 +285,7 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron .kc .cap.wide { min-width: 24px; }
   /* Room keys: three a row, the cap beside its label */
   .chron[data-layout="room"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .chron[data-layout="room"] .kc { grid-template-columns: 22px 1fr; justify-items: start; text-align: left; gap: 5px; min-height: 44px; padding: 4px 5px 4px 4px; }
+  .chron[data-layout="room"] .kc { grid-template-columns: auto 1fr; justify-items: start; text-align: left; gap: 5px; min-height: 44px; padding: 4px 5px 4px 4px; }
   .chron[data-layout="room"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
   /* The fight fills the screen: the log takes what the panels and the dock leave, whole lines only. A fight with
      more cards than fit scrolls, with the dock held at the bottom. */
@@ -335,7 +335,7 @@ html.hc .chron .kgroups, html.hc .chron .enterbar, html.hc .chron .foot { border
 html.hc .chron .grid, html.hc .chron[data-layout] .grid, html.hc .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 html.hc .chron .text-toggle { font-family: var(--mono); font-size: 16px; letter-spacing: 0; background: #000; border: 2px solid #fff; color: #fff; }
 html.hc .chron .text-toggle[aria-pressed="true"] { border-width: 4px; color: #ffe14d; }
-html.hc .chron .kc, html.hc .chron .kc.off { background: #000; border: 2px solid #fff; box-shadow: none; min-height: 48px; grid-template-columns: 36px 1fr; gap: 10px; padding: 6px 10px 6px 6px; }
+html.hc .chron .kc, html.hc .chron .kc.off { background: #000; border: 2px solid #fff; box-shadow: none; min-height: 48px; grid-template-columns: auto 1fr; gap: 10px; padding: 6px 10px 6px 6px; }
 html.hc .chron .kc.off { border-style: dashed; }
 html.hc .chron .kc .cap { width: 34px; height: 34px; border: 2px solid #fff; background: #000; color: #ffe14d; box-shadow: none; font-family: var(--mono); font-size: 18px; }
 html.hc .chron .kc.enter .cap { width: auto; padding: 0 10px; }
@@ -350,6 +350,9 @@ html.hc .chron.tfocus .recto { outline-offset: -6px; }
   html.hc .chron .spread { padding: 12px; gap: 14px; }
   html.hc .chron .dock { background: #000; }
 }
+
+/* A key longer than one letter (AUTO, SPD) widens its cap to fit, at every size and in high contrast */
+.chron .kc .cap.wide { width: auto !important; white-space: nowrap; }
 
 /* No motion in this view; anything added later stops for a reader who asks for less */
 @media (prefers-reduced-motion: reduce) {

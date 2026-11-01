@@ -590,6 +590,7 @@
   "play.view.classic": "Classic",
   "play.view.chronicle": "Chronicle",
   "play.view.contrast": "Chronicle, high contrast",
+  "play.view.hint": "Classic is the terminal page. Chronicle draws the game as a book; the terminal keeps working underneath it. The choice is kept in this browser.",
   "play.chron.text": "Text page",
   "play.chron.plate": "Plate: {0}",
   "play.chron.plate_level": "Plate: {0}, Level {1}",
