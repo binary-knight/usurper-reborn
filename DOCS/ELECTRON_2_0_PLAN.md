@@ -222,3 +222,14 @@ Each screen was mocked up in the Chronicle look with three placements of one ele
 - **Character Status: "G2".** The class portrait with the equipment slots framed around it on the left page; the basic information, level and experience, combat statistics and equipment totals on the right page.
 
 A screen without its own layout shows the game's own text in the book page in monospace; this was mocked up on the status screen and reads in the same look.
+
+### 2026-11-01: the Steam desktop client
+
+The Steam build starts the game in single player inside WezTerm (`wezterm.lua:15` runs the game with `--local`; `launchers/Play.bat`, `launchers/play.sh`) and reaches the online server only through the game's own online menu (`Scripts/Systems/OnlinePlaySystem.cs`, an SSH link). The browser client at `/play/` is online only: its screens come from `Client.Menu` and `Room.Detail`, which the server sends to web sessions (`Scripts/Server/GmcpBridge.cs`, `EmitWebClient`). A terminal window cannot draw them.
+
+Three ways to bring the browser client to Steam players were put to the user: a link from the game's online menu that opens `/play/` in the browser; a second Steam launch option that opens `/play/` in the browser; a desktop app that hosts the browser client as a second Steam launch option beside WezTerm, online first and single player later through the same screens. The user answered: "let's do 3, which will be the capstone of the 2.0 release".
+
+- **Decision 3, local, online, or both: both, online first.** The desktop app loads the online client first; single player through the same screens follows.
+- **Decision 5, distribution: a second Steam launch option beside the WezTerm build.** The WezTerm build and its accessible launchers (`launchers/Play-Accessible.bat`, `launchers/play-accessible.sh`) stay.
+- **Decision 4, platforms: open.**
+- The link from the game's online menu and the browser launch option were not picked.
