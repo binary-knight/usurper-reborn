@@ -1910,7 +1910,7 @@
     }
 
     function loadLanguage(lang) {
-        return fetch('lang/' + lang + '.json')
+        return fetch('lang/' + lang + '.json', { cache: 'no-cache' })
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 i18nStrings = data;
@@ -1968,7 +1968,7 @@
         loadLanguage(i18nLang);
     } else {
         // Still load en.json so t() works for JS-generated strings
-        fetch('lang/en.json')
+        fetch('lang/en.json', { cache: 'no-cache' })
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 i18nStrings = data;

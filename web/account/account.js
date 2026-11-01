@@ -55,7 +55,7 @@
     });
   }
 
-  var ready = lang === 'en' ? Promise.resolve() : window.fetch('/lang/' + lang + '.json', { credentials: 'omit' })
+  var ready = lang === 'en' ? Promise.resolve() : window.fetch('/lang/' + lang + '.json', { credentials: 'omit', cache: 'no-cache' })
     .then(function (r) { return r.json(); })
     .then(apply, function () {});
 
