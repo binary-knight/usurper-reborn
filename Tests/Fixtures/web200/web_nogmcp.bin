@@ -1,0 +1,121 @@
+[37m [90m[90m[[93m[93mD[90m[90m] [37m[37mDungeons            [90m[90m[[93m[93mI[90m[90m] [37m[37mInn                 [90m[90m[[93m[93mE[90m[90m] [92m[92mExplore
+[0m[92m [90m[90m[[93m[93mT[90m[90m] [37m[37mTeam Corner         [90m[90m[[93m[93mA[90m[90m] [90m[90mDark Alley
+[0m
+[90m [90m[90m[[93m[93mM[90m[90m] [96m[96mMerchant Row ...    [90m[90m[[93m[93mG[90m[90m] [96m[96mGuild Row ...       [90m[90m[[93m[93mH[90m[90m] [96m[96mHome & Hearth ...
+[0m[96m [90m[90m[[93m[93mC[90m[90m] [96m[96mCastle Grounds ...  [90m[90m[[93m[93mS[90m[90m] [96m[96mStatus ...          [90m[90m[[93m[93mN[90m[90m] [96m[96mNotice Board ...
+[0m
+[96m [90m[90m[[93m[93m~[90m[90m] [90m[90mSettings            [90m[90m[[93m[93m?[90m[90m] [90m[90mHelp                [90m[90m[[93m[93mQ[90m[90m] [90m[90mQuit Game
+[0m[37m
+
+[37m [90m[90m[[93m[93mD[90m[90m][37m[37mDungeons     [90m[90m[[93m[93mI[90m[90m][37m[37mInn          [90m[90m[[93m[93mT[90m[90m][37m[37mTemple       [90m[90m[[93m[93mO[90m[90m][37m[37mOld Church
+[0m[37m [90m[90m[[93m[93mW[90m[90m][37m[37mWeapon Shop  [90m[90m[[93m[93mA[90m[90m][37m[37mArmor Shop   [90m[90m[[93m[93mM[90m[90m][37m[37mMagic Shop   [90m[90m[[93m[93mU[90m[90m][36m[36mMusic Shop   [90m[90m[[93m[93mJ[90m[90m][37m[37mAuctions
+[0m[37m [90m[90m[[93m[93mB[90m[90m][37m[37mBank         [90m[90m[[93m[93m1[90m[90m][37m[37mHealer       [90m[90m[[93m[93m2[90m[90m][37m[37mQuest Hall   [90m[90m[[93m[93mV[90m[90m][37m[37mLevel Master
+[0m[37m [90m[90m[[93m[93mK[90m[90m][37m[37mCastle       [90m[90m[[93m[93mH[90m[90m][37m[37mHome         [90m[90m[[93m[93mC[90m[90m][37m[37mChallenges   [90m[90m[[93m[93mL[90m[90m][37m[37mLodging      [90m[90m[[93m[93mZ[90m[90m][37m[37mTeam Corner
+[0m
+[37m [90m[90m[[93m[93mS[90m[90m][37m[37mStatus       [90m[90m[[93m[93mN[90m[90m][37m[37mNews         [90m[90m[[93m[93mF[90m[90m][37m[37mFame         [90m[90m[[93m[93mE[90m[90m][92m[92mWilderness   [90m[90m[[93m[93m$[90m[90m][37m[37mWorld Events
+[0m[37m [90m[90m[[93m[93m=[90m[90m][37m[37mStats Record [90m[90m[[93m[93mP[90m[90m][37m[37mProgress
+[0m[37m [90m[90m[[93m[93mY[90m[90m][90m[90mDark Alley   [90m[90m[[93m[93m+[90m[90m][93m[93mThe Sanctum  [90m[90m[[93m[93mX[90m[90m][35m[35mLove Street  [90m[90m[[93m[93mQ[90m[90m][90m[90mQuit Game    [90m[90m[[93m[93m~[90m[90m][90m[90mSettings
+[0m
+[37m
+[90m[90m [[93m[93mD[90m[90m][37m[37m Dungeons   [90m[90m[[93m[93mW[90m[90m][37m[37m Weapon Shop[90m[90m[[93m[93mA[90m[90m][37m[37m Armor Shop [90m[90m[[93m[93mM[90m[90m][37m[37m Magic Shop [90m[90m[[93m[93mU[90m[90m][36m[36mMusic Shop
+[90m[90m [[93m[93mI[90m[90m][37m[37m Inn        [90m[90m[[93m[93m1[90m[90m][37m[37mHealer     [90m[90m[[93m[93m2[90m[90m][37m[37mQuest Hall [90m[90m[[93m[93mV[90m[90m][37m[37mMaster
+[90m[90m [[93m[93mB[90m[90m][37m[37m Bank       [90m[90m[[93m[93mT[90m[90m][37m[37m Temple     [90m[90m[[93m[93mK[90m[90m][37m[37mCastle     [90m[90m[[93m[93mH[90m[90m][37m[37m Home
+[90m[90m [[93m[93mN[90m[90m][37m[37m News       [90m[90m[[93m[93mF[90m[90m][37m[37m Fame       [90m[90m[[93m[93mE[90m[90m][92m[92m Explore    [90m[90m[[93m[93m$[90m[90m][37m[37m World Events
+[90m[90m [[93m[93mY[90m[90m][90m[90mDark Alley [90m[90m[[93m[93m+[90m[90m][93m[93mSanctum [90m[90m[[93m[93mX[90m[90m][35m[35mLove St    [90m[90m[[93m[93mO[90m[90m][37m[37m Old Church [90m[90m[[93m[93mJ[90m[90m][37m[37mAuction
+[90m[90m [[93m[93mC[90m[90m][37m[37m Challenges [90m[90m[[93m[93mL[90m[90m][37m[37m Lodging    [90m[90m[[93m[93m=[90m[90m][37m[37mStats      [90m[90m[[93m[93mP[90m[90m][37m[37m Progress
+[90m[90m [[93m[93mZ[90m[90m][37m[37mTeam Corner
+[90m[90m[[93m[93mQ[90m[90m][90m[90m Quit       [90m[90m[[93m[93m~[90m[90m][90m[90mSettings
+[0m[2J[H[90m[90m╔═══════════════════════════════════════════════════════╗
+[0m[90m║  Room q1                                              ║
+[0m[90m╚═══════════════════════════════════════════════════════╝
+[0m[90m[90mLevel 6 | [90m[90mCatacombs | [33m[33mDanger: [33m*[33m*[33m.[32m[32m [CLEARED]
+
+[37m[37mA cold stone room.
+[0m
+[90m[90mWater drips somewhere.
+[0m
+[33m[33m>> Something valuable glints in the darkness! <<
+[0m[36m[36m>> A strange altar radiates energy <<
+[0m[34m[34m>> Stairs lead down to a deeper level <<
+[0m[36m
+[36mYou notice:
+[0m[36m  - [37m[37ma cracked altar
+[0m[36m[36m  - [37m[37ma rusted lever
+[0m[36m
+[37m[37mExits:
+[0m[90m[90m  [[96m[96mN[90m[90m] [90m[90ma stone arch[32m[32m (cleared)
+[90m[90m  [[96m[96mE[90m[90m] [90m[90ma dark tunnel[90m[90m (unknown)
+[90m[90m  [[96m[96mW[90m[90m] [90m[90ma narrow stair[33m[33m (explored)
+[90m[90m  [[96m[96mS[90m[90m] [90m[90ma crack in the wall[90m[90m (unknown)
+
+[37m[37mActions:
+[0m[90m[90m  [[93m[93mT[90m[90m] [37m[37mCollect treasure
+[0m[90m[90m  [[93m[93mV[90m[90m] [37m[37mInvestigate the event
+[0m[90m[90m  [[93m[93mX[90m[90m] [37m[37mExamine features
+[0m[90m[90m  [[93m[93mD[90m[90m] [37m[37mDescend stairs
+[0m[90m[90m  [[93m[93mR[90m[90m] [37m[37mMake camp and recover
+[0m[90m[90m  [[93m[93mM[90m[90m] [37m[37mMap  [90m[90m[[93m[93mG[90m[90m] [37m[37mGuide  [90m[90m[[93m[93m*[90m[90m] [37m[37mInventory  [90m[90m[[93m[93mP[90m[90m] [37m[37mPotions  [90m[90m[[93m[93m%[90m[90m] [37m[37mStatus  [90m[90m[[93m[93mQ[90m[90m] [37m[37mLeave dungeon
+[0m
+[90m[90m─────────────────────────────────────────────────────────
+[37m[37mHP: [37m[[31m[31m████████████████████[90m[90m[37m[37m][37m[37m 400/400[37m  [32m[32mPotions: 3/31[32m  [33m[33mGold: 1,234
+[96m[96mLv 12  XP 0/40900
+[2J[H[90m[90m╔═══════════════════════════════════════════════════════╗
+[0m[90m║  Room m6                                              ║
+[0m[90m╚═══════════════════════════════════════════════════════╝
+[0m[90m[90mLevel 6 | [90m[90mCatacombs | [31m[31mDanger: [31m*[31m*[31m*[31m[31m [DANGER]
+
+[37m[37mA cold stone room.
+[0m
+[90m[90mWater drips somewhere.
+[0m
+[31m[31mYou hear hostile sounds from the darkness...
+[0m
+[37m[37mExits:
+[0m[90m[90m  [[96m[96mS[90m[90m] [90m[90ma stone arch[32m[32m (cleared)
+
+[37m[37mActions:
+[0m[90m[90m  [[93m[93mF[90m[90m] [37m[37mFight the monsters
+[0m[90m[90m  [[93m[93mM[90m[90m] [37m[37mMap  [90m[90m[[93m[93mG[90m[90m] [37m[37mGuide  [90m[90m[[93m[93m*[90m[90m] [37m[37mInventory  [90m[90m[[93m[93mP[90m[90m] [37m[37mPotions  [90m[90m[[93m[93m%[90m[90m] [37m[37mStatus  [90m[90m[[93m[93mQ[90m[90m] [37m[37mLeave dungeon
+[0m
+[90m[90m─────────────────────────────────────────────────────────
+[37m[37mHP: [37m[[31m[31m████████████████████[90m[90m[37m[37m][37m[37m 400/400[37m  [32m[32mPotions: 3/31[32m  [33m[33mGold: 1,234
+[96m[96mLv 12  XP 0/40900
+[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
+[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
+[0m[32m║[97m[97m            Choose action:             [32m[32m║
+[0m[32m╠═══════════════════════════════════════╣
+[0m[32m║ [36m[36mYour HP: 400/400  │  Rival: 400/400  [32m[32m ║
+[0m[32m[32m╠═══════════════════════════════════════╣
+[0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
+[0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
+[0m[32m[32m║ [93m[93m[H] [35m[35mHeal (Potions: 3/31)              [32m[32m║
+[0m[32m[32m║ [93m[93m[I] [36m[36mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [36m[36mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [90m[90mHide                              [32m[32m║
+[0m[32m[32m║ [93m[93m[R] [37m[37mFlee Combat                       [32m[32m║
+[0m[32m[32m║ [93m[93m[S] [90m[90mView Status                       [32m[32m║
+[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m╚═══════════════════════════════════════╝
+[0m
+[37m[37mChoose action: [97m
