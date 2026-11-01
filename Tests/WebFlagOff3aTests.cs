@@ -22,9 +22,9 @@ namespace UsurperReborn.Tests;
 /// and GMCP frames on one stream as on a live connection. The run is made for the same six sessions that are not a web
 /// client (door, door compact, telnet MUD with GMCP, SSH, screen reader with GMCP, web terminal without GMCP).
 ///
-/// The expected bytes in Tests/Fixtures/web200p3 were written by this same test on the phase 3a branch before any
-/// change under Scripts (the Scripts tree of origin/main at a6a8a85e), with USURPER_WEB3A_CAPTURE set to the fixture
-/// folder. The test reads only methods that existed there, by reflection. A byte match says the old code and the new
+/// The expected bytes in Tests/Fixtures/web200p3 were written by this same test against the Scripts tree of origin/main
+/// at a6a8a85e (a copy of the branch's first commit, 8cee362b, which changes nothing under Scripts), with
+/// USURPER_WEB3A_CAPTURE set to the fixture folder. The test reads only methods that existed there, by reflection. A byte match says the old code and the new
 /// code wrote the same terminal text and the same GMCP frames for these sessions, and no new package appeared. The
 /// second test says the same without the fixtures: none of the new packages in any stream.
 /// </summary>
@@ -115,6 +115,9 @@ public class WebFlagOff3aTests
         bool savedPacing = Pacing.Disabled;
         try
         {
+            // The fight unlocks achievements once their table is loaded, which another test may or may not have done
+            // first; load it here so the run writes the same bytes in any test order.
+            AchievementSystem.Initialize();
             Pacing.Disabled = true;
             GameConfig.CompactMode = kind == "door_compact";
             var hero = Hero(sr);

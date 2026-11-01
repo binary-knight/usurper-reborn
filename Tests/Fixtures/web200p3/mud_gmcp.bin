@@ -345,4 +345,17 @@
 [0m[90m[90m  (Other modifiers, included above: x1.8 from early levels)
 [0m[90mGold gained: 0
 [0m
-���Char.Combat.End {"outcome":"Victory","kills":2,"xpGained":36,"goldGained":0}�����Char.Items.List {"inventory":[],"equipped":{},"count":0,"max":50}�����Char.Skills.List {"abilities":[{"id":"power_strike","name":"Power Strike","type":"Attack","cooldown":0,"staminaCost":15,"manaCost":0,"requiresLevel":1},{"id":"second_wind","name":"Second Wind","type":"Heal","cooldown":5,"staminaCost":25,"manaCost":0,"requiresLevel":1},{"id":"focus","name":"Focus","type":"Buff","cooldown":2,"staminaCost":15,"manaCost":0,"requiresLevel":5},{"id":"shield_wall","name":"Shield Wall","type":"Defense","cooldown":3,"staminaCost":25,"manaCost":0,"requiresLevel":8}],"spells":[],"mana":0,"maxMana":0,"stamina":100}�����Char.Status {"name":"Webtest","class":"Warrior","level":12,"race":"Human","gold":1234,"bank":0,"xp":1536,"location":""}��
+
+[93m[93m╔══════════════════════════════════════════════════════════╗
+[0m[93m║[96m[96m               * 5 ACHIEVEMENTS UNLOCKED! *               [93m[93m║
+[0m[93m╠══════════════════════════════════════════════════════════╣
+[0m[93m║[93m[93m  [G] Untouchable                                         [93m[93m║
+[0m[93m║[33m[33m  [B] First Blood                                         [93m[93m║
+[0m[93m║[33m[33m  [B] Adventurer                                          [93m[93m║
+[0m[93m║[33m[33m  [B] Seasoned                                            [93m[93m║
+[0m[93m║[33m[33m  [B] Getting Started                                     [93m[93m║
+[0m[93m╠══════════════════════════════════════════════════════════╣
+[0m[93m║[92m[92m  Total Rewards: +50 Gold +600 XP                         [93m[93m║
+[0m[93m╚══════════════════════════════════════════════════════════╝
+[0m
+���Char.Combat.End {"outcome":"Victory","kills":2,"xpGained":36,"goldGained":0}�����Char.Items.List {"inventory":[],"equipped":{},"count":0,"max":50}�����Char.Skills.List {"abilities":[{"id":"power_strike","name":"Power Strike","type":"Attack","cooldown":0,"staminaCost":15,"manaCost":0,"requiresLevel":1},{"id":"second_wind","name":"Second Wind","type":"Heal","cooldown":5,"staminaCost":25,"manaCost":0,"requiresLevel":1},{"id":"focus","name":"Focus","type":"Buff","cooldown":2,"staminaCost":15,"manaCost":0,"requiresLevel":5},{"id":"shield_wall","name":"Shield Wall","type":"Defense","cooldown":3,"staminaCost":25,"manaCost":0,"requiresLevel":8}],"spells":[],"mana":0,"maxMana":0,"stamina":100}�����Char.Status {"name":"Webtest","class":"Warrior","level":12,"race":"Human","gold":1284,"bank":0,"xp":2136,"location":""}��
