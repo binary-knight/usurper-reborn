@@ -186,6 +186,7 @@ ssh -p 4000 usurper@your-server-ip
 
 /etc/ssh/sshd_config_usurper    # Game SSH daemon config
 /etc/nginx/sites-available/usurper  # Nginx reverse proxy config (optional)
+/etc/nginx/sites-enabled/usurper    # The file nginx loads: a link to the one above on a fresh install
 /etc/systemd/system/
   sshd-usurper.service          # Game SSH service
   usurper-mud.service           # MUD game server (advanced)
@@ -274,6 +275,24 @@ sudo systemctl status usurper-web
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com -d www.your-domain.com
 ```
+
+### Changing nginx on a running server
+
+The deploy job updates the game and the web files; it does not touch nginx. A change to `scripts-server/nginx-*.conf` is applied on the server by hand.
+
+1. Find the file nginx loads: `ls -l /etc/nginx/sites-enabled/`. A fresh install links `sites-enabled/usurper` to `sites-available/usurper`. If `sites-enabled/usurper` is a regular file instead, that file is the live one and `sites-available/usurper` is only an old copy: edit the file in `sites-enabled`. `grep -n usurper-csp.conf /etc/nginx/sites-enabled/*` shows which file and line hold the CSP include.
+2. Do not copy `nginx-usurper.conf` over the live file once certbot has run: the template has only the port 80 blocks, so the copy drops the SSL setup.
+3. Back up the live file: `sudo cp -a /etc/nginx/sites-enabled/usurper /root/nginx-usurper.bak-$(date +%Y%m%d)`.
+4. Make the change. New includes go in the server block for your domain on port 443 (certbot adds it), next to the CSP include. For example, the Cache-Control rule:
+   ```bash
+   sudo cp scripts-server/nginx-cache.conf /etc/nginx/snippets/usurper-cache.conf
+   sudo cp scripts-server/nginx-cache-map.conf /etc/nginx/conf.d/usurper-cache-map.conf
+   sudo sed -i -E '/^\s*include \/etc\/nginx\/snippets\/usurper-csp\.conf;/a\    include /etc/nginx/snippets/usurper-cache.conf;' /etc/nginx/sites-enabled/usurper
+   ```
+   Check first that the live file has exactly one CSP include line and no cache include, so the line is added once.
+5. Test: `sudo nginx -t`. If it fails, restore the backup, remove any files you added, and test again before going on.
+6. Reload: `sudo systemctl reload nginx`. A reload keeps open connections; a restart drops them.
+7. Check from outside: `curl -sI https://your-domain.com/play/` shows the headers the change should add.
 
 ### Stats API
 
