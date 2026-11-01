@@ -403,10 +403,11 @@ test('without the room menu the headings and the header line stay; the text page
   // a heading whose lines stay on the page keeps its heading even with the menu
   const r = await chronicle();
   frame(r, 'Room.Info', { num: 'room_4', name: 'Hall', area: 'Dungeon Floor 6' });
-  screen(r, ['Strange marks:', 'A spiral cut into the floor.', 'Exits:', '  [E] A dark passage leads east.']);
+  screen(r, ['Strange marks:', 'A spiral cut into the floor.', 'An inscription reads:', 'Exits:', '  [E] A dark passage leads east.', 'Hall of the Ancestors:', 'Level 6 | Catacombs']);
   frame(r, 'Room.Detail', ROOM_DETAIL);
   frame(r, 'Client.Menu', ROOM_MENU);
-  assert.deepStrictEqual(r.el('c-body').querySelector('.screen').children.map((l) => l.textContent), ['Strange marks:', 'A spiral cut into the floor.']);
+  assert.deepStrictEqual(r.el('c-body').querySelector('.screen').children.map((l) => l.textContent), ['Strange marks:', 'A spiral cut into the floor.', 'An inscription reads:', 'Hall of the Ancestors:'],
+    'a heading goes only with a line that went to the dock, never with another heading or a header line');
 });
 
 test('a key cap is as wide as its key: long keys are marked and never clipped', async () => {

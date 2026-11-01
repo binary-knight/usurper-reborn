@@ -1349,13 +1349,15 @@
     }
     // The screen's lines a layout does not place itself. Left out: menu lines whose every key is on the dock, box
     // rules, and the lines the frame names (the room name, the level header). Runs of blank lines become one.
-    // With headings on (a room whose keys came from Client.Menu), a heading line ("Exits:") whose own lines all went to
-    // the dock goes too, and so does a line that opens with the level header the chapter line already shows.
+    // With headings on (a room whose keys came from Client.Menu), a heading line ("Exits:") whose next line went to the
+    // dock goes too, and so does a line that opens with the level header the chapter line already shows. Only a line
+    // that went to the dock takes its heading along; a heading left out this way never takes the line above it.
     function proseRows(rows, known, drop, headings) {
         var out = [], blank = true, kind = rows.map(function (segs) {
             var text = rowText(segs), core = unbox(text);
             if (!core || BOX_ONLY.test(text)) return 'blank';
-            if (menuLine(text, known) || (drop && drop[core] === 1)) return 'gone';
+            if (menuLine(text, known)) return 'menu';
+            if (drop && drop[core] === 1) return 'gone';
             if (headings && headings.header && core.indexOf(headings.header) === 0) return 'gone';
             return 'keep';
         });
@@ -1363,11 +1365,11 @@
             if (kind[i] !== 'keep' || !/:\s*$/.test(unbox(rowText(rows[i])))) continue;
             var j = i + 1;
             while (j < kind.length && kind[j] === 'blank') j++;
-            if (j < kind.length && kind[j] === 'gone') kind[i] = 'gone';
+            if (j < kind.length && kind[j] === 'menu') kind[i] = 'gone';
         }
         rows.forEach(function (segs, i) {
             if (kind[i] === 'blank') { if (!blank) out.push([]); blank = true; return; }
-            if (kind[i] === 'gone') return;
+            if (kind[i] === 'gone' || kind[i] === 'menu') return;
             out.push(segs);
             blank = false;
         });
