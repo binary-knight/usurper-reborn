@@ -233,3 +233,14 @@ Three ways to bring the browser client to Steam players were put to the user: a 
 - **Decision 5, distribution: a second Steam launch option beside the WezTerm build.** The WezTerm build and its accessible launchers (`launchers/Play-Accessible.bat`, `launchers/play-accessible.sh`) stay.
 - **Decision 4, platforms: open.**
 - The link from the game's online menu and the browser launch option were not picked.
+
+### 2026-11-01: the shop, the desktop shell, platforms, keys
+
+The picks were put to the user on one page with the facts and a lean for each. The user answered: "1. I like H3.  2. Electron is fine 3. All four. 4. The user should be able to click a button to make it default if they want for future sessions, not sure how that would work though since they don't have a web account.  5. Yeah, I like the cache-control.  6. keep & and * and let the client label them clearly."
+
+- **Weapon Shop: "H3".** A compact list with the selected item's detail compared with the weapon in hand.
+- **Desktop shell: Electron.** The desktop app reuses the window and launcher parts of `electron-client/` (Electron 32, `electron-client/package.json`); it carries its own Chromium, so the page renders as it does in Chrome.
+- **Decision 4, platforms: all four Steam targets.** Windows x64, Linux x64, macOS Intel and macOS ARM, as the Steam build ships today (`.github/workflows/ci-cd.yml:330-333`). CI signs none of the game's own programs; the WezTerm app on macOS is left untouched to keep its signature (`ci-cd.yml:627-629`). A macOS launch test comes first; signing that needs a purchase is a separate question for the user.
+- **The `%` and `*` keys stay** (`Scripts/Locations/BaseLocation.cs:2881-2887`, `:4284-4287`); the client labels them clearly.
+- **The default view:** the View tab saves Classic or Chronicle in the browser (`web/play/index.html`, `playView`), so the choice holds for later visits in that browser.
+- **Caching:** the user approved a Cache-Control rule for the web server (`scripts-server/nginx-usurper.conf`).
