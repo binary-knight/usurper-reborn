@@ -607,5 +607,11 @@
   "play.chron.vitals": "Vitals",
   "play.chron.gold": "Gold",
   "play.chron.level": "Level",
-  "play.chron.xp": "XP"
+  "play.chron.xp": "XP",
+  "play.chron.potions": "Potions",
+  "play.chron.lives": "Lives",
+  "play.chron.revives": "Revives",
+  "play.chron.map_explored": "Map: {0}/{1} explored",
+  "play.chron.map_label": "Map of the floor, {0} of {1} rooms explored",
+  "play.chron.sheet": "Character sheet"
 }

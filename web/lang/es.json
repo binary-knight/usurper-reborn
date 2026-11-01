@@ -581,5 +581,11 @@
   "play.chron.vitals": "Estado vital",
   "play.chron.gold": "Oro",
   "play.chron.level": "Nivel",
-  "play.chron.xp": "EXP"
+  "play.chron.xp": "EXP",
+  "play.chron.potions": "Pociones",
+  "play.chron.lives": "Vidas",
+  "play.chron.revives": "Resurr.",
+  "play.chron.map_explored": "Mapa: {0}/{1} explorado",
+  "play.chron.map_label": "Mapa del piso, {0} de {1} salas exploradas",
+  "play.chron.sheet": "Hoja del personaje"
 }

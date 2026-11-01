@@ -356,7 +356,9 @@
         death: null,       // Char.Death
         log: [],           // Char.Combat.Killed lines
         chat: [],          // Comm.Channel.Text
-        exits: {}          // Room.Info exits that are compass directions, for the pad
+        exits: {},         // Room.Info exits that are compass directions, for the pad
+        footer: null,      // Client.Footer: potions, lives and the XP percent, as the status line prints them
+        foes: []           // Client.Enemies: each foe's name and monster family, in the enemy list's order
     };
     var CHAT_MAX = 200;
     var LOG_MAX = 20;
@@ -560,6 +562,7 @@
             case 'Char.Combat.Start':
                 state.inCombat = true;
                 state.enemies = units(d.enemies, 30).map(function (u) { u.alive = true; return u; });
+                state.foes = [];
                 state.round = 0;
                 state.party = [];
                 state.result = null;
@@ -620,6 +623,21 @@
                 break;
             case 'Room.Detail':
                 chronDetail(d);
+                break;
+            case 'Client.Enemies':
+                state.foes = readFoes(d);
+                chronFrame();
+                break;
+            case 'Client.Footer':
+                state.footer = readFooter(d);
+                chronFrame();
+                break;
+            case 'Client.Sheet':
+                chronSheet(d);
+                break;
+            case 'Client.Map':
+                chron.map = readMap(d);
+                chronFrame();
                 break;
             default:
                 break;
@@ -967,12 +985,28 @@
         seq: 0,           // draws so far: each Enter sent and each screen clear starts one
         open: false,      // the current draw has not ended yet
         menuAt: -1,       // the draw each frame arrived in
-        detailAt: -1
+        detailAt: -1,
+        sheet: null,      // the last Client.Sheet
+        sheetAt: -1,
+        map: null         // the last Client.Map: shown in the room only while it is the map of the room the player is in
     };
     var chronTimer = 0, drawTimer = 0;
     var STREET = { main_street: 1, main_street_classic: 1 }, FIGHT = { combat: 1, combat_pvp: 1 }, DIRS4 = { N: 1, S: 1, E: 1, W: 1 };
     // Scene art by Room.Info num, the game's location id (GameLocation), which is the same in every language.
     var TOWN = { 1: 'main-street', 2: 'inn', 4: 'temple', 5: 'weapon-shop', 8: 'dungeon', 19: 'bank', 21: 'healer', 47: 'temple', 70: 'castle', 504: 'wilderness' };
+    // Floor scenes by Room.Detail themeId, the DungeonTheme name, which is the same in every language.
+    var THEMES = { Catacombs: 'catacombs', Sewers: 'sewers', Caverns: 'caverns', AncientRuins: 'ancient-ruins', DemonLair: 'demon-lair',
+        FrozenDepths: 'frozen-depths', VolcanicPit: 'volcanic-pit', AbyssalVoid: 'abyssal-void' };
+    // Enemy sprites by Client.Enemies family, the game's monster family name.
+    var SPRITES = { Goblinoid: 'goblin', Undead: 'skeleton', Orcish: 'orc', Draconic: 'dragon', Demonic: 'demon', Giant: 'giant', Beast: 'wolf-beast',
+        Elemental: 'elemental', Insectoid: 'spider-queen', Construct: 'golem', Fey: 'dark-fairy', Aquatic: 'sea-creature', Celestial: 'fallen-angel',
+        Shadow: 'shadow', Aberration: 'wraith' };
+    var MAP_KINDS = { here: 1, boss: 1, stairs: 1, cleared: 1, monsters: 1, safe: 1 };
+    // Client.Sheet slots, and where G2 sets each one around the portrait: a top row, a column each side, a bottom row.
+    var SLOTS = ['MainHand', 'OffHand', 'Head', 'Body', 'Arms', 'Hands', 'Legs', 'Feet', 'Waist', 'Face', 'Cloak', 'Neck', 'LFinger', 'RFinger'];
+    var DOLL = [['drow dt', ['Head', 'Face', 'Neck']], ['dcol dl', ['MainHand', 'Arms', 'Hands', 'LFinger']], null,
+        ['dcol dr', ['OffHand', 'Body', 'Cloak', 'RFinger']], ['drow db', ['Waist', 'Legs', 'Feet']]];
+    function own(o, k) { return typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k); }
     // Portraits by Char.Status class, the CharacterClass name.
     var CLASSES = ['Alchemist', 'Assassin', 'Barbarian', 'Bard', 'Cleric', 'Jester', 'Magician', 'Paladin', 'Ranger', 'Sage', 'Warrior',
         'Tidesworn', 'Wavecaller', 'Cyclebreaker', 'Abysswarden', 'Voidreaver', 'MysticShaman'];
@@ -1047,6 +1081,7 @@
         chron.open = false;
         if (chron.layout === 'room' && !current(chron.detailAt)) chron.layout = 'text';
         if (chron.layout === 'street' && !(chron.menu && STREET[chron.menu.screen] && current(chron.menuAt))) chron.layout = 'text';
+        if (chron.layout === 'sheet' && !current(chron.sheetAt)) chron.layout = 'text';
         renderChronNow();
     }
     function afterWrite(seq) {
@@ -1061,7 +1096,7 @@
     function setLayout(l) { chron.layout = l; renderChronNow(); }
     function chronFrame() { renderChronNow(); }
     function chronReset() {
-        chron.layout = 'text'; chron.menu = null; chron.detail = null; chron.place = null;
+        chron.layout = 'text'; chron.menu = null; chron.detail = null; chron.place = null; chron.sheet = null; chron.sheetAt = -1; chron.map = null;
         chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1;
         clearTimeout(drawTimer); clearTimeout(chronTimer);
         renderChronNow();
@@ -1094,6 +1129,7 @@
         var status = str(d.status, 20);
         return {
             name: str(d.name, 80), level: fin(d.level), theme: str(d.theme, 40), header: str(d.header, 100),
+            themeId: own(THEMES, d.themeId) ? d.themeId : '',
             rating: fin(dg.rating), max: fin(dg.max), status: status === 'danger' || status === 'cleared' ? status : '',
             boss: d.boss === true, exits: exits,
             features: (Array.isArray(d.features) ? d.features : []).slice(0, 12).map(function (f) { return str(f, 60); }).filter(Boolean)
@@ -1116,9 +1152,86 @@
         else renderChronNow();
     }
     function chronRoomInfo(d) {
-        chron.place = { num: typeof d.num === 'number' && isFinite(d.num) ? d.num : null, dungeon: /^Dungeon Floor \d{1,4}$/.test(str(d.area, 40)) };
+        chron.place = { num: typeof d.num === 'number' && isFinite(d.num) ? d.num : null, id: str(d.num, 60), dungeon: /^Dungeon Floor \d{1,4}$/.test(str(d.area, 40)) };
         // A new place ends a layout that belongs to another: Main Street is location 1, a room is on a dungeon floor.
         if ((chron.layout === 'street' && chron.place.num !== 1) || (chron.layout === 'room' && !chron.place.dungeon)) setLayout('text');
+        else renderChronNow();
+    }
+
+    // A whole count: a finite number, not below 0; anything else is missing (null).
+    function count(v) { return typeof v === 'number' && isFinite(v) ? Math.max(0, Math.floor(v)) : null; }
+    function readFoes(d) {
+        return (Array.isArray(d.enemies) ? d.enemies : []).slice(0, 30).map(function (e) {
+            e = obj(e) || {};
+            return { name: str(e.name, 60), family: str(e.family, 30) };
+        });
+    }
+    // Client.Footer: a pair comes whole or not at all, and the lives counter only with its kind.
+    function readFooter(d) {
+        var f = { potions: count(d.potions), maxPotions: count(d.maxPotions), lives: count(d.lives), maxLives: count(d.maxLives),
+            kind: d.livesKind === 'lives' || d.livesKind === 'revives' ? d.livesKind : null, xpPercent: count(d.xpPercent) };
+        if (f.potions === null || f.maxPotions === null) f.potions = f.maxPotions = null;
+        if (f.lives === null || f.maxLives === null || !f.kind) f.lives = f.maxLives = f.kind = null;
+        if (f.xpPercent !== null) f.xpPercent = Math.min(100, f.xpPercent);
+        return f;
+    }
+    // Client.Map: rooms on whole number places with a known kind, and corridors only between two of those rooms side by side.
+    function place(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && Math.abs(v) <= 500 ? v : null; }
+    function readMap(d) {
+        var rooms = [], links = [], at = Object.create(null);
+        (Array.isArray(d.rooms) ? d.rooms : []).slice(0, 400).forEach(function (r) {
+            r = obj(r);
+            if (!r) return;
+            var x = place(r.x), y = place(r.y), k = own(MAP_KINDS, r.kind) ? r.kind : '';
+            if (x === null || y === null || !k || at[x + ',' + y]) return;
+            at[x + ',' + y] = 1;
+            rooms.push({ x: x, y: y, kind: k });
+        });
+        (Array.isArray(d.links) ? d.links : []).slice(0, 800).forEach(function (l) {
+            l = obj(l);
+            if (!l) return;
+            var a = [place(l.x1), place(l.y1), place(l.x2), place(l.y2)];
+            if (a.indexOf(null) !== -1 || Math.abs(a[0] - a[2]) + Math.abs(a[1] - a[3]) !== 1) return;
+            if (!at[a[0] + ',' + a[1]] || !at[a[2] + ',' + a[3]]) return;
+            links.push({ x1: a[0], y1: a[1], x2: a[2], y2: a[3] });
+        });
+        return { level: fin(d.level), room: str(d.room, 60), explored: count(d.explored) || 0, total: count(d.total) || 0, rooms: rooms, links: links };
+    }
+    function sheetRows(list, max) {
+        return (Array.isArray(list) ? list : []).slice(0, max).map(function (r) {
+            r = obj(r) || {};
+            return { label: str(r.label, 60), value: str(r.value, 80), extra: str(r.extra, 120) };
+        }).filter(function (r) { return r.label || r.value; });
+    }
+    function sheetMeter(m) {
+        m = obj(m);
+        return m ? { label: str(m.label, 30), value: str(m.value, 40), now: fin(m.now), max: fin(m.max) } : null;
+    }
+    function readSheet(d) {
+        var b = obj(d.basic) || {}, lv = obj(d.level) || {}, cb = obj(d.combat) || {}, eq = obj(d.equipment) || {}, tt = obj(d.totals) || {};
+        var st = obj(eq.style) || {}, slots = Object.create(null);
+        (Array.isArray(eq.slots) ? eq.slots : []).slice(0, 20).forEach(function (x) {
+            x = obj(x);
+            if (!x || SLOTS.indexOf(x.slot) === -1 || slots[x.slot]) return;
+            slots[x.slot] = { label: str(x.label, 40), item: str(x.item, 80), stats: str(x.stats, 120), empty: x.empty === true };
+        });
+        return {
+            title: str(d.title, 60), name: str(d.name, 60), classId: str(d.classId, 30),
+            basic: { heading: str(b.heading, 60), rows: sheetRows(b.rows, 12), note: str(b.note, 120) },
+            level: { heading: str(lv.heading, 60), rows: sheetRows(lv.rows, 6), xp: count(lv.xp), xpNext: count(lv.xpNext) },
+            combat: { heading: str(cb.heading, 60), hp: sheetMeter(cb.hp), mana: sheetMeter(cb.mana), stats: sheetRows(cb.stats, 12), more: sheetRows(cb.more, 6) },
+            style: { label: str(st.label, 40), value: str(st.value, 120), extra: str(st.extra, 120) },
+            eqHeading: str(eq.heading, 60), slots: slots,
+            totals: { heading: str(tt.heading, 60), rows: sheetRows(tt.rows, 4), bonusLabel: str(tt.bonusLabel, 40),
+                bonuses: (Array.isArray(tt.bonuses) ? tt.bonuses : []).slice(0, 16).map(function (x) { x = obj(x) || {}; return { label: str(x.label, 20), value: str(x.value, 12) }; })
+                    .filter(function (x) { return x.label || x.value; }) }
+        };
+    }
+    // The sheet layout lasts while the Client.Sheet of the current draw is up: the first page of the status screen.
+    function chronSheet(d) {
+        chron.sheet = readSheet(d);
+        chron.sheetAt = chron.seq;
+        if (!state.inCombat) setLayout('sheet');
         else renderChronNow();
     }
 
@@ -1199,11 +1312,11 @@
         if (lay === 'street') return 'main-street';
         var p = chron.place;
         if (!p) return '';
-        if (p.dungeon) return 'dungeon';
+        if (p.dungeon) return chron.detail && chron.detail.themeId ? THEMES[chron.detail.themeId] : 'dungeon';
         return p.num !== null && Object.prototype.hasOwnProperty.call(TOWN, p.num) ? TOWN[p.num] : '';
     }
-    function portraitOf() {
-        var c = state.status ? state.status.cls : '';
+    function portraitOf(cls) {
+        var c = typeof cls === 'string' ? cls : state.status ? state.status.cls : '';
         if (CLASSES.indexOf(c) === -1) return '';
         return c === 'MysticShaman' ? 'mystic-shaman' : c.toLowerCase();
     }
@@ -1249,18 +1362,23 @@
     }
 
     function renderPlate(lay) {
-        var frame = document.getElementById('c-frame'), d = chron.detail, where = state.room || '';
-        var scene = sceneOf(lay), portrait = lay === 'text' && !scene ? portraitOf() : '';
-        var cap = inRoom(lay) ? t('play.chron.plate_level', [d.theme || where, num(d.level)])
+        var frame = document.getElementById('c-frame'), d = chron.detail, where = state.room || '', sh = lay === 'sheet' ? chron.sheet : null;
+        var scene = sh ? '' : sceneOf(lay), portrait = sh ? portraitOf(sh.classId) : lay === 'text' && !scene ? portraitOf() : '';
+        var who = sh ? sh.name + (sh.basic.rows.length > 1 && sh.basic.rows[1].value ? ', ' + sh.basic.rows[1].value : '') : '';
+        var cap = sh ? (who ? t('play.chron.plate', [who]) : '')
+            : inRoom(lay) ? t('play.chron.plate_level', [d.theme || where, num(d.level)])
             : portrait ? t('play.chron.plate', [state.status.name || where])
             : where ? t('play.chron.plate', [where]) : '';
         clear(frame);
-        frame.className = 'frame' + (portrait ? ' fp' : '');
-        if (portrait) {
-            var box = el('div', 'portrait'), img = el('img', 'px');
-            img.setAttribute('src', '/play/art/classes/' + portrait + '.png');
-            img.setAttribute('alt', state.status.name);
-            box.appendChild(img);
+        frame.className = 'frame' + (portrait || sh ? ' fp' : '');
+        if (portrait || sh) {
+            var box = el('div', 'portrait');
+            if (portrait) {
+                var img = el('img', 'px');
+                img.setAttribute('src', '/play/art/classes/' + portrait + '.png');
+                img.setAttribute('alt', sh ? who : state.status.name);
+                box.appendChild(img);
+            }
             frame.appendChild(box);
         } else {
             var sc = el('div', 'scene s-' + lay + (scene ? '' : ' blank'));
@@ -1269,12 +1387,62 @@
                 sc.setAttribute('role', 'img');
                 sc.setAttribute('aria-label', cap || where);
             }
+            if (lay === 'fight') foesIn(sc);
             frame.appendChild(sc);
         }
+        dollAround(frame, sh);
         document.getElementById('c-cap').textContent = cap;
-        var head = inRoom(lay) ? (d.theme ? d.theme + ' · ' : '') + t('play.chron.sub_level', [num(d.level)]) : where;
+        var head = sh ? sh.title : inRoom(lay) ? (d.theme ? d.theme + ' · ' : '') + t('play.chron.sub_level', [num(d.level)]) : where;
         document.getElementById('c-rh').textContent = head;
         document.getElementById('c-rh-phone').textContent = lay === 'fight' && state.round > 0 ? t('play.combat.round', [num(state.round)]) : head;
+    }
+
+    // The foes standing in the fight's plate, once Client.Enemies has named them: the sprite of a family with art,
+    // otherwise the foe's name. Living foes only, at most four; the cards below list every foe.
+    function spriteOf(i) {
+        var f = state.foes[i], m = state.enemies[i];
+        if (!f || !m || f.name !== m.name) return null;
+        return own(SPRITES, f.family) ? SPRITES[f.family] : '';
+    }
+    function foesIn(sc) {
+        var shown = [];
+        state.enemies.forEach(function (m, i) {
+            var art = spriteOf(i);
+            if (m.alive !== false && art !== null && shown.length < 4) shown.push({ name: m.name, art: art });
+        });
+        if (!shown.length) return;
+        var row = el('div', 'foes-in n' + shown.length);
+        shown.forEach(function (x) {
+            if (x.art) {
+                var img = el('img', 'px foe');
+                img.setAttribute('src', '/play/art/monsters/' + x.art + '.png');
+                img.setAttribute('alt', x.name);
+                row.appendChild(img);
+            } else row.appendChild(el('span', 'foe-name', x.name));
+        });
+        sc.appendChild(row);
+    }
+
+    // G2: the equipment slots around the portrait, read from Client.Sheet. Every other layout has the frame alone.
+    function slotCard(x) {
+        var c = el('div', 'slot' + (x.empty ? ' empty' : ''));
+        c.appendChild(el('span', 'sl', x.label));
+        c.appendChild(el('span', 'it', x.item));
+        if (x.stats) c.appendChild(el('span', 'st n', x.stats));
+        return c;
+    }
+    function dollAround(frame, sh) {
+        var row = frame.parentElement;
+        Array.prototype.slice.call(row.childNodes).forEach(function (c) { if (c !== frame) row.removeChild(c); });
+        row.className = 'plate-row' + (sh ? ' doll' : '');
+        if (!sh) return;
+        DOLL.forEach(function (part) {
+            if (!part) return;
+            var box = el('div', part[0]);
+            part[1].forEach(function (k) { if (sh.slots[k]) box.appendChild(slotCard(sh.slots[k])); });
+            if (part[0].indexOf('dt') !== -1 || part[0].indexOf('dl') !== -1) row.insertBefore(box, frame);
+            else row.appendChild(box);
+        });
     }
 
     function meter(label, cls, a, b) {
@@ -1310,6 +1478,16 @@
         var hud = document.getElementById('c-hud'), v = state.vitals, st = state.status;
         clear(hud);
         hud.className = 'hud h-' + lay;
+        if (lay === 'sheet') {
+            var sh = chron.sheet, cs = el('div', 'cstyle');
+            if (sh && sh.style.value) {
+                cs.appendChild(el('span', 'lbl', sh.style.label));
+                cs.appendChild(el('span', 'val', sh.style.value));
+                if (sh.style.extra) cs.appendChild(el('span', 'val x', sh.style.extra));
+                hud.appendChild(cs);
+            }
+            return;
+        }
         var me = v ? vitCard(st ? st.name : '', t('play.chron.you'), v.hp, v.maxHp, playerSt(), [], false) : null;
         if (lay === 'room' || lay === 'street') {
             if (me) { hud.appendChild(el('div', 'kh hide-phone', t('play.combat.party'))); hud.appendChild(me); }
@@ -1439,6 +1617,10 @@
             pre.scrollTop = atEnd ? pre.scrollHeight : oldTop;
             return;
         }
+        if (lay === 'sheet' && chron.sheet) {
+            renderSheet(body, chron.sheet);
+            return;
+        }
         if (lay === 'fight') {
             var pr = el('div', 'prose fight'), log = el('div', 'clog');
             if (inRoom(lay)) {
@@ -1479,7 +1661,109 @@
         var heads = lay === 'room' && d && menuFor(lay) ? { header: d.header } : null;
         prose.appendChild(screenPre(proseRows(chron.rows.slice(chron.start), known, drop, heads), 'screen mini'));
         body.appendChild(prose);
-        if (lay === 'room' && d) body.appendChild(compass(d));
+        if (lay === 'room' && d) {
+            // D3: the map and the exits side by side above the keys
+            var nav = el('div', 'nav navr');
+            if (mapOn()) nav.appendChild(mapCard(chron.map));
+            nav.appendChild(compass(d));
+            body.appendChild(nav);
+        }
+    }
+
+    // The map from the last Client.Map, shown in the room only while it is the map of this floor drawn from this very
+    // room (Room.Info num): after a move it would be out of date, so it stays out until the map screen is opened again.
+    function mapOn() {
+        var m = chron.map, d = chron.detail, p = chron.place;
+        return !!(m && d && p && p.dungeon && p.id && m.room === p.id && m.level === d.level && m.rooms.length);
+    }
+    function mapCard(m) {
+        var card = el('div', 'card mapcard'), g = el('div', 'cmap');
+        var xs = m.rooms.map(function (r) { return r.x; }), ys = m.rooms.map(function (r) { return r.y; });
+        var minX = Math.min.apply(null, xs), minY = Math.min.apply(null, ys);
+        var cols = Math.max.apply(null, xs) - minX + 1, rows = Math.max.apply(null, ys) - minY + 1;
+        var room = isPhone() ? 96 : window.matchMedia && window.matchMedia('(max-width: 1180px)').matches ? 112 : 132;
+        var pitch = Math.max(8, Math.min(32, Math.floor(room / Math.max(cols, rows))));
+        var size = Math.max(5, Math.round(pitch * 0.5)), here = Math.round(size * 1.25);
+        g.setAttribute('role', 'img');
+        g.setAttribute('aria-label', t('play.chron.map_label', [num(m.explored), num(m.total)]));
+        g.style.width = cols * pitch + 'px';
+        g.style.height = rows * pitch + 'px';
+        m.links.forEach(function (l) {
+            var h = l.y1 === l.y2, c = el('span', 'mlink ' + (h ? 'h' : 'v'));
+            var x = (Math.min(l.x1, l.x2) - minX) * pitch + pitch / 2, y = (Math.min(l.y1, l.y2) - minY) * pitch + pitch / 2;
+            c.style.left = (h ? x : x - 1) + 'px';
+            c.style.top = (h ? y - 1 : y) + 'px';
+            c.style[h ? 'width' : 'height'] = pitch + 'px';
+            g.appendChild(c);
+        });
+        m.rooms.forEach(function (r) {
+            var z = r.kind === 'here' ? here : size, c = el('span', 'mroom k-' + r.kind);
+            c.style.left = (r.x - minX) * pitch + (pitch - z) / 2 + 'px';
+            c.style.top = (r.y - minY) * pitch + (pitch - z) / 2 + 'px';
+            c.style.width = c.style.height = z + 'px';
+            g.appendChild(c);
+        });
+        card.appendChild(g);
+        card.appendChild(el('div', 'cap', t('play.chron.map_explored', [num(m.explored), num(m.total)])));
+        return card;
+    }
+
+    // G2's right page: the sheet's sections from Client.Sheet, every label and value as the game prints it.
+    function kvList(rows, cls) {
+        var dl = el('dl', 'kv' + (cls ? ' ' + cls : ''));
+        rows.forEach(function (r) {
+            var row = el('div'), dd = el('dd', /^[\d.,+\-\/\s:%()a-z]*$/.test(r.value) && /\d/.test(r.value) ? 'n' : null);
+            dd.appendChild(el('span', null, r.value));
+            if (r.extra) dd.appendChild(el('span', 'dim', ' ' + r.extra));
+            row.appendChild(el('dt', null, r.label));
+            row.appendChild(dd);
+            dl.appendChild(row);
+        });
+        return dl;
+    }
+    function sheetSection(heading, cls) {
+        var sec = el('section', 'sheet' + (cls ? ' ' + cls : ''));
+        if (heading) sec.appendChild(el('h2', 'sh', heading));
+        return sec;
+    }
+    function sheetRule(m, cls) {
+        var r = el('div', cls), rule = el('span', 'rule' + (cls === 'xprule' ? ' st' : '')), i = el('i');
+        i.style.width = pct(m.now, m.max) + '%';
+        rule.appendChild(i);
+        if (m.label) r.appendChild(el('span', 'lbl', m.label));
+        r.appendChild(rule);
+        r.appendChild(el('span', 'n', m.value));
+        return r;
+    }
+    function renderSheet(body, sh) {
+        var page = el('div', 'leaf sheetpage');
+        page.setAttribute('aria-label', t('play.chron.sheet'));
+        page.appendChild(el('h1', 'chap', sh.title));
+        var basic = sheetSection(sh.basic.heading);
+        basic.appendChild(kvList(sh.basic.rows));
+        if (sh.basic.note) basic.appendChild(el('div', 'snote', sh.basic.note));
+        page.appendChild(basic);
+        var lv = sheetSection(sh.level.heading);
+        lv.appendChild(kvList(sh.level.rows, 'one'));
+        if (sh.level.xp !== null && sh.level.xpNext) lv.appendChild(sheetRule({ label: '', value: num(sh.level.xp) + '/' + num(sh.level.xpNext), now: sh.level.xp, max: sh.level.xpNext }, 'xprule'));
+        page.appendChild(lv);
+        var cb = sheetSection(sh.combat.heading);
+        if (sh.combat.hp) cb.appendChild(sheetRule(sh.combat.hp, 'hp'));
+        if (sh.combat.mana) cb.appendChild(sheetRule(sh.combat.mana, 'hp mp'));
+        cb.appendChild(kvList(sh.combat.stats, 'three'));
+        if (sh.combat.more.length) cb.appendChild(kvList(sh.combat.more));
+        page.appendChild(cb);
+        var tt = sheetSection(sh.totals.heading, 'totals');
+        tt.appendChild(kvList(sh.totals.rows));
+        if (sh.totals.bonuses.length) {
+            var bonus = el('div', 'bonus'), chips = el('span', 'cchips');
+            if (sh.totals.bonusLabel) bonus.appendChild(el('span', 'lbl', sh.totals.bonusLabel));
+            sh.totals.bonuses.forEach(function (x) { chips.appendChild(el('span', 'chipc n', x.label + ' ' + x.value)); });
+            bonus.appendChild(chips);
+            tt.appendChild(bonus);
+        }
+        page.appendChild(tt);
+        body.appendChild(page);
     }
 
     // A key cap sends what a typed key does: the key, then Enter, as the pad's buttons do. After a click with the
@@ -1533,19 +1817,24 @@
         }
     }
 
-    // The footer: only the fields the game sends today (HP, Gold, Stamina, Level, XP), in one order on every screen.
-    // Desktop rows: HP Gold Stamina / Level XP. Narrower: HP Gold / Stamina Level / XP.
+    // The footer: one order on every screen. Desktop rows: HP Potions Gold Stamina / Level XP Lives. Narrower:
+    // HP Potions Gold / Stamina Level / XP Lives. Potions and Lives come from Client.Footer (a field the game's status
+    // line leaves out stays out); the XP percent follows the last field, where the status line prints it. Until the
+    // first Client.Footer, only the fields the other frames carry.
     function renderFoot() {
-        var f = document.getElementById('c-foot'), v = state.vitals, st = state.status, fields = [];
+        var f = document.getElementById('c-foot'), v = state.vitals, st = state.status, ft = state.footer, fields = [];
         clear(f);
         f.setAttribute('aria-label', t('play.chron.vitals'));
         if (v) fields.push({ l: t('play.hp'), v: num(v.hp) + '/' + num(v.maxHp), d: 0, n: 0 });
+        if (ft && ft.potions !== null) fields.push({ l: t('play.chron.potions'), v: num(ft.potions) + '/' + num(ft.maxPotions), d: 0, n: 0 });
         if (st) fields.push({ l: t('play.chron.gold'), v: num(st.gold), d: 0, n: 0 });
         if (v && v.maxCombatSp > 0) fields.push({ l: t('play.stamina'), v: num(v.combatSp) + '/' + num(v.maxCombatSp), d: 0, n: 1 });
         if (st) {
             fields.push({ l: t('play.chron.level'), v: num(st.level), d: 1, n: 1 });
             fields.push({ l: t('play.chron.xp'), v: num(st.xp), d: 1, n: 2 });
         }
+        if (ft && ft.lives !== null) fields.push({ l: ft.kind === 'lives' ? t('play.chron.lives') : t('play.chron.revives'), v: num(ft.lives) + '/' + num(ft.maxLives), d: 1, n: 2 });
+        if (ft && ft.xpPercent !== null && fields.length) fields[fields.length - 1].pc = '(' + num(ft.xpPercent) + '%)';
         fields.forEach(function (x, i) {
             if (i) {
                 var p = fields[i - 1], bd = x.d !== p.d, bn = x.n !== p.n;
@@ -1563,6 +1852,7 @@
             var s = el('span', 'f');
             s.appendChild(el('span', 'fl', x.l));
             s.appendChild(el('b', null, x.v));
+            if (x.pc) s.appendChild(el('span', 'pc', x.pc));
             f.appendChild(s);
         });
     }
@@ -1624,7 +1914,7 @@
     }
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
-        state.vitals = null; state.status = null; state.room = null; state.exits = {};
+        state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = [];
         roomEnter = -1; clearMatched = 0; screenCleared();
         chronReset();
         renderCombat();

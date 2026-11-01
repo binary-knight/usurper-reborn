@@ -581,5 +581,11 @@
   "play.chron.vitals": "Életjelek",
   "play.chron.gold": "Arany",
   "play.chron.level": "Szint",
-  "play.chron.xp": "TP"
+  "play.chron.xp": "TP",
+  "play.chron.potions": "Főzetek",
+  "play.chron.lives": "Életek",
+  "play.chron.revives": "Feltám.",
+  "play.chron.map_explored": "Térkép: {0}/{1} felfedezve",
+  "play.chron.map_label": "A szint térképe, {1} teremből {0} felfedezve",
+  "play.chron.sheet": "Karakterlap"
 }

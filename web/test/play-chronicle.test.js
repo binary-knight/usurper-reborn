@@ -194,8 +194,8 @@ test('the new strings are real translations in all five languages', () => {
   for (const l of LANGS.slice(1)) {
     const d = lang(l);
     const same = keys.filter((k) => d[k] === en[k]);
-    // Only words that are the same in that language may match English (XP, and Danger in French).
-    const alike = { fr: ['play.chron.xp', 'play.chron.danger'] }[l] || [];
+    // Only words that are the same in that language may match English (XP, and Danger and Potions in French).
+    const alike = { fr: ['play.chron.xp', 'play.chron.danger', 'play.chron.potions'] }[l] || [];
     assert.deepStrictEqual(same.filter((k) => !alike.includes(k)), [], l);
     for (const k of keys) assert.ok(typeof d[k] === 'string' && d[k].trim().length > 0, l + ' ' + k);
   }
@@ -590,6 +590,292 @@ test('art comes only from language neutral data: location id, dungeon floor, cla
   for (const m of css.matchAll(/background-size: (\d+)px (\d+)px/g)) assert.ok([384, 768].includes(Number(m[1])) && Number(m[2]) * 2 === Number(m[1]), m[0]);
 });
 
+// ---------------------------------------------------------------- phase 3a: footer, sprites, theme scenes, map, sheet
+
+// Frames as the game sends them (WebClient3aTests and the r200-p3 capture): real labels and values.
+const FOOTER = { potions: 7, maxPotions: 31, lives: 2, maxLives: 3, livesKind: 'lives', xpPercent: 37 };
+
+test('Client.Footer brings all seven fields, in one order, with the XP percent after the last as the status line prints it', async () => {
+  const p = await chronicle();
+  player(p);
+  frame(p, 'Client.Footer', FOOTER);
+  const f = p.el('c-foot');
+  assert.deepStrictEqual(f.querySelectorAll('.fl').map((e) => e.textContent), ['HP', 'Potions', 'Gold', 'Stamina', 'Level', 'XP', 'Lives']);
+  assert.deepStrictEqual(f.querySelectorAll('b').map((e) => e.textContent), ['40/62', '7/31', '2,500', '100/105', '3', '900', '2/3']);
+  assert.deepStrictEqual(f.querySelectorAll('.pc').map((e) => e.textContent), ['(37%)']);
+  assert.ok(f.querySelectorAll('.f')[6].querySelector('.pc'), 'the percent sits with the last field');
+  // desktop rows HP Potions Gold Stamina / Level XP Lives; narrower HP Potions Gold / Stamina Level / XP Lives
+  assert.deepStrictEqual(f.children.map((c) => c.getAttribute('class')),
+    ['f', 'sep', 'f', 'sep', 'f', 'sep sd', 'brk bn', 'f', 'sep sn', 'brk bd', 'f', 'sep sd', 'brk bn', 'f', 'sep', 'f']);
+  // revives in single player wording, and no lives where the line prints none: the percent moves to XP
+  frame(p, 'Client.Footer', Object.assign({}, FOOTER, { livesKind: 'revives' }));
+  assert.strictEqual(f.querySelectorAll('.fl')[6].textContent, 'Revives');
+  frame(p, 'Client.Footer', { potions: 7, maxPotions: 31, xpPercent: 5 });
+  assert.deepStrictEqual(f.querySelectorAll('.fl').map((e) => e.textContent), ['HP', 'Potions', 'Gold', 'Stamina', 'Level', 'XP']);
+  assert.strictEqual(f.querySelectorAll('.f')[5].querySelector('.pc').textContent, '(5%)');
+  frame(p, 'Client.Footer', { potions: 7, maxPotions: 31 });
+  assert.deepStrictEqual(f.querySelectorAll('.pc'), [], 'no percent at the level cap');
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('odd Client.Footer values are dropped at the door: a pair comes whole, lives only with their kind', async () => {
+  const p = await chronicle();
+  player(p);
+  for (const bad of [null, 5, 'x', [], { potions: '7', maxPotions: 31 }, { potions: 7 }, { lives: 2, maxLives: 3 }, { lives: 2, maxLives: 3, livesKind: 'souls' },
+    { potions: -4, maxPotions: NaN, xpPercent: Infinity }, { potions: { toString: null }, livesKind: { toString: null } }]) {
+    p.ctx.__d = bad;
+    p.run("UsurperPlay.handleGmcp('Client.Footer', __d)");
+    const labels = p.el('c-foot').querySelectorAll('.fl').map((e) => e.textContent);
+    assert.ok(!labels.includes('Lives') && !labels.includes('Revives'), JSON.stringify(bad));
+  }
+  p.ctx.__d = { potions: -4, maxPotions: 2.7, xpPercent: 250 };
+  p.run("UsurperPlay.handleGmcp('Client.Footer', __d)");
+  assert.strictEqual(p.el('c-foot').querySelectorAll('b')[1].textContent, '0/2');
+  assert.strictEqual(p.el('c-foot').querySelector('.pc').textContent, '(100%)');
+  assert.deepStrictEqual(p.errors, []);
+});
+
+const ENEMIES = { enemies: [{ name: 'Bone Guard A', family: 'Undead' }, { name: 'Nameless Thing', family: '' }, { name: 'Imp', family: 'Demonic' }] };
+function fight(p) {
+  player(p);
+  frame(p, 'Room.Info', { num: 'room_4', name: 'Hall of the Ancestors', area: 'Dungeon Floor 6' });
+  frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { themeId: 'Catacombs' }));
+  frame(p, 'Char.Combat.Start', { enemies: [{ name: 'Bone Guard A', level: 8, hp: 260, maxHp: 260 }, { name: 'Nameless Thing', level: 8, hp: 200, maxHp: 200 }, { name: 'Imp', level: 3, hp: 20, maxHp: 20 }] });
+}
+const foes = (p) => { const row = p.el('c-frame').querySelector('.foes-in'); return row ? row.children : []; };
+const foesOf = (p) => foes(p).map((e) => e.tagName === 'IMG' ? 'img ' + e.getAttribute('src') + ' ' + e.getAttribute('alt') : 'name ' + e.textContent);
+
+
+test('a foe stands in the fight plate as its family sprite, or as its name when its family has no art', async () => {
+  const p = await chronicle();
+  fight(p);
+  assert.deepStrictEqual(foesOf(p), [], 'no Client.Enemies yet: the scene alone, as before');
+  frame(p, 'Client.Enemies', ENEMIES);
+  assert.deepStrictEqual(foesOf(p), ['img /play/art/monsters/skeleton.png Bone Guard A', 'name Nameless Thing', 'img /play/art/monsters/demon.png Imp']);
+  assert.ok(p.el('c-frame').querySelector('.foes-in').classList.contains('n3'));
+  // a fallen foe leaves the plate; the cards keep it
+  frame(p, 'Char.Combat.Killed', { name: 'Imp' });
+  assert.deepStrictEqual(foesOf(p), ['img /play/art/monsters/skeleton.png Bone Guard A', 'name Nameless Thing']);
+  assert.ok(p.el('c-hud').textContent.includes('Imp'));
+  // a list that does not match the fight's own (order or names) names nothing
+  frame(p, 'Client.Enemies', { enemies: [{ name: 'Nameless Thing', family: 'Undead' }, { name: 'Bone Guard A', family: 'Undead' }] });
+  assert.deepStrictEqual(foesOf(p), []);
+  // a new fight forgets the last one's families until its own Client.Enemies comes
+  frame(p, 'Client.Enemies', ENEMIES);
+  frame(p, 'Char.Combat.Start', { enemies: [{ name: 'Bone Guard A', level: 8, hp: 260, maxHp: 260 }] });
+  assert.deepStrictEqual(foesOf(p), []);
+  frame(p, 'Client.Enemies', { enemies: [{ name: 'Bone Guard A', family: 'Undead' }] });
+  assert.ok(p.el('c-frame').querySelector('.foes-in').classList.contains('n1'));
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('only a family the page knows names art: odd and inherited names draw the foe by name', async () => {
+  const p = await chronicle();
+  fight(p);
+  for (const fam of ['__proto__', 'constructor', 'toString', 'undead', '../x', '<img src=x>', 5, null]) {
+    frame(p, 'Client.Enemies', { enemies: [{ name: 'Bone Guard A', family: fam }] });
+    assert.ok(!foesOf(p)[0] || foesOf(p)[0].startsWith('name '), String(fam));
+  }
+  for (const bad of [null, 5, 'x', { enemies: 'x' }, { enemies: [null, 5, { name: { toString: null } }] }]) {
+    p.ctx.__d = bad;
+    p.run("UsurperPlay.handleGmcp('Client.Enemies', __d)");
+  }
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('the floor scene comes from themeId, the same in every language; the translated theme is never read for art', async () => {
+  const p = await chronicle();
+  const bg = () => p.el('c-frame').querySelector('.scene').style.backgroundImage;
+  frame(p, 'Room.Info', { num: 'room_3', name: 'Cripta', area: 'Dungeon Floor 12' });
+  frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { theme: 'Profundidades Heladas', themeId: 'FrozenDepths' }));
+  assert.strictEqual(bg(), 'url("/play/art/scenes/frozen-depths.png")');
+  assert.strictEqual(p.el('c-cap').textContent, 'Plate: Profundidades Heladas, Level 6', 'the caption keeps the game\'s own words');
+  frame(p, 'Char.Combat.Start', { enemies: [{ name: 'Wight', level: 12, hp: 1, maxHp: 1 }] });
+  assert.strictEqual(bg(), 'url("/play/art/scenes/frozen-depths.png")', 'the fight keeps the floor scene');
+  frame(p, 'Char.Combat.End', { outcome: 'Victory' });
+  for (const odd of ['Frozen Depths', 'frozendepths', '__proto__', 'constructor', 5, null]) {
+    frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { theme: 'Frozen Depths', themeId: odd }));
+    assert.strictEqual(bg(), 'url("/play/art/scenes/dungeon.png")', String(odd));
+  }
+  // every scene and sprite the page can name is a file in web/play/art
+  const code = readPage(PAGE);
+  const themes = /var THEMES = \{([^}]*)\}/.exec(code)[1].match(/'([a-z-]+)'/g).map((x) => x.slice(1, -1));
+  assert.strictEqual(themes.length, 8);
+  for (const s of themes) assert.ok(fs.existsSync(path.join(WEB, 'play', 'art', 'scenes', s + '.png')), s);
+  const sprites = /var SPRITES = \{([^}]*)\}/.exec(code)[1].match(/'([a-z-]+)'/g).map((x) => x.slice(1, -1));
+  assert.strictEqual(sprites.length, 15);
+  for (const s of sprites) assert.ok(fs.existsSync(path.join(WEB, 'play', 'art', 'monsters', s + '.png')), s);
+  const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
+  for (const m of css.matchAll(/\.foe[^{]*\{[^}]*?width: (\d+)px; height: (\d+)px/g)) assert.ok(m[1] === m[2] && ['64', '128', '256'].includes(m[1]), 'sprites at whole scales of 128: ' + m[0]);
+  assert.match(css, /\.chron \.foe \{[^}]*image-rendering: pixelated/);
+});
+
+const MAP = {
+  level: 6, theme: 'Catacombs', themeId: 'Catacombs', explored: 4, total: 6, cleared: 2, room: 'room_4', location: 'Hall of the Ancestors', bossDefeated: false,
+  rooms: [{ x: 0, y: 0, kind: 'here' }, { x: 0, y: -1, kind: 'cleared' }, { x: -1, y: 0, kind: 'safe' }, { x: -1, y: 1, kind: 'monsters' }],
+  links: [{ x1: 0, y1: 0, x2: -1, y2: 0 }, { x1: -1, y1: 0, x2: -1, y2: 1 }],
+};
+function inRoomWithMap(p, map) {
+  frame(p, 'Room.Info', { num: 'room_4', name: 'Hall of the Ancestors', area: 'Dungeon Floor 6' });
+  frame(p, 'Client.Map', map || MAP);
+  frame(p, 'Room.Detail', ROOM_DETAIL);
+  frame(p, 'Client.Menu', ROOM_MENU);
+}
+
+test('the room shows the map beside the exits (D3) while it is the map drawn from this room', async () => {
+  const p = await chronicle();
+  inRoomWithMap(p);
+  assert.strictEqual(layout(p), 'room');
+  const nav = p.el('c-body').querySelector('.nav');
+  assert.ok(nav, 'the map and exits panel');
+  assert.deepStrictEqual(nav.children.map((c) => c.getAttribute('class')), ['card mapcard', 'card compcard'], 'map first, the exits beside it');
+  const m = nav.querySelector('.cmap');
+  assert.strictEqual(m.getAttribute('role'), 'img');
+  assert.strictEqual(m.getAttribute('aria-label'), 'Map of the floor, 4 of 6 rooms explored');
+  assert.deepStrictEqual(m.querySelectorAll('.mroom').map((r) => r.getAttribute('class')), ['mroom k-here', 'mroom k-cleared', 'mroom k-safe', 'mroom k-monsters']);
+  assert.deepStrictEqual(m.querySelectorAll('.mlink').map((r) => r.getAttribute('class')), ['mlink h', 'mlink v']);
+  assert.strictEqual(nav.querySelector('.mapcard .cap').textContent, 'Map: 4/6 explored');
+  assert.strictEqual(m.textContent, '', 'the map is a picture with its words in the label');
+  // the rooms sit on a grid: the current room east of the safe one, the cleared one above it
+  const at = (r) => [parseFloat(r.style.left) + parseFloat(r.style.width) / 2, parseFloat(r.style.top) + parseFloat(r.style.height) / 2];
+  const [here, up, west, down] = m.querySelectorAll('.mroom').map(at);
+  assert.ok(here[0] === up[0] && up[1] < here[1] && west[1] === here[1] && west[0] < here[0] && down[0] === west[0] && down[1] > west[1]);
+  // a move to another room: the map would be out of date, so it stays out until the map screen is opened again
+  frame(p, 'Room.Info', { num: 'room_5', name: 'Crypt', area: 'Dungeon Floor 6' });
+  frame(p, 'Room.Detail', ROOM_DETAIL);
+  assert.strictEqual(p.el('c-body').querySelector('.mapcard'), null);
+  assert.ok(p.el('c-body').querySelector('.compcard'), 'the exits stay');
+  // another floor's map is not this floor's
+  const q = await chronicle();
+  inRoomWithMap(q, Object.assign({}, MAP, { level: 7 }));
+  assert.strictEqual(q.el('c-body').querySelector('.mapcard'), null);
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('odd Client.Map rooms and corridors are dropped: unknown kinds, broken places, corridors to rooms not listed', async () => {
+  const p = await chronicle();
+  inRoomWithMap(p, Object.assign({}, MAP, {
+    rooms: MAP.rooms.concat([{ x: 1, y: 0, kind: 'unknown' }, { x: 2.5, y: 0, kind: 'safe' }, { x: '3', y: 0, kind: 'safe' }, { x: 0, y: 0, kind: 'safe' },
+      { x: 9, y: 9, kind: '__proto__' }, { x: 1e9, y: 0, kind: 'safe' }, null, 5]),
+    links: MAP.links.concat([{ x1: 0, y1: 0, x2: 1, y2: 0 }, { x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: -1, y2: 1 }, { x1: 'a' }, null]),
+  }));
+  const m = p.el('c-body').querySelector('.cmap');
+  assert.strictEqual(m.querySelectorAll('.mroom').length, 4, 'only the four good rooms');
+  assert.strictEqual(m.querySelectorAll('.mlink').length, 2, 'only corridors between two listed rooms side by side');
+  for (const bad of [null, 5, 'x', { rooms: 'x', links: 5 }, { rooms: [{ x: { toString: null } }] }]) {
+    p.ctx.__d = bad;
+    p.run("UsurperPlay.handleGmcp('Client.Map', __d)");
+  }
+  assert.deepStrictEqual(p.errors, []);
+});
+
+const SHEET = {
+  title: 'CHARACTER STATUS', name: 'Webtest', classId: 'Warrior',
+  basic: { heading: 'BASIC INFORMATION', rows: [{ label: 'Name', value: 'Webtest' }, { label: 'Class', value: 'Warrior' }, { label: 'Race', value: 'Human' }, { label: 'Sex', value: 'Female' },
+    { label: 'Age', value: '22' }, { label: 'Height', value: '180cm' }, { label: 'Weight', value: '80kg' }], note: 'Royal Authority: +10% ATK, +10% DEF, +5% HP' },
+  level: { heading: 'LEVEL & EXPERIENCE', rows: [{ label: 'Current Level', value: '12' }, { label: 'Experience', value: '15,880' }, { label: 'XP to Next Level', value: '25,020', extra: '(Need 40900 total)' }], xp: 15880, xpNext: 40900 },
+  combat: { heading: 'COMBAT STATISTICS', hp: { label: 'HP', value: '400/400', now: 400, max: 400 }, mana: { label: 'Mana', value: '20/50', now: 20, max: 50 },
+    stats: [['Strength', '60'], ['Defense', '20'], ['Agility', '20'], ['Dexterity', '30'], ['Stamina', '100'], ['Wisdom', '20'], ['Intelligence', '20'], ['Charisma', '15'], ['Constitution', '30']].map(([label, value]) => ({ label, value })), more: [] },
+  equipment: { heading: 'EQUIPMENT', style: { label: 'Combat Style', value: 'One-Handed' }, slots: [
+    { slot: 'MainHand', label: 'Main Hand', item: 'Webtest Blade', stats: '(WP:19 Str:+2)', empty: false }, { slot: 'OffHand', label: 'Off Hand', item: 'Empty', empty: true },
+    { slot: 'Head', label: 'Head', item: 'Webtest Helm', stats: '(AC:11 Con:+1)', empty: false }, { slot: 'Body', label: 'Body', item: 'Empty', empty: true },
+    { slot: 'Arms', label: 'Arms', item: 'Empty', empty: true }, { slot: 'Hands', label: 'Hands', item: 'Empty', empty: true }, { slot: 'Legs', label: 'Legs', item: 'Empty', empty: true },
+    { slot: 'Feet', label: 'Feet', item: 'Empty', empty: true }, { slot: 'Waist', label: 'Waist', item: 'Empty', empty: true }, { slot: 'Face', label: 'Face', item: 'Empty', empty: true },
+    { slot: 'Cloak', label: 'Cloak', item: 'Empty', empty: true }, { slot: 'Neck', label: 'Neck', item: 'Empty', empty: true },
+    { slot: 'LFinger', label: 'Left Ring', item: 'Empty', empty: true }, { slot: 'RFinger', label: 'Right Ring', item: 'Empty', empty: true }] },
+  totals: { heading: 'Equipment Totals', rows: [{ label: 'Weapon Power', value: '19' }, { label: 'Armor Power', value: '11' }], bonusLabel: 'Bonuses', bonuses: [{ label: 'Str', value: '+2' }, { label: 'Con', value: '+1' }] },
+};
+const SHEET_TEXT = ['CHARACTER STATUS', 'BASIC INFORMATION', 'Name: Webtest', 'Class: Warrior  |  Race: Human  |  Sex: Female', 'Press Enter to continue...'];
+
+test('Client.Sheet draws Character Status as G2: the slots around the portrait, the sheet on the right, the game\'s Enter key', async () => {
+  const sent = [];
+  const p = await chronicle({ WebSocket: socket(sent) });
+  player(p);
+  screen(p, SHEET_TEXT);
+  assert.strictEqual(layout(p), 'text', 'the text page until the sheet arrives');
+  frame(p, 'Client.Sheet', SHEET);
+  assert.strictEqual(layout(p), 'sheet');
+  // the doll: top row, left column, the portrait, right column, bottom row, in reading order
+  const row = p.el('c-frame').parentElement;
+  assert.ok(row.classList.contains('doll'));
+  assert.deepStrictEqual(row.children.map((c) => c.id || c.getAttribute('class')), ['drow dt', 'dcol dl', 'c-frame', 'dcol dr', 'drow db']);
+  const slotText = (cls) => row.querySelector('.' + cls).querySelectorAll('.slot').map((x) => x.querySelector('.sl').textContent + ':' + x.querySelector('.it').textContent);
+  assert.deepStrictEqual(slotText('dt'), ['Head:Webtest Helm', 'Face:Empty', 'Neck:Empty']);
+  assert.deepStrictEqual(slotText('dl'), ['Main Hand:Webtest Blade', 'Arms:Empty', 'Hands:Empty', 'Left Ring:Empty']);
+  assert.deepStrictEqual(slotText('dr'), ['Off Hand:Empty', 'Body:Empty', 'Cloak:Empty', 'Right Ring:Empty']);
+  assert.deepStrictEqual(slotText('db'), ['Waist:Empty', 'Legs:Empty', 'Feet:Empty']);
+  assert.strictEqual(row.querySelector('.dl .slot .st').textContent, '(WP:19 Str:+2)');
+  assert.ok(row.querySelectorAll('.slot.empty').every((x) => x.querySelector('.it').textContent === 'Empty'), 'an empty slot is dashed and says so');
+  assert.strictEqual(p.el('c-frame').querySelector('img').getAttribute('src'), '/play/art/classes/warrior.png');
+  assert.strictEqual(p.el('c-cap').textContent, 'Plate: Webtest, Warrior');
+  assert.strictEqual(p.el('c-hud').querySelector('.cstyle').textContent, 'Combat StyleOne-Handed');
+  // the right page: the game's own headings, labels and values
+  const body = p.el('c-body');
+  assert.strictEqual(body.querySelector('h1').textContent, 'CHARACTER STATUS');
+  assert.deepStrictEqual(body.querySelectorAll('h2').map((h) => h.textContent), ['BASIC INFORMATION', 'LEVEL & EXPERIENCE', 'COMBAT STATISTICS', 'Equipment Totals']);
+  const pairs = body.querySelectorAll('dl').flatMap((dl) => dl.children).map((d) => d.querySelector('dt').textContent + '=' + d.querySelector('dd').textContent);
+  for (const want of ['Name=Webtest', 'Race=Human', 'Height=180cm', 'Experience=15,880', 'XP to Next Level=25,020 (Need 40900 total)', 'Strength=60', 'Constitution=30', 'Weapon Power=19'])
+    assert.ok(pairs.includes(want), want);
+  assert.strictEqual(body.querySelector('dl.three').children.length, 9);
+  assert.strictEqual(body.querySelector('.snote').textContent, SHEET.basic.note);
+  assert.deepStrictEqual(body.querySelectorAll('.bonus .chipc').map((c) => c.textContent), ['Str +2', 'Con +1']);
+  assert.deepStrictEqual(body.querySelectorAll('.hp .n').map((c) => c.textContent), ['400/400', '20/50']);
+  assert.strictEqual(body.querySelector('.xprule .n').textContent, '15,880/40,900');
+  // the game's Press Enter handling, unchanged: the Enter key from the screen sends Enter alone
+  assert.strictEqual(p.el('c-enterbar').hidden, false);
+  p.click(p.el('c-enterbar').querySelector('.kc'));
+  assert.deepStrictEqual(sent, ['\r']);
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('the sheet lasts for its own draw: the next page is the text page, and the Text page button shows the text at any time', async () => {
+  const p = await chronicle();
+  frame(p, 'Client.Sheet', SHEET);
+  screen(p, SHEET_TEXT);
+  assert.strictEqual(layout(p), 'sheet');
+  p.run('UsurperPlay.drawStarted(300)');   // Enter for the next page
+  assert.strictEqual(layout(p), 'sheet', 'pending, not flashed');
+  p.run('UsurperPlay.drawEnded()');
+  assert.strictEqual(layout(p), 'text', 'no sheet in this draw');
+  assert.strictEqual(p.el('c-frame').parentElement.className, 'plate-row', 'the doll goes with it');
+  assert.strictEqual(p.el('c-frame').parentElement.children.length, 1);
+  p.run('UsurperPlay.drawStarted(300)');
+  frame(p, 'Client.Sheet', SHEET);
+  p.click(p.el('text-toggle'));
+  assert.strictEqual(layout(p), 'text');
+  assert.ok(p.el('c-screen').textContent.includes('Name: Webtest'), 'the game\'s own lines are always one press away');
+  p.click(p.el('text-toggle'));
+  assert.strictEqual(layout(p), 'sheet');
+  // a street menu takes over; a fight is never replaced by a sheet
+  frame(p, 'Client.Menu', STREET_MENU);
+  assert.strictEqual(layout(p), 'street');
+  frame(p, 'Char.Combat.Start', { enemies: [{ name: 'Zombie', level: 1, hp: 5, maxHp: 9 }] });
+  frame(p, 'Client.Sheet', SHEET);
+  assert.strictEqual(layout(p), 'fight');
+});
+
+test('odd Client.Sheet fields are dropped at the door, and every value is drawn as text', async () => {
+  const p = await chronicle();
+  const H = '<img src=x onerror=alert(2)><script>a()</script>&amp;';
+  const hostile = JSON.parse(JSON.stringify(SHEET).split('Webtest').join(H).split('Empty').join(H));
+  hostile.classId = H;
+  frame(p, 'Client.Sheet', hostile);
+  for (const id of ['c-body', 'c-hud', 'c-cap', 'c-rh']) {
+    const tags = descendants(p.el(id)).map((e) => e.tagName);
+    assert.ok(tags.every((t) => ['DIV', 'SPAN', 'B', 'SMALL', 'I', 'H1', 'H2', 'SECTION', 'DL', 'DT', 'DD', 'PRE', 'BUTTON'].includes(t)), id + ': ' + tags.join(','));
+  }
+  const doll = descendants(p.el('c-frame').parentElement).map((e) => e.tagName);
+  assert.ok(doll.every((t) => ['DIV', 'SPAN'].includes(t)), 'no portrait for an unknown class, and no markup from the frame: ' + doll.join(','));
+  assert.ok(p.el('c-body').textContent.includes(H));
+  for (const bad of [null, 5, 'x', [], { basic: 5, level: 'x', combat: [], equipment: { slots: [null, 5, { slot: 'Toes' }, { slot: '__proto__' }, { slot: { toString: null } }] }, totals: { bonuses: 'x' } },
+    { basic: { rows: [null, 5, { label: { toString: null }, value: NaN }] }, combat: { hp: 5, mana: { now: 'x', max: Infinity } }, level: { xp: -5, xpNext: 'x' } }]) {
+    p.ctx.__d = bad;
+    p.run("UsurperPlay.handleGmcp('Client.Sheet', __d)");
+  }
+  assert.deepStrictEqual(p.errors, []);
+  assert.strictEqual(layout(p), 'sheet');
+});
+
 // ---------------------------------------------------------------- accessibility
 
 test('the screen reader path: the terminal is never hidden, the text page is real text, and the Text page button forces it', async () => {
@@ -737,6 +1023,7 @@ test('no new third party origins: the page loads only Google Fonts and the pinne
   assert.doesNotMatch(outside, /url\(/, 'only the inline grain image');
   assert.match(html, /style\.backgroundImage = 'url\("\/play\/art\/scenes\/' \+ scene \+ '\.png"\)'/);
   assert.match(html, /img\.setAttribute\('src', '\/play\/art\/classes\/' \+ portrait \+ '\.png'\)/);
+  assert.match(html, /img\.setAttribute\('src', '\/play\/art\/monsters\/' \+ x\.art \+ '\.png'\)/);
   assert.strictEqual(html.match(/new WebSocket\(/g).length, 1);
   assert.deepStrictEqual(html.match(/fetch\('[^']*'/g), ["fetch('/lang/'", "fetch('/api/languages'"]);
 });
