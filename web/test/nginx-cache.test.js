@@ -63,3 +63,11 @@ test('the server deployment guide installs both files', () => {
   assert.match(guide, /^sudo cp scripts-server\/nginx-cache\.conf \/etc\/nginx\/snippets\/usurper-cache\.conf$/m);
   assert.match(guide, /^sudo cp scripts-server\/nginx-cache-map\.conf \/etc\/nginx\/conf\.d\/usurper-cache-map\.conf$/m);
 });
+
+test('the guide edits the file nginx loads on a running server, with the include line used live', () => {
+  const guide = read('DOCS', 'SERVER_DEPLOYMENT.md');
+  assert.match(guide, /^### Changing nginx on a running server$/m);
+  assert.match(guide, /^1\. Find the file nginx loads: `ls -l \/etc\/nginx\/sites-enabled\/`\./m);
+  assert.match(guide, /^   sudo sed -i -E '\/\^\\s\*include \\\/etc\\\/nginx\\\/snippets\\\/usurper-csp\\\.conf;\/a\\    include \/etc\/nginx\/snippets\/usurper-cache\.conf;' \/etc\/nginx\/sites-enabled\/usurper$/m);
+  assert.match(guide, /^6\. Reload: `sudo systemctl reload nginx`\./m);
+});
