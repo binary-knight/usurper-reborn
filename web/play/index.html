@@ -1414,7 +1414,7 @@
         var row = el('div', 'foes-in n' + shown.length);
         shown.forEach(function (x) {
             if (x.art) {
-                var img = el('img', 'px foe');
+                var img = el('img', 'px sprite');
                 img.setAttribute('src', '/play/art/monsters/' + x.art + '.png');
                 img.setAttribute('alt', x.name);
                 row.appendChild(img);

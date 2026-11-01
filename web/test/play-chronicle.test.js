@@ -706,8 +706,11 @@ test('the floor scene comes from themeId, the same in every language; the transl
   assert.strictEqual(sprites.length, 15);
   for (const s of sprites) assert.ok(fs.existsSync(path.join(WEB, 'play', 'art', 'monsters', s + '.png')), s);
   const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
-  for (const m of css.matchAll(/\.foe[^{]*\{[^}]*?width: (\d+)px; height: (\d+)px/g)) assert.ok(m[1] === m[2] && ['64', '128', '256'].includes(m[1]), 'sprites at whole scales of 128: ' + m[0]);
-  assert.match(css, /\.chron \.foe \{[^}]*image-rendering: pixelated/);
+  const scales = [...css.matchAll(/\.sprite[^{]*\{[^}]*?width: (\d+)px; height: (\d+)px/g)];
+  assert.ok(scales.length >= 4);
+  for (const m of scales) assert.ok(m[1] === m[2] && ['64', '128', '256'].includes(m[1]), 'sprites at whole scales of 128: ' + m[0]);
+  assert.match(css, /\.chron \.sprite \{[^}]*image-rendering: pixelated/);
+  assert.doesNotMatch(css, /\.chron \.foe[\s,{]/, 'the sprite never takes the enemy HP rule\'s class');
 });
 
 const MAP = {

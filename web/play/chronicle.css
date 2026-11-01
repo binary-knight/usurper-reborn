@@ -80,10 +80,10 @@ body.chron #view-select:focus-visible { outline: 2px solid var(--gold); outline-
 .chron .plate-cap:empty { display: none; }
 .chron .plate-cap::before, .chron .plate-cap::after { content: ""; display: inline-block; width: 34px; height: 1px; background: var(--rule); vertical-align: middle; margin: 0 12px; }
 
-/* The foes in the fight's plate (2.0 phase 3a): the family sprite at 2x (one or two foes) or 1x, or the foe's name */
+/* The foes in the fight's plate (2.0 phase 3a): the family sprite (.sprite; .foe is the enemy HP rule) at 2x (one or two foes) or 1x, or the foe's name */
 .chron .foes-in { position: absolute; left: 0; right: 0; bottom: 14px; z-index: 1; display: flex; justify-content: center; align-items: flex-end; gap: 22px; padding: 0 8px; }
-.chron .foe { width: 256px; height: 256px; flex: none; image-rendering: pixelated; filter: drop-shadow(0 10px 8px rgba(0,0,0,.75)); }
-.chron .foes-in.n3 .foe, .chron .foes-in.n4 .foe { width: 128px; height: 128px; }
+.chron .sprite { width: 256px; height: 256px; flex: none; image-rendering: pixelated; filter: drop-shadow(0 10px 8px rgba(0,0,0,.75)); }
+.chron .foes-in.n3 .sprite, .chron .foes-in.n4 .sprite { width: 128px; height: 128px; }
 .chron .foe-name { flex: 0 1 auto; min-width: 0; margin-bottom: 10px; padding: 3px 9px 1px; border: 1px solid var(--iron-hi); background: rgba(12,11,10,.82);
   font-family: var(--display); font-size: 15px; letter-spacing: .06em; color: var(--ink-0); overflow-wrap: anywhere; text-align: center; }
 
@@ -144,13 +144,15 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .rd::before, .chron .rd::after { content: ""; display: inline-block; width: 46px; height: 1px; background: var(--st-ink); vertical-align: middle; margin: 0 12px; }
 
 /* Exit compass: a solid cell with its state word for each exit the room sends, a dashed dim cell otherwise */
-.chron .cbody.b-room { display: flex; flex-direction: column; gap: 10px; }
-.chron .cbody.b-room > .prose { flex: 1 1 auto; min-height: 0; }
+.chron .cbody.b-room { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+/* The prose takes what the map, the exits and the keys leave, and scrolls inside when the room text is longer */
+.chron .cbody.b-room > .prose { flex: 1 1 auto; min-height: 6.5em; overflow: auto; }
 .chron .compcard { flex: none; align-items: center; }
 /* D3: the map and the exits side by side above the keys (2.0 phase 3a) */
 .chron .nav { flex: none; display: flex; justify-content: flex-end; align-items: stretch; gap: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
 .chron .mapcard { flex: 1 1 auto; min-width: 0; flex-direction: row; align-items: center; justify-content: center; gap: 14px; }
 .chron .cmap { position: relative; flex: none; }
+.chron .nav .ccomp { grid-template-rows: repeat(3, 36px); }
 .chron .mlink { position: absolute; background: #b3a993; }
 .chron .mlink.h { height: 2px; } .chron .mlink.v { width: 2px; }
 .chron .mroom { position: absolute; display: grid; place-items: center; border: 1px solid #d6cdbb; background: var(--page);
@@ -178,7 +180,9 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .kgroups[hidden] { display: none; }
 .chron .kgroup .kh { margin-bottom: 5px; }
 .chron .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chron[data-layout="street"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* The room has up to 19 keys under its prose and the map: four across on a desktop so the map and exits stay in view */
+.chron[data-layout="room"] .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .chron .khint { margin-top: 5px; font-style: italic; font-size: 14px; color: var(--ink-3); }
 .chron[data-layout="fight"] .kgroups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .chron[data-layout="fight"] .kgroups[hidden] { display: none; }
@@ -238,15 +242,15 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .cstyle .val.x { flex-basis: 100%; text-align: center; font-size: 15px; }
 .chron .cbody.b-sheet { overflow: auto; }
 .chron .sheetpage { display: flex; flex-direction: column; }
-.chron .sheetpage .chap { font-size: 32px; margin-bottom: 2px; }
-.chron .sheet { margin-top: 10px; }
+.chron .sheetpage .chap { font-size: 28px; margin-bottom: 0; }
+.chron .sheet { margin-top: 8px; }
 .chron .sh { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; font-family: var(--display); font-weight: 400; font-size: 16px; letter-spacing: .14em; color: var(--st-ink); }
 .chron .sh::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
 .chron .sheetpage .n, .chron .slot .n { font-family: var(--term); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .chron dl.kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 26px; margin: 0; }
 .chron dl.kv.one { grid-template-columns: 1fr; }
 .chron dl.kv.three { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; }
-.chron .kv > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--rule); padding: 5px 0 4px; min-width: 0; }
+.chron .kv > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--rule); padding: 4px 0 3px; min-width: 0; }
 .chron .kv dt { font-family: var(--display); font-size: 15px; letter-spacing: .06em; color: var(--ink-3); }
 .chron .kv dd { margin: 0; font-size: 18px; color: var(--ink-0); text-align: right; min-width: 0; overflow-wrap: anywhere; }
 .chron .kv dd.n { font-size: 15px; }
@@ -297,9 +301,9 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron .foot .bn { display: block; }
   .chron .foot .sn { display: inline; }
   .chron .dock { gap: 7px; }
-  .chron .foe { width: 128px; height: 128px; }
+  .chron .sprite { width: 128px; height: 128px; }
   .chron .foes-in { gap: 14px; bottom: 10px; }
-  .chron .foes-in.n3 .foe, .chron .foes-in.n4 .foe { width: 64px; height: 64px; }
+  .chron .foes-in.n3 .sprite, .chron .foes-in.n4 .sprite { width: 64px; height: 64px; }
   .chron .foe-name { font-size: 13px; }
   .chron .nav { gap: 10px; padding-top: 8px; }
   .chron .sheetpage .chap { font-size: 25px; }
@@ -321,9 +325,23 @@ body.chron-read .chron .screen { font-size: 15px; }
 @media (max-width: 900px) {
   .chron .plate-row.doll { grid-template-columns: 1fr 1fr; grid-template-areas: "t t" "p p" "l r" "b b"; }
   .chron .plate-row.doll > .frame { justify-self: center; }
-  .chron dl.kv.three, .chron dl.kv { grid-template-columns: 1fr; }
-  .chron .nav { flex-wrap: wrap; }
+  .chron dl.kv, .chron dl.kv.three { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+  .chron .sheetpage .chap { font-size: 22px; }
   .chron .mapcard { flex-direction: column; gap: 6px; }
+  .chron .hud.h-fight { grid-template-columns: 1fr; gap: 6px; }
+  .chron .grid, .chron[data-layout="room"] .grid, .chron[data-layout="street"] .grid, .chron[data-layout="fight"] .kgroups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chron .kc .lb { overflow-wrap: break-word; }
+  .chron .foot { font-size: 12px; }
+  .chron .foot .sep { margin: 0 5px; }
+  .chron .nav .ccomp { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 30px); gap: 3px; }
+  .chron .nav .cdir small { margin-top: 1px; }
+  .chron .nav .compcard .kh { display: none; }
+  /* a narrow spread: the room's keys three across, the cap beside a smaller label, so the prose keeps some room */
+  .chron[data-layout="room"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .chron[data-layout="room"] .kc { gap: 5px; min-height: 38px; padding: 3px 4px 3px 3px; }
+  .chron[data-layout="room"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
+  .chron[data-layout="room"] .kc .lb { font-size: 12.5px; letter-spacing: 0; }
+  .chron .kc .lb { hyphens: auto; }
 }
 
 /* Phone: one page that scrolls, the dock held at the bottom */
@@ -353,7 +371,7 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron .portrait, .chron .portrait img { width: 192px; height: 192px; }
   .chron .plate-cap { font-size: 12px; letter-spacing: .12em; }
   .chron .plate-cap::before, .chron .plate-cap::after { width: 18px; margin: 0 8px; }
-  .chron .hud.h-fight { gap: 6px; }
+  .chron .hud.h-fight { grid-template-columns: 1fr 1fr; gap: 6px; }
   .chron .hcol { gap: 4px; }
   .chron .card { padding: 4px 6px; gap: 3px; }
   .chron .who { font-size: 13.5px; }
@@ -393,7 +411,8 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron[data-layout="fight"] .kc { min-height: 44px; padding: 2px; gap: 1px; }
   .chron[data-layout="fight"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
   .chron[data-layout="fight"] .kc .cap.wide { width: auto; min-width: 22px; font-size: 12px; }
-  .chron .foe, .chron .foes-in.n3 .foe, .chron .foes-in.n4 .foe { width: 64px; height: 64px; }
+  .chron[data-layout="fight"] .kc .lb { letter-spacing: 0; }
+  .chron .sprite, .chron .foes-in.n3 .sprite, .chron .foes-in.n4 .sprite { width: 64px; height: 64px; }
   .chron .foes-in { gap: 10px; bottom: 6px; }
   .chron .foe-name { font-size: 12px; margin-bottom: 4px; padding: 2px 6px 1px; }
   .chron .cbody.b-room { flex: none; }
