@@ -1008,7 +1008,10 @@
         document.body.classList.toggle('chron-read', fitMode === 'read');
         if (terminal.rows !== CHRON_ROWS || terminal.cols !== COLS) terminal.resize(COLS, CHRON_ROWS);
         schedulePad();
-        renderChronNow();   // a new size can change how many log lines fit
+        // Read what the terminal already holds, so a switch in the middle of a screen shows it at once, and draw
+        // again since a new size can change how many log lines fit.
+        readScreen();
+        renderChronNow();
     }
 
     // A draw starts at each Enter sent and at each screen clear, and ends at the game's prompt or after a quiet
@@ -1190,8 +1193,30 @@
     }
     function inRoom(lay) { return (lay === 'room' || lay === 'fight') && chron.detail && chron.place && chron.place.dungeon; }
 
+    // A redraw replaces the text page and the keys, so the element that had focus is found again in the new ones, and
+    // a reader scrolled back in the text page stays where they were.
+    function focusMark() {
+        var a = document.activeElement;
+        if (!a || typeof a.closest !== 'function' || !a.closest('.chron')) return null;
+        if (a.getAttribute('id') === 'c-screen') return { screen: true };
+        if (a.classList.contains('kc')) return { key: a.getAttribute('data-key') };
+        return null;
+    }
+    function focusAgain(mark) {
+        if (!mark) return;
+        var target = null;
+        if (mark.screen) target = document.getElementById('c-screen');
+        else document.querySelectorAll('.chron .kc').forEach(function (b) { if (!target && b.getAttribute('data-key') === mark.key) target = b; });
+        if (target) target.focus();
+        else if (terminal && !isTouch()) terminal.focus();
+    }
     function renderChronNow() {
         if (!chronOn()) return;
+        var mark = focusMark();
+        renderChronBook();
+        focusAgain(mark);
+    }
+    function renderChronBook() {
         var lay = layoutNow();
         var texts = chron.rows.map(rowText);
         var screen = texts.slice(chron.start);
@@ -1369,6 +1394,9 @@
     }
     function renderBody(lay, known) {
         var body = document.getElementById('c-body'), d = chron.detail, drop = Object.create(null);
+        var old = document.getElementById('c-screen');
+        var oldTop = old ? Number(old.scrollTop) || 0 : 0;
+        var atEnd = !old || !(oldTop + (Number(old.clientHeight) || 0) < (Number(old.scrollHeight) || 0) - 4);
         clear(body);
         body.className = 'cbody b-' + lay;
         if (lay === 'text') {
@@ -1377,7 +1405,7 @@
             pre.setAttribute('tabindex', '0');
             pre.setAttribute('aria-label', t('play.chron.screen'));
             body.appendChild(pre);
-            pre.scrollTop = pre.scrollHeight;
+            pre.scrollTop = atEnd ? pre.scrollHeight : oldTop;
             return;
         }
         if (lay === 'fight') {
@@ -1427,6 +1455,7 @@
     function keyCap(key, label, enabled) {
         var b = el('button', 'kc' + (enabled ? '' : ' off'));
         b.type = 'button';
+        b.setAttribute('data-key', key);
         b.setAttribute('aria-label', key + ', ' + label);
         if (!enabled) b.setAttribute('aria-disabled', 'true');
         b.appendChild(el('span', 'cap' + (key.length > 2 ? ' wide' : key === 'Q' ? ' swash' : ''), key));
@@ -1461,6 +1490,7 @@
         if (enter) {
             var b = el('button', 'kc enter');
             b.type = 'button';
+            b.setAttribute('data-key', '\r');
             b.appendChild(el('span', 'cap', t('play.pad.enter')));
             b.appendChild(el('span', 'lb', said[said.length - 1].trim().slice(0, 80)));
             b.addEventListener('click', function (e) {

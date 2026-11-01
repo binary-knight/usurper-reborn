@@ -106,10 +106,10 @@ body.chron #view-select:focus-visible { outline: 2px solid var(--gold); outline-
 /* The right page body */
 .chron .cbody { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
 .chron .screen { margin: 0; flex: 1; min-height: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--term);
-  font-size: clamp(12px, calc(100cqi / 49), 15px); line-height: 1.38; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+  font-size: clamp(13px, calc(100cqi / 49), 15px); line-height: 1.38; color: var(--ink-1); font-variant-numeric: tabular-nums; }
 body.chron-read .chron .screen { font-size: 15px; }
 .chron .screen .ln { display: block; min-height: 1.38em; }
-.chron .screen.mini { flex: none; overflow: visible; font-size: clamp(12px, calc(100cqi / 52), 14px); }
+.chron .screen.mini { flex: none; overflow: visible; font-size: clamp(13px, calc(100cqi / 52), 14px); }
 .chron .screen:focus-visible { outline: 2px solid var(--st-ink); outline-offset: 2px; }
 .chron .k-gold { color: var(--st-ink); } .chron .k-grn { color: #8cc46a; } .chron .k-cyn { color: #6cc7d4; } .chron .k-pur { color: #b9a3e0; }
 .chron .k-red { color: var(--rubric); } .chron .k-gry { color: var(--ink-4); } .chron .k-wht { color: var(--ink-0); }
@@ -167,7 +167,7 @@ body.chron-read .chron .screen { font-size: 15px; }
   background: linear-gradient(#0f0d0b, #1a1714); box-shadow: inset 0 1px 2px rgba(0,0,0,.8), 0 0 0 1px #000;
   font-family: var(--display); font-size: 21px; line-height: 1; color: var(--rubric-cap); padding-top: 2px; }
 .chron .kc .cap.swash { font-size: 17px; justify-items: start; padding: 0 0 2px 1px; }
-.chron .kc .cap.wide { width: auto; min-width: 30px; padding: 0 3px; font-family: var(--term); font-size: 12px; letter-spacing: -.02em; }
+.chron .kc .cap.wide { width: auto; min-width: 30px; padding: 0 3px; font-family: var(--term); font-size: 13px; letter-spacing: -.02em; }
 .chron .kc .lb { font-family: var(--display); font-size: 15px; letter-spacing: .04em; color: var(--ink-0); line-height: 1.12; min-width: 0; overflow-wrap: anywhere; }
 .chron .kc:hover { border-color: var(--iron-hi); background: linear-gradient(#2a2520, #1c1814); }
 .chron .kc:hover .cap { border-color: #8a847a; }
@@ -193,6 +193,9 @@ body.chron-read .chron .screen { font-size: 15px; }
 /* Tablet: still a spread, tighter measures */
 @media (max-width: 1180px) {
   .chron { padding: 10px; }
+  .chron .screen { font-size: clamp(12px, calc(100cqi / 49), 15px); }
+  .chron .screen.mini { font-size: clamp(12px, calc(100cqi / 52), 14px); }
+  .chron .kc .cap.wide { font-size: 12px; }
   .chron .book { padding: 10px; }
   .chron .page { padding: 16px 26px 14px; gap: 10px; }
   .chron .rh { font-size: 13px; }
@@ -227,9 +230,9 @@ body.chron-read .chron .screen { font-size: 15px; }
 /* Phone: one page that scrolls, the dock held at the bottom */
 @media (max-width: 600px) {
   .chron { padding: 6px; overflow-y: auto; }
-  .chron .book { padding: 6px; height: auto; min-height: 100%; }
+  .chron .book { padding: 6px; height: auto; min-height: 100%; display: flex; flex-direction: column; }
   .chron .book::before { display: none; }
-  .chron .spread { height: auto; min-height: 100%; display: flex; flex-direction: column; gap: 9px; background: var(--page); padding: 10px 14px 12px; position: relative; }
+  .chron .spread { flex: 1 0 auto; height: auto; min-height: 0; display: flex; flex-direction: column; gap: 9px; background: var(--page); padding: 10px 14px 12px; position: relative; }
   .chron .spread::before { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .07; pointer-events: none; }
   .chron .page { display: contents; }
   .chron .page::before, .chron .page::after { display: none; }
@@ -284,12 +287,10 @@ body.chron-read .chron .screen { font-size: 15px; }
   .chron[data-layout="room"] .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .chron[data-layout="room"] .kc { grid-template-columns: 22px 1fr; justify-items: start; text-align: left; gap: 5px; min-height: 44px; padding: 4px 5px 4px 4px; }
   .chron[data-layout="room"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
-  /* The fight fits the screen: the log takes what the panels and the dock leave, whole lines only */
-  .chron[data-layout="fight"] { overflow: hidden; }
-  .chron[data-layout="fight"] .book, .chron[data-layout="fight"] .spread { height: 100%; min-height: 0; }
-  .chron[data-layout="fight"] .cbody { flex: 1 1 0; min-height: 48px; }
+  /* The fight fills the screen: the log takes what the panels and the dock leave, whole lines only. A fight with
+     more cards than fit scrolls, with the dock held at the bottom. */
+  .chron[data-layout="fight"] .cbody { flex: 1 1 0; min-height: 96px; }
   .chron[data-layout="fight"] .prose.fight { overflow: hidden; }
-  .chron[data-layout="fight"] .dock { position: static; margin: 0 -14px -12px; }
   .chron[data-layout="fight"] .kc { min-height: 44px; padding: 2px; gap: 1px; }
   .chron[data-layout="fight"] .kc .cap { width: 22px; height: 22px; font-size: 15px; }
   .chron[data-layout="fight"] .kc .cap.wide { width: auto; min-width: 22px; font-size: 12px; }

@@ -533,8 +533,15 @@ test('the screen reader path: the terminal is never hidden, the text page is rea
   assert.ok(p.el('c-screen').getAttribute('aria-label').length > 0);
   p.click(tt);
   assert.strictEqual(layout(p), 'fight');
-  // keys and labels are text; no key is colour only
-  assert.ok(p.el('c-keys').querySelectorAll('.kc').every((b) => b.getAttribute('type') === 'button' && b.getAttribute('aria-label')));
+  // every key is a real button with its key and label as text
+  frame(p, 'Client.Menu', { screen: 'combat', groups: [{ label: 'Actions', items: [{ key: 'A', label: 'Attack', enabled: true }, { key: 'G', label: 'Rage', enabled: false }] }] });
+  const keys = p.el('c-keys').querySelectorAll('.kc');
+  assert.strictEqual(keys.length, 2);
+  assert.ok(keys.every((b) => b.tagName === 'BUTTON' && b.type === 'button'));
+  assert.deepStrictEqual(keys.map((b) => b.getAttribute('aria-label')), ['A, Attack', 'G, Rage']);
+  assert.strictEqual(keys[1].getAttribute('aria-disabled'), 'true');
+  assert.strictEqual(p.el('c-keys').querySelector('.kgroup').getAttribute('role'), 'group');
+  assert.strictEqual(p.el('c-keys').querySelector('.kgroup').getAttribute('aria-label'), 'Actions');
 });
 
 test('the high contrast variant: its own choice, or the system asking for more contrast; never in Classic', async () => {
@@ -580,6 +587,27 @@ test('keys typed with the book focused go to the game as the terminal sends them
   key(p.el('c-screen'), 'c', { ctrlKey: true });
   key(p.el('c-screen'), 'v', { metaKey: true });
   assert.deepStrictEqual(sent, ['d', '\r', '\x7f', 'x']);
+  assert.deepStrictEqual(p.errors, []);
+});
+
+test('a redraw keeps the keyboard where it was: the text page, or the key cap with the same key', async () => {
+  const sent = [];
+  const p = await chronicle({ WebSocket: socket(sent) });
+  screen(p, [' [D] Dungeons   [I] Inn', 'Your choice:']);
+  p.el('c-screen').focus();
+  screen(p, [' [D] Dungeons   [I] Inn', 'Your choice: d']);
+  assert.strictEqual(p.doc.activeElement, p.el('c-screen'), 'the new text page has the focus');
+  p.doc.dispatch(p.doc.activeElement, 'keydown', { key: 'x' });
+  assert.deepStrictEqual(sent, ['x'], 'and typed keys still reach the game');
+  p.el('c-keys').querySelectorAll('.kc')[1].focus();
+  screen(p, [' [D] Dungeons   [I] Inn', 'Your choice: x']);
+  assert.strictEqual(p.doc.activeElement.getAttribute('data-key'), 'I');
+  assert.strictEqual(p.doc.activeElement, p.el('c-keys').querySelectorAll('.kc')[1]);
+  // a reader scrolled back in the text page stays there; one at the end follows new lines
+  const pre = p.el('c-screen');
+  Object.assign(pre, { scrollTop: 40, clientHeight: 100, scrollHeight: 500 });
+  screen(p, ['a', 'b']);
+  assert.strictEqual(p.el('c-screen').scrollTop, 40);
   assert.deepStrictEqual(p.errors, []);
 });
 
