@@ -122,6 +122,54 @@
             .rail button { writing-mode: horizontal-tb; padding: 0 16px; flex: 1; }
             .tabs { display: none; }
         }
+
+        /* Touch screens (phones and tablets): the terminal fits the width and a tap pad sits under it,
+           or beside it when the screen is wide and short. Only body.touch rules apply, so a desktop
+           with a mouse keeps the layout above. */
+        .fit-toggle { display: none; }
+        body.touch { --pad-w: 300px; }
+        body.touch .fit-toggle { display: inline-block; flex: none; font-family: var(--term); font-size: 15px; line-height: 1; padding: 5px 10px; border: 1px solid var(--iron); color: var(--bone); }
+        body.touch .fit-toggle[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+        body.touch .stage { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "vitals" "term" "pad"; gap: 6px; padding: 6px 4px 0; min-height: 0; align-items: start; }
+        body.touch.pad-side .stage { grid-template-columns: minmax(0, 1fr) var(--pad-w); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "vitals pad" "term pad"; }
+        body.touch.typing .stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "vitals" "term" "pad"; }
+        body.touch .vitals { grid-area: vitals; order: 0; padding: 0 8px; gap: 4px 16px; font-size: 15px; }
+        body.touch .meter .bar { width: 110px; }
+        body.touch .term-scroll { grid-area: term; flex: none; padding: 0 4px; justify-content: flex-start; -webkit-overflow-scrolling: touch; }
+        body.touch.typing .pad { display: none; }
+        .pad { grid-area: pad; align-self: stretch; min-height: 0; display: flex; flex-direction: column; background: var(--bg-ink); border-top: 1px solid var(--iron-dark); }
+        body.touch.pad-side .pad { border-top: 0; border-left: 1px solid var(--iron-dark); }
+        .pad-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .pad-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ash); }
+        .chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 6px; }
+        .chip { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 4px 8px; background: var(--card); border: 1px solid var(--iron); text-align: left; font-size: 14px; line-height: 1.2; }
+        .chip b { flex: none; min-width: 1.6em; color: var(--gold); font-family: var(--term); text-align: center; }
+        .chip span { min-width: 0; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .pad-none { margin: 0; color: var(--ash); font-size: 14px; line-height: 1.4; }
+        .compass-row { display: flex; align-items: center; gap: 12px; }
+        .compass { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 36px); gap: 4px; }
+        .dir { background: var(--card); border: 1px solid var(--iron); color: var(--gold); font-family: var(--term); font-weight: 700; }
+        .dir:disabled { opacity: 0.25; cursor: default; }
+        .dir.n { grid-column: 2; grid-row: 1; }
+        .dir.w { grid-column: 1; grid-row: 2; }
+        .dir.e { grid-column: 3; grid-row: 2; }
+        .dir.s { grid-column: 2; grid-row: 3; }
+        .kb { display: grid; gap: 5px; }
+        .kb-row { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+        .key { min-width: 0; min-height: 40px; overflow: hidden; background: var(--card); border: 1px solid var(--iron); font-family: var(--term); font-size: 15px; }
+        .pad-fixed { flex: none; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 6px; padding: 6px 8px 8px; border-top: 1px solid var(--iron-dark); }
+        .pk { min-height: 46px; background: var(--card); border: 1px solid var(--iron); font-size: 15px; }
+        .pk.enter { border-color: var(--blood); }
+        .pk.hot { background: var(--blood); border-color: var(--blood); color: #fff; }
+        .pk[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+        .chip:active, .pk:active, .dir:active, .key:active { background: var(--iron-dark); }
+        .chip:focus-visible, .pk:focus-visible, .dir:focus-visible, .key:focus-visible, .fit-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+        /* A phone held sideways: every row of height goes to the terminal and the pad */
+        @media (max-height: 500px) {
+            body.touch .top { height: 40px; padding: 0 12px; gap: 12px; }
+            body.touch .brand { font-size: 18px; }
+            body.touch .vitals { font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -129,6 +177,7 @@
     <a class="brand" href="/">Usurper Reborn</a>
     <span id="conn" class="conn" role="status" data-i18n="play.status.connecting">Connecting...</span>
     <button id="reconnect" class="reconnect" type="button" hidden data-i18n="play.reconnect">Connect again</button>
+    <button id="fit-toggle" class="fit-toggle" type="button" aria-pressed="false" aria-label="Bigger text" title="Bigger text">Aa</button>
     <nav class="top-links">
         <a href="/" data-i18n="play.home">Home</a>
         <a href="/wiki/" target="_blank" rel="noopener" data-i18n="play.wiki">Wiki</a>
@@ -147,6 +196,15 @@
             <span id="room" class="room"></span>
         </div>
         <div class="term-scroll" id="term-scroll"><div id="terminal"></div></div>
+        <div class="pad" id="pad" role="group" aria-label="Game buttons" hidden>
+            <div class="pad-scroll" id="pad-scroll"></div>
+            <div class="pad-fixed">
+                <button type="button" class="pk enter" id="pad-enter" data-i18n="play.pad.enter">Enter</button>
+                <button type="button" class="pk" id="pad-back" data-i18n="play.pad.back">Back</button>
+                <button type="button" class="pk" id="pad-keys" aria-pressed="false" data-i18n="play.pad.keys">Keys</button>
+                <button type="button" class="pk" id="pad-type" data-i18n="play.pad.type">Type</button>
+            </div>
+        </div>
     </section>
 
     <aside class="drawer" id="drawer" hidden>
@@ -205,7 +263,12 @@
             if (strings[key]) el.textContent = strings[key];
         });
         document.documentElement.setAttribute('lang', lang);
+        var fitBtn = document.getElementById('fit-toggle');
+        fitBtn.setAttribute('aria-label', t('play.fit.bigger'));
+        fitBtn.setAttribute('title', t('play.fit.bigger'));
+        document.getElementById('pad').setAttribute('aria-label', t('play.pad.region'));
         renderAll();
+        renderPadNow();
     }
     function loadLanguage(code) {
         return fetch('/lang/' + code + '.json')
@@ -253,7 +316,8 @@
         result: null,      // Char.Combat.End
         death: null,       // Char.Death
         log: [],           // Char.Combat.Killed lines
-        chat: []           // Comm.Channel.Text
+        chat: [],          // Comm.Channel.Text
+        exits: {}          // Room.Info exits that are compass directions, for the pad
     };
     var CHAT_MAX = 200;
     var LOG_MAX = 20;
@@ -407,13 +471,15 @@
             renderChat();
         }
         if (tab === 'combat') document.getElementById('rail-combat').classList.remove('new');
+        // On a wide tablet the drawer takes room from the stage, so the terminal is fitted again.
+        if (isTouch()) queueFit();
     }
-    function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal) terminal.focus(); }
+    function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal && !isTouch()) terminal.focus(); }
     ['combat', 'chat'].forEach(function (name) {
         document.getElementById('rail-' + name).addEventListener('click', function () { toggleTab(name); });
         document.getElementById('tab-' + name).addEventListener('click', function () { setDrawer(name); });
     });
-    document.getElementById('drawer-close').addEventListener('click', function () { setDrawer(null); if (terminal) terminal.focus(); });
+    document.getElementById('drawer-close').addEventListener('click', function () { setDrawer(null); if (terminal && !isTouch()) terminal.focus(); });
 
     // ---- GMCP from the proxy: {"gmcp": "Package.Name", "data": ...} ----
     function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : null; }
@@ -443,7 +509,10 @@
                 break;
             case 'Room.Info':
                 state.room = str(d.name, 80);
+                state.exits = compassExits(d.exits);
+                roomEnter = Object.keys(state.exits).length ? enterCount : -1;
                 renderVitals();
+                schedulePad();
                 break;
             case 'Char.Combat.Start':
                 state.inCombat = true;
@@ -534,31 +603,290 @@
 
     function fitTerminal() {
         if (!terminal) return;
+        var touch = applyTouch();
         var scroll = document.getElementById('term-scroll');
         var box = document.getElementById('terminal');
         var pad = 16 + 2 + 14; // terminal padding, border and the scrollbar
-        var availW = scroll.clientWidth - (isPhone() ? 24 : 0);
-        // Beside a closed drawer, keep its room so opening it never changes the font size.
-        if (drawerBeside() && document.getElementById('drawer').hidden) availW -= 341;
-        // Keep the rail's room while it is hidden, so showing it never changes the font size.
-        if (!isPhone() && document.getElementById('rail').hidden) availW -= 45;
-        var availH = scroll.clientHeight;
+        var availW, availH, minFont = MIN_FONT, step = 1;
+        if (touch) {
+            // The stage is a grid here: the terminal takes what the pad leaves. Wide and short
+            // screens put the pad beside it; while the phone keyboard is up the pad steps aside.
+            var stage = document.querySelector('.stage');
+            var typing = document.body.classList.contains('typing');
+            var w = stage.clientWidth - 8;
+            var h = stage.clientHeight - 6 - document.getElementById('vitals').offsetHeight - 6;
+            var side = !typing && w > h * 1.3;
+            document.body.classList.toggle('pad-side', side);
+            availW = w - 8 - (side ? PAD_SIDE_W + 6 : 0);
+            availH = h - (side || typing ? 0 : PAD_MIN);
+            pad = 16 + 2;
+            if (fitMode === 'whole') { minFont = TOUCH_MIN_FONT; step = 0.25; }
+        } else {
+            availW = scroll.clientWidth - (isPhone() ? 24 : 0);
+            // Beside a closed drawer, keep its room so opening it never changes the font size.
+            if (drawerBeside() && document.getElementById('drawer').hidden) availW -= 341;
+            // Keep the rail's room while it is hidden, so showing it never changes the font size.
+            if (!isPhone() && document.getElementById('rail').hidden) availW -= 45;
+            availH = scroll.clientHeight;
+        }
+        var buf = terminal.buffer && terminal.buffer.active;
+        var atBottom = !buf || !(buf.viewportY < buf.baseY);
         var fs = MAX_FONT, cell;
-        for (; fs >= MIN_FONT; fs--) {
+        for (; fs >= minFont; fs = Math.round((fs - step) * 100) / 100) {
             terminal.options.fontSize = fs;
             cell = cellSize();
             if (cell.w * COLS + pad <= availW && cell.h * MIN_ROWS + 14 <= availH) break;
         }
-        if (fs < MIN_FONT) { fs = MIN_FONT; terminal.options.fontSize = fs; cell = cellSize(); }
+        if (fs < minFont) { fs = minFont; terminal.options.fontSize = fs; cell = cellSize(); }
         var rows = Math.max(MIN_ROWS, Math.floor((availH - 14) / cell.h));
         terminal.resize(COLS, rows);
-        var w = Math.ceil(cell.w * COLS) + pad;
-        box.style.width = w + 'px';
+        // A new font or size can leave xterm showing the top of its scrollback. A player who was at the
+        // bottom stays there; one reading back is left where they were.
+        if (atBottom) terminal.scrollToBottom();
+        var bw = Math.ceil(cell.w * COLS) + pad;
+        box.style.width = bw + 'px';
         box.style.height = Math.ceil(cell.h * rows) + 14 + 'px';
-        document.getElementById('vitals').style.maxWidth = isPhone() ? '' : w + 'px';
+        document.getElementById('vitals').style.maxWidth = isPhone() || touch ? '' : bw + 'px';
+        if (touch) schedulePad();
     }
     var fitTimer = 0;
-    window.addEventListener('resize', function () { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerminal, 100); });
+    function queueFit() { clearTimeout(fitTimer); fitTimer = setTimeout(fitTerminal, 100); }
+    window.addEventListener('resize', queueFit);
+    // On a touch screen the status line can wrap when a room name arrives, which moves the terminal down.
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(function () { if (isTouch()) queueFit(); }).observe(document.getElementById('vitals'));
+    }
+    // The phone keyboard shrinks the visual viewport, not always the window.
+    if (window.visualViewport && window.visualViewport.addEventListener) window.visualViewport.addEventListener('resize', queueFit);
+
+    // ---- Touch screens: the text size switch and the tap pad ----
+    // A pad button sends what a typed line would: the game reads whole lines, so a menu key goes
+    // with Enter. Keys mode sends each character as it is tapped, as typing does.
+    var TOUCH_MIN_FONT = 4, PAD_MIN = 280, PAD_SIDE_W = 300;
+    var fitMode = 'whole';
+    try { if (localStorage.getItem('playFit') === 'read') fitMode = 'read'; } catch (e) {}
+    var padKeys = false;
+    var padTimer = 0;
+    var inputMark = null;   // an xterm marker on the row where the player last pressed Enter
+    var enterCount = 0;     // Enters sent so far
+    var roomEnter = -1;     // enterCount when the last Room.Info with compass exits arrived
+    var clearMatched = 0;   // bytes of ESC [ 2 J matched at the end of the last chunk
+    function isTouch() { return window.matchMedia ? window.matchMedia('(hover: none) and (pointer: coarse)').matches : false; }
+    function applyTouch() {
+        var touch = isTouch();
+        document.body.classList.toggle('touch', touch);
+        if (!touch) document.body.classList.remove('pad-side', 'typing');
+        document.getElementById('pad').hidden = !touch;
+        var fitBtn = document.getElementById('fit-toggle');
+        fitBtn.setAttribute('aria-pressed', fitMode === 'read' ? 'true' : 'false');
+        return touch;
+    }
+    function sendToGame(data) {
+        if (!ws || ws.readyState !== 1) return;
+        ws.send(data);
+        // Whatever the game prints after an Enter is the next screen, so the pad reads only below it.
+        if (typeof data === 'string' && data.indexOf('\r') !== -1) enterCount++;
+        if (typeof data === 'string' && data.indexOf('\r') !== -1 && terminal) {
+            try {
+                if (inputMark) inputMark.dispose();
+                inputMark = terminal.registerMarker(0) || null;
+            } catch (e) { inputMark = null; }
+        }
+    }
+
+    // The room's exits belong to the screen the game drew with them: the compass shows only while
+    // no Enter has been sent since the last Room.Info. A fight or a bag opened in the room comes
+    // after an Enter, so its [E] or [S] never turns into an arrow.
+    function roomFresh(atEnter, nowEnter) {
+        return typeof atEnter === 'number' && atEnter >= 0 && atEnter === nowEnter;
+    }
+    // The game starts a new screen with ESC [ 2 J. xterm erases in place and moves the cursor to the
+    // top, so the row of the last Enter no longer marks where the new screen begins.
+    function seesClear(bytes) {
+        var found = false;
+        for (var i = 0; i < bytes.length; i++) {
+            var b = bytes[i];
+            clearMatched = b === [0x1b, 0x5b, 0x32, 0x4a][clearMatched] ? clearMatched + 1 : (b === 0x1b ? 1 : 0);
+            if (clearMatched === 4) { found = true; clearMatched = 0; }
+        }
+        return found;
+    }
+    function screenCleared() {
+        try { if (inputMark) inputMark.dispose(); } catch (e) {}
+        inputMark = null;
+    }
+
+    function compassExits(exits) {
+        var out = {};
+        var e = obj(exits);
+        if (!e) return out;
+        ['north', 'south', 'east', 'west'].forEach(function (d) {
+            if (Object.prototype.hasOwnProperty.call(e, d)) out[d] = true;
+        });
+        return out;
+    }
+
+    // The current screen: from the cursor row up to the row where the player last pressed Enter, the
+    // previous game prompt, or the top of what is on screen, whichever comes first. The game does not
+    // always clear between screens, so an older menu can sit above.
+    var PREV_PROMPT = /^\s*\[[^\]]*\]\s[^\[\]]*>\s*\S{0,12}\s*$|Press (Enter|any key)/i;
+    function rowsFromBuffer(buf, after) {
+        var rows = [];
+        if (!buf || typeof buf.getLine !== 'function') return rows;
+        var top = Number(buf.baseY) || 0;
+        var y = top + (Number(buf.cursorY) || 0);
+        var floor = typeof after === 'number' && isFinite(after) ? after : -1;
+        if (floor >= top) top = floor + 1;
+        for (var first = true; y >= top && rows.length < 60; y--, first = false) {
+            var line = buf.getLine(y);
+            var text = line && typeof line.translateToString === 'function' ? String(line.translateToString(true)) : '';
+            if (!first && PREV_PROMPT.test(text)) break;
+            rows.unshift(text);
+        }
+        return rows;
+    }
+
+    // Menu options as the game prints them: [D] Dungeons, [E]nter the dungeon, [AUTO] Auto-Combat.
+    var COMMAND = /\[([^\[\]\s]{1,5})\]([a-z]*)([^\[\]║│]*)/g;
+    function scanCommands(rows) {
+        var out = [], seen = {};
+        rows.forEach(function (row) {
+            var m;
+            COMMAND.lastIndex = 0;
+            while ((m = COMMAND.exec(row)) && out.length < 40) {
+                var key = m[1];
+                // Status bars ([████░░]) and the prompt's [40hp 100st] are not options.
+                if (/[^\x21-\x7e]/.test(key) || /^\d+(hp|st)$/i.test(key)) continue;
+                if (/\bPress\s*$/i.test(row.slice(0, m.index))) continue;
+                var rest = m[3].replace(/^\s+/, '').split(/\s{2,}/)[0].replace(/[:>]\s*$/, '').trim();
+                var label = m[2] ? key + m[2] + (rest ? ' ' + rest : '') : rest;
+                // A key named inside a sentence ("in Settings [~].") does not claim the key.
+                if (/^to\b/i.test(label) || !/[A-Za-z0-9\u00C0-\u024F]/.test(label)) continue;
+                var k = key.toUpperCase();
+                if (seen[k]) continue;
+                seen[k] = 1;
+                out.push({ key: key, label: label.slice(0, 40) });
+            }
+        });
+        return out;
+    }
+
+    // What the screen waits for, read from its shape so it holds in every language.
+    function promptOf(rows, cmds) {
+        var tail = rows.filter(function (r) { return r.trim(); }).slice(-2).join(' ');
+        var yn = /\(([A-Za-z])\/([A-Za-z])\)[\s:?>]*$/.exec(tail);
+        if (yn) return { kind: 'yesno', yes: yn[1].toUpperCase(), no: yn[2].toUpperCase() };
+        if (cmds.length) return { kind: 'menu' };
+        if (/[:?]\s*$/.test(tail)) return { kind: 'text' };
+        return { kind: 'enter' };
+    }
+
+    function padButton(cls, key, label, onTap) {
+        var b = el('button', cls);
+        b.type = 'button';
+        b.setAttribute('aria-label', key + ', ' + label);
+        b.appendChild(el('b', null, key));
+        b.appendChild(el('span', null, label));
+        b.addEventListener('click', onTap);
+        return b;
+    }
+    var DIRS = [
+        { d: 'north', k: 'N', c: 'n', label: function () { return t('play.pad.go_north'); } },
+        { d: 'west', k: 'W', c: 'w', label: function () { return t('play.pad.go_west'); } },
+        { d: 'east', k: 'E', c: 'e', label: function () { return t('play.pad.go_east'); } },
+        { d: 'south', k: 'S', c: 's', label: function () { return t('play.pad.go_south'); } }
+    ];
+
+    function renderPad(rows, fresh) {
+        var box = document.getElementById('pad-scroll');
+        clear(box);
+        rows = Array.isArray(rows) ? rows.map(function (r) { return typeof r === 'string' ? r : ''; }) : [];
+        var cmds = scanCommands(rows);
+        var p = promptOf(rows, cmds);
+        document.getElementById('pad-enter').classList.toggle('hot', p.kind === 'enter');
+        document.getElementById('pad-keys').setAttribute('aria-pressed', padKeys ? 'true' : 'false');
+        if (padKeys) { renderKeyboard(box); return; }
+        if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
+        // The compass shows only on the room screen itself: a menu drawn since the last Enter, no fight
+        // on (an ambush starts one with no Enter after the move), and every exit the game sent offered
+        // on screen as its key. A yes or no question in a room keeps its own two buttons.
+        var keys = {};
+        if (p.kind === 'menu' && fresh === true && !state.inCombat) cmds.forEach(function (c) { keys[c.key.toUpperCase()] = 1; });
+        var exitDirs = DIRS.filter(function (x) { return state.exits[x.d]; });
+        var shown = exitDirs.length && exitDirs.every(function (x) { return keys[x.k]; }) ? exitDirs : [];
+        if (shown.length) {
+            var row = el('div', 'compass-row');
+            row.appendChild(el('span', 'pad-label', t('play.pad.exits')));
+            var comp = el('div', 'compass');
+            DIRS.forEach(function (x) {
+                var b = el('button', 'dir ' + x.c, x.k);
+                b.type = 'button';
+                b.setAttribute('aria-label', x.label());
+                if (state.exits[x.d] && keys[x.k]) b.addEventListener('click', function () { sendToGame(x.k + '\r'); });
+                else b.disabled = true;
+                comp.appendChild(b);
+            });
+            row.appendChild(comp);
+            box.appendChild(row);
+            cmds = cmds.filter(function (c) { return !shown.some(function (x) { return x.k === c.key.toUpperCase(); }); });
+        }
+        if (p.kind === 'text') {
+            box.appendChild(el('div', 'pad-label', t('play.pad.answer')));
+            var g = el('div', 'chips');
+            g.appendChild(padButton('chip', 'Aa', t('play.pad.open_keyboard'), openKeyboard));
+            box.appendChild(g);
+            return;
+        }
+        if (!cmds.length) {
+            if (!shown.length) box.appendChild(el('p', 'pad-none', t('play.pad.none')));
+            return;
+        }
+        box.appendChild(el('div', 'pad-label', t('play.pad.on_screen')));
+        var grid = el('div', 'chips');
+        cmds.forEach(function (c) {
+            grid.appendChild(padButton('chip', c.key, c.label, function () { sendToGame(c.key + '\r'); }));
+        });
+        box.appendChild(grid);
+    }
+
+    function renderKeyboard(box) {
+        box.appendChild(el('div', 'pad-label', t('play.pad.keys_hint')));
+        var kb = el('div', 'kb');
+        ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL*', 'ZXCVBNM%~?', '!@#$/.,-+ '].forEach(function (chars) {
+            var row = el('div', 'kb-row');
+            chars.split('').forEach(function (ch) {
+                var b = el('button', 'key', ch === ' ' ? t('play.pad.space') : ch);
+                b.type = 'button';
+                b.addEventListener('click', function () { sendToGame(ch); });
+                row.appendChild(b);
+            });
+            kb.appendChild(row);
+        });
+        box.appendChild(kb);
+    }
+
+    function renderPadNow() {
+        if (!terminal || document.getElementById('pad').hidden) return;
+        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
+        renderPad(rowsFromBuffer(terminal.buffer && terminal.buffer.active, mark), roomFresh(roomEnter, enterCount));
+    }
+    function schedulePad() { clearTimeout(padTimer); padTimer = setTimeout(renderPadNow, 60); }
+
+    function openKeyboard() {
+        if (!terminal) return;
+        document.body.classList.add('typing');
+        terminal.focus();   // the one deliberate way to raise the phone keyboard
+        queueFit();
+    }
+    document.getElementById('pad-enter').addEventListener('click', function () { sendToGame('\r'); });
+    document.getElementById('pad-back').addEventListener('click', function () { sendToGame('\x7f'); });
+    document.getElementById('pad-type').addEventListener('click', openKeyboard);
+    document.getElementById('pad-keys').addEventListener('click', function () { padKeys = !padKeys; renderPadNow(); });
+    document.getElementById('fit-toggle').addEventListener('click', function () {
+        fitMode = fitMode === 'whole' ? 'read' : 'whole';
+        try { localStorage.setItem('playFit', fitMode); } catch (e) {}
+        fitTerminal();
+    });
 
     function setConn(key, cls) {
         var c = document.getElementById('conn');
@@ -574,10 +902,15 @@
         var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(proto + '//' + location.host + '/ws?gmcp=1');
         ws.binaryType = 'arraybuffer';
-        ws.onopen = function () { setConn('play.status.connected', 'ok'); if (terminal) terminal.focus(); };
+        // On a touch screen focusing the terminal would raise the phone keyboard over the pad.
+        ws.onopen = function () { setConn('play.status.connected', 'ok'); if (terminal && !isTouch()) terminal.focus(); };
         ws.onmessage = function (event) {
             if (typeof event.data === 'string') handleFrame(event.data);
-            else if (terminal) terminal.write(new Uint8Array(event.data));
+            else if (terminal) {
+                var bytes = new Uint8Array(event.data);
+                if (seesClear(bytes)) screenCleared();
+                terminal.write(bytes, schedulePad);
+            }
         };
         ws.onclose = function () {
             setConn('play.status.closed');
@@ -588,7 +921,8 @@
     }
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
-        state.vitals = null; state.status = null; state.room = null;
+        state.vitals = null; state.status = null; state.room = null; state.exits = {};
+        roomEnter = -1; clearMatched = 0; screenCleared();
         renderCombat();
         renderVitals();
         // A new connection starts as the first did: no panels until its own first GMCP frame.
@@ -617,13 +951,31 @@
             convertEol: true
         });
         terminal.open(document.getElementById('terminal'));
-        terminal.onData(function (data) { if (ws && ws.readyState === 1) ws.send(data); });
-        document.getElementById('terminal').addEventListener('click', function () { terminal.focus(); });
+        terminal.onData(sendToGame);
+        document.getElementById('terminal').addEventListener('click', function () { if (!isTouch()) terminal.focus(); });
+        // xterm focuses its textarea on mousedown, and a tap sends one, which would raise the phone
+        // keyboard over the pad. On a touch screen only Type opens it; scrolling uses touch events.
+        document.getElementById('terminal').addEventListener('mousedown', function (e) {
+            if (isTouch() && !document.body.classList.contains('typing')) { e.preventDefault(); e.stopPropagation(); }
+        }, true);
+        // The pad comes back when the phone keyboard goes away.
+        if (terminal.textarea && terminal.textarea.addEventListener) {
+            terminal.textarea.addEventListener('blur', function () {
+                if (!document.body.classList.contains('typing')) return;
+                document.body.classList.remove('typing');
+                queueFit();
+            });
+        }
         fitTerminal();
         connect();
     }
 
-    window.UsurperPlay = { handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer };
+    window.UsurperPlay = {
+        handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer,
+        scanCommands: scanCommands, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad, roomFresh: roomFresh, seesClear: seesClear,
+        padFresh: function () { return roomFresh(roomEnter, enterCount); },
+        applyTouch: applyTouch, fitMode: function () { return fitMode; }
+    };
 
     populateLanguagePicker();
     loadLanguage(lang);

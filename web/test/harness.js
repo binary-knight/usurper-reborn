@@ -410,6 +410,7 @@ function pageScripts(html) {
 
 // Loads a page into a vm context. options.fetch(url, init) returns a body (object)
 // or { status, body }. options.storage seeds localStorage; options.localStorage replaces it.
+// options.WebSocket replaces the socket stub; options.matchMedia adds window.matchMedia.
 async function loadPage(name, options = {}) {
   const html = readPage(name);
   const bodyStart = html.search(/<body[\s>]/i);
@@ -437,7 +438,7 @@ async function loadPage(name, options = {}) {
       return { status, ok: status >= 200 && status < 300, json: async () => JSON.parse(JSON.stringify(body === undefined ? {} : body)), text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) };
     },
     EventSource: class { constructor(url) { this.url = url; this.listeners = {}; } addEventListener(t, fn) { this.listeners[t] = fn; } close() {} },
-    WebSocket: class { constructor() {} send() {} close() {} },
+    WebSocket: options.WebSocket || class { constructor() {} send() {} close() {} },
     Chart: makeAny(),
     d3: makeAny(d3Handlers),
     Terminal: makeAny(),
@@ -457,6 +458,8 @@ async function loadPage(name, options = {}) {
     URLSearchParams,
     TextEncoder,
   };
+  // options.matchMedia(query) returns { matches }; without it the page sees no matchMedia at all.
+  if (options.matchMedia) ctx.matchMedia = options.matchMedia;
   ctx.window = ctx;
   ctx.self = ctx;
   vm.createContext(ctx);
