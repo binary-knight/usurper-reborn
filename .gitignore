@@ -76,10 +76,11 @@ nul
 !*.env.example
 
 # Dev/localization tooling scripts (not part of the game); tools/promptfoo is committed (its own
-# .gitignore drops node_modules and results)
+# .gitignore drops node_modules and results); tools/class-portraits holds the class portrait converter (1.3.10)
 tools/*
 !tools/promptfoo/
 !tools/wiki-build/
+!tools/class-portraits/
 DOCS/FEEDBACK_PLAN_0.56.0.md
 AGENTS.md
 __pycache__/
