@@ -1532,11 +1532,14 @@
     // dock goes too, and so does a line that opens with the level header the chapter line already shows. Only a line
     // that went to the dock takes its heading along; a heading left out this way never takes the line above it.
     function proseRows(rows, known, drop, headings) {
+        // a title the page already shows is left out in any case: the street's box says MAIN STREET, the frame Main Street
+        var dropLc = Object.create(null);
+        if (drop) Object.keys(drop).forEach(function (k) { if (drop[k] === 1) dropLc[k.toLowerCase()] = 1; });
         var out = [], blank = true, kind = rows.map(function (segs) {
             var text = rowText(segs), core = unbox(text);
             if (!core || BOX_ONLY.test(text)) return 'blank';
             if (menuLine(text, known)) return 'menu';
-            if (drop && drop[core] === 1) return 'gone';
+            if (dropLc[core.toLowerCase()] === 1) return 'gone';
             if (headings && headings.header && core.indexOf(headings.header) === 0) return 'gone';
             return 'keep';
         });

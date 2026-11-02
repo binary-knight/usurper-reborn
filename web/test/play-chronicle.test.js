@@ -277,6 +277,28 @@ test('with Client.Menu the keys are the frame\'s, in its groups and order; a ref
   assert.deepStrictEqual(p.errors, []);
 });
 
+test('the street box title the page already shows is left out, whatever its case, and the street text keeps its floor', async () => {
+  const p = await chronicle();
+  player(p);
+  frame(p, 'Room.Info', { num: 1, name: 'Main Street', area: 'Usurper Reborn' });
+  screen(p, ['\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557', '\u2551  MAIN STREET  \u2551',
+    '\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d'].concat(STREET_TEXT.slice(1)));
+  frame(p, 'Client.Menu', STREET_MENU);
+  assert.strictEqual(layout(p), 'street');
+  const pre = p.el('c-body').querySelector('pre');
+  assert.ok(!/MAIN STREET/.test(pre.textContent), 'the box title is not repeated under the heading: ' + pre.textContent);
+  assert.match(pre.textContent, /You are standing on the main street of Usurper\./);
+  assert.match(pre.textContent, /Players online: 1/);
+  // the street text has a floor beside the keys, the right page scrolls when both do not fit, and on a phone the
+  // keys follow the text instead of covering it
+  const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
+  assert.match(css, /^\.chron \.cbody\.b-street \{ flex: 1 0 12em; \}$/m);
+  assert.match(css, /^\.chron\[data-layout="street"\] \.recto \{ overflow-y: auto; \}$/m);
+  const phone = css.slice(css.indexOf('@media (max-width: 600px) {'));
+  assert.match(phone.slice(0, phone.indexOf('\n}')), /\.chron\[data-layout="street"\] \.dock \{ position: static; \}/);
+  assert.deepStrictEqual(p.errors, []);
+});
+
 test('a menu goes stale at the next Enter: the keys come from the screen again, and the street gives way when its draw ends without one', async () => {
   const sent = [];
   const p = await chronicle({ WebSocket: socket(sent) });
