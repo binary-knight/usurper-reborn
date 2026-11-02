@@ -337,11 +337,11 @@ test('B12: the enemy chip comes from rank when the frame has it, and from isBoss
     { name: 'Sentinel', level: 3, hp: 9, maxHp: 9, isBoss: true, rank: 'boss' },
     { name: 'Goblin', level: 3, hp: 9, maxHp: 9, isBoss: true, rank: 'normal' },
     { name: 'Old Boss', level: 3, hp: 9, maxHp: 9, isBoss: true },
-    { name: 'Rat', level: 1, hp: 9, maxHp: 9, isBoss: false, rank: 'odd' }] });
+    { name: 'Rat', level: 1, hp: 9, maxHp: 9, isBoss: true, rank: 'odd' }] });
   const chips = p.el('c-hud').querySelectorAll('.hcol')[1].querySelectorAll('.card').map((c) => c.querySelectorAll('.chipc').map((x) => x.textContent).join(','));
-  assert.deepStrictEqual(chips, ['Champion', 'Boss', '', 'Boss', '']);
+  assert.deepStrictEqual(chips, ['Champion', 'Boss', '', 'Boss', 'Boss'], 'a rank the page does not know is no rank: isBoss decides');
   const tags = p.el('enemy-list').querySelectorAll('.unit').map((u) => u.querySelectorAll('.tag').map((x) => x.textContent).filter((x) => !/^Lv/.test(x)).join(','));
-  assert.deepStrictEqual(tags, ['Champion', 'Boss', '', 'Boss', ''], 'the drawer says the same');
+  assert.deepStrictEqual(tags, ['Champion', 'Boss', '', 'Boss', 'Boss'], 'the drawer says the same');
 });
 
 test('C4: at a quarter of the HP or less, the card, its rule and the Classic meter say Low HP in words', async () => {
@@ -400,7 +400,7 @@ test('P4: the street\'s text leaves out its Online heading, the status line and 
     'Quick Commands: [%] Status   [*]Inventory    [?]Help    [0] Talk (4)  [~]Prefs', '                [/]Cmds    [!]Bug', '',
     '│ The Quest Hall (Main Street: Quest Hall [2]) offers bounties', '[44hp 100st] Main Street >'], 0, 13);
   frame(p, 'Client.Menu', { screen: 'main_street_classic', oneKey: true, groups: [
-    { label: 'Places', items: [{ key: 'D', label: 'Dungeons' }, { key: 'I', label: 'Inn' }, { key: 'S', label: 'Status' }] },
+    { label: 'Places', items: [{ key: 'D', label: 'Dungeons' }, { key: 'I', label: 'Inn' }, { key: '2', label: 'Quest Hall' }, { key: 'S', label: 'Status' }] },
     { label: 'Online', items: [{ key: '3', label: 'Who\'s Online' }] }, { label: 'System', items: [{ key: '~', label: 'Settings' }] }] });
   assert.strictEqual(p.run('UsurperPlay.layout()'), 'street');
   const text = p.el('c-body').querySelector('.screen').textContent;
