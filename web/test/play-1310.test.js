@@ -478,7 +478,7 @@ test('the new strings are in all five languages, translated, with no dashes', ()
     const d = lang(l);
     for (const k of keys) {
       assert.ok(typeof d[k] === 'string' && d[k].trim(), l + ' ' + k);
-      assert.doesNotMatch(d[k], /[–—]/, l + ' ' + k);
+      assert.doesNotMatch(d[k], /[\u2013\u2014]/, l + ' ' + k);
       if (l !== 'en' && !(l === 'fr' && k === 'play.combat.champion')) assert.notStrictEqual(d[k], en[k], l + ' ' + k);
     }
     assert.match(d['play.chron.type_number'], /\{0\}/);
