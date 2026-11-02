@@ -91,6 +91,16 @@ namespace UsurperRemake.Systems
         /// Returns true if hint was shown, false if already seen.
         /// </summary>
         public bool TryShowHint(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints, params object[] msgArgs)
+            => ShowOnce(hintId, terminal, shownHints, null, msgArgs);
+
+        /// <summary>
+        /// 2.0: the same, for a player: a hint whose text names Main Street keys is shown with the keys of the
+        /// player's layout (MainStreetLocation.StreetTextKey). A null player shows nothing, as a null set does.
+        /// </summary>
+        public bool TryShowHint(string hintId, TerminalEmulator terminal, Character? player, params object[] msgArgs)
+            => player != null && ShowOnce(hintId, terminal, player.HintsShown, player, msgArgs);
+
+        private bool ShowOnce(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints, Character? player, object[] msgArgs)
         {
             if (shownHints == null)
                 return false;
@@ -105,7 +115,7 @@ namespace UsurperRemake.Systems
             shownHints.Add(hintId);
 
             // Display the hint
-            ShowHintBox(hintId, hint, terminal, msgArgs);
+            ShowHintBox(hintId, hint, terminal, msgArgs, player);
             return true;
         }
 
@@ -132,13 +142,15 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display a hint in a nice box format
         /// </summary>
-        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal, object[]? msgArgs = null)
+        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal, object[]? msgArgs = null, Character? player = null)
         {
             // Resolve localized title/message from keys derived from the hint ID.
             string title = Loc.Get($"hint.{hintId}.title");
+            // 2.0: a message that names Main Street keys follows the player's layout (classic without a player)
+            string msgKey = MainStreetLocation.StreetTextKey($"hint.{hintId}.msg", player);
             string message = msgArgs != null && msgArgs.Length > 0
-                ? Loc.Get($"hint.{hintId}.msg", msgArgs)
-                : Loc.Get($"hint.{hintId}.msg");
+                ? Loc.Get(msgKey, msgArgs)
+                : Loc.Get(msgKey);
             string tipLabel = Loc.Get("hint.tip_label");
 
             terminal.WriteLine("");

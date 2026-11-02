@@ -145,7 +145,7 @@ namespace UsurperRemake.Systems
             await term.PressAnyKey();
 
             if (player != null)
-                HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player.HintsShown);
+                HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player);
             return true;
         }
     }

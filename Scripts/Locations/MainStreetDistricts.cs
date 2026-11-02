@@ -438,7 +438,7 @@ public partial class MainStreetLocation
         bool firstSeen = !player.HintsShown.Contains("menu_tier_1");
         var added = Enumerable.Range(1, tier).Where(t => player.HintsShown.Add($"menu_tier_{t}")).ToList();
         if (firstSeen || added.Count == 0) return new List<string>();
-        if (player.ClassicMainStreet) return ClassicUnlockLines(added.Min() - 1, tier); // v1.1.14: no districts to name
+        if (!player.DistrictsMainStreet) return ClassicUnlockLines(added.Min() - 1, tier); // v1.1.14: no districts to name
         return UnlockLines(added.Min() - 1, tier);
     }
 
@@ -462,10 +462,31 @@ public partial class MainStreetLocation
     /// </summary>
     internal static string? TakeClassicLayoutTip(Character player, bool noticeShown)
     {
-        if (player == null || player.ClassicMainStreet || noticeShown || player.ClassicTipDraws >= ClassicTipDrawLimit) return null;
+        if (player == null || !player.DistrictsMainStreet || noticeShown || player.ClassicTipDraws >= ClassicTipDrawLimit) return null;
         player.ClassicTipDraws++;
         return Loc.Get("main_street.classic_tip");
     }
+
+    /// <summary>
+    /// 2.0: the text keys that name a district key path (Guild Row [G], Level Master [V] and the like). Each has a
+    /// "&lt;key&gt;.classic" variant in every language giving the classic keys and places instead.
+    /// </summary>
+    internal static readonly HashSet<string> ClassicTextKeys = new()
+    {
+        "church.marriage_step1", "church.marriage_step3",
+        "journal.next_heal", "journal.next_level_up", "journal.next_turn_in", "journal.next_merc_turn_in", "journal.next_training",
+        "journal.line_training_points", "journal.line_level_ready", "journal.line_free_blessing",
+        "base.training_points_hint", "base.train_how", "base.stat_awakening_hint",
+        "hint.awakening.msg", "hint.low_hp.msg", "hint.first_level_up.msg", "hint.level_master.msg", "hint.mana_spells.msg",
+        "hint.quest_system.msg", "hint.getting_started.msg",
+    };
+
+    /// <summary>
+    /// 2.0: the one place that picks a Main Street key text for the player's layout: the ".classic" variant of a
+    /// ClassicTextKeys key unless the player chose the districts (DistrictsMainStreet); any other key unchanged.
+    /// </summary>
+    public static string StreetTextKey(string key, Character? player) =>
+        player?.DistrictsMainStreet != true && ClassicTextKeys.Contains(key) ? key + ".classic" : key;
 
     /// <summary>v1.1.13: the help screen: every unlocked place under the key path that reaches it.</summary>
     internal static List<string> HelpMapLines(StreetView v, int onlineCount)

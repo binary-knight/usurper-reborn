@@ -532,7 +532,7 @@ public class TrainCommand1113Tests
         var output = new MemoryStream();
         var term = new TerminalEmulator(new LineStream(new[] { "", "", "" }), output);
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(loc, term);
-        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(loc, new Character { Name1 = "t", Name2 = "T", Level = 10, TrainingPoints = 5 });
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(loc, new Character { Name1 = "t", Name2 = "T", Level = 10, TrainingPoints = 5, DistrictsMainStreet = true });
         return (loc, term, output);
     }
 

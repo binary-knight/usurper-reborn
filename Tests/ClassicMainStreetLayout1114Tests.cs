@@ -32,7 +32,7 @@ public class ClassicMainStreetLayout1114Tests
         var term = new TerminalEmulator(new LineStream(lines), output);
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, term);
         var hero = new Character { Name1 = "Golden", Name2 = "Golden", Level = level, HP = 100, MaxHP = 100, MKills = 3, AI = CharacterAI.Human,
-                                   ClassicMainStreet = classic };
+                                   DistrictsMainStreet = !classic };
         hero.HintsShown.UnionWith(new[] { "menu_tier_1", "menu_tier_2", "menu_tier_3", MainStreetLocation.DistrictsNoticeHint });
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(street, hero);
         return (street, output, hero);

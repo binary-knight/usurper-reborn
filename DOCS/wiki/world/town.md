@@ -15,7 +15,7 @@ history: 1.2.6 | A new team's name at Team Corner cannot contain < > & or a doub
 history: 1.2.5 | Main Street, the Dormitory, the Level Master, Team Corner and the Marketplace are shown in all five languages, and Dormitory murder mail reaches the victim in the victim's language.
 history: 1.2.4 | Long news rows wrap at 79 columns, and the notice to a sleeper you attack in the Dormitory reaches their mailbox.
 ---
-Main Street shows a few places and a list of districts. Press a district's key to open it, then the place's key; R goes back. More places appear as you gain your first levels. The classic single-screen layout can be chosen in Settings (`~`).
+Main Street shows the classic single-screen menu by default, with a key for each place. More places appear as you gain your first levels. The district layout can be chosen in Settings (`~`, then S): it shows a few places and a list of districts. Press a district's key to open it, then the place's key; R goes back. The sections below follow the district layout.
 
 ## Main Street
 

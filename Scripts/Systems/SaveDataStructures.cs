@@ -510,7 +510,8 @@ namespace UsurperRemake.Systems
         public bool AutoLevelUp { get; set; } = true;  // Auto-level on XP threshold (default on)
         public bool AutoEquipDisabled { get; set; }  // Shop purchases go to inventory
         public int AutoCombatHealPercent { get; set; } = 50;  // v1.1.13: auto-combat potion threshold, HP %; old saves read 50
-        public bool ClassicMainStreet { get; set; }  // v1.1.14: classic Main Street layout; old saves read false (districts)
+        public bool ClassicMainStreet { get; set; }  // v1.1.14: true when the classic layout is shown; still written for older builds, no longer read for the layout
+        public bool DistrictsMainStreet { get; set; }  // 2.0: districts Main Street layout; old saves read false (classic)
         public bool MenuKeysNeedEnter { get; set; } = true;  // v1.1.15: console menus wait for Enter; old saves read true
         public int ClassicTipDraws { get; set; }  // v1.1.14: switch-to-classic tip draws so far; old saves read 0
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD

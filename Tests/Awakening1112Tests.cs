@@ -350,7 +350,7 @@ public class Awakening1112Tests : IDisposable
         Loc.Get("opening_story.dream_asleep").Should().NotContain("Manwe");
         string status = Source("Scripts/Locations/BaseLocation.cs");
         status.Should().Contain("base.stat_awakening_hint");
-        status.Should().Contain("HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown)");
+        status.Should().Contain("HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer)");
     }
 
     [Fact]
