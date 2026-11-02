@@ -4472,7 +4472,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
-                terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)}"); // v1.1.14
                 if (MenuKeysSettingShown)
                     terminal.WriteLine($"  {Loc.Get("prefs.menu_keys_need_enter")}: {(currentPlayer.MenuKeysNeedEnter ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}"); // v1.1.15
                 terminal.WriteLine("");
@@ -4496,7 +4496,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
                 terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
-                terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(currentPlayer.ClassicMainStreet)})"); // v1.1.14
+                terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)})"); // v1.1.14
                 if (MenuKeysSettingShown)
                     terminal.WriteLine($"  E. {Loc.Get("prefs.toggle", Loc.Get("prefs.menu_keys_need_enter"))}"); // v1.1.15
                 if (IsRunningInWezTerm())
@@ -4575,7 +4575,7 @@ public abstract class BaseLocation
                 if (!IsBBSSession && !GameConfig.ScreenReaderMode)
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
-                WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)}"); // v1.1.14
                 if (MenuKeysSettingShown)
                     WriteMenuOption("E", $"{Loc.Get("prefs.menu_keys_need_enter")}: {onOff(currentPlayer.MenuKeysNeedEnter)}"); // v1.1.15
                 if (IsRunningInWezTerm())
@@ -4739,9 +4739,9 @@ public abstract class BaseLocation
                     break;
 
                 case "S":
-                    // v1.1.14: Main Street layout, the districts (default) or the classic pre-1.1.13 menu
-                    currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
-                    terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
+                    // 2.0: Main Street layout, the classic menu (default) or the districts
+                    currentPlayer.DistrictsMainStreet = !currentPlayer.DistrictsMainStreet;
+                    terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)), "green");
                     await GameEngine.Instance.SaveCurrentGame();
                     await Pacing.Wait(800);
                     break;

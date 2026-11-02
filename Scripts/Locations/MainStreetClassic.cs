@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 
 /// <summary>
 /// v1.1.14: the classic Main Street, the layout before the v1.1.13 districts (git tag mainstreet-classic),
-/// for a character with the ClassicMainStreet preference. The rows, labels, colours and keys are the
-/// tagged code's. What each row shows is decided by the district table (StreetEntries), the single
+/// shown by default since 2.0 (a character that sets DistrictsMainStreet sees the districts). The rows, labels,
+/// colours and keys are the tagged code's. What each row shows is decided by the district table (StreetEntries), the single
 /// source of unlock tiers, so the classic menu can never show a place the districts keep locked.
 /// </summary>
 public partial class MainStreetLocation
@@ -82,8 +82,8 @@ public partial class MainStreetLocation
         new[] { CI("Z", StreetPlace.TeamCorner, "main_street.menu_team_corner"), CI(">", StreetPlace.Settlement, "main_street.menu_outskirts", "bright_green") },
     };
 
-    /// <summary>v1.1.14: true when this character asked for the classic Main Street.</summary>
-    private bool UseClassicLayout => currentPlayer?.ClassicMainStreet == true;
+    /// <summary>2.0: true unless this character chose the districts Main Street in Settings (classic is the default).</summary>
+    private bool UseClassicLayout => currentPlayer?.DistrictsMainStreet != true;
 
     /// <summary>v1.1.14: whether a classic item shows, from the district table's tiers (Quit, Settings, Help and Bug always).</summary>
     internal static bool ClassicShows(ClassicItem item, StreetView v) =>

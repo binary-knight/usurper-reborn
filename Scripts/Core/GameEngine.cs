@@ -5756,7 +5756,7 @@ public partial class GameEngine
             AutoLevelUp = playerData.AutoLevelUp,
             AutoEquipDisabled = playerData.AutoEquipDisabled,
             AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
-            ClassicMainStreet = playerData.ClassicMainStreet, // v1.1.14: Main Street layout preference
+            DistrictsMainStreet = playerData.DistrictsMainStreet, // 2.0: Main Street layout preference (ClassicMainStreet is not read)
             ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
             MenuKeysNeedEnter = playerData.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
             DateFormatPreference = playerData.DateFormatPreference,

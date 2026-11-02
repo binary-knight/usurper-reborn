@@ -12,21 +12,30 @@ using Xunit;
 
 namespace UsurperReborn.Tests;
 
-/// <summary>v1.1.14: the "Classic Main Street" preference: saved per character, off by default, toggled in the prefs menu.</summary>
+/// <summary>
+/// v1.1.14: the Main Street layout preference, saved per character and toggled in the prefs menu. Since 2.0 the stored
+/// choice is DistrictsMainStreet (off by default, so classic); ClassicMainStreet is still written for older builds.
+/// </summary>
 [Collection("SharedGameSingletons")]
 public class ClassicMainStreetPref1114Tests
 {
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
 
     [Fact]
-    public void Default_IsOff_ForANewCharacter_AndAnOldSave()
+    public void Default_IsClassic_ForANewCharacter_AndAnOldSave()
     {
-        new Character().ClassicMainStreet.Should().BeFalse("a new character gets the districts");
-        new PlayerData().ClassicMainStreet.Should().BeFalse();
-        System.Text.Json.JsonSerializer.Deserialize<PlayerData>("{}")!.ClassicMainStreet
-            .Should().BeFalse("a save written before the field existed reads as districts");
-        System.Text.Json.JsonSerializer.Deserialize<PlayerData>("{\"AutoCombatHealPercent\":40}")!.ClassicMainStreet.Should().BeFalse();
-        Restore(new PlayerData()).ClassicMainStreet.Should().BeFalse("an existing save without the field restores as districts");
+        new Character().DistrictsMainStreet.Should().BeFalse("a new character gets the classic layout");
+        new Character().ClassicMainStreet.Should().BeTrue();
+        new PlayerData().DistrictsMainStreet.Should().BeFalse();
+        System.Text.Json.JsonSerializer.Deserialize<PlayerData>("{}")!.DistrictsMainStreet
+            .Should().BeFalse("a save written before the field existed reads as classic");
+        Restore(new PlayerData()).DistrictsMainStreet.Should().BeFalse("an existing save without the field restores as classic");
+        foreach (string json in new[] { "{\"ClassicMainStreet\":false}", "{\"ClassicMainStreet\":true}", "{\"AutoCombatHealPercent\":40}" })
+        {
+            var back = Restore(System.Text.Json.JsonSerializer.Deserialize<PlayerData>(json)!);
+            back.DistrictsMainStreet.Should().BeFalse(json + " has no DistrictsMainStreet, so it loads to classic");
+            back.ClassicMainStreet.Should().BeTrue(json);
+        }
     }
 
     [Theory]
@@ -34,13 +43,16 @@ public class ClassicMainStreetPref1114Tests
     [InlineData(false)]
     public void Preference_RoundTripsThroughTheSave(bool classic)
     {
-        var p = new Character { Name1 = "Round", Name2 = "Round", Level = 5, HP = 50, MaxHP = 50, ClassicMainStreet = classic };
+        var p = new Character { Name1 = "Round", Name2 = "Round", Level = 5, HP = 50, MaxHP = 50, DistrictsMainStreet = !classic };
         var ser = typeof(SaveSystem).GetMethod("SerializePlayer", F)!;
         var data = (PlayerData)ser.Invoke(SaveSystem.Instance, new object[] { p })!;
-        data.ClassicMainStreet.Should().Be(classic);
+        data.DistrictsMainStreet.Should().Be(!classic);
+        data.ClassicMainStreet.Should().Be(classic, "the old field is still written, true when classic is shown");
         var json = System.Text.Json.JsonSerializer.Serialize(data);
-        json.Should().Contain($"\"ClassicMainStreet\":{(classic ? "true" : "false")}");
+        json.Should().Contain($"\"DistrictsMainStreet\":{(classic ? "false" : "true")}")
+            .And.Contain($"\"ClassicMainStreet\":{(classic ? "true" : "false")}");
         var back = System.Text.Json.JsonSerializer.Deserialize<PlayerData>(json)!;
+        Restore(back).DistrictsMainStreet.Should().Be(!classic);
         Restore(back).ClassicMainStreet.Should().Be(classic);
     }
 
@@ -68,7 +80,7 @@ public class ClassicMainStreetPref1114Tests
             GameConfig.ScreenReaderMode = screenReader;
             // three presses of S: on, off, on
             await (Task)typeof(BaseLocation).GetMethod("ShowPreferencesMenu", F)!.Invoke(street, null)!;
-            hero.ClassicMainStreet.Should().BeTrue("S pressed three times leaves it on");
+            hero.DistrictsMainStreet.Should().BeTrue("S pressed three times leaves the districts on");
             term.StreamWriterInternal?.Flush();
             string text = Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
             string label = Loc.Get("prefs.main_street_layout");

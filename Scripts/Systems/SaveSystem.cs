@@ -857,7 +857,8 @@ namespace UsurperRemake.Systems
                 AutoLevelUp = player.AutoLevelUp,
                 AutoEquipDisabled = player.AutoEquipDisabled,
                 AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
-                ClassicMainStreet = player.ClassicMainStreet, // v1.1.14: Main Street layout preference
+                ClassicMainStreet = player.ClassicMainStreet, // v1.1.14: true when classic is shown, for older builds
+                DistrictsMainStreet = player.DistrictsMainStreet, // 2.0: Main Street layout preference
                 ClassicTipDraws = player.ClassicTipDraws, // v1.1.14: switch-to-classic tip count
                 MenuKeysNeedEnter = player.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
                 DateFormatPreference = player.DateFormatPreference,
