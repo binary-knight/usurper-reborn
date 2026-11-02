@@ -329,7 +329,7 @@ public class WebClient3aTests
         Invoke(street, typeof(BaseLocation), "ShowStatusLine");
         Of(s.Bytes(t), "Client.Footer").Should().HaveCount(2);
         Of(s.Bytes(t), "Client.Footer").Last().GetProperty("potions").GetInt64().Should().Be(1);
-        // and nothing but the draw sends it: no frame without a status line
+        // and no frame without a draw or a prompt (1.3.9: a prompt sends it too, WebRefresh139Tests)
         long before = s.Stream.Length;
         hero.Healing = 2;
         s.Bytes(t).Length.Should().Be((int)before);

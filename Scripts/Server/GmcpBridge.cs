@@ -504,8 +504,8 @@ public static class GmcpBridge
     /// <summary>
     /// 2.0 phase 3a: Client.Footer, the status line's values the other packages do not carry: potions (as the potion
     /// line prints them, Healing out of MaxPotions), the lives or revives counter and the XP percent. A null field is
-    /// one the status line leaves out on this session, and is left out of the frame. Sent when the status line draws
-    /// and a value changed since the last Client.Footer on this session. Web client only.
+    /// one the status line leaves out on this session, and is left out of the frame. Sent when the status line draws,
+    /// and (1.3.9) before each prompt, when a value changed since the last Client.Footer on this session. Web client only.
     /// </summary>
     public static void EmitWebFooterIfChanged(long potions, long maxPotions, int? lives, int? maxLives, string? livesKind, int? xpPercent)
     {
@@ -515,6 +515,27 @@ public static class GmcpBridge
         if (snapshot == ctx.LastWebFooterSnapshot) return;
         ctx.LastWebFooterSnapshot = snapshot;
         EmitWebClient("Client.Footer", new { potions, maxPotions, lives, maxLives, livesKind, xpPercent });
+    }
+
+    /// <summary>
+    /// 1.3.9: before each prompt on a web client session, Char.Vitals, Char.Status and Client.Footer for the character
+    /// that session plays, each only when one of its values changed since it was last sent. The web page's footer
+    /// reads these three, and many screens (dungeon rooms, traps, the map, victory and loot) change HP, potions, gold,
+    /// XP or level without drawing the status line or passing the location loop, so their values went stale.
+    /// <paramref name="reading"/> is the terminal asking for input: a grouped follower's terminal read on the leader's
+    /// session is not that session's own and sends nothing. Web client sessions only: no other session gets a byte
+    /// more, and no terminal text is written.
+    /// </summary>
+    public static void EmitWebRefreshIfChanged(TerminalEmulator? reading)
+    {
+        if (!IsWebClientActive) return;
+        var ctx = SessionContext.Current!;
+        if (reading != null && ctx.Terminal != null && !ReferenceEquals(ctx.Terminal, reading)) return;
+        var player = ctx.Engine?.CurrentPlayer;
+        if (player == null) return;
+        EmitVitalsIfChanged(player);
+        EmitStatusIfChanged(player);
+        BaseLocation.EmitWebFooterFor(player);
     }
 
     /// <summary>

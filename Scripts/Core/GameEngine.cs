@@ -966,6 +966,7 @@ public partial class GameEngine
         // Preserve player preferences before deleting old save
         bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
         bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
+        bool preserveWebMenuKeys = currentPlayer?.WebMenuKeysNeedEnter ?? false; // 1.3.9
         var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
         // Use the active character key (could be main or alt)
         var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
@@ -979,6 +980,7 @@ public partial class GameEngine
             currentPlayer.ScreenReaderMode = preserveScreenReader;
             currentPlayer.Orientation = preserveOrientation;
             currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
+            currentPlayer.WebMenuKeysNeedEnter = preserveWebMenuKeys; // 1.3.9
             GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
         }
     }
@@ -5759,6 +5761,7 @@ public partial class GameEngine
             DistrictsMainStreet = playerData.DistrictsMainStreet, // 2.0: Main Street layout preference (ClassicMainStreet is not read)
             ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
             MenuKeysNeedEnter = playerData.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
+            WebMenuKeysNeedEnter = playerData.WebMenuKeysNeedEnter, // 1.3.9: the web client's menu keys preference
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,

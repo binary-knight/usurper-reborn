@@ -1015,6 +1015,10 @@ public partial class TerminalEmulator
 
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // 1.3.9: a web client session's footer values (HP, level, gold, potions, XP) as they are now, before
+        // every prompt and pause; a no-op on every other session
+        UsurperRemake.Server.GmcpBridge.EmitWebRefreshIfChanged(this);
+
         // v1.1.13: a command typed at a pause is the answer to this prompt
         if (_pendingLine != null)
         {
@@ -2142,7 +2146,7 @@ public partial class TerminalEmulator
     private static bool StreamHasReadableData(Stream stream) => stream switch
     {
         System.Net.Sockets.NetworkStream ns => ns.DataAvailable,
-        UsurperRemake.Server.PrependedStream ps => ps.HasReadableData,
+        UsurperRemake.Server.IReadableDataStream rs => rs.HasReadableData,   // 1.3.9: PrependedStream, and a test stream
         _ => false
     };
 
@@ -2185,7 +2189,10 @@ public partial class TerminalEmulator
     /// Consume any pending input without blocking. Call after IsInputAvailable() returns true
     /// to clear the buffer so the input doesn't leak into the next prompt.
     /// </summary>
-    public void FlushPendingInput()
+    /// <param name="alsoReaderBuffer">1.3.9: also drop the lines the stream reader already holds (two lines that
+    /// arrived in one read leave the second there, where the byte discard never sees it). An encounter's prompt
+    /// asks for this; the older callers keep the byte discard alone.</param>
+    public void FlushPendingInput(bool alsoReaderBuffer = false)
     {
         _pendingLine = null; // v1.1.13: a flush discards a line kept from a pause too
         try
@@ -2206,6 +2213,13 @@ public partial class TerminalEmulator
                 while (StreamHasReadableData(_streamReader.BaseStream))
                 {
                     _streamReader.BaseStream.Read(discard, 0, discard.Length);
+                }
+                // 1.3.9: and, when asked, what the reader already pulled off the stream. No read is outstanding
+                // here: a line read returns only after its last read completed.
+                if (alsoReaderBuffer)
+                {
+                    try { _streamReader.DiscardBufferedData(); }
+                    catch (InvalidOperationException) { }
                 }
                 return;
             }

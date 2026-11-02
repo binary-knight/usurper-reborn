@@ -17,7 +17,14 @@ namespace UsurperRemake.Server;
 /// own the underlying stream -- Dispose/Close is a no-op on the underlying
 /// (the original NetworkStream stays owned by its TcpClient).
 /// </summary>
-internal sealed class PrependedStream : Stream
+/// <summary>1.3.9: a stream that can say, without blocking, that a read would return data now
+/// (TerminalEmulator.StreamHasReadableData, so FlushPendingInput can drain it).</summary>
+internal interface IReadableDataStream
+{
+    bool HasReadableData { get; }
+}
+
+internal sealed class PrependedStream : Stream, IReadableDataStream
 {
     private readonly Stream _underlying;
     private byte[]? _prefix;

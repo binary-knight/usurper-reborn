@@ -48,6 +48,15 @@ public class StreetEncounterSystem
     private async Task TerminalPressAnyKey(TerminalEmulator terminal) => await terminal.PressAnyKey();
 
     /// <summary>
+    /// 1.3.9 (play test B5): the start of an encounter, before its first line. Whatever was typed before it (a key
+    /// meant for the screen the encounter interrupted, a line the reader holds, a line kept from a pause) is
+    /// discarded, so its prompt reads a key typed once the encounter began, including one typed while its options
+    /// were still drawing. Every random encounter starts in ProcessEncounter and every consequence encounter in
+    /// CheckForConsequenceEncounter, and both call this first.
+    /// </summary>
+    internal static void BeginEncounter(TerminalEmulator terminal) => terminal.FlushPendingInput(alsoReaderBuffer: true);
+
+    /// <summary>
     /// Types of street encounters
     /// </summary>
     public enum EncounterType
@@ -217,6 +226,7 @@ public class StreetEncounterSystem
     private async Task ProcessEncounter(Character player, EncounterType type, GameLocation location,
         EncounterResult result, TerminalEmulator terminal)
     {
+        BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
         switch (type)
         {
             case EncounterType.HostileNPC:
@@ -2270,6 +2280,7 @@ public class StreetEncounterSystem
             if (grudgeNpc != null)
             {
                 MarkConsequenceFired();
+                BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
                 await ExecuteGrudgeConfrontation(grudgeNpc, player, terminal, result);
                 return result;
             }
@@ -2281,6 +2292,7 @@ public class StreetEncounterSystem
             if (jealousSpouse != null)
             {
                 MarkConsequenceFired();
+                BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
                 await ExecuteSpouseConfrontation(jealousSpouse, player, terminal, result);
                 return result;
             }

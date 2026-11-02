@@ -2521,12 +2521,18 @@ public abstract class BaseLocation
     /// of MaxPotions), and the lives counter and XP percent only where the line printed them. Sent only to a web client
     /// session, only for the character that session plays, and only when a value changed.
     /// </summary>
-    private void EmitWebFooter()
+    private void EmitWebFooter() => EmitWebFooterFor(currentPlayer);
+
+    /// <summary>
+    /// 2.0 phase 3a: Client.Footer for <paramref name="p"/>, with the values the status line would print. Sent by the
+    /// status line draw and (1.3.9) before each prompt (GmcpBridge.EmitWebRefreshIfChanged).
+    /// </summary>
+    internal static void EmitWebFooterFor(Character? p)
     {
-        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(currentPlayer)) return;
-        var lives = StatusLineLives(currentPlayer);
-        UsurperRemake.Server.GmcpBridge.EmitWebFooterIfChanged(currentPlayer.Healing, currentPlayer.MaxPotions,
-            lives?.Left, lives?.Max, lives == null ? null : lives.Value.Permadeath ? "lives" : "revives", StatusLineXpPercent(currentPlayer));
+        if (p == null || !UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(p)) return;
+        var lives = StatusLineLives(p);
+        UsurperRemake.Server.GmcpBridge.EmitWebFooterIfChanged(p.Healing, p.MaxPotions,
+            lives?.Left, lives?.Max, lives == null ? null : lives.Value.Permadeath ? "lives" : "revives", StatusLineXpPercent(p));
     }
 
     /// <summary>
@@ -4431,6 +4437,13 @@ public abstract class BaseLocation
     /// </summary>
     internal static bool MenuKeysSettingShown => !UsurperRemake.BBS.DoorMode.ShouldUseAnsiOutput && !UsurperRemake.BBS.DoorMode.IsMudServerMode;
 
+    /// <summary>
+    /// 1.3.9 (play test C1, his pick 4): Settings E on a web client session is the web preference
+    /// (Character.WebMenuKeysNeedEnter), not the console one. A screen reader session never gets one-key menus, so
+    /// it is not offered there; telnet, SSH and door sessions are not web client sessions and see no change.
+    /// </summary>
+    internal static bool WebMenuKeysSettingShown => UsurperRemake.Server.GmcpBridge.IsWebClientActive && !GameConfig.ScreenReaderMode;
+
     protected virtual async Task ShowPreferencesMenu()
     {
         bool exitPrefs = false;
@@ -4576,7 +4589,9 @@ public abstract class BaseLocation
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)}"); // v1.1.14
-                if (MenuKeysSettingShown)
+                if (WebMenuKeysSettingShown)
+                    WriteMenuOption("E", $"{Loc.Get("prefs.web_menu_keys_need_enter")}: {onOff(currentPlayer.WebMenuKeysNeedEnter)}"); // 1.3.9
+                else if (MenuKeysSettingShown)
                     WriteMenuOption("E", $"{Loc.Get("prefs.menu_keys_need_enter")}: {onOff(currentPlayer.MenuKeysNeedEnter)}"); // v1.1.15
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
@@ -4746,7 +4761,15 @@ public abstract class BaseLocation
                     await Pacing.Wait(800);
                     break;
 
-                case "E" when MenuKeysSettingShown:
+                case "E" when WebMenuKeysSettingShown:
+                    // 1.3.9: the web client's menus act on one key (default) or wait for Enter; the next Client.Menu says which
+                    currentPlayer.WebMenuKeysNeedEnter = !currentPlayer.WebMenuKeysNeedEnter;
+                    terminal.WriteLine(Loc.Get("base.pref_web_menu_keys_need_enter_set", Loc.Get(currentPlayer.WebMenuKeysNeedEnter ? "prefs.on" : "prefs.off")), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Pacing.Wait(800);
+                    break;
+
+                case "E" when MenuKeysSettingShown && !WebMenuKeysSettingShown:
                     // v1.1.15: single-player console menus wait for Enter (default) or act on one key
                     currentPlayer.MenuKeysNeedEnter = !currentPlayer.MenuKeysNeedEnter;
                     GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
