@@ -152,11 +152,11 @@ test("invalid directives and filters fail closed", () => {
     /Monster tier samples/,
   );
 });
-function invalidPage(body, extra = "") {
+function invalidPage(body, extra = "", sources = "Scripts/Core/GameConfig.cs") {
   const content = fs.mkdtempSync(path.join(temp, "content-"));
   fs.writeFileSync(
     path.join(content, "index.md"),
-    `---\ntitle: Test\npath: /wiki/en/\nchecked: 1.2.0\nsources: Scripts/Core/GameConfig.cs\n${extra}---\n${body}`,
+    `---\ntitle: Test\npath: /wiki/en/\nchecked: 1.2.0\nsources: ${sources}\n${extra}---\n${body}`,
   );
   return () =>
     build({ dataDir, contentDir: content, outDir: path.join(temp, "invalid") });
@@ -179,6 +179,28 @@ test("broken local links, anchors, malformed directives and duplicate routes fai
   );
   assert.throws(invalidPage("# Extra title"), /level-two/);
   assert.throws(invalidPage("Text", "unknown: field\n"), /Unknown frontmatter/);
+});
+test("web pages are guide sources, but only html under web/ that exists", () => {
+  const live = result.pages.find(
+    (p) => p.path === "/wiki/en/getting-started/connections/",
+  );
+  assert.match(live.sources, /(^|, )web\/index\.html(,|$)/);
+  const withSource = (source) => {
+    const content = fs.mkdtempSync(path.join(temp, "websource-"));
+    fs.cpSync(path.resolve(__dirname, "../../../DOCS/wiki"), content, {
+      recursive: true,
+    });
+    const file = path.join(content, "getting-started/connections.md");
+    fs.writeFileSync(
+      file,
+      fs.readFileSync(file, "utf8").replace(/^sources: .*$/m, `sources: ${source}`),
+    );
+    return () =>
+      build({ dataDir, contentDir: content, outDir: path.join(temp, "websource-out") });
+  };
+  assert.doesNotThrow(withSource("README.md, web/index.html"));
+  for (const bad of ["web/no-such-page.html", "docker/web/index.html", "DOCS/DOCKER.html"])
+    assert.throws(withSource(bad), /Missing or invalid source/, bad);
 });
 test("duplicate URLs and mismatched dataset versions are rejected", () => {
   const content = fs.mkdtempSync(path.join(temp, "duplicate-"));
