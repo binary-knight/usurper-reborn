@@ -18418,7 +18418,7 @@
   "base.awakening_enlightened": "Risvegliato",
   "base.awakening_awakened": "Destato",
   "base.stat_awakening": "  Risveglio: {0} ({1}/7)",
-  "base.stat_awakening_hint": "(il tuo Diario dell'Oceano: Via Principale, Stato [S], Progresso [P], dal livello {0})",
+  "base.stat_awakening_hint": "(Diario dell'Oceano: Via Principale, Stato [S], Progresso [P], dal livello {0})",
   "base.stat_awakening_hint.classic": "(il tuo Diario dell'Oceano: Via Principale, Progresso [P])",
   "ocean.awakening_header": "RISVEGLIO",
   "ocean.awakening_stage": "Stadio {0} di {1}: {2}",

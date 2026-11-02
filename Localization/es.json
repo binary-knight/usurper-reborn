@@ -18429,7 +18429,7 @@
   "base.awakening_enlightened": "Iluminado",
   "base.awakening_awakened": "Despierto",
   "base.stat_awakening": "  Despertar: {0} ({1}/7)",
-  "base.stat_awakening_hint": "(tu Diario del Océano: Calle Mayor, Estado [S], Progreso [P], desde el nivel {0})",
+  "base.stat_awakening_hint": "(tu Diario del Océano: Calle Mayor, Estado [S], Progreso [P], desde nivel {0})",
   "base.stat_awakening_hint.classic": "(tu Diario del Océano: Calle Mayor, Progreso [P])",
   "ocean.awakening_header": "DESPERTAR",
   "ocean.awakening_stage": "Etapa {0} de {1}: {2}",
