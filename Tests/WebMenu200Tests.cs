@@ -199,6 +199,7 @@ public class WebMenu200Tests
     {
         GmcpBridge.IsWebClientPackage("Client.Menu").Should().BeTrue();
         GmcpBridge.IsWebClientPackage("Room.Detail").Should().BeTrue();
+        GmcpBridge.IsWebClientPackage("Client.Waiting").Should().BeTrue();
         GmcpBridge.IsWebClientPackage("Room.Info").Should().BeFalse();
         GmcpBridge.IsWebClientPackage("Comm.Channel.Text").Should().BeFalse();
         var emitTo = Source("Scripts/Server/GmcpBridge.cs");
@@ -520,7 +521,9 @@ public class WebMenu200Tests
         var labels = CaseLabels("Scripts/Systems/CombatEngine.cs", "GetPlayerActionMultiMonster");
         var digits = Enumerable.Range(1, 9).Select(i => i.ToString()).ToList();
         labels.Should().Contain(digits);
-        var expected = labels.Where(l => l != "" && !digits.Contains(l)).Append("1").ToList();
+        // 1.3.9: AUTO and SPD typed out are the long forms of O and X, which the menu lists
+        labels.Should().Contain(new[] { "O", "AUTO", "X", "SPD" });
+        var expected = labels.Where(l => l != "" && !digits.Contains(l) && l != "AUTO" && l != "SPD").Append("1").ToList();
         items.Select(i => i.Key).Should().BeEquivalentTo(expected, "every case of the handler, the filled quickbar slot for the digits");
     }
 
@@ -574,8 +577,8 @@ public class WebMenu200Tests
         var arms = parse.DescendantNodes().OfType<SwitchExpressionArmSyntax>()
             .Select(a => a.Pattern).OfType<ConstantPatternSyntax>().Select(p => ((LiteralExpressionSyntax)p.Expression).Token.ValueText).ToList();
         // B and J parse as Coat Blade and herbs, but the PvP round has no case for either: they make a plain attack
-        items.Keys.Where(k => k.Length == 1 && !char.IsDigit(k[0]) || k == "SPD").Should().BeEquivalentTo(arms.Except(new[] { "B", "J" }).Append("SPD"),
-            "the menu holds every ParseCombatAction key (S is one) that does what it says in PvP, and SPD");
+        items.Keys.Where(k => !char.IsDigit(k[0])).Should().BeEquivalentTo(arms.Except(new[] { "B", "J" }).Append("X"),
+            "the menu holds every ParseCombatAction key (S is one) that does what it says in PvP, and X (1.3.9: Speed)");
         var pvpRound = CSharpSyntaxTree.ParseText(Source("Scripts/Systems/CombatEngine.cs")).GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(m => m.Identifier.Text == "ProcessPlayerVsPlayerAction").ToString();
         pvpRound.Should().NotContain("CombatActionType.CoatBlade").And.NotContain("CombatActionType.UseHerb", "if the PvP round learns them, list B and J");
@@ -719,12 +722,14 @@ public class WebMenu200Tests
         // watchdog code, which write to other sessions.
         var allowed = new Dictionary<string, string[]>
         {
-            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient", "EmitWebEnemies", "EmitWebFooterIfChanged", "EmitCombatEnemiesIfChanged" },
+            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient", "EmitWebEnemies", "EmitWebFooterIfChanged", "EmitCombatEnemiesIfChanged", "EmitWebWaiting", "EmitWebPollWaiting" },
             ["Scripts/Server/WebClientMenu.cs"] = new[] { "Emit" },
+            ["Scripts/UI/TerminalEmulator.cs"] = new[] { "ReadLineInteractiveAsync", "GetMaskedInput" },   // 1.3.9: Client.Waiting, at the start of each stream read
             ["Scripts/Locations/MainStreetWebMenu.cs"] = new[] { "EmitWebMenu" },
             ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu", "EmitWebMap" },
             ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter", "EmitWebFooterFor" },   // 1.3.9: EmitWebFooterFor, the status line and the prompt refresh
-            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters" },
+            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters", "AutoCombatStopRequested" },   // 1.3.9: Client.Waiting at the stop key
+            ["Scripts/Systems/OpeningStorySystem.cs"] = new[] { "SkippableDelay" },   // 1.3.9: Client.Waiting at the story skip
         };
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "Scripts"), "*.cs", SearchOption.AllDirectories))
         {
@@ -735,6 +740,7 @@ public class WebMenu200Tests
                 string callee = call.Expression.ToString();
                 bool sends = callee.EndsWith("EmitWebClient") || callee.EndsWith("WebClientMenu.Emit")
                     || callee.EndsWith("EmitWebEnemies") || callee.EndsWith("EmitWebFooterIfChanged")   // 2.0 phase 3a
+                    || callee.EndsWith("EmitWebWaiting") || callee.EndsWith("EmitWebPollWaiting")   // 1.3.9
                     || (callee.EndsWith("Emit") || callee.EndsWith("EmitTo"))
                         && GmcpBridge.WebClientPackages.Any(pkg => call.ArgumentList.ToString().Contains("\"" + pkg + "\""));
                 if (!sends) continue;

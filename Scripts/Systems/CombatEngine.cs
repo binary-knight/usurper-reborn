@@ -462,11 +462,11 @@ public partial class CombatEngine
 
     /// <summary>
     /// 1.3.9: the keys a combat tip may name under each standard menu, with the potion key of that menu: the
-    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, AUTO and SPD; the PvP menu
-    /// (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and SPD and has no AUTO row.
+    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed);
+    /// the PvP menu (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and X and has no Auto-Combat.
     /// </summary>
-    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "AUTO", "SPD" });
-    internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "SPD" });
+    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X" });
+    internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "X" });
 
     /// <summary>
     /// A tip every 5th round (10th at Fast or Instant), under the standard menu. 1.3.9: the potion tip names the
@@ -1621,6 +1621,7 @@ public partial class CombatEngine
         // Main combat loop
         int roundNumber = 0;
         bool autoCombat = false; // Auto-combat toggle
+        _webPollPending = false;
         bool leaderDeathAnnounced = false;
 
         // Combat continues as long as ANY party member is alive (not just leader)
@@ -1912,19 +1913,7 @@ public partial class CombatEngine
                     // Floor at one 50ms poll: Instant speed returns 0, which skipped
                     // the loop entirely and made auto-combat impossible to stop.
                     int delayMs = Math.Max(50, GetCombatDelay(500));
-                    int elapsed = 0;
-                    bool stopRequested = false;
-                    while (elapsed < delayMs)
-                    {
-                        if (terminal.IsInputAvailable())
-                        {
-                            terminal.FlushPendingInput();
-                            stopRequested = true;
-                            break;
-                        }
-                        await Task.Delay(50); // Check every 50ms
-                        elapsed += 50;
-                    }
+                    bool stopRequested = await AutoCombatStopRequested(delayMs);
 
                     if (stopRequested)
                     {
@@ -2192,6 +2181,15 @@ public partial class CombatEngine
 
             // Short pause between rounds
             await Pacing.Wait(GetCombatDelay(1000));
+        }
+
+        // 1.3.9: the fight ended under auto-combat before it polled for the stop key it told the web page about; the
+        // page sent that key as a stop key, so it must not reach the next prompt. A web client session only: every
+        // other session keeps its type-ahead as before.
+        if (_webPollPending)
+        {
+            _webPollPending = false;
+            terminal.FlushPendingInput();
         }
 
         // v0.60.0, issue #87: hoist the kill-tracking sweep so it runs for EVERY
@@ -2748,8 +2746,8 @@ public partial class CombatEngine
             catch { /* never let instrumentation break combat */ }
             var upperChoice = choice.Trim().ToUpper();
 
-            // Handle combat speed toggle
-            if (upperChoice == "SPD")
+            // Handle combat speed toggle: [X], or SPD typed out (1.3.9)
+            if (upperChoice == "X" || upperChoice == "SPD")
             {
                 player.CombatSpeed = player.CombatSpeed switch
                 {
@@ -2967,13 +2965,6 @@ public partial class CombatEngine
         }
     }
 
-    private static string BbsSpeedLabel(Character player) => player.CombatSpeed switch
-    {
-        CombatSpeed.Instant => Loc.Get("combat.bbs_speed_instant"),
-        CombatSpeed.Fast => Loc.Get("combat.bbs_speed_fast"),
-        _ => Loc.Get("combat.bbs_speed_normal")
-    };
-
     private static string BbsPotionLabel(Character player)
     {
         string potLabel = "";
@@ -3029,8 +3020,8 @@ public partial class CombatEngine
         if (player.TotalHerbCount > 0)
             row.Item("[J]", "bright_yellow", Loc.Get("combat.bbs_herbs", player.TotalHerbCount) + " ", "bright_green");
 
-        row.Item(Loc.Get("combat.bbs_auto_key") + " ", "bright_yellow", "", "bright_yellow");
-        row.Item(Loc.Get("combat.bbs_speed_key"), "bright_yellow", $"{BbsSpeedLabel(player)} ", "darkgray");
+        // 1.3.9: no Auto-Combat here; PvP has none, as the standard and screen reader PvP menus show
+        row.Item(Loc.Get("combat.bbs_speed_key"), "bright_yellow", Loc.Get("combat.bbs_speed") + " ", "darkgray");
         row.Item("[S]", "bright_yellow", HotkeyLabel('S', "combat.bbs_stats"), "darkgray");
         row.End();
     }
@@ -3092,8 +3083,8 @@ public partial class CombatEngine
 
         if (!isFollower)
         {
-            row.Item(Loc.Get("combat.bbs_auto_key") + " ", "bright_yellow", "", "bright_yellow");
-            row.Item(Loc.Get("combat.bbs_speed_key"), "bright_yellow", BbsSpeedLabel(player), "darkgray");
+            row.Item(Loc.Get("combat.bbs_auto_key"), "bright_yellow", Loc.Get("combat.bbs_auto") + " ", "bright_yellow");
+            row.Item(Loc.Get("combat.bbs_speed_key"), "bright_yellow", Loc.Get("combat.bbs_speed"), "darkgray");
         }
 
         // Boss save option
@@ -3262,7 +3253,7 @@ public partial class CombatEngine
             _ => Loc.Get("combat.speed_normal")
         };
         string spdDesc = Loc.Get("combat.speed_label", speedLabel);
-        WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc);
+        WriteBoxRow(Loc.Get("combat.bbs_speed_key") + " ", "darkgray", spdDesc);
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
@@ -3467,11 +3458,37 @@ public partial class CombatEngine
                 _ => Loc.Get("combat.speed_normal")
             };
             string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
-            WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc2);
+            WriteBoxRow(Loc.Get("combat.bbs_speed_key") + " ", "darkgray", spdDesc2);
         }
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// The auto-combat stop key: true when a key arrives within <paramref name="delayMs"/> (polled every 50 ms; the
+    /// key is thrown away). 1.3.9: tells a web client session once, before the polls, that the game takes a key now.
+    /// </summary>
+    /// <summary>1.3.9: a web client session was told the stop key is taken and the fight has not polled for it since.</summary>
+    private bool _webPollPending;
+
+    internal async Task<bool> AutoCombatStopRequested(int delayMs)
+    {
+        if (UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal)) _webPollPending = true;
+        int elapsed = 0;
+        while (elapsed < delayMs)
+        {
+            bool keyed = terminal.IsInputAvailable();
+            _webPollPending = false;   // it has polled since the frame
+            if (keyed)
+            {
+                terminal.FlushPendingInput();
+                return true;
+            }
+            await Task.Delay(50); // Check every 50ms
+            elapsed += 50;
+        }
+        return false;
     }
 
     /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>
@@ -15314,7 +15331,11 @@ public partial class CombatEngine
                     action.Type = CombatActionType.Retreat;
                     return (action, false);
 
+                case "O":   // 1.3.9: the single key; AUTO typed out still works
                 case "AUTO":
+                    // 1.3.9: a key typed from here on stops auto-combat at its first poll (the connection holds it),
+                    // so a web client hears now, not when the first round has played out
+                    if (UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal)) _webPollPending = true;
                     // Enable auto-combat mode
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine("");
@@ -15328,6 +15349,7 @@ public partial class CombatEngine
                     action.TargetIndex = null; // Random target
                     return (action, true);
 
+                case "X":   // 1.3.9: the single key; SPD typed out still works
                 case "SPD":
                     // Cycle combat speed: Normal -> Fast -> Instant -> Normal
                     player.CombatSpeed = player.CombatSpeed switch
@@ -33531,7 +33553,7 @@ public partial class CombatEngine
     /// <summary>
     /// Parse a grouped player's single-line combat input into a CombatAction.
     /// Supports the full combat action set: A (attack), C (cast spell), I (use potion),
-    /// D (defend), H (heal ally), R (retreat), 1-9 (quickbar), AUTO, SPD,
+    /// D (defend), H (heal ally), R (retreat), 1-9 (quickbar), AUTO (one attack; O, like SPD and X, is not offered here),
     /// and all class-specific abilities. v0.65.1: heal/buff spells can target an ally
     /// (incl. the leader) via C#T#, and bare C / H pick a heal for healer classes.
     /// </summary>

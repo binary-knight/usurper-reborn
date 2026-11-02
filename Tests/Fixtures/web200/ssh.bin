@@ -87,8 +87,8 @@
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
-[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
-[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
+[0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
 [0m[32m╚═══════════════════════════════════════╝
 [0m
 [37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
@@ -98,8 +98,8 @@
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
-[0m[32m[32m║ [93m[93m[AUTO] [36m[36mAuto-Combat                    [32m[32m║
-[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
+[0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
 [0m[32m╚═══════════════════════════════════════╝
 [0m
 [37m[37mChoose action: [97m[32m[32m╔═══════════════════════════════════════╗
@@ -115,7 +115,7 @@
 [0m[32m[32m║ [93m[93m[L] [90m[90mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[S] [90m[90mView Status                       [32m[32m║
-[0m[32m[32m║ [93m[93m[SPD]  [90m[90mCombat Speed: Instant          [32m[32m║
+[0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
 [0m[32m╚═══════════════════════════════════════╝
 [0m
 [37m[37mChoose action: [97m

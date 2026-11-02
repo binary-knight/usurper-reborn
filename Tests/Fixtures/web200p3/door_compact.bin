@@ -141,7 +141,7 @@
 [90m[90m ST:[33m[33m306/306[33m [90m[90m ATK:[93m[93m60[90m[90m  DEF:[96m[96m23[90m[90m  Hit Roll AC:[92m[92m17[90m[90m  [33m[33mLast Stand ready,Death's Door ready
 [96m[96m──────────────────────────────────────────────────────────────────────────────
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[33m[33mTarget which monster? (1-2, ENTER=random, Q=cancel): [97m
 [92m[92mYou attack Bone Guard B!
 [0m[90m[90m[You roll a natural 20: always a hit]
@@ -166,7 +166,7 @@
 [90m[90m ST:[33m[33m306/306[33m [90m[90m ATK:[93m[93m60[90m[90m  DEF:[96m[96m23[90m[90m  Hit Roll AC:[92m[92m17[90m[90m  [33m[33mLast Stand ready,Death's Door ready
 [96m[96m──────────────────────────────────────────────────────────────────────────────
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[33m[33mTarget which monster? (1-2, ENTER=random, Q=cancel): [97m
 [92m[92mYou attack Bone Guard B!
 [0m[90m[90m[You roll 3; you need 2 or more]
@@ -183,7 +183,7 @@
 [90m[90m ST:[33m[33m306/306[33m [90m[90m ATK:[93m[93m60[90m[90m  DEF:[96m[96m23[90m[90m  Hit Roll AC:[92m[92m17[90m[90m  [33m[33mLast Stand ready,Death's Door ready
 [96m[96m──────────────────────────────────────────────────────────────────────────────
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m
 [92m[92mYou attack Bone Guard A!
 [0m[90m[90m[You roll 15; you need 2 or more]
@@ -201,9 +201,9 @@
 [90m[90m ST:[33m[33m306/306[33m [90m[90m ATK:[93m[93m60[90m[90m  DEF:[96m[96m23[90m[90m  Hit Roll AC:[92m[92m17[90m[90m  [33m[33mLast Stand ready,Death's Door ready
 [96m[96m──────────────────────────────────────────────────────────────────────────────
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m
 [92m[92mYou attack Bone Guard A!
 [0m[90m[90m[You roll 12; you need 2 or more]
@@ -219,9 +219,9 @@
 [90m[90m ST:[33m[33m306/306[33m [90m[90m ATK:[93m[93m60[90m[90m  DEF:[96m[96m23[90m[90m  Hit Roll AC:[92m[92m17[90m[90m  [33m[33mLast Stand ready,Death's Door ready
 [96m[96m──────────────────────────────────────────────────────────────────────────────
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m
 [92m[92mYou attack Bone Guard A!
 [0m[90m[90m[You roll 5; you need 2 or more]

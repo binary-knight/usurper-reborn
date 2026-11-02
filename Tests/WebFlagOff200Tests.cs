@@ -30,6 +30,8 @@ namespace UsurperReborn.Tests;
 /// package (Client.Menu, Room.Detail) appeared. The second test says the same without the fixtures, so a later text
 /// change that makes the fixtures stale still leaves a working guard: no new package name in any of the five streams.
 /// To refresh the fixtures after a deliberate text change, run the test on the parent commit with the variable set.
+/// 1.3.9 (single combat keys) re-captured them on fix/combat-single-keys: the only difference is the combat menu rows
+/// for Auto-Combat and Speed ([AUTO] and [SPD] became [O] and [X]); every GMCP frame is the same.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WebFlagOff200Tests

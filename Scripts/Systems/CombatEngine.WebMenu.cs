@@ -71,14 +71,14 @@ public partial class CombatEngine
             new(Loc.Get("web.menu.quickbar"), QuickbarMenuItems(player)),
             new(Loc.Get("web.menu.options"), new List<WebMenuItem>
             {
-                new("AUTO", Loc.Get("combat.auto_short")),
-                new("SPD", Loc.Get("combat.speed_label", SpeedName(player))),
+                new("O", Loc.Get("combat.auto_short")),   // 1.3.9: single keys; AUTO and SPD typed out still work
+                new("X", Loc.Get("combat.speed_label", SpeedName(player))),
             }),
         };
     }
 
     /// <summary>
-    /// 2.0: the PvP prompt's keys (GetPlayerAction with a PvP opponent: S, SPD, the quickbar, then ParseCombatAction).
+    /// 2.0: the PvP prompt's keys (GetPlayerAction with a PvP opponent: S, X or SPD, the quickbar, then ParseCombatAction).
     /// Power Attack, Precise Strike, Fight to Death and Beg for Mercy are refused in PvP and listed as not enabled.
     /// G is listed only while ParseCombatAction reads it as Rage; otherwise it falls through to its default, a plain
     /// attack, as any other key does. B and J are not listed: ParseCombatAction reads them as Coat Blade and the herb
@@ -111,7 +111,7 @@ public partial class CombatEngine
             }),
             new(Loc.Get("web.menu.tactics"), tactics),
             new(Loc.Get("web.menu.quickbar"), QuickbarMenuItems(player)),
-            new(Loc.Get("web.menu.options"), new List<WebMenuItem> { new("SPD", Loc.Get("combat.speed_label", SpeedName(player))) }),
+            new(Loc.Get("web.menu.options"), new List<WebMenuItem> { new("X", Loc.Get("combat.speed_label", SpeedName(player))) }),
         };
     }
 }
