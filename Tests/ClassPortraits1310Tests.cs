@@ -129,33 +129,34 @@ public class ClassPortraits1310Tests
     // ---------------------------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(true, null, true)]
-    [InlineData(true, "Local", true)]
-    [InlineData(false, "BBS", true)]
-    [InlineData(false, null, false)]
-    [InlineData(false, "Web", false)]
-    [InlineData(false, "SSH", false)]
-    [InlineData(false, "MUD", false)]
-    [InlineData(false, "Steam", false)]
-    [InlineData(false, "Local", false)]
-    public void SixteenColours_InADoorOrABbsSession_Only(bool door, string? connectionType, bool expected)
+    [InlineData(true, null, false, true)]
+    [InlineData(true, "Local", false, true)]
+    [InlineData(false, "BBS", false, true)]
+    [InlineData(false, "MUD", true, true)]
+    [InlineData(false, null, false, false)]
+    [InlineData(false, "Web", false, false)]
+    [InlineData(false, "SSH", false, false)]
+    [InlineData(false, "MUD", false, false)]
+    [InlineData(false, "Steam", false, false)]
+    [InlineData(false, "Local", false, false)]
+    public void SixteenColours_InADoorOrABbsSession_Only(bool door, string? connectionType, bool cp437, bool expected)
     {
-        CharacterCreationSystem.ClassPortraitSixteenColours(door, connectionType).Should().Be(expected);
+        CharacterCreationSystem.ClassPortraitSixteenColours(door, connectionType, cp437).Should().Be(expected);
     }
 
     [Fact]
     public void ThePreview_PassesTheDoorFlagAndTheConnectionType()
     {
         var src = File.ReadAllText(Path.Combine(FloorAndStun1113Tests.RepoRoot(), "Scripts/Systems/CharacterCreationSystem.cs"));
-        Regex.IsMatch(src, @"RacePortraits\.GetCroppedClassPortrait\(characterClass, 38,\s*ClassPortraitSixteenColours\(UsurperRemake\.BBS\.DoorMode\.IsInDoorMode, UsurperRemake\.Server\.SessionContext\.Current\?\.ConnectionType\)\)")
-            .Should().BeTrue("a door session reads DoorMode, a door player on the online server reads the connection type");
+        Regex.IsMatch(src, @"RacePortraits\.GetCroppedClassPortrait\(characterClass, 38,\s*ClassPortraitSixteenColours\(UsurperRemake\.BBS\.DoorMode\.IsInDoorMode, UsurperRemake\.Server\.SessionContext\.Current\?\.ConnectionType, terminal\.UseCp437\)\)")
+            .Should().BeTrue("a door session reads DoorMode, a door player on the online server the connection type, a BBS terminal on the game port UseCp437");
     }
 
     // ---------------------------------------------------------------------------------------------
     // The preview screen as a session receives it
     // ---------------------------------------------------------------------------------------------
 
-    private static string Preview(CharacterClass c, string connectionType, string lang = "en", bool screenReader = false, bool artOff = false)
+    private static string Preview(CharacterClass c, string connectionType, string lang = "en", bool screenReader = false, bool artOff = false, bool cp437 = false)
     {
         var saved = SessionContext.Current;
         var output = new MemoryStream();
@@ -166,7 +167,7 @@ public class ClassPortraits1310Tests
             GameConfig.Language = lang;
             GameConfig.ScreenReaderMode = screenReader;
             ctx.DisableCharacterMonsterArt = artOff;
-            var term = new TerminalEmulator(new LineStream(new[] { "N" }), output);
+            var term = new TerminalEmulator(new LineStream(new[] { "N" }), output) { UseCp437 = cp437 };
             var ccs = new CharacterCreationSystem(term);
             var mi = typeof(CharacterCreationSystem).GetMethod("ShowClassPreview", BindingFlags.NonPublic | BindingFlags.Instance)!;
             ((Task<bool>)mi.Invoke(ccs, new object[] { c, CharacterRace.Human })!).GetAwaiter().GetResult();
@@ -191,6 +192,17 @@ public class ClassPortraits1310Tests
             var bbs = Preview(c, "BBS");
             bbs.Should().NotContain("38;5;").And.NotContain("48;5;", $"{c} for a BBS door player uses 16 colours");
             bbs.Should().Contain(ClassPortraitArt.Ansi16[c][9], $"{c} shows its 16 colour portrait");
+        }
+    }
+
+    [Fact]
+    public void ABbsTerminalOnTheGamePort_Gets16Colours()
+    {
+        foreach (var c in Converted())
+        {
+            var cp437 = Preview(c, "MUD", cp437: true);
+            cp437.Should().NotContain("38;5;").And.NotContain("48;5;", $"{c} for a CP437 BBS terminal uses 16 colours");
+            cp437.Should().Contain("\u001b[0;", $"{c} is drawn with the 16 colour codes");
         }
     }
 
