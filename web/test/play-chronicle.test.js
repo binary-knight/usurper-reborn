@@ -295,7 +295,7 @@ test('the street box title the page already shows is left out, whatever its case
   assert.match(css, /^\.chron \.cbody\.b-street \{ flex: 1 0 12em; \}$/m);
   assert.match(css, /^\.chron\[data-layout="street"\] \.recto \{ overflow-y: auto; \}$/m);
   const phone = css.slice(css.indexOf('@media (max-width: 600px) {'));
-  assert.match(phone.slice(0, phone.indexOf('\n}')), /\.chron\[data-layout="street"\] \.dock \{ position: static; \}/);
+  assert.match(phone.slice(0, phone.indexOf('\n}')), /^  \.chron \.dock \{ order: 5; position: static;/m);
   assert.deepStrictEqual(p.errors, []);
 });
 

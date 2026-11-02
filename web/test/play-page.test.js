@@ -199,17 +199,25 @@ test('the landing page Play buttons open /play/ in a new tab, and the old termin
   }
 });
 
-test('the Combat and Chat buttons stay hidden until the first GMCP frame', async () => {
+// N1: the View button is there from the first page load, before login; Combat and Chat wait for the first GMCP frame.
+const panelButtons = (p) => ['rail-combat', 'rail-chat', 'tab-combat', 'tab-chat'].map((id) => p.el(id).hidden);
+test('the View button shows from the first page load; the Combat and Chat buttons stay hidden until the first GMCP frame', async () => {
   const p = await load();
-  assert.strictEqual(p.el('rail').hidden, true, 'no GMCP yet: the terminal alone');
+  assert.strictEqual(p.el('rail').hidden, false, 'the rail is there before any frame, so View can be picked before login');
+  assert.strictEqual(p.el('rail-view').hidden, false);
+  assert.deepStrictEqual(panelButtons(p), [true, true, true, true], 'no GMCP yet: no Combat or Chat');
   assert.strictEqual(p.el('drawer').hidden, true);
   p.ctx.__f = 'not json';
   p.run('UsurperPlay.handleFrame(__f)');
   p.ctx.__f = '{"nogmcp":1}';
   p.run('UsurperPlay.handleFrame(__f)');
-  assert.strictEqual(p.el('rail').hidden, true, 'a frame that is not GMCP does not show them');
+  assert.deepStrictEqual(panelButtons(p), [true, true, true, true], 'a frame that is not GMCP does not show them');
+  p.click(p.el('rail-view'));
+  assert.strictEqual(p.el('drawer').hidden, false, 'the View panel opens before login');
+  assert.strictEqual(p.el('pane-view').hidden, false);
+  assert.deepStrictEqual(panelButtons(p), [true, true, true, true], 'opening View does not show Combat and Chat');
   frame(p, 'Room.Info', { name: 'Main Street' });
-  assert.strictEqual(p.el('rail').hidden, false);
+  assert.deepStrictEqual(panelButtons(p), [false, false, false, false]);
   assert.deepStrictEqual(p.errors, []);
 });
 
@@ -221,19 +229,21 @@ test('reconnecting hides the panels and clears the old vitals until the new conn
   assert.strictEqual(p.el('rail').hidden, false);
   assert.strictEqual(p.el('drawer').hidden, false);
   p.click(p.el('reconnect'));
-  assert.strictEqual(p.el('rail').hidden, true, 'no GMCP on the new connection yet');
+  assert.strictEqual(p.el('rail').hidden, false, 'the View button stays');
+  assert.deepStrictEqual(panelButtons(p), [true, true, true, true], 'no GMCP on the new connection yet');
   assert.strictEqual(p.el('drawer').hidden, true);
   assert.strictEqual(p.el('hp-meter').hidden, true, 'the old HP is gone');
   assert.strictEqual(p.el('room').textContent, '');
   frame(p, 'Char.Vitals', { hp: 7, maxHp: 10, mp: 0, maxMp: 0 });
-  assert.strictEqual(p.el('rail').hidden, false);
+  assert.deepStrictEqual(panelButtons(p), [false, false, false, false]);
   assert.strictEqual(p.el('hp-num').textContent, '7/10');
   assert.deepStrictEqual(p.errors, []);
 });
 
-test('opening the drawer always shows its buttons', async () => {
+test('opening the fight or chat drawer always shows its buttons', async () => {
   const p = await load();
-  assert.strictEqual(p.el('rail').hidden, true);
+  assert.deepStrictEqual(panelButtons(p), [true, true, true, true]);
   p.run("UsurperPlay.setDrawer('chat')");
+  assert.deepStrictEqual(panelButtons(p), [false, false, false, false]);
   assert.strictEqual(p.el('rail').hidden, false);
 });

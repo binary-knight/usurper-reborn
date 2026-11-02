@@ -358,10 +358,13 @@
         chat: [],          // Comm.Channel.Text
         exits: {},         // Room.Info exits that are compass directions, for the pad
         footer: null,      // Client.Footer: potions, lives and the XP percent, as the status line prints them
-        foes: []           // Client.Enemies: each foe's name and monster family, in the enemy list's order
+        foes: [],          // Client.Enemies: each foe's name and monster family, in the enemy list's order
+        foot: {},          // the footer's values, each from the newest frame that carried it (see noteFoot)
+        flog: []           // the fight's round text from the terminal: one {seq, lines} per draw (see captureFight)
     };
     var CHAT_MAX = 200;
     var LOG_MAX = 20;
+    var FLOG_MAX = 120;    // round text lines kept for the fight log
 
     function el(tag, cls, text) {
         var e = document.createElement(tag);
@@ -469,7 +472,11 @@
         }
 
         clear(logBox);
+        // The round text as the game printed it, oldest first, then the foes killed.
+        flogLines().slice(-LOG_MAX * 3).forEach(function (line) { logBox.appendChild(el('span', 'ev', line)); });
         state.log.forEach(function (line) { logBox.appendChild(el('span', null, t('play.combat.killed', [line]))); });
+        var pane = document.getElementById('pane-combat');
+        if (logBox.children.length) pane.scrollTop = pane.scrollHeight;
     }
 
     function renderChat() {
@@ -497,7 +504,7 @@
     // terminal, so a fight lights the Combat button instead of opening it.
     function drawerBeside() { return window.matchMedia ? window.matchMedia('(min-width: 1200px)').matches : true; }
     function setDrawer(tab) {
-        if (tab) showPanels();   // an open drawer always has its buttons beside it
+        if (tab && tab !== 'view') showPanels();   // an open fight or chat drawer always has its buttons beside it
         openTab = tab;
         var drawer = document.getElementById('drawer');
         drawer.hidden = !tab;
@@ -514,6 +521,8 @@
         if (tab === 'combat') document.getElementById('rail-combat').classList.remove('new');
         // On a wide tablet the drawer takes room from the stage, so the terminal is fitted again.
         if (isTouch()) queueFit();
+        // Beside the drawer the book is narrower: draw it again so the fight log trims to whole lines in its new size.
+        renderChronNow();
     }
     function toggleTab(tab) { setDrawer(openTab === tab ? null : tab); if (terminal && !isTouch()) terminal.focus(); }
     ['combat', 'chat', 'view'].forEach(function (name) {
@@ -543,11 +552,13 @@
             case 'Char.Vitals':
                 // sp is the Stamina stat, not the fight stamina, so it is not read.
                 state.vitals = { hp: fin(d.hp), maxHp: fin(d.maxHp), mp: fin(d.mp), maxMp: fin(d.maxMp), combatSp: fin(d.combatSp), maxCombatSp: fin(d.maxCombatSp) };
+                noteFoot({ hp: [state.vitals.hp, state.vitals.maxHp], st: [state.vitals.combatSp, state.vitals.maxCombatSp] });
                 renderVitals();
                 chronFrame();
                 break;
             case 'Char.Status':
                 state.status = { level: fin(d.level), gold: fin(d.gold), xp: fin(d.xp), name: str(d.name, 60), cls: str(d['class'], 30) };
+                noteFoot({ level: state.status.level, gold: state.status.gold, xp: state.status.xp });
                 renderVitals();
                 chronFrame();
                 break;
@@ -568,6 +579,9 @@
                 state.result = null;
                 state.death = null;
                 state.log = [];
+                state.flog = [];
+                fightTail = -1;
+                captureFight();   // the fight's opening lines, already on screen when the frame comes after them
                 renderCombat();
                 setLayout('fight');
                 if (openTab === 'combat') break;
@@ -603,6 +617,8 @@
                 break;
             case 'Char.Combat.End':
                 state.inCombat = false;
+                // The last round's text can still be on its way to the terminal: the log keeps reading this draw.
+                fightTail = chron.seq;
                 state.result = { outcome: str(d.outcome, 40), kills: fin(d.kills), xpGained: fin(d.xpGained), goldGained: fin(d.goldGained) };
                 renderCombat();
                 setLayout('text');
@@ -630,6 +646,7 @@
                 break;
             case 'Client.Footer':
                 state.footer = readFooter(d);
+                noteFoot(footerFields(d, state.footer));
                 chronFrame();
                 break;
             case 'Client.Sheet':
@@ -643,15 +660,21 @@
                 break;
         }
     }
-    // The Combat and Chat buttons stay hidden until the game sends its first GMCP frame, so a
-    // connection with no GMCP (a server that does not offer it) shows the terminal alone.
+    // The View button shows from the first page load, so a new player can pick Chronicle before logging in. The Combat
+    // and Chat buttons stay hidden until the game sends its first GMCP frame, so a connection with no GMCP (a server
+    // that does not offer it) shows the terminal and the View button alone.
     var panelsShown = false;
+    function panelButtons(on) {
+        ['rail-combat', 'rail-chat', 'tab-combat', 'tab-chat'].forEach(function (id) { document.getElementById(id).hidden = !on; });
+    }
     function showPanels() {
         if (panelsShown) return;
         panelsShown = true;
-        document.getElementById('rail').hidden = false;
+        panelButtons(true);
         fitTerminal();
     }
+    document.getElementById('rail').hidden = false;
+    panelButtons(false);
 
     function handleFrame(text) {
         var msg;
@@ -988,7 +1011,11 @@
         detailAt: -1,
         sheet: null,      // the last Client.Sheet
         sheetAt: -1,
-        map: null         // the last Client.Map: shown in the room only while it is the map of the room the player is in
+        map: null,        // the last Client.Map: shown in the room only while it is the map of the room the player is in
+        rowsSeq: -1,      // the draw the rows were read in
+        cursorRow: -1,    // the row of chron.rows the cursor waits on with text before it (a prompt), or -1
+        textSeq: -1,      // the draw the text page last opened at its first line
+        textTop: 0        // where it put the text page then
     };
     var chronTimer = 0, drawTimer = 0;
     var STREET = { main_street: 1, main_street_classic: 1 }, FIGHT = { combat: 1, combat_pvp: 1 }, DIRS4 = { N: 1, S: 1, E: 1, W: 1 };
@@ -1084,11 +1111,13 @@
         if (chron.layout === 'sheet' && !current(chron.sheetAt)) chron.layout = 'text';
         renderChronNow();
     }
+    // The book reads the terminal in Chronicle; in Classic it reads it only during a fight, for the drawer's log.
     function afterWrite(seq) {
-        if (!chronOn()) return;
+        if (!chronOn() && !state.inCombat && !(fightTail >= 0 && fightTail === chron.seq)) return;
         clearTimeout(chronTimer);
         chronTimer = setTimeout(function () {
             readScreen();
+            if (!chronOn()) return;
             if (chron.open && seq === chron.seq && PREV_PROMPT.test(chron.cursorText)) drawEnded();
             else renderChronNow();
         }, 40);
@@ -1097,7 +1126,7 @@
     function chronFrame() { renderChronNow(); }
     function chronReset() {
         chron.layout = 'text'; chron.menu = null; chron.detail = null; chron.place = null; chron.sheet = null; chron.sheetAt = -1; chron.map = null;
-        chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1;
+        chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1; chron.rowsSeq = -1; chron.textSeq = -1; chron.textTop = 0;
         clearTimeout(drawTimer); clearTimeout(chronTimer);
         renderChronNow();
     }
@@ -1175,6 +1204,25 @@
         if (f.xpPercent !== null) f.xpPercent = Math.min(100, f.xpPercent);
         return f;
     }
+    // The footer takes each value from the newest frame that carries it: Char.Vitals (HP, stamina), Char.Status (level,
+    // gold, XP) and Client.Footer (potions, lives, the XP percent, and HP, level, gold and XP when it carries them).
+    // Frames are read in the order they arrive, so the last write is the newest; an older value never stays over it.
+    // A key the frame does not have leaves the value as it is; Client.Footer's null for potions, lives or the percent
+    // means the status line leaves that field out, so it goes.
+    function footerFields(d, f) {
+        var out = {
+            potions: f.potions !== null ? [f.potions, f.maxPotions] : null,
+            lives: f.lives !== null ? { v: f.lives, max: f.maxLives, kind: f.kind } : null,
+            xpPercent: f.xpPercent
+        };
+        var hp = count(d.hp), maxHp = count(d.maxHp);
+        if (hp !== null && maxHp !== null) out.hp = [hp, maxHp];
+        ['level', 'gold', 'xp'].forEach(function (k) { if (count(d[k]) !== null) out[k] = count(d[k]); });
+        return out;
+    }
+    function noteFoot(fields) {
+        Object.keys(fields).forEach(function (k) { if (fields[k] !== undefined) state.foot[k] = fields[k]; });
+    }
     // Client.Map: rooms on whole number places with a known kind, and corridors only between two of those rooms side by side.
     function place(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && Math.abs(v) <= 500 ? v : null; }
     function readMap(d) {
@@ -1236,11 +1284,12 @@
     }
 
     // ---- Reading the terminal: each row as runs of text with the game's colour ----
-    function runsOf(line) {
+    // keep: the row wraps onto the next one, so its trailing spaces are part of the line and stay.
+    function runsOf(line, keep) {
         var out = [], cur = null, cell;
         if (!line) return out;
         if (typeof line.getCell !== 'function') {
-            var plain = typeof line.translateToString === 'function' ? String(line.translateToString(true)) : '';
+            var plain = typeof line.translateToString === 'function' ? String(line.translateToString(!keep)) : '';
             return plain ? [{ t: plain, c: '' }] : out;
         }
         var n = Math.min(Number(line.length) || 0, 400);
@@ -1256,7 +1305,7 @@
             if (cur && cur.c === c) cur.t += ch;
             else { cur = { t: ch, c: c }; out.push(cur); }
         }
-        while (out.length) {
+        while (!keep && out.length) {
             var last = out[out.length - 1];
             last.t = last.t.replace(/\s+$/, '');
             if (last.t) break;
@@ -1264,37 +1313,128 @@
         }
         return out;
     }
+    // The screen's rows as the book reads them: runs of text and colour, with the terminal's own wraps undone.
+    // R4, the wrap rule: a row is joined to the row above it only when xterm marks it isWrapped. xterm does that when
+    // the game's line ran past column 80 with no line end, so it carried the rest over ("hands mov" / "e with
+    // practiced ease"). The row above keeps its trailing spaces, so a line that broke at a space ("your " / "way")
+    // keeps the space. A row after a real line end (CR LF) is never joined: table rows, menu lines, box lines and
+    // short lines all end with a line end, even a row that fills all 80 columns.
+    function joinWrapped(rows, wrapped, start) {
+        var out = [], at = [];
+        rows.forEach(function (segs, i) {
+            if (wrapped[i] === true && out.length) out[out.length - 1] = out[out.length - 1].concat(segs);
+            else out.push(segs.slice());
+            at.push(out.length - 1);   // the joined row that holds row i
+        });
+        return { rows: out, start: start < at.length ? at[start] : out.length };
+    }
     function readScreen() {
         var buf = terminal && terminal.buffer && terminal.buffer.active;
         if (!buf || typeof buf.getLine !== 'function') return;
-        var top = Number(buf.baseY) || 0, cy = Number(buf.cursorY) || 0, rows = [], last = cy;
+        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
+        var s = screenOf(buf, mark);
+        chron.rows = s.rows;
+        chron.start = s.start;
+        chron.cursorText = s.cursorText;
+        chron.cursorRow = s.cursorRow;
+        chron.rowsSeq = chron.seq;
+        captureFight();
+    }
+    // The viewport as joined rows, where the current screen starts in them, and the cursor's row as text.
+    function screenOf(buf, mark) {
+        var top = Number(buf.baseY) || 0, cy = Number(buf.cursorY) || 0, rows = [], wrapped = [], last = cy;
         for (var y = 0; y < CHRON_ROWS; y++) {
             var line = buf.getLine(top + y);
             if (!line) break;
-            var r = runsOf(line);
+            var next = buf.getLine(top + y + 1);
+            var r = runsOf(line, !!(next && next.isWrapped === true));
             rows.push(r);
+            wrapped.push(y > 0 && line.isWrapped === true);
             if (r.length && y > last) last = y;
         }
-        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
         var screen = rowsFromBuffer(buf, mark);
-        chron.rows = rows.slice(0, last + 1);
-        chron.start = Math.max(0, cy - screen.length + 1);
-        chron.cursorText = screen.length ? screen[screen.length - 1] : '';
+        var joined = joinWrapped(rows.slice(0, last + 1), wrapped, Math.max(0, cy - screen.length + 1));
+        // The cursor row holds text only while the game waits on a prompt there (or is mid line): its joined row.
+        var cx = Number(buf.cursorX) || 0, cl = buf.getLine(top + cy), typed = false;
+        if (cl && typeof cl.translateToString === 'function') typed = /\S/.test(String(cl.translateToString(false, 0, cx)));
+        var at = joinWrapped(rows.slice(0, cy + 1), wrapped, 0).rows.length - 1;
+        return { rows: joined.rows, start: joined.start, cursorText: screen.length ? screen[screen.length - 1] : '', cursorRow: typed || cx > 0 ? at : -1 };
     }
+    // A row given as a string, a list of runs, or {text or runs, wrapped: true} for a row the terminal wrapped.
     function segsOf(row) {
+        var o = obj(row);
+        if (o) row = Array.isArray(o.runs) ? o.runs : typeof o.text === 'string' ? o.text : '';
         if (typeof row === 'string') return row ? [{ t: row, c: '' }] : [];
         if (!Array.isArray(row)) return [];
         return row.filter(function (r) { return r && typeof r.t === 'string'; })
             .map(function (r) { return { t: r.t, c: PAL.indexOf(r.c) !== -1 ? r.c : '' }; });
     }
     function rowText(segs) { return segs.map(function (r) { return r.t; }).join(''); }
-    // Draws the book from rows given as strings or runs, as if the terminal held them (the current screen is all of them).
-    function renderChron(rows) {
-        chron.rows = Array.isArray(rows) ? rows.map(segsOf) : [];
-        chron.start = 0;
+    // Draws the book from rows given as strings or runs, as if the terminal held them (the current screen starts at row
+    // start, 0 when not given).
+    function renderChron(rows, start, cursor) {
+        rows = Array.isArray(rows) ? rows : [];
+        start = typeof start === 'number' && start > 0 ? Math.floor(start) : 0;
+        chron.cursorRow = typeof cursor === 'number' && cursor >= 0 ? Math.floor(cursor) : -1;
+        var joined = joinWrapped(rows.map(segsOf), rows.map(function (r) { var o = obj(r); return !!(o && o.wrapped === true); }), start);
+        chron.rows = joined.rows;
+        chron.start = Math.min(joined.start, chron.rows.length);
         chron.cursorText = chron.rows.length ? rowText(chron.rows[chron.rows.length - 1]) : '';
+        chron.rowsSeq = chron.seq;
+        captureFight();
         renderChronNow();
     }
+
+    // ---- The fight's round text (B1, B2): what the game printed each round, for the fight page and the drawer ----
+    // Read from the rows of each draw: from the player's last Enter to the prompt. Left out: blank rows, rows inside a
+    // double line box (the combat status and the action menu, which the cards and the keys already show), menu lines
+    // whose keys are all on the dock, the prompt the screen waits on (the cursor's row with what the player has typed
+    // so far, or a last row ending in a colon, question mark or >), and rows drawn only in block characters (the
+    // monster's picture). Kept in the order printed: hits, misses, damage, potions, spells, flight, the round line.
+    var FIGHT_BOX = /^\s*[║╔╠╚╗╣╝]/;
+    function fightEvents(rows, known, cursor) {
+        var texts = rows.map(function (r) { return typeof r === 'string' ? r : rowText(r); });
+        var lastText = -1;
+        texts.forEach(function (s, i) { if (s.trim()) lastText = i; });
+        var out = [];
+        texts.forEach(function (s, i) {
+            // a row drawn only in block characters is the monster's picture; the plate shows the foe instead
+            if (!s.trim() || FIGHT_BOX.test(s) || /^[\s▀-▟■]+$/.test(s)) return;
+            // the prompt: the row the cursor waits on, with what the player has typed so far ("Choose action: I"), or
+            // a last row shaped like a prompt
+            if (i === cursor || (i === lastText && /[:?>]\s*$/.test(s))) return;
+            var line = unbox(s), cmds = scanCommands([s]);
+            // A menu line opens with a key; a sentence that names a key ("Use [1] Power Strike") is kept.
+            if (cmds.length && /^\[/.test(line) && (!known || cmds.every(function (c) { return known[c.key.toUpperCase()] === 1; }))) return;
+            if (line) out.push(line.slice(0, 300));
+        });
+        return out;
+    }
+    var fightTail = -1;   // the draw in which Char.Combat.End came: its last lines still belong to the fight
+    // Each draw's lines replace that draw's entry, so text that arrives in pieces is read once. Rows read before the
+    // current draw began are never stored under it.
+    function captureFight() {
+        if (!(state.inCombat || (fightTail >= 0 && fightTail === chron.seq)) || chron.rowsSeq !== chron.seq) return;
+        var known = null, m = chron.menu;
+        if (m && FIGHT[m.screen] === 1 && current(chron.menuAt)) {
+            known = Object.create(null);
+            m.groups.forEach(function (g) { g.items.forEach(function (it) { known[it.key.toUpperCase()] = 1; }); });
+        }
+        var lines = fightEvents(chron.rows.slice(chron.start), known, chron.cursorRow - chron.start);
+        var top = state.flog[state.flog.length - 1];
+        if (top && top.seq === chron.seq) {
+            if (top.lines.join('\n') === lines.join('\n')) return;
+            top.lines = lines;
+        } else if (lines.length) state.flog.push({ seq: chron.seq, lines: lines });
+        else return;
+        var total = 0;
+        for (var i = state.flog.length - 1; i >= 0; i--) {
+            total += state.flog[i].lines.length;
+            if (total > FLOG_MAX && i < state.flog.length - 1) { state.flog = state.flog.slice(i + 1); break; }
+        }
+        renderCombat();
+    }
+    function flogLines() { return [].concat.apply([], state.flog.map(function (e) { return e.lines; })); }
 
     // ---- Drawing the book ----
     function menuFor(lay) {
@@ -1356,9 +1496,11 @@
         document.getElementById('text-toggle').setAttribute('aria-pressed', chron.textOnly ? 'true' : 'false');
         renderPlate(lay);
         renderHud(lay);
-        renderBody(lay, known);
+        var settle = renderBody(lay, known);
         renderDock(menu, keys, screen);
         renderFoot();
+        // The body's size is known only once the keys and the footer beside it are in: scroll and trim after them.
+        if (typeof settle === 'function') settle();
     }
 
     function renderPlate(lay) {
@@ -1558,10 +1700,18 @@
         while (out.length && !out[out.length - 1].length) out.pop();
         return out;
     }
+    // A1: a row drawn in block characters (the splash, banners) is set solid, as the terminal draws it: line height 1,
+    // no gap between letters, one line however narrow the page. A row is art when it has at least 8 block or shade
+    // characters and they are at least half of what it prints; a box frame or a short bar is not.
+    var ART_CH = /[▀-▟■]/g;
+    function artRow(text) {
+        var n = (text.match(ART_CH) || []).length, ink = text.replace(/\s+/g, '').length;
+        return n >= 8 && n * 2 >= ink;
+    }
     function screenPre(rows, cls) {
         var pre = el('pre', cls);
         rows.forEach(function (segs) {
-            var ln = el('span', 'ln');
+            var ln = el('span', artRow(rowText(segs)) ? 'ln art' : 'ln');
             if (!segs.length) ln.textContent = ' ';
             segs.forEach(function (r) { ln.appendChild(el('span', r.c || null, r.t)); });
             pre.appendChild(ln);
@@ -1617,8 +1767,18 @@
             pre.setAttribute('tabindex', '0');
             pre.setAttribute('aria-label', t('play.chron.screen'));
             body.appendChild(pre);
-            pre.scrollTop = atEnd ? pre.scrollHeight : oldTop;
-            return;
+            // R2: a new screen opens at its own first line, not wherever the last one was left. While its text arrives
+            // the page stays on that line; once the reader scrolls, their place is kept until the next screen.
+            var fresh = chron.rowsSeq === chron.seq && chron.textSeq !== chron.seq;
+            return function () {
+                if (fresh || (chron.rowsSeq === chron.seq && old && oldTop === chron.textTop)) {
+                    chron.textSeq = chron.seq;
+                    var first = pre.children[chron.start];
+                    var y = first ? (Number(first.offsetTop) || 0) - (Number(pre.offsetTop) || 0) : 0;
+                    pre.scrollTop = Math.max(0, y);
+                    chron.textTop = Number(pre.scrollTop) || 0;   // as the browser kept it, so a later draw can tell the reader moved
+                } else pre.scrollTop = old ? oldTop : atEnd ? pre.scrollHeight : 0;
+            };
         }
         if (lay === 'sheet' && chron.sheet) {
             renderSheet(body, chron.sheet);
@@ -1633,17 +1793,16 @@
                 pr.appendChild(op);
             }
             log.setAttribute('aria-label', t('play.chron.log'));
-            var lines = proseRows(chron.rows, known, null).filter(function (s) { return s.length; }).slice(-LOG_LINES);
-            lines.forEach(function (segs, i) {
-                var text = unbox(rowText(segs));
+            // The round text of this fight, oldest at the top, newest at the foot and largest.
+            var lines = flogLines().slice(-LOG_LINES);
+            lines.forEach(function (text, i) {
                 log.appendChild(el('div', 'ev a' + Math.min(4, lines.length - 1 - i) + (/^[\[(]/.test(text) ? ' aside' : ''), text));
             });
             if (state.round > 0) log.appendChild(el('div', 'rd now', t('play.combat.round', [num(state.round)])));
             pr.appendChild(log);
             body.appendChild(pr);
             // Never a line cut at the top: the oldest go until the rest fit.
-            while (log.children.length > 1 && log.scrollHeight > log.clientHeight + 1) log.removeChild(log.firstChild);
-            return;
+            return function () { while (log.children.length > 1 && log.scrollHeight > log.clientHeight + 1) log.removeChild(log.firstChild); };
         }
         var prose = el('div', 'prose croom' + (lay === 'street' ? ' town' : ''));
         if (lay === 'room' && d) {
@@ -1825,19 +1984,18 @@
     // line leaves out stays out); the XP percent follows the last field, where the status line prints it. Until the
     // first Client.Footer, only the fields the other frames carry.
     function renderFoot() {
-        var f = document.getElementById('c-foot'), v = state.vitals, st = state.status, ft = state.footer, fields = [];
+        var f = document.getElementById('c-foot'), ft = state.foot, fields = [];
+        var pair = function (p) { return num(p[0]) + '/' + num(p[1]); };
         clear(f);
         f.setAttribute('aria-label', t('play.chron.vitals'));
-        if (v) fields.push({ l: t('play.hp'), v: num(v.hp) + '/' + num(v.maxHp), d: 0, n: 0 });
-        if (ft && ft.potions !== null) fields.push({ l: t('play.chron.potions'), v: num(ft.potions) + '/' + num(ft.maxPotions), d: 0, n: 0 });
-        if (st) fields.push({ l: t('play.chron.gold'), v: num(st.gold), d: 0, n: 0 });
-        if (v && v.maxCombatSp > 0) fields.push({ l: t('play.stamina'), v: num(v.combatSp) + '/' + num(v.maxCombatSp), d: 0, n: 1 });
-        if (st) {
-            fields.push({ l: t('play.chron.level'), v: num(st.level), d: 1, n: 1 });
-            fields.push({ l: t('play.chron.xp'), v: num(st.xp), d: 1, n: 2 });
-        }
-        if (ft && ft.lives !== null) fields.push({ l: ft.kind === 'lives' ? t('play.chron.lives') : t('play.chron.revives'), v: num(ft.lives) + '/' + num(ft.maxLives), d: 1, n: 2 });
-        if (ft && ft.xpPercent !== null && fields.length) fields[fields.length - 1].pc = '(' + num(ft.xpPercent) + '%)';
+        if (ft.hp) fields.push({ l: t('play.hp'), v: pair(ft.hp), d: 0, n: 0 });
+        if (ft.potions) fields.push({ l: t('play.chron.potions'), v: pair(ft.potions), d: 0, n: 0 });
+        if (ft.gold !== undefined) fields.push({ l: t('play.chron.gold'), v: num(ft.gold), d: 0, n: 0 });
+        if (ft.st && ft.st[1] > 0) fields.push({ l: t('play.stamina'), v: pair(ft.st), d: 0, n: 1 });
+        if (ft.level !== undefined) fields.push({ l: t('play.chron.level'), v: num(ft.level), d: 1, n: 1 });
+        if (ft.xp !== undefined) fields.push({ l: t('play.chron.xp'), v: num(ft.xp), d: 1, n: 2 });
+        if (ft.lives) fields.push({ l: ft.lives.kind === 'lives' ? t('play.chron.lives') : t('play.chron.revives'), v: num(ft.lives.v) + '/' + num(ft.lives.max), d: 1, n: 2 });
+        if (ft.xpPercent !== null && ft.xpPercent !== undefined && fields.length) fields[fields.length - 1].pc = '(' + num(ft.xpPercent) + '%)';
         fields.forEach(function (x, i) {
             if (i) {
                 var p = fields[i - 1], bd = x.d !== p.d, bn = x.n !== p.n;
@@ -1917,15 +2075,16 @@
     }
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
-        state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = [];
+        state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = []; state.foot = {}; state.flog = [];
+        fightTail = -1;
         roomEnter = -1; clearMatched = 0; screenCleared();
         chronReset();
         renderCombat();
         renderVitals();
-        // A new connection starts as the first did: no panels until its own first GMCP frame.
+        // A new connection starts as the first did: the View button only, until its own first GMCP frame.
         setDrawer(null);
         panelsShown = false;
-        document.getElementById('rail').hidden = true;
+        panelButtons(false);
         fitTerminal();
         if (terminal) terminal.reset();
         connect();
@@ -1978,7 +2137,7 @@
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; },
         view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
-        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron
+        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf
     };
 
     populateLanguagePicker();
