@@ -466,9 +466,9 @@ public static class GmcpBridge
     }
 
     /// <summary>2.0: the packages only EmitWebClient sends, to the current session (phase 1: Client.Menu, Room.Detail;
-    /// phase 3a: Client.Enemies, Client.Footer, Client.Sheet, Client.Map).</summary>
+    /// phase 3a: Client.Enemies, Client.Footer, Client.Sheet, Client.Map; 1.3.9: Client.Waiting, sent by EmitWebWaiting).</summary>
     internal static readonly string[] WebClientPackages =
-        { "Client.Menu", "Room.Detail", "Client.Enemies", "Client.Footer", "Client.Sheet", "Client.Map" };
+        { "Client.Menu", "Room.Detail", "Client.Enemies", "Client.Footer", "Client.Sheet", "Client.Map", "Client.Waiting" };
 
     /// <summary>2.0: true for a package only EmitWebClient sends.</summary>
     internal static bool IsWebClientPackage(string? package) => package != null && Array.IndexOf(WebClientPackages, package) >= 0;
@@ -548,6 +548,51 @@ public static class GmcpBridge
         var ctx = SessionContext.Current;
         if (ctx == null || !ctx.WebClient) return;
         TryWriteFrame(ctx, package, payload, ctx.Username);
+    }
+
+    /// <summary>
+    /// 1.3.9: Client.Waiting, an empty frame that tells the web page the game is reading input now, in any language.
+    /// Sent once at the start of each stream read to the session that owns <paramref name="reading"/>: a grouped
+    /// follower's terminal read on the leader's session reaches the follower, written under that terminal's writer
+    /// lock as EmitVitalsToFollower does. Web client sessions only; the frame goes straight to the owner's stream, so
+    /// a spectator (mirrored from the terminal's text) never gets it.
+    /// </summary>
+    public static void EmitWebWaiting(TerminalEmulator reading) => EmitWebWaiting(reading, OwnerOfTerminal);   // the result only matters to a poll
+
+    /// <summary>
+    /// 1.3.9: Client.Waiting {"poll": true}, for a poll that throws away the key it catches (the auto-combat stop key,
+    /// the story skip), so the page knows that key is not typed on a line. Same owner and lock rule as a read.
+    /// </summary>
+    /// <returns>True when the frame was sent (a web client session owns the terminal).</returns>
+    public static bool EmitWebPollWaiting(TerminalEmulator polling) => EmitWebWaiting(polling, OwnerOfTerminal, poll: true);
+
+    private static SessionContext? OwnerOfTerminal(TerminalEmulator reading)
+    {
+        var sessions = MudServer.Instance?.ActiveSessions;
+        if (sessions == null) return null;
+        foreach (var kv in sessions)
+        {
+            var ctx = kv.Value.Context;
+            if (ctx != null && ReferenceEquals(ctx.Terminal, reading)) return ctx;
+        }
+        return null;
+    }
+
+    internal static bool EmitWebWaiting(TerminalEmulator reading, Func<TerminalEmulator, SessionContext?> resolve, bool poll = false)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null || (ctx.Terminal != null && !ReferenceEquals(ctx.Terminal, reading)))
+        {
+            try { ctx = resolve(reading); }
+            catch { return false; }
+            // A new login under the same name has its own terminal; this terminal is not its.
+            if (ctx == null || !ReferenceEquals(ctx.Terminal, reading)) return false;
+        }
+        if (!ctx.WebClient) return false;
+        var owner = ctx;
+        object? payload = poll ? new { poll = true } : null;   // a line read sends the empty frame
+        reading.RunUnderWriterLock(() => TryWriteFrame(owner, "Client.Waiting", payload, owner.Username));
+        return true;
     }
 
     /// <summary>

@@ -106,10 +106,10 @@ public class HighFindingsRound2139Tests
     {
         var text = await PvpPrompts(Hero(), 400);
         var menuKeys = BracketKeys(text.Substring(0, text.IndexOf('╚'))).ToHashSet();   // the first menu drawn
-        menuKeys.Should().Contain("H").And.Contain("I").And.NotContain("AUTO", "the PvP menu: H heals, I disarms, no AUTO");
+        menuKeys.Should().Contain("H").And.Contain("I").And.NotContain("O", "the PvP menu: H heals, I disarms, no Auto-Combat");
         text.Should().Contain(HintSystem.WordWrap(Loc.Get("combat.tip_healing_potions", "H"), 77)[0], "the potion tip names the PvP menu's Heal key");
         text.Should().NotContain(HintSystem.WordWrap(Loc.Get("combat.tip_healing_potions", "I"), 77)[0], "I is Disarm under this menu");
-        text.Should().NotContain(Loc.Get("combat.tip_auto"), "the AUTO tip names a key this menu does not list");
+        text.Should().NotContain(Loc.Get("combat.tip_auto"), "the Auto-Combat tip names a key this menu does not list");
         var tipPrefix = Loc.Get("combat.tip_spd").Split(':')[0] + ":";
         foreach (var line in text.Split('\n').Where(l => l.TrimStart().StartsWith(tipPrefix)))
             BracketKeys(line).Except(menuKeys).Should().BeEmpty("'{0}'", line);

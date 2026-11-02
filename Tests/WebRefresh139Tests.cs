@@ -187,12 +187,12 @@ public class WebRefresh139Tests
     }
 
     [Fact]
-    public async Task ASessionWithNoCharacterInPlay_SendsNothing()
+    public async Task ASessionWithNoCharacterInPlay_SendsNoFooterValues()
     {
         var hero = Hero();
         using var s = new Scope("web", hero, engine: false);
         var t = s.Term(Lines(1));
         await t.GetInput("> ");
-        WebFlagOff200Tests.Packages(s.Bytes(t)).Should().BeEmpty("before a character is loaded there is no footer to fill");
+        WebFlagOff200Tests.Packages(s.Bytes(t)).Should().Equal(new[] { "Client.Waiting" }, "before a character is loaded there is no footer to fill; the read itself is still announced");
     }
 }
