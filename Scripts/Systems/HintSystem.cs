@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UsurperRemake.Systems
 {
@@ -64,26 +65,40 @@ namespace UsurperRemake.Systems
         };
 
         /// <summary>
-        /// Get a class-specific first combat tip for the player, localized.
+        /// 1.3.9 (play test B4): the quickbar entries each class's first battle tip names, in the order its text names
+        /// them. The tip takes each entry's key from the quickbar the combat menu shows, so it never names a slot the
+        /// entry is not in (a Paladin's bar is [1] Power Strike, [2] Lay on Hands, while the tip used to say the reverse).
         /// </summary>
-        public static string GetClassCombatTip(CharacterClass playerClass)
+        internal static readonly Dictionary<CharacterClass, (string LocKey, string[] SlotIds)> ClassCombatTips = new()
         {
-            string key = playerClass switch
+            [CharacterClass.Magician] = ("hint.class_combat.magician", new[] { "spell:1" }),
+            [CharacterClass.Cleric] = ("hint.class_combat.cleric", new[] { "spell:1" }),
+            [CharacterClass.Sage] = ("hint.class_combat.sage", new[] { "spell:1" }),
+            [CharacterClass.Warrior] = ("hint.class_combat.warrior", new[] { "power_strike" }),
+            [CharacterClass.Barbarian] = ("hint.class_combat.barbarian", new[] { "power_strike" }),
+            [CharacterClass.Paladin] = ("hint.class_combat.paladin", new[] { "lay_on_hands", "power_strike" }),
+            [CharacterClass.Assassin] = ("hint.class_combat.assassin", new[] { "backstab" }),
+            [CharacterClass.Ranger] = ("hint.class_combat.ranger", new[] { "precise_shot" }),
+            [CharacterClass.Jester] = ("hint.class_combat.jester", new[] { "mock" }),
+            [CharacterClass.Bard] = ("hint.class_combat.bard", new[] { "mock" }),
+            [CharacterClass.Alchemist] = ("hint.class_combat.alchemist", new[] { "throw_bomb" }),
+        };
+
+        /// <summary>
+        /// 1.3.9 (play test B4): a class's first battle tip, localized, with the keys of the menu shown.
+        /// <paramref name="quickbarKeyOf"/> gives the key the combat menu shows for a quickbar entry, or null when the
+        /// entry is not on the bar. When an entry the tip names is not on the bar, the tip names no quickbar key:
+        /// the general tip if the bar holds anything, else the attack tip alone.
+        /// </summary>
+        public static string GetClassCombatTip(CharacterClass playerClass, Func<string, string?> quickbarKeyOf, bool hasQuickbar)
+        {
+            if (ClassCombatTips.TryGetValue(playerClass, out var tip))
             {
-                CharacterClass.Magician => "hint.class_combat.magician",
-                CharacterClass.Cleric => "hint.class_combat.cleric",
-                CharacterClass.Sage => "hint.class_combat.sage",
-                CharacterClass.Warrior => "hint.class_combat.warrior",
-                CharacterClass.Barbarian => "hint.class_combat.barbarian",
-                CharacterClass.Paladin => "hint.class_combat.paladin",
-                CharacterClass.Assassin => "hint.class_combat.assassin",
-                CharacterClass.Ranger => "hint.class_combat.ranger",
-                CharacterClass.Jester => "hint.class_combat.jester",
-                CharacterClass.Bard => "hint.class_combat.bard",
-                CharacterClass.Alchemist => "hint.class_combat.alchemist",
-                _ => "hint.class_combat.default"
-            };
-            return Loc.Get(key);
+                var keys = tip.SlotIds.Select(quickbarKeyOf).ToArray();
+                if (keys.All(k => !string.IsNullOrEmpty(k)))
+                    return Loc.Get(tip.LocKey, keys.Cast<object>().ToArray());
+            }
+            return Loc.Get(hasQuickbar ? "hint.class_combat.default" : "hint.class_combat.attack_only");
         }
 
         /// <summary>
@@ -94,13 +109,21 @@ namespace UsurperRemake.Systems
             => ShowOnce(hintId, terminal, shownHints, null, msgArgs);
 
         /// <summary>
+        /// 1.3.9: the same, with the message read from <paramref name="msgKey"/> in place of hint.&lt;id&gt;.msg, for a
+        /// hint whose text depends on the screen it describes (the first combat tip names [I] only where the combat
+        /// menu shows it).
+        /// </summary>
+        public bool TryShowHintWithMessage(string hintId, string msgKey, TerminalEmulator terminal, HashSet<string>? shownHints)
+            => ShowOnce(hintId, terminal, shownHints, null, Array.Empty<object>(), msgKey);
+
+        /// <summary>
         /// 2.0: the same, for a player: a hint whose text names Main Street keys is shown with the keys of the
         /// player's layout (MainStreetLocation.StreetTextKey). A null player shows nothing, as a null set does.
         /// </summary>
         public bool TryShowHint(string hintId, TerminalEmulator terminal, Character? player, params object[] msgArgs)
             => player != null && ShowOnce(hintId, terminal, player.HintsShown, player, msgArgs);
 
-        private bool ShowOnce(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints, Character? player, object[] msgArgs)
+        private bool ShowOnce(string hintId, TerminalEmulator terminal, HashSet<string>? shownHints, Character? player, object[] msgArgs, string? msgKey = null)
         {
             if (shownHints == null)
                 return false;
@@ -115,7 +138,7 @@ namespace UsurperRemake.Systems
             shownHints.Add(hintId);
 
             // Display the hint
-            ShowHintBox(hintId, hint, terminal, msgArgs, player);
+            ShowHintBox(hintId, hint, terminal, msgArgs, player, msgKey);
             return true;
         }
 
@@ -142,12 +165,12 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display a hint in a nice box format
         /// </summary>
-        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal, object[]? msgArgs = null, Character? player = null)
+        private void ShowHintBox(string hintId, HintDefinition hint, TerminalEmulator terminal, object[]? msgArgs = null, Character? player = null, string? msgKeyOverride = null)
         {
             // Resolve localized title/message from keys derived from the hint ID.
             string title = Loc.Get($"hint.{hintId}.title");
             // 2.0: a message that names Main Street keys follows the player's layout (classic without a player)
-            string msgKey = MainStreetLocation.StreetTextKey($"hint.{hintId}.msg", player);
+            string msgKey = msgKeyOverride ?? MainStreetLocation.StreetTextKey($"hint.{hintId}.msg", player);
             string message = msgArgs != null && msgArgs.Length > 0
                 ? Loc.Get(msgKey, msgArgs)
                 : Loc.Get(msgKey);
@@ -194,7 +217,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Word wrap text to fit within a maximum width
         /// </summary>
-        private List<string> WordWrap(string text, int maxWidth)
+        internal static List<string> WordWrap(string text, int maxWidth)   // 1.3.9: static, the combat tips wrap with it too
         {
             var lines = new List<string>();
             var words = text.Split(' ');

@@ -437,6 +437,29 @@ public partial class CombatEngine
     /// <summary>
     /// Show a combat tip occasionally to help players learn tactics
     /// </summary>
+    /// <summary>
+    /// 1.3.9 (play test B4): the first combat tip's message key. It names [A] Attack, [R] Retreat and [I] for a
+    /// potion; the standard and screen reader menus always list I, the compact (door) menu only while a potion is
+    /// held, so without one there it names A and R alone.
+    /// </summary>
+    internal static string FirstCombatHintKey(Character player)
+    {
+        bool compactMenu = DoorMode.IsInDoorMode || GameConfig.CompactMode;
+        bool itemShown = !compactMenu || player.Healing > 0 || player.ManaPotions > 0;
+        return itemShown ? "hint.first_combat.msg" : "hint.first_combat.msg_no_item";
+    }
+
+    /// <summary>
+    /// 1.3.9 (play test B4): the class's first battle tip, with each ability's key taken from the quickbar the
+    /// combat menu shows (GetQuickbarActions, the rows of every menu form), not a fixed slot number.
+    /// </summary>
+    internal string FirstBattleTip(Character player)
+    {
+        var bar = GetQuickbarActions(player);
+        return HintSystem.GetClassCombatTip(player.Class,
+            slotId => bar.Where(a => a.slotId == slotId).Select(a => a.key).FirstOrDefault(), bar.Count > 0);
+    }
+
     private void ShowCombatTipIfNeeded(Character player)
     {
         // Show tip every 5th combat round, less often if player has Fast/Instant speed
@@ -459,7 +482,8 @@ public partial class CombatEngine
                 tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w)\]", "$1");
             }
             terminal.SetColor(ColorRole.Notice);
-            terminal.WriteLine($"  {tip}");
+            foreach (var line in HintSystem.WordWrap(tip, 77))   // 1.3.9: within 79 columns in every language
+                terminal.WriteLine($"  {line}");
             terminal.WriteLine("");
         }
     }
@@ -1419,8 +1443,8 @@ public partial class CombatEngine
         // 1.2.0 Temple gods piece 2: Discordia's boon, a chance each foe's first action fails, per roller
         RollDiscordiaFirstActionFail(player, monsters, result.Teammates);
 
-        // Show first combat hint for new players
-        HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
+        // Show first combat hint for new players (1.3.9: naming only keys the combat menu shows)
+        HintSystem.Instance.TryShowHintWithMessage(HintSystem.HINT_FIRST_COMBAT, FirstCombatHintKey(player), terminal, player.HintsShown);
 
         await Pacing.Wait(GetCombatDelay(2000));
 
@@ -15076,7 +15100,7 @@ public partial class CombatEngine
             if (player.MKills == 0 && player.HintsShown != null && !player.HintsShown.Contains(HintSystem.HINT_FIRST_COMBAT_CLASS))
             {
                 player.HintsShown.Add(HintSystem.HINT_FIRST_COMBAT_CLASS);
-                var classTip = HintSystem.GetClassCombatTip(player.Class);
+                var classTip = FirstBattleTip(player);
                 terminal.WriteLine("");
                 if (!GameConfig.ScreenReaderMode)
                 {
@@ -15085,7 +15109,8 @@ public partial class CombatEngine
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"│ {Loc.Get("combat.first_battle_tip")}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"│ {classTip}");
+                    foreach (var line in HintSystem.WordWrap(classTip, 75))   // 1.3.9: wrapped as the hint box wraps
+                        terminal.WriteLine($"│ {line}");
                     terminal.SetColor("gray");
                     terminal.WriteLine("└────────────────────────────────────────────────────────────────────────────┘");
                 }
@@ -15094,7 +15119,8 @@ public partial class CombatEngine
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("combat.first_battle_tip"));
                     terminal.SetColor("white");
-                    terminal.WriteLine(classTip);
+                    foreach (var line in HintSystem.WordWrap(classTip, 77))
+                        terminal.WriteLine(line);
                 }
                 terminal.WriteLine("");
             }

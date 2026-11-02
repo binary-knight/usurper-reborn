@@ -131,8 +131,7 @@
 
 [90m[90m┌─── TIP ────────────────────────────────────────────────────────────────────┐
 [0m[96m[96m│ Combat Tip
-[0m[37m[37m│ Press [A] to Attack, [R] to Retreat, [H] to use a Healing Potion, or [S] to
-[0m[37m│ check your Status.
+[0m[37m[37m│ Press [A] to Attack, [R] to Retreat, or [I] to use a Healing Potion.
 [0m[90m[90m└────────────────────────────────────────────────────────────────────────────┘
 [0m
 [2J[H[96m[96m══════════════════════ COMBAT - Round 1 ══════════════════════

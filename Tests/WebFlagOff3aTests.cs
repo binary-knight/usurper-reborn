@@ -24,7 +24,9 @@ namespace UsurperReborn.Tests;
 ///
 /// The expected bytes in Tests/Fixtures/web200p3 were written by this same test against the Scripts tree of origin/main
 /// at a6a8a85e (a copy of the branch's first commit, 8cee362b, which changes nothing under Scripts), with
-/// USURPER_WEB3A_CAPTURE set to the fixture folder. The test reads only methods that existed there, by reflection. A byte match says the old code and the new
+/// USURPER_WEB3A_CAPTURE set to the fixture folder. The test reads only methods that existed there, by reflection. 1.3.9 re-captured them on the branch fix/high-findings-game after its
+/// first commit (the web prompt refresh, 02eaa8c4) passed against the old bytes; the one difference is the first combat tip's text (it names [A], [R] and
+/// [I] now, play test B4), the same line in every session. A byte match says the old code and the new
 /// code wrote the same terminal text and the same GMCP frames for these sessions, and no new package appeared. The
 /// second test says the same without the fixtures: none of the new packages in any stream.
 /// </summary>
