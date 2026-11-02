@@ -57,6 +57,24 @@ public class StreetEncounterSystem
     internal static void BeginEncounter(TerminalEmulator terminal) => terminal.FlushPendingInput(alsoReaderBuffer: true);
 
     /// <summary>
+    /// 1.3.10 (play test G1): an encounter's one-key prompt that asks again on a key it does not offer, instead of reading
+    /// it as the hostile choice (an invalid key started the fight). Reads one key as before (GetKeyInput). After
+    /// TerminalEmulator.MaxInvalidChoiceAttempts invalid keys, or when the connection is gone, returns the fallback (the
+    /// encounter's old answer to junk), so a dead peer cannot spin here.
+    /// </summary>
+    internal static async Task<string> ReadEncounterKey(TerminalEmulator terminal, IReadOnlyList<string> keys, string fallback)
+    {
+        for (int attempt = 0; attempt < TerminalEmulator.MaxInvalidChoiceAttempts; attempt++)
+        {
+            string key = (await terminal.GetKeyInput()).Trim().ToUpperInvariant();
+            if (keys.Contains(key)) return key;
+            if (UsurperRemake.BBS.DoorMode.IsDisconnected) break;
+            terminal.WriteLine(Loc.Get("ui.invalid_choice_choose", string.Join(", ", keys)), "red");
+        }
+        return fallback;
+    }
+
+    /// <summary>
     /// Types of street encounters
     /// </summary>
     public enum EncounterType
@@ -321,7 +339,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.hostile.opt_talk")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+        string choice = await ReadEncounterKey(terminal, new[] { "F", "R", "B", "T" }, "F");   // 1.3.10 (G1): a typo asks again
 
         switch (choice)
         {
@@ -617,9 +635,9 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.mugging.opt_run")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
+        // 1.3.10 (G1): a typo asks again; after three, or with the connection gone, it is the fight (you can't ignore thugs)
+        string choice = await ReadEncounterKey(terminal, new[] { "F", "S", "R" }, "F");
 
-        // Invalid input defaults to fight — you can't ignore thugs
         if (choice != "S" && choice != "R")
         {
             terminal.SetColor("red");
@@ -2875,7 +2893,8 @@ public class StreetEncounterSystem
         UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "bright_red", "bright_yellow", "white");
         UIHelper.DrawBoxBottom(terminal, "bright_red");
 
-        var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
+        // 1.3.10 (G1): a typo asks again instead of starting the fight; the fight stays the answer after three
+        var choice = await terminal.GetValidChoice(Loc.Get("street_encounter.grudge.your_response"), new[] { "D", "A", "T", "F" }, "F");
 
         switch (choice.ToUpper())
         {

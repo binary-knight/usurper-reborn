@@ -635,7 +635,7 @@ public class InvalidChoice1113Tests
     [Fact]
     public async Task Chest_ATypo_AsksAgain_AndTheEventIsSpentByTheChoice()
     {
-        var (d, term, output, _) = Dungeon(new LowRandom(), "x", "L");
+        var (d, term, output, _) = Dungeon(new LowRandom(), "x", "L", "");   // 1.3.10: Enter after the result
         var room = new DungeonRoom { Id = "r1", HasEvent = true, EventType = DungeonEventType.TreasureChest };
         await Run(d, "HandleRoomEvent", room);
         string shown = Plain(term, output);
@@ -658,7 +658,7 @@ public class InvalidChoice1113Tests
     public async Task Chest_Search_FindsAndDisarmsATrap()
     {
         // chest roll 7 = trapped; search roll 0 = found
-        var (d, term, output, hero) = Dungeon(new ScriptRandom(7, 0), "S", "L");
+        var (d, term, output, hero) = Dungeon(new ScriptRandom(7, 0), "S", "L", "");
         await Run(d, "TreasureChestEncounter");
         string shown = Plain(term, output);
         shown.Should().Contain(Loc.Get("dungeon.chest_search_disarmed"));
@@ -694,7 +694,7 @@ public class InvalidChoice1113Tests
     [Fact]
     public async Task Shrine_ATypo_AsksAgain()
     {
-        var (d, term, output, _) = Dungeon(new LowRandom(), "q", "L");
+        var (d, term, output, _) = Dungeon(new LowRandom(), "q", "L", "");
         await Run(d, "MysteriousShrine");
         string shown = Plain(term, output);
         shown.Should().Contain(Loc.Get("ui.invalid_choice_choose", "P, D, L"));
@@ -704,11 +704,11 @@ public class InvalidChoice1113Tests
     [Fact]
     public async Task Strangers_And_Damsel_ATypo_AsksAgain()
     {
-        var (d, term, output, hero) = Dungeon(new LowRandom(), "z", "E");
+        var (d, term, output, hero) = Dungeon(new LowRandom(), "z", "E", "");
         await Run(d, "StrangersEncounter");
         Plain(term, output).Should().Contain(Loc.Get("ui.invalid_choice_choose", "F, P, E"));
 
-        var (d2, term2, output2, _) = Dungeon(new LowRandom(), "z", "I");
+        var (d2, term2, output2, _) = Dungeon(new LowRandom(), "z", "I", "");
         await Run(d2, "HarassedWomanEncounter");
         string shown = Plain(term2, output2);
         shown.Should().Contain(Loc.Get("ui.invalid_choice_choose", "H, I, J"));

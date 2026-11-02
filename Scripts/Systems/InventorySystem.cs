@@ -636,14 +636,45 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
         }
 
+        /// <summary>1.3.10 (play test N7): the slot name keys, for the width of the slot name column.</summary>
+        private static readonly string[] SlotNameKeys =
+        {
+            "inventory.slot_main_hand", "inventory.slot_off_hand", "inventory.slot_head", "inventory.slot_body", "inventory.slot_arms",
+            "inventory.slot_hands", "inventory.slot_legs", "inventory.slot_feet", "inventory.slot_waist", "inventory.slot_face",
+            "inventory.slot_cloak", "inventory.slot_neck", "inventory.slot_left_ring", "inventory.slot_right_ring",
+        };
+
+        /// <summary>
+        /// 1.3.10 (play test N7): a slot row is "[key] Slot: Item", the slot name right-aligned so the colons line up and a
+        /// single space on each side of the colon, so what follows the key reads as the slot and the item in it (the web
+        /// client takes the text after a key up to the first double space; "Main Hand   : Short Sword" gave "Main Hand").
+        /// </summary>
+        internal static string SlotRowHead(string key, string slotName) =>
+            $"  [{key}] {slotName.PadLeft(SlotNameKeys.Max(k => Loc.Get(k).Length))}: ";
+
+        /// <summary>
+        /// 1.3.10 (play test B15): the attack a new weapon is compared against, and the off-hand item equipping it takes
+        /// off. A two-handed weapon replaces both hands: the main hand's attack plus the off-hand weapon's (a shield adds
+        /// none but still comes off). Any other weapon is compared against the item it replaces alone.
+        /// </summary>
+        internal static (int CurrentPower, Equipment? OffHandRemoved) WeaponComparison(Character player, Equipment? replaced, bool newIsTwoHanded)
+        {
+            int power = replaced?.WeaponPower ?? 0;
+            var off = newIsTwoHanded ? player.GetEquipment(EquipmentSlot.OffHand) : null;
+            if (off == null || ReferenceEquals(off, replaced)) return (power, null);
+            return (power + off.WeaponPower, off);
+        }
+
         private void DisplaySlot(string slotName, EquipmentSlot slot, string key)
         {
             var item = player.GetEquipment(slot);
 
+            string head = SlotRowHead(key, slotName);
+            int keyEnd = head.IndexOf(']') + 1;
             terminal.SetColor("gray");
-            terminal.Write($"  [{key}] ");
+            terminal.Write(head.Substring(0, keyEnd));
             terminal.SetColor("white");
-            terminal.Write($"{slotName,-12}: ");
+            terminal.Write(head.Substring(keyEnd));
 
             if (item != null)
             {
@@ -1160,7 +1191,10 @@ namespace UsurperRemake.Systems
                 // Compare primary stat
                 if (item.Type == ObjType.Weapon)
                 {
-                    int currentPower = currentEquip.WeaponPower;
+                    // 1.3.10 (play test B15): a two-hander is compared against the main hand plus the off-hand weapon,
+                    // and the off-hand it takes off is named
+                    var (currentPower, offHandRemoved) = WeaponComparison(player, currentEquip,
+                        compareSlot == EquipmentSlot.MainHand && equipment.Handedness == WeaponHandedness.TwoHanded);
                     int newPower = equipment.WeaponPower;
                     int diff = newPower - currentPower;
                     terminal.SetColor("white");
@@ -1168,6 +1202,11 @@ namespace UsurperRemake.Systems
                     if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine(Loc.Get("combat.upgrade", diff)); }
                     else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine(Loc.Get("combat.downgrade", diff)); }
                     else { terminal.SetColor("yellow"); terminal.WriteLine(Loc.Get("combat.same")); }
+                    if (offHandRemoved != null)
+                    {
+                        terminal.SetColor("yellow");
+                        UIHelper.WriteRow(terminal, Loc.Get("inventory.offhand_comes_off", ItemNames.Display(offHandRemoved), offHandRemoved.WeaponPower));
+                    }
                 }
                 else if (item.Type == ObjType.Fingers || item.Type == ObjType.Neck ||
                          (item.Type == ObjType.Magic && ((int)item.MagicType == 5 || (int)item.MagicType == 10)))
