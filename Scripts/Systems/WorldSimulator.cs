@@ -2432,12 +2432,16 @@ public class WorldSimulator
     /// added to each relative's Enemies list. Surfaces downstream as the
     /// relative refusing to talk to / join the killer's team, attacking on
     /// sight when alignment is dark. Sparse + idempotent.
+    /// 1.3.10: static, and also called on a player kill (street murder, death spell, execution) with the
+    /// player's Name2 as killer, whether or not the death is permanent: only the grudge, never the permadeath
+    /// cascade (spouse notice, bereavement, orphans), which stays inside MarkNPCDead's permadeath branch.
     /// </summary>
-    private void RecordFamilyDeath(NPC deceased, string killerName)
+    internal static void RecordFamilyDeath(NPC deceased, string killerName)
     {
         try
         {
             if (deceased == null) return;
+            var npcs = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
 
             // Walk all NPCs once and classify by relation to the deceased.
             string deceasedName = deceased.Name2 ?? deceased.Name1 ?? deceased.Name;

@@ -4164,6 +4164,7 @@ public partial class MagicShopLocation : BaseLocation
             targetNPC.IsDead = true;
             // targetNPC.IsPermaDead = true;  // Disabled — NPCs now respawn after death
             targetNPC.HP = 0;
+            WorldSimulator.RecordFamilyDeath(targetNPC, player.Name2);   // 1.3.10: the victim's kin remember
 
             // Blood price for dark magic kill
             WorldSimulator.ApplyBloodPrice(player, targetNPC, GameConfig.MurderWeightPerDarkMagicKill, isDeliberate: true);

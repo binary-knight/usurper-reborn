@@ -1763,6 +1763,7 @@ public class CastleLocation : BaseLocation
                 // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
                 npc.DaysInPrison = 0;
                 npc.HP = 0;
+                WorldSimulator.RecordFamilyDeath(npc, currentPlayer.Name2);   // 1.3.10: the executed NPC's kin remember
             }
 
             // Release player from prison (execution just frees them with a penalty)
