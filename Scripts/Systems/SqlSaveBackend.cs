@@ -3290,21 +3290,21 @@ namespace UsurperRemake.Systems
         {
             try
             {
-                using var conn = new SqliteConnection(connectionString);
-                await conn.OpenAsync();
+                // v1.3.10: OpenConnection registers ulower, so a stored case can never orphan a live row
+                using var conn = OpenConnection();
 
                 // sleeping_players, online_players, combat_events keyed on username/player_name
                 string[] orphanQueries = new[]
                 {
-                    "DELETE FROM sleeping_players WHERE username NOT IN (SELECT username FROM players)",
-                    "DELETE FROM online_players WHERE username NOT IN (SELECT username FROM players)",
-                    "DELETE FROM combat_events WHERE player_name NOT IN (SELECT username FROM players) AND player_name NOT IN (SELECT display_name FROM players)",
+                    "DELETE FROM sleeping_players WHERE ulower(username) NOT IN (SELECT ulower(username) FROM players)",
+                    "DELETE FROM online_players WHERE ulower(username) NOT IN (SELECT ulower(username) FROM players)",
+                    "DELETE FROM combat_events WHERE ulower(player_name) NOT IN (SELECT ulower(username) FROM players) AND ulower(player_name) NOT IN (SELECT ulower(display_name) FROM players)",
                     // v0.65.0 (save-state-review F1): reap pending wire transfers + inheritance
                     // whose recipient permadied/was deleted before delivery. The gold was already
                     // a sink (sender paid, recipient gone); this just stops dead rows accumulating.
                     // Both columns are stored lowercase, matching players.username (also lowercase).
-                    "DELETE FROM pending_gold_transfers WHERE recipient_username NOT IN (SELECT username FROM players)",
-                    "DELETE FROM pending_inheritance WHERE player_username NOT IN (SELECT username FROM players)",
+                    "DELETE FROM pending_gold_transfers WHERE ulower(recipient_username) NOT IN (SELECT ulower(username) FROM players)",
+                    "DELETE FROM pending_inheritance WHERE ulower(player_username) NOT IN (SELECT ulower(username) FROM players)",
                 };
 
                 foreach (var sql in orphanQueries)
@@ -6488,9 +6488,9 @@ namespace UsurperRemake.Systems
             {
                 cmd.CommandText = @"
                     SELECT t.team_name, t.created_by,
-                           (SELECT COUNT(*) FROM pending_inheritance pi WHERE pi.player_username = t.created_by)
+                           (SELECT COUNT(*) FROM pending_inheritance pi WHERE ulower(pi.player_username) = ulower(t.created_by))
                     FROM player_teams t
-                    WHERE t.created_by NOT IN (SELECT username FROM players)
+                    WHERE ulower(t.created_by) NOT IN (SELECT ulower(username) FROM players)
                     ORDER BY t.team_name;";
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())

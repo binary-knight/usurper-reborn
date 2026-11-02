@@ -1965,7 +1965,8 @@ function build(options = {}) {
       if (
         !(
           source === "README.md" ||
-          /^(Scripts|DOCS|web)\/[\w./-]+\.(cs|md|js)$/.test(source)
+          /^(Scripts|DOCS|web)\/[\w./-]+\.(cs|md|js)$/.test(source) ||
+          /^web\/[\w./-]+\.html$/.test(source)
         ) ||
         source.includes("..") ||
         !fs.existsSync(path.join(root, source))

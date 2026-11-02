@@ -15,7 +15,7 @@ history: 1.2.5 | Watchtower scout reports name monsters in the player's language
 history: 1.2.4 | none
 history: 1.2.3 | The settlement workshop, the watchtower scout report and settlement news are translated into all five languages, and long scout report rows wrap.
 ---
-The Settlement on Castle Grounds leads to the Outskirts, an NPC-built community beyond the city gates. It is not one of the safe [outposts](/wiki/en/world/dungeon/#dungeon-outposts) found inside the dungeon. The numbers below are per step of the world simulation, the same steps in which NPCs act.
+The Outskirts is an NPC-built community beyond the city gates. With the classic Main Street, which is the default, press > for the Outskirts. With the district layout, open the Castle Grounds district with C, then press E for the Settlement. It is not one of the safe [outposts](/wiki/en/world/dungeon/#dungeon-outposts) found inside the dungeon. The numbers below are per step of the world simulation, the same steps in which NPCs act.
 
 ## When the Outskirts appears
 
