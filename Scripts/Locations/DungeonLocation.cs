@@ -5708,9 +5708,7 @@ public class DungeonLocation : BaseLocation
             {
                 var boss = MonsterGenerator.GenerateMonster(effectiveMonsterLevel, isBoss: true, random: dungeonRandom);
                 boss.Name = GetBossName(currentFloor.Theme);
-                boss.Phrase = GetBossPhrase(currentFloor.Theme);
-                var bossTheme = currentFloor.Theme;
-                boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);
+                GiveFloorBossPhrase(boss, currentFloor.Theme);
                 if (monsters.Count == 0)
                     monsters.Add(boss);
                 else
@@ -5894,6 +5892,19 @@ public class DungeonLocation : BaseLocation
             return names[index];
         }
         return "Dungeon Boss";
+    }
+
+    /// <summary>
+    /// The floor boss's spoken line for the theme, in the reader's language. 1.3.10 (B16): the boss speaks it, so the
+    /// fight opens with "Tomb Sentinel says: ..." and not "Tomb Sentinel The dead do not rest here..." (a monster that
+    /// cannot speak has its phrase printed after its name as an action).
+    /// </summary>
+    internal static void GiveFloorBossPhrase(Monster boss, DungeonTheme theme)
+    {
+        boss.Phrase = GetBossPhrase(theme);
+        boss.CanSpeak = true;
+        var bossTheme = theme;
+        boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);
     }
 
     private static string GetBossPhrase(DungeonTheme theme)

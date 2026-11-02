@@ -31,6 +31,27 @@ public class Combat1310Tests
         catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
     }
 
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !(Directory.Exists(Path.Combine(dir.FullName, "Scripts")) && Directory.Exists(Path.Combine(dir.FullName, "Localization"))))
+            dir = dir.Parent;
+        dir.Should().NotBeNull("the test must run inside the repository");
+        return dir!.FullName;
+    }
+
+    private static string Source(string file) => File.ReadAllText(Path.Combine(RepoRoot(), file));
+
+    /// <summary>Runs <paramref name="body"/> with the game language set, and puts the language back.</summary>
+    private static void InLang(string lang, Action body)
+    {
+        var saved = GameConfig.Language;
+        try { GameConfig.Language = lang; body(); }
+        finally { GameConfig.Language = saved; }
+    }
+
+    public static readonly TheoryData<string> Langs = new() { "en", "es", "fr", "hu", "it" };
+
     // ------------------------------------------------------------------ B12: the enemy rank on Char.Combat.Enemies
 
     [Fact]
@@ -109,5 +130,48 @@ public class Combat1310Tests
         prisoner.CurrentCombatStamina = prisoner.MaxCombatStamina - 3;
         typeof(PrisonActivitySystem).GetMethod("PerformShadowBoxing", F)!.Invoke(PrisonActivitySystem.Instance, new object[] { prisoner });
         prisoner.CurrentCombatStamina.Should().Be(prisoner.MaxCombatStamina, "shadow boxing stops at the maximum, not at 100");
+    }
+    // ------------------------------------------------------------------ B16: two combat text slips
+
+    [Theory]
+    [MemberData(nameof(Langs))]
+    public void FloorBoss_SpeaksItsPhrase_WithAVerb(string lang)
+    {
+        InLang(lang, () =>
+        {
+            foreach (var theme in new[] { DungeonTheme.Catacombs, DungeonTheme.Sewers, DungeonTheme.AbyssalVoid })
+            {
+                var boss = new Monster { Name = "Tomb Sentinel", Level = 5, HP = 100, MaxHP = 100, IsBoss = true, CanSpeak = false };
+                DungeonLocation.GiveFloorBossPhrase(boss, theme);
+                string text = string.Join(" ", CombatEngine.MonsterSaysRows(boss, boss.Phrase, ""));
+                text.Should().Be(Loc.Get("combat.monster_says", MonsterNames.TheName(boss), boss.Phrase), "{0} {1}: the boss says its line", lang, theme);
+                boss.PhraseInLanguage!().Should().Be(boss.Phrase);
+            }
+        });
+    }
+
+    private static readonly string[] GrazeKeys = { "combat.msg.monster.graze.0", "combat.msg.monster.graze.1", "combat.msg.monster.graze.2" };
+
+    [Theory]
+    [MemberData(nameof(Langs))]
+    public void MonsterCritical_IsNeverFollowedByAGrazeLine(string lang)
+    {
+        InLang(lang, () =>
+        {
+            var grazes = GrazeKeys.Select(k => Loc.Get(k, "red", "Wolf")).ToList();
+            var rng = new Random(1310);
+            for (int i = 0; i < 60; i++)
+            {
+                string crit = CombatMessages.GetMonsterAttackMessage("Wolf", "red", 3, 1000, rng, critical: true);
+                grazes.Should().NotContain(crit, "a critical hit does not barely touch you");
+            }
+            // a plain weak hit still grazes, and the seeded draw is one sample either way
+            var a = new Random(7); var b = new Random(7);
+            grazes.Should().Contain(CombatMessages.GetMonsterAttackMessage("Wolf", "red", 3, 1000, a));
+            CombatMessages.GetMonsterAttackMessage("Wolf", "red", 3, 1000, b, critical: true);
+            a.Next().Should().Be(b.Next(), "the critical floor draws no extra number");
+        });
+        Source("Scripts/Systems/CombatEngine.cs").Should().Contain("critical: monsterRoll.IsCriticalSuccess",
+            "the monster attack passes its critical roll to the flavour line");
     }
 }

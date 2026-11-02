@@ -5648,7 +5648,8 @@ public partial class CombatEngine
         }
 
         // Use colored combat message
-        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
+        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random,
+            critical: monsterRoll.IsCriticalSuccess);   // v1.1.14: the engine RNG; 1.3.10: no graze line after a critical
         foreach (var row in CombatMessages.Rows(attackMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
         // Check for shield block (20% chance to block, halves incoming damage)
