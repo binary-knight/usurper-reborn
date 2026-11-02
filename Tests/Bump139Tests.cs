@@ -110,7 +110,7 @@ public class Bump139Tests
         foreach (string n in next) At("r1.road_" + n + "_when").Should().Be(At("r1.road_" + n + "_d") + 1, n + " has its place in the order");
         foreach (string n in shipped) keys.Should().NotContain("r1.road_" + n + "_when", n + " is shipped");
         var en = WebLang("en");
-        string[] changed = { "r1.road_now_t", "r1.road_now_d", "r1.road_139_t", "r1.road_139_d" };
+        string[] changed = { "r1.road_now_t", "r1.road_now_d", "r1.road_20_d", "r1.road_139_t", "r1.road_139_d" };
         foreach (string lang in Languages)
         {
             var dict = WebLang(lang);
@@ -137,5 +137,7 @@ public class Bump139Tests
         en["r1.road_139_d"].Should().Be("Shipped: the play page with its Chronicle view, a book page layout with monster pictures, floor "
             + "scenes and a room map, single key menus on the web, the Observatory page of public world data and the classic Main Street "
             + "back as the default, with 31 changes in all.");
+        en["r1.road_20_d"].Should().Be("The Chronicle view on the play page grows into a full graphical client for the same living world, "
+            + "in the browser and in a desktop app on Steam, with book pages for the shops, the town and the screens that still show as text.");
     }
 }
