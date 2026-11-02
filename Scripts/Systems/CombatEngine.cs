@@ -3461,7 +3461,7 @@ public partial class CombatEngine
     /// </summary>
     internal async Task<bool> AutoCombatStopRequested(int delayMs)
     {
-        UsurperRemake.Server.GmcpBridge.EmitWebWaiting(terminal);
+        UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal);
         int elapsed = 0;
         while (elapsed < delayMs)
         {
@@ -15318,6 +15318,9 @@ public partial class CombatEngine
 
                 case "O":   // 1.3.9: the single key; AUTO typed out still works
                 case "AUTO":
+                    // 1.3.9: a key typed from here on stops auto-combat at its first poll (the connection holds it),
+                    // so a web client hears now, not when the first round has played out
+                    UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal);
                     // Enable auto-combat mode
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine("");

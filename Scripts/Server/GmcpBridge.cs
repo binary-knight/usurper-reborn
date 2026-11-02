@@ -559,6 +559,12 @@ public static class GmcpBridge
     /// </summary>
     public static void EmitWebWaiting(TerminalEmulator reading) => EmitWebWaiting(reading, OwnerOfTerminal);
 
+    /// <summary>
+    /// 1.3.9: Client.Waiting {"poll": true}, for a poll that throws away the key it catches (the auto-combat stop key,
+    /// the story skip), so the page knows that key is not typed on a line. Same owner and lock rule as a read.
+    /// </summary>
+    public static void EmitWebPollWaiting(TerminalEmulator polling) => EmitWebWaiting(polling, OwnerOfTerminal, poll: true);
+
     private static SessionContext? OwnerOfTerminal(TerminalEmulator reading)
     {
         var sessions = MudServer.Instance?.ActiveSessions;
@@ -571,7 +577,7 @@ public static class GmcpBridge
         return null;
     }
 
-    internal static void EmitWebWaiting(TerminalEmulator reading, Func<TerminalEmulator, SessionContext?> resolve)
+    internal static void EmitWebWaiting(TerminalEmulator reading, Func<TerminalEmulator, SessionContext?> resolve, bool poll = false)
     {
         var ctx = SessionContext.Current;
         if (ctx == null || (ctx.Terminal != null && !ReferenceEquals(ctx.Terminal, reading)))
@@ -583,7 +589,8 @@ public static class GmcpBridge
         }
         if (!ctx.WebClient) return;
         var owner = ctx;
-        reading.RunUnderWriterLock(() => TryWriteFrame(owner, "Client.Waiting", null, owner.Username));
+        object? payload = poll ? new { poll = true } : null;   // a line read sends the empty frame
+        reading.RunUnderWriterLock(() => TryWriteFrame(owner, "Client.Waiting", payload, owner.Username));
     }
 
     /// <summary>

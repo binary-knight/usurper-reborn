@@ -54,6 +54,11 @@ public class ClientWaiting139Tests
 
     private static int Waiting(byte[] bytes) => WebMenu200Tests.Frames(bytes).Count(f => f.Package == "Client.Waiting");
 
+    /// <summary>The Client.Waiting frames that say a poll throws the key away ({"poll": true}).</summary>
+    private static int PollWaiting(byte[] bytes) => WebMenu200Tests.Frames(bytes)
+        .Count(f => f.Package == "Client.Waiting" && f.Json.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && f.Json.TryGetProperty("poll", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.True);
+
     private static readonly byte[] EmptyFrame =
         new byte[] { 0xFF, 0xFA, 0xC9 }.Concat(Encoding.UTF8.GetBytes("Client.Waiting")).Concat(new byte[] { 0xFF, 0xF0 }).ToArray();
 
@@ -96,6 +101,7 @@ public class ClientWaiting139Tests
         var t = s.Term("1\n1\n");
         await Read(t, how);
         Waiting(s.Bytes(t)).Should().Be(1, "one read, one frame");
+        PollWaiting(s.Bytes(t)).Should().Be(0, "a line read keeps the key: no poll field");
     }
 
     [Theory]
@@ -324,6 +330,7 @@ public class ClientWaiting139Tests
         var t = PollTerm(s, "");
         (await AutoStop(t, 200)).Should().BeFalse("no key came");
         Waiting(s.Bytes(t)).Should().Be(1, "four polls, one frame");
+        PollWaiting(s.Bytes(t)).Should().Be(1, "the stop key is thrown away: the frame says poll");
     }
 
     [Fact]
@@ -335,6 +342,75 @@ public class ClientWaiting139Tests
         Waiting(s.Bytes(t)).Should().Be(1);
     }
 
+    private static async Task<(byte[] bytes, bool auto)> AutoPrompt(string kind, string key)
+    {
+        var hero = WebFlagOff3aTests.Hero(false);
+        hero.CombatSpeed = CombatSpeed.Normal;
+        using var s = new Scope(kind);
+        var t = s.Term(key + "\n");
+        var engine = new CombatEngine(t);
+        var F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+        typeof(CombatEngine).GetField("_combatOwner", F)!.SetValue(engine, hero);
+        typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character>());
+        var monsters = new List<Monster> { WebFlagOff200Tests.Foe("Ghoul 1") };
+        var result = new CombatResult { Player = hero, Teammates = new List<Character>(), CombatLog = new List<string>(), CurrentRound = 1 };
+        var m = typeof(CombatEngine).GetMethod("GetPlayerActionMultiMonster", F)!;
+        var (_, auto) = await (Task<(CombatAction action, bool enableAutoCombat)>)m.Invoke(engine, new object[] { hero, monsters, result })!;
+        return (s.Bytes(t), auto);
+    }
+
+    [Theory]
+    [InlineData("O")]
+    [InlineData("AUTO")]
+    public async Task TurningAutoCombatOn_SendsThePollFrame_AtOnce_BeforeTheFirstRound(string key)
+    {
+        var (bytes, auto) = await AutoPrompt("web", key);
+        auto.Should().BeTrue();
+        PollWaiting(bytes).Should().Be(1, "the stop key is taken from the moment auto-combat is on");
+        var frames = WebMenu200Tests.Frames(bytes).Where(f => f.Package == "Client.Waiting").ToList();
+        frames.Should().HaveCount(2, "the menu's line read, then the stop key's poll");
+        frames[1].Json.ValueKind.Should().Be(System.Text.Json.JsonValueKind.Object);
+        // before the auto-combat lines and their pause, not after the round
+        string raw = Encoding.UTF8.GetString(bytes);
+        int poll = raw.IndexOf("Client.Waiting {", StringComparison.Ordinal);
+        poll.Should().BeGreaterThan(-1);
+        poll.Should().BeLessThan(raw.IndexOf(Loc.Get("combat.auto_combat_on").Substring(0, 12), StringComparison.Ordinal), "sent as the key is taken");
+    }
+
+    [Fact]
+    public async Task AnotherKey_SendsNoPollFrame_AndNoOtherSessionGetsOne()
+    {
+        var (bytes, auto) = await AutoPrompt("web", "D");
+        auto.Should().BeFalse();
+        PollWaiting(bytes).Should().Be(0);
+        foreach (var kind in new[] { "mud_gmcp", "ssh", "screenreader", "web_nogmcp" })
+            Waiting((await AutoPrompt(kind, "O")).bytes).Should().Be(0, "{0} is not the web client", kind);
+    }
+
+    [Fact]
+    public async Task TurningAutoCombatOn_LeavesTheTerminalText_AsItIsForOtherSessions()
+    {
+        var web = (await AutoPrompt("web", "O")).bytes;
+        var ssh = (await AutoPrompt("ssh", "O")).bytes;
+        string strip(byte[] b)
+        {
+            var o = new List<byte>();
+            for (int i = 0; i < b.Length; i++)
+            {
+                if (i + 2 < b.Length && b[i] == 0xFF && b[i + 1] == 0xFA && b[i + 2] == 0xC9)
+                {
+                    int end = i + 3;
+                    while (end + 1 < b.Length && !(b[end] == 0xFF && b[end + 1] == 0xF0)) end++;
+                    i = end + 1; continue;
+                }
+                o.Add(b[i]);
+            }
+            return Encoding.UTF8.GetString(o.ToArray());
+        }
+        strip(web).Should().Be(strip(ssh), "the frames are out of band; the text is the same");
+    }
+
     [Fact]
     public async Task TheStorySkip_SendsOneFrame_WhenItStartsListening_NotOnEachPoll()
     {
@@ -342,6 +418,7 @@ public class ClientWaiting139Tests
         var t = PollTerm(s, "");
         await StorySkip(t, 200);
         Waiting(s.Bytes(t)).Should().Be(1, "four polls, one frame");
+        PollWaiting(s.Bytes(t)).Should().Be(1, "the skip key is thrown away: the frame says poll");
     }
 
     [Fact]
@@ -392,6 +469,9 @@ public class ClientWaiting139Tests
     }
 
     private static bool SendsWaiting(InvocationExpressionSyntax call) => call.Expression.ToString().EndsWith("EmitWebWaiting", StringComparison.Ordinal);
+
+    /// <summary>A poll throws its key away, so it must send the poll form.</summary>
+    private static bool SendsPollWaiting(InvocationExpressionSyntax call) => call.Expression.ToString().EndsWith("EmitWebPollWaiting", StringComparison.Ordinal);
 
     /// <summary>The methods that read the stream, and the ones of them with a path that does not send the frame first.</summary>
     internal static (List<string> Readers, List<string> Unguarded) Scan(string source)
@@ -450,7 +530,7 @@ public class ClientWaiting139Tests
                 if (polls.Count == 0) continue;
                 string name = file + ":" + (m is MethodDeclarationSyntax md ? md.Identifier.Text : m.Kind().ToString());
                 pollers.Add(name);
-                var sends = m.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(SendsWaiting).ToList();
+                var sends = m.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(SendsPollWaiting).ToList();
                 bool ok = polls.All(p =>
                 {
                     var loop = p.Ancestors().FirstOrDefault(a => a is WhileStatementSyntax || a is ForStatementSyntax || a is DoStatementSyntax || a is ForEachStatementSyntax);
@@ -489,9 +569,12 @@ public class ClientWaiting139Tests
     {
         var files = ScriptSources().ToList();
         var story = files.Single(f => f.File == "Scripts/Systems/OpeningStorySystem.cs");
-        const string send = "if (_terminal != null) UsurperRemake.Server.GmcpBridge.EmitWebWaiting(_terminal);";
+        const string send = "if (_terminal != null) UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(_terminal);";
         story.Source.Should().Contain(send);
         List<(string, string)> With(string src) => files.Select(f => f.File == story.File ? (f.File, src) : f).ToList();
+
+        ScanPolls(With(story.Source.Replace(send, send.Replace("EmitWebPollWaiting", "EmitWebWaiting")))).Unguarded
+            .Should().Contain("Scripts/Systems/OpeningStorySystem.cs:SkippableDelay", "a poll sends the poll form, not the line read's frame");
 
         ScanPolls(With(story.Source.Replace(send, ""))).Unguarded.Should().Contain("Scripts/Systems/OpeningStorySystem.cs:SkippableDelay", "no frame");
 
