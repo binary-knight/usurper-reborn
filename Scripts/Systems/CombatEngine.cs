@@ -15515,7 +15515,7 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "G":
-                    if (CanRage(player))   // 1.3.2: the class modifier decides; 1.3.10: the menus share the condition
+                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides; CanRage is the same test
                     {
                         action.Type = CombatActionType.Rage;
                         return (action, false);
@@ -23999,10 +23999,11 @@ public partial class CombatEngine
     /// page read as "YOUDIED"), and the HP the page shows is sent first: the last Char.Vitals went out at the round's
     /// prompt, so the page kept that HP (1 of 155 after Death's Door) under "YOU DIED".
     /// </summary>
-    internal async Task ShowDeathBanner(Character player)
+    internal async Task ShowDeathBanner(Character player, List<Character>? teammates)
     {
         if (player.HP < 0) player.HP = 0;
         UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(teammates);   // as beside every leader vitals send in combat
         terminal.ClearScreen();
         terminal.WriteLine("");
         if (GameConfig.ScreenReaderMode)
@@ -24791,7 +24792,7 @@ public partial class CombatEngine
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
 
-        await ShowDeathBanner(result.Player);
+        await ShowDeathBanner(result.Player, result.Teammates);
         await Pacing.Wait(GetCombatDelay(1000));
 
         // Show NPC teammate reactions to player death

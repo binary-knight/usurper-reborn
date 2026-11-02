@@ -234,7 +234,7 @@ public class Combat1310Tests
             try
             {
                 var t = new TerminalEmulator(new MemoryStream(), stream);
-                await (Task)typeof(CombatEngine).GetMethod("ShowDeathBanner", F)!.Invoke(new CombatEngine(t), new object[] { hero })!;
+                await (Task)typeof(CombatEngine).GetMethod("ShowDeathBanner", F)!.Invoke(new CombatEngine(t), new object?[] { hero, null })!;
                 t.StreamWriterInternal?.Flush();
                 string text = Plain(stream.ToArray());
                 text.Should().Contain("  " + Loc.Get("death.you_died") + "\n", "the words are a plain line of their own");

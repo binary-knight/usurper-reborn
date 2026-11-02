@@ -113,6 +113,7 @@ internal static class HitRoll128Golden
         HP = hp, MaxHP = hp, BaseMaxHP = hp, Strength = strength, BaseStrength = strength, Defence = 10, BaseDefence = 10,
         Dexterity = dexterity, BaseDexterity = dexterity, Agility = 10, BaseAgility = 10, Constitution = 20, BaseConstitution = 20,
         Stamina = 50, BaseStamina = 50, Mental = 80, CombatSpeed = CombatSpeed.Instant,
+        CurrentCombatStamina = 100,   // 1.3.10 (G6): the old fixed start (now the maximum unless set), so the golden draws hold
     };
 
     /// <summary>A monster of a real tier name, with no abilities and nothing to say.</summary>
