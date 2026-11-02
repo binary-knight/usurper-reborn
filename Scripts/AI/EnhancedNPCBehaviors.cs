@@ -140,6 +140,9 @@ public static class EnhancedNPCBehaviors
     /// </summary>
     public static void ProcessNPCRelationships(NPC npc, List<NPC> allNPCs)
     {
+        // 1.3.10: a jailed NPC courts, befriends and feuds with no one from its cell
+        if (npc.DaysInPrison > 0) return;
+
         // Marriage system
         if (!npc.Married && npc.Level >= 5)
         {
@@ -510,6 +513,7 @@ public static class EnhancedNPCBehaviors
         var eligiblePartners = candidates.Where(c =>
         {
             if (c.ID == npc.ID || c.IsDead || !c.IsAlive) return false;
+            if (c.DaysInPrison > 0) return false;   // 1.3.10: no wedding for a jailed NPC
             if (c.Level < 5 || c.Brain?.Personality == null) return false;
             if (Math.Abs(c.Level - npc.Level) > 10) return false;
             if (!IsCompatibleForMarriage(npc, c)) return false;

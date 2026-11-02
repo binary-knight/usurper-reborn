@@ -120,9 +120,10 @@ public class WorldSimulator
     /// 1.3.2, the activity guard: the NPC runs none of its own world sim activities (shopping, moves, dungeon runs
     /// and the rest): a player team member, a member of the player's dungeon party, an NPC in conversation. The
     /// spouse and lovers are not held here: they keep their activities and go home to the player (NPCGoHome).
+    /// 1.3.10: nor does a jailed NPC (DaysInPrison above 0): it stays in its cell until released.
     /// </summary>
     internal static bool IsOutOfActivityPass(NPC npc) =>
-        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc);
+        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc) || npc.DaysInPrison > 0;
 
     /// <summary>
     /// 1.3.2, the gear guard: the world sim never changes this NPC's equipment or gear power, and never sends it
