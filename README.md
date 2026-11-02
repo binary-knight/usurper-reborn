@@ -25,6 +25,13 @@ Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, v
 |---|---|
 | ![A Catacombs room with its exits, features and the explored map](DOCS/images/screenshot-dungeon.png) | ![The character status sheet](DOCS/images/screenshot-status.png) |
 
+### In the browser (usurper-reborn.net/play/)
+
+| Chronicle view | Classic view |
+|---|---|
+| ![Main Street in the Chronicle view](DOCS/images/screenshot-web-chronicle-street.png) | ![Main Street in the Classic view](DOCS/images/screenshot-web-classic-street.png) |
+| ![A dungeon fight in the Chronicle view, with the monster picture and the party and enemy cards](DOCS/images/screenshot-web-chronicle-fight.png) | ![A dungeon fight in the Classic view, with the combat menu and the round log](DOCS/images/screenshot-web-classic-fight.png) |
+
 ---
 
 ## The Living World
