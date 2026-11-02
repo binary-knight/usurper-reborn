@@ -4170,7 +4170,7 @@
   "death.permadeath_disabled": "(Permadeath is disabled on this server.)",
   "death.final_warning": "WARNING: This was your final resurrection.",
   "death.final_warning2": "The next death will erase your character permanently.",
-  "death.rez_remaining": "Resurrections remaining: {0} of {1}",
+  "death.rez_remaining": "A life was spent. Lives left: {0} of {1}.",
   "death.died_times": "You have died {0} times.",
   "permadeath.no_rez": "You have died with no resurrections remaining.",
   "permadeath.threads": "The threads that bind your soul to the world fray.",

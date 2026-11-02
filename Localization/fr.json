@@ -31166,7 +31166,7 @@
   "death.permadeath_disabled": "(La mort permanente est désactivée sur ce serveur.)",
   "death.final_warning": "ATTENTION : c'était ta dernière résurrection.",
   "death.final_warning2": "La prochaine mort effacera ton personnage pour toujours.",
-  "death.rez_remaining": "Résurrections restantes : {0} sur {1}",
+  "death.rez_remaining": "Une vie a été perdue. Vies restantes : {0} sur {1}.",
   "death.died_times": "Tu as péri {0} fois.",
   "permadeath.no_rez": "Tu as péri, et il ne te reste aucune résurrection.",
   "permadeath.threads": "Les fils qui lient ton âme au monde s'effilochent.",

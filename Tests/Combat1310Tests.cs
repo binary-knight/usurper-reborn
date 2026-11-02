@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake;
+using UsurperRemake.Locations;
 using UsurperRemake.Server;
 using UsurperRemake.Systems;
 using Xunit;
@@ -201,5 +202,87 @@ public class Combat1310Tests
         named.Should().BeGreaterThan(2, "the tips name keys");
         CombatEngine.ScreenReaderTip("TIP: [D]efend halves it.").Should().Be("TIP: D - Defend halves it.");
         Source("Scripts/Systems/CombatEngine.cs").Should().Contain("tip = ScreenReaderTip(tip);");
+    }
+    // ------------------------------------------------------------------ C5: the death page
+
+    private static string Plain(byte[] bytes)
+    {
+        var b = Regex.Replace(Encoding.Latin1.GetString(bytes), "\u00FF\u00FA\u00C9.*?\u00FF\u00F0", "", RegexOptions.Singleline);
+        var text = Encoding.UTF8.GetString(Encoding.Latin1.GetBytes(b));
+        return Regex.Replace(text, "\u001b\\[[0-9;?]*[A-Za-z]", "").Replace("\r", "");
+    }
+
+    [Theory]
+    [InlineData("en", false)]
+    [InlineData("hu", false)]
+    [InlineData("en", true)]
+    public async Task DeathBanner_IsPlainWords_AndSendsTheHpTheDeathLeft(string lang, bool screenReader)
+    {
+        var saved = SessionContext.Current;
+        bool savedSr = GameConfig.ScreenReaderMode, savedPacing = Pacing.Disabled;
+        var stream = new MemoryStream();
+        try
+        {
+            Pacing.Disabled = true;
+            var hero = new Character { Name2 = "Hero", HP = 1, MaxHP = 155 };
+            SessionContext.Current = WebFlagOff200Tests.Session("mud_gmcp", stream, hero);
+            GmcpBridge.EmitVitalsIfChanged(hero);   // the round's prompt: 1 of 155 after Death's Door
+            hero.HP = -4;                            // the blow that killed
+            GameConfig.ScreenReaderMode = screenReader;
+            var saveLang = GameConfig.Language;
+            GameConfig.Language = lang;
+            try
+            {
+                var t = new TerminalEmulator(new MemoryStream(), stream);
+                await (Task)typeof(CombatEngine).GetMethod("ShowDeathBanner", F)!.Invoke(new CombatEngine(t), new object[] { hero })!;
+                t.StreamWriterInternal?.Flush();
+                string text = Plain(stream.ToArray());
+                text.Should().Contain("  " + Loc.Get("death.you_died") + "\n", "the words are a plain line of their own");
+                text.Should().NotContain("Y O U").And.NotContain("D I E D");
+                var vitals = WebMenu200Tests.Frames(stream.ToArray()).Where(f => f.Package == "Char.Vitals").ToList();
+                vitals.Last().Json.GetProperty("hp").GetInt64().Should().Be(0, "the death page shows the HP the death left, not the 1 of the last prompt");
+                hero.HP.Should().Be(0);
+            }
+            finally { GameConfig.Language = saveLang; }
+        }
+        finally { SessionContext.Current = saved; GameConfig.ScreenReaderMode = savedSr; Pacing.Disabled = savedPacing; }
+    }
+
+    [Theory]
+    [MemberData(nameof(Langs))]
+    public void DeathShareLine_WrapsAtWordBounds_Within79(string lang)
+    {
+        InLang(lang, () =>
+        {
+            string share = Loc.Get("combat.share_death", "Ptesterwithalongername", "Paladin", 4, "Goblin Shaman of the Deep Catacombs", "1,234", 7);
+            var rows = CombatEngine.ShareRows(share);
+            rows.Should().HaveCountGreaterThan(1, "the line is longer than one row");
+            rows.Should().OnlyContain(r => r.Length <= 79 && r.StartsWith("  "));
+            string joined = string.Join(" ", rows.Select(r => r.Trim()));
+            joined.Should().Be(Loc.Get("combat.share_label", share), "no word is split across rows");
+        });
+    }
+
+    [Fact]
+    public void LifeNotice_SaysALifeWasSpent_AndTheTempleHallShowsItOnce()
+    {
+        Loc.GetIn("en", "death.rez_remaining", 2, 3).Should().Be("A life was spent. Lives left: 2 of 3.");
+        Source("Scripts/Systems/CombatEngine.cs").Should().Contain("result.Player.PendingLifeNotice = rezLeft == 0");
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new MemoryStream(), output);
+        var temple = new TempleLocation(term, null!, UsurperRemake.GodSystemSingleton.Instance);
+        var hero = new Character { Name1 = "Hero", Name2 = "Hero", HP = 77, MaxHP = 155, Level = 4 };
+        hero.PendingLifeNotice = Loc.Get("death.rez_remaining", 2, 3);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(temple, hero);
+        var draw = typeof(TempleLocation).GetMethod("DisplayMenu", F)!;
+        ((Task)draw.Invoke(temple, new object[] { true })!).GetAwaiter().GetResult();
+        term.StreamWriterInternal?.Flush();
+        string first = Plain(output.ToArray());
+        first.Should().Contain(Loc.Get("death.rez_remaining", 2, 3));
+        hero.PendingLifeNotice.Should().BeNull("shown once");
+        output.SetLength(0);
+        ((Task)draw.Invoke(temple, new object[] { true })!).GetAwaiter().GetResult();
+        term.StreamWriterInternal?.Flush();
+        Plain(output.ToArray()).Should().NotContain(Loc.Get("death.rez_remaining", 2, 3), "not again on the next draw");
     }
 }

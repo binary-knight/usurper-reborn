@@ -23993,6 +23993,37 @@ public partial class CombatEngine
     /// Display a paste-able death narrative after the player dies.
     /// Creates a roguelike-style "tombstone" summary of the character's journey.
     /// </summary>
+    /// <summary>
+    /// The death page's opening: the screen cleared, then "YOU DIED" and the art. 1.3.10 (C5): the words are a plain line
+    /// in the reader's language above the art (the art spelled them "Y O U   D I E D" between block glyphs, which the web
+    /// page read as "YOUDIED"), and the HP the page shows is sent first: the last Char.Vitals went out at the round's
+    /// prompt, so the page kept that HP (1 of 155 after Death's Door) under "YOU DIED".
+    /// </summary>
+    internal async Task ShowDeathBanner(Character player)
+    {
+        if (player.HP < 0) player.HP = 0;
+        UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            terminal.WriteLine("");
+        }
+        else
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
+            terminal.WriteLine("");
+        }
+    }
+
+    /// <summary>1.3.10 (C5): the death story's share line as rows of at most 79 columns, each indented two spaces.</summary>
+    internal static List<string> ShareRows(string shareLine) =>
+        UIHelper.WordWrap(Loc.Get("combat.share_label", shareLine), UIHelper.WrapWidth - 2).Select(r => "  " + r).ToList();
+
     private async Task ShowDeathSummary(CombatResult result)
     {
         var player = result.Player;
@@ -24054,7 +24085,8 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         string shareLine = Loc.Get("combat.share_death", playerName, className, player.Level, killerName, totalKills.ToString("N0"), deepestFloor);
-        terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
+        foreach (var row in ShareRows(shareLine))   // 1.3.10 (C5): wrapped at word bounds, not split at column 80
+            terminal.WriteLine(row);
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
@@ -24759,21 +24791,7 @@ public partial class CombatEngine
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
 
-        terminal.ClearScreen();
-
-        // Display dramatic death art
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
-            terminal.WriteLine("");
-        }
-        else
-        {
-            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
-            terminal.WriteLine("");
-        }
+        await ShowDeathBanner(result.Player);
         await Pacing.Wait(GetCombatDelay(1000));
 
         // Show NPC teammate reactions to player death
@@ -24918,6 +24936,8 @@ public partial class CombatEngine
             int restoredHP = (int)(result.Player.MaxHP * 0.5);
 
             ShowDivineRestore(restoredHP, result.Player.MaxHP, rezLeft, max);
+            // 1.3.10 (C5): the Temple's screen clears this page a few seconds later, so its hall says it once more
+            result.Player.PendingLifeNotice = rezLeft == 0 ? Loc.Get("death.final_warning") : Loc.Get("death.rez_remaining", rezLeft, max);
             // v0.65.6: lives are renewable now -- say so at the moment the
             // player is most afraid, or the countdown reads as a death spiral.
             terminal.SetColor("gray");

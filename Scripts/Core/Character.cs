@@ -598,6 +598,11 @@ public class Character
 
     // Combat Stamina System - resource for special abilities
     // Formula: MaxCombatStamina = 50 + (Stamina stat * 2) + (Level * 3) + armor weight bonus
+    /// <summary>1.3.10 (C5): the line "A life was spent. Lives left: N of M." from the last death, shown once by the
+    /// Temple's hall, where a death lands; run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? PendingLifeNotice { get; set; }
+
     // 1.3.10 (G6): the fight stamina is not saved, and it started at a fixed 100 on every new or loaded character,
     // above the maximum of a low level character (100/78 on the status line). Until something sets it, it is now the
     // maximum; RecalculateStats lowers it to a maximum that dropped (level, Stamina, armor).

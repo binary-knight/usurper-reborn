@@ -31168,7 +31168,7 @@
   "death.permadeath_disabled": "(A végleges halál ki van kapcsolva ezen a szerveren.)",
   "death.final_warning": "FIGYELEM: Ez volt az utolsó feltámadásod.",
   "death.final_warning2": "A következő halál végleg eltörli a karakteredet.",
-  "death.rez_remaining": "Hátralévő feltámadások: {0} / {1}",
+  "death.rez_remaining": "Elfogyott egy életed. Hátralévő életek: {0} / {1}.",
   "death.died_times": "Már {0} alkalommal haltál meg.",
   "permadeath.no_rez": "Meghaltál, és nem maradt több feltámadásod.",
   "permadeath.threads": "A szálak, amelyek lelkedet a világhoz kötik, foszladoznak.",
