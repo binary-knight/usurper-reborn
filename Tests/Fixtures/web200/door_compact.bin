@@ -46,9 +46,9 @@
 [37m [90m[90m[[93m[93mM[90m[90m][37m[37mMap [90m[90m[[93m[93mG[90m[90m][37m[37mGuide [90m[90m[[93m[93mI[90m[90m][37m[37mInv [90m[90m[[93m[93mP[90m[90m][37m[37mPotions [90m[90m[[93m[93m=[90m[90m][37m[37mStatus [90m[90m[[93m[93mQ[90m[90m][37m[37mLeave 
 [90m[90m HP:[92m[92m400/400[90m[90m Potions:[32m[32m3/31[90m[90m Gold:[33m[33m1,234[90m[90m Lv:[36m[36m12
 [0m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[I][35m[35mPot(HP:3) [93m[93m[R][37m[37metreat
-[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst
+[93m[93m [P][90m[90mower [93m[93m[E][90m[90mxact [93m[93m[T][90m[90maunt [93m[93m[W][90m[90mDisarm [93m[93m[L][90m[90mHide [93m[93m[O][93m[93mAuto [93m[93m[X][90m[90mSpd
 [37m[37mChoose action: [97m[93m[93m [A][32m[32mttack [93m[93m[D][36m[36mefend [93m[93m[H][35m[35mPot(HP:3) [93m[93m[R][37m[37mFlee 
-[93m[93m[I][90m[90mDisarm [93m[93m[T][90m[90maunt [93m[93m[AUTO] [93m[93m[SPD][90m[90mInst [93m[93m[S][90m[90mtats
+[93m[93m[I][90m[90mDisarm [93m[93m[T][90m[90maunt [93m[93m[X][90m[90mSpd [93m[93m[S][90m[90mtats
 [37m[37mChoose action: [97m

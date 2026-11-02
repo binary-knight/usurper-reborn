@@ -149,8 +149,8 @@ public class CombatLocA122Tests
         Capture("combat-a-bbs-menu-hu.txt", text);
         text.Should().Contain("[A]Támadás").And.Contain("[D]Védés").And.Contain("[R]Menekülés")
             .And.Contain("[P]Erő").And.Contain("[E]Pontos").And.Contain("[T]Gúny").And.Contain("[S]Adatok")
-            .And.Contain("[H]Gyógyít").And.Contain("Méreg(2)").And.Contain("Képess.(1)").And.Contain("[SPD]Norm");
-        foreach (var english in new[] { "ttack", "efend", "etreat", "ower ", "xact", "aunt", "tats", "ealAlly", "Poison(", "Skills(", "Nrml" })
+            .And.Contain("[H]Gyógyít").And.Contain("Méreg(2)").And.Contain("Képess.(1)").And.Contain("[X]Seb");
+        foreach (var english in new[] { "ttack", "efend", "etreat", "ower ", "xact", "aunt", "tats", "ealAlly", "Poison(", "Skills(", "Nrml", "Spd" })
             text.Should().NotContain(english);
     }
 
@@ -161,7 +161,7 @@ public class CombatLocA122Tests
         Capture("combat-a-bbs-menu-es.txt", text);
         text.Should().Contain("[A]tacar").And.Contain("[D]efensa").And.Contain("[R]etirada").And.Contain("[P]oder")
             .And.Contain("[E]xacto").And.Contain("[T]Burla").And.Contain("[S]Estado").And.Contain("Veneno(2)");
-        foreach (var english in new[] { "[A]ttack", "[D]efend ", "[R]etreat", "[P]ower", "[E]xact ", "[T]aunt", "[S]tats", "Poison(", "Nrml" })
+        foreach (var english in new[] { "[A]ttack", "[D]efend ", "[R]etreat", "[P]ower", "[E]xact ", "[T]aunt", "[S]tats", "Poison(", "Nrml", "Spd" })
             text.Should().NotContain(english);
     }
 
@@ -170,7 +170,7 @@ public class CombatLocA122Tests
     {
         string text = await WithLanguage("en", RenderBbsMenus);
         text.Should().Contain(" [A]ttack [D]efend ").And.Contain("[R]etreat ").And.Contain("[P]ower [E]xact ")
-            .And.Contain("[T]aunt ").And.Contain("[B]Poison(2) ").And.Contain("[AUTO] [SPD]Nrml [S]tats")
+            .And.Contain("[T]aunt ").And.Contain("[B]Poison(2) ").And.Contain("[X]Spd [S]tats").And.Contain("[O]Auto [X]Spd")
             .And.Contain("[H]ealAlly ").And.Contain("[1-9]Skills(1) ");
     }
 
@@ -253,7 +253,7 @@ public class CombatLocA122Tests
         text.Should().Contain(Loc.GetIn(lang, "combat.pvp_your_hp", 500, 500));
         string prefix = Loc.GetIn(lang, "combat.status_prefix");
         text.Should().Contain("║ " + prefix);
-        text.Should().Contain("[SPD]  ");
+        text.Should().Contain("[X] ").And.NotContain("[SPD]");
         // the status row keeps its width
         foreach (var line in text.Split('\n'))
             if (line.Contains(prefix)) line.TrimEnd('\r').Length.Should().Be(41);

@@ -139,8 +139,8 @@ Actions:
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
 R - Retreat, attempt to flee
-AUTO - Auto-Combat Mode
-SPD - Combat Speed, currently Instant
+O - Auto-Combat Mode
+X - Combat Speed, currently Instant
 
 Choose action: 
 Dungeon Combat Menu
@@ -150,8 +150,8 @@ Actions:
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
 R - Retreat, attempt to flee
-AUTO - Auto-Combat Mode
-SPD - Combat Speed, currently Instant
+O - Auto-Combat Mode
+X - Combat Speed, currently Instant
 
 Choose action: 
 Combat Menu
@@ -169,6 +169,6 @@ Actions:
   L - Hide, attempt to slip away
   R - Flee Combat
   S - View Status
-  SPD - Combat Speed, currently Instant
+  X - Combat Speed, currently Instant
 
 Choose action: 
