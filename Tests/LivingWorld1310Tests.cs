@@ -139,7 +139,7 @@ public class LivingWorld1310Tests : IDisposable
         }
     }
 
-    private static Screen At(BaseLocation place, Character hero, params string[] lines)
+    private static Screen NewScreen(params string[] lines)
     {
         var s = new Screen();
         s.Term = new TerminalEmulator(new LineStream(lines.Concat(Enumerable.Repeat("", 12)), _ =>
@@ -147,6 +147,12 @@ public class LivingWorld1310Tests : IDisposable
             s.Term.StreamWriterInternal?.Flush();
             s.Output.WriteByte((byte)'\n');
         }), s.Output);
+        return s;
+    }
+
+    private static Screen At(BaseLocation place, Character hero, params string[] lines)
+    {
+        var s = NewScreen(lines);
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(place, s.Term);
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(place, hero);
         if (place is CastleLocation) typeof(CastleLocation).GetField("playerIsKing", F)!.SetValue(place, true);
@@ -459,8 +465,8 @@ public class LivingWorld1310Tests : IDisposable
         var prisoner = Npc("fc_rescued", "Fcten Rescued");
         Roster(prisoner);
         Jail(prisoner);
-        var walk = new PrisonWalkLocation();
-        var s = At(walk, hero);
+        var s = NewScreen();
+        var walk = new PrisonWalkLocation(GameEngine.Instance, s.Term);   // the prison walk keeps its own terminal
         await Run(walk, "FreePrisonerSuccessfully", hero, prisoner);
 
         prisoner.DaysInPrison.Should().Be(0);
