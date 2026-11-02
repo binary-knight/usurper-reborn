@@ -460,7 +460,20 @@ public partial class CombatEngine
             slotId => bar.Where(a => a.slotId == slotId).Select(a => a.key).FirstOrDefault(), bar.Count > 0);
     }
 
-    private void ShowCombatTipIfNeeded(Character player)
+    /// <summary>
+    /// 1.3.9: the keys a combat tip may name under each standard menu, with the potion key of that menu: the
+    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, AUTO and SPD; the PvP menu
+    /// (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and SPD and has no AUTO row.
+    /// </summary>
+    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "AUTO", "SPD" });
+    internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "SPD" });
+
+    /// <summary>
+    /// A tip every 5th round (10th at Fast or Instant), under the standard menu. 1.3.9: the potion tip names the
+    /// shown menu's potion key, and a tip naming a key that menu does not list is not shown (the draw is the same,
+    /// so seeded fights keep their numbers).
+    /// </summary>
+    private void ShowCombatTipIfNeeded(Character player, (string PotionKey, string[] Keys) menu)
     {
         // Show tip every 5th combat round, less often if player has Fast/Instant speed
         combatTipCounter++;
@@ -475,7 +488,9 @@ public partial class CombatEngine
                 tipKey = classTipKeys[random.Next(classTipKeys.Length)];
             else
                 tipKey = CombatTipKeys[random.Next(CombatTipKeys.Length)];
-            string tip = Loc.Get(tipKey);
+            string tip = Loc.Get(tipKey, menu.PotionKey);
+            if (System.Text.RegularExpressions.Regex.Matches(tip, @"\[([^\]\s]+)\]").Any(m => Array.IndexOf(menu.Keys, m.Groups[1].Value) < 0))
+                return;
             if (GameConfig.ScreenReaderMode)
             {
                 // Strip bracket-key formatting like [P]ower Attack → Power Attack
@@ -1289,6 +1304,7 @@ public partial class CombatEngine
             CombatLog = new List<string>()
         };
         _combatOwner = player;
+        _lastChosenTarget = null;   // 1.3.9: Enter at the target prompt repeats a target chosen in this fight only
         BeginFightEvents(result);   // 1.2.6: the combat event stream for this fight
         // v1.1.1: per-combat buffs are consumed in the finally below so that every exit
         // (victory, defeat, retreat, rescue, and a thrown disconnect) counts the fight.
@@ -2706,12 +2722,12 @@ public partial class CombatEngine
             {
                 ShowCombatMenuStandard(player, monster, pvpOpponent, isPvP);
                 // Combat tip is visual-only (clutters BBS/SR/graphical clients).
-                ShowCombatTipIfNeeded(player);
+                ShowCombatTipIfNeeded(player, PvpMenuTipKeys);
             }
 
             // 2.0: the PvP prompt's Client.Menu, web client only (a monster here is the retired single foe path)
             if (!GameConfig.ElectronMode && isPvP)
-                WebClientMenu.Emit(WebClientMenu.CombatPvp, () => PvpMenuGroups(player), QuickbarHintIfDrawn);
+                WebClientMenu.Emit(WebClientMenu.CombatPvp, () => PvpMenuGroups(player), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
 
             // Prompt text only when terminal is the user's primary surface.
             if (!GameConfig.ElectronMode)
@@ -13973,6 +13989,13 @@ public partial class CombatEngine
     /// <summary>
     /// Get target selection from player
     /// </summary>
+    /// <summary>
+    /// 1.3.9 (play test C1, his pick 2): the foe the combat owner last chose by number at the target prompt in this
+    /// fight. Enter at the prompt takes it again while it lives; with none, or a dead one, Enter stays random.
+    /// Only the owner's own prompt (GetPlayerActionMultiMonster and its quickbar) asks for a target here.
+    /// </summary>
+    private Monster? _lastChosenTarget;
+
     private async Task<int?> GetTargetSelection(List<Monster> monsters, bool allowRandom = true)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
@@ -13983,8 +14006,13 @@ public partial class CombatEngine
             return monsters.IndexOf(livingMonsters[0]);
         }
 
+        int last = _lastChosenTarget != null && _lastChosenTarget.IsAlive ? monsters.IndexOf(_lastChosenTarget) : -1;
         terminal.SetColor("yellow");
-        if (allowRandom)
+        if (allowRandom && last >= 0)
+        {
+            terminal.Write(Loc.Get("combat.target_monster_last", monsters.Count, last + 1));
+        }
+        else if (allowRandom)
         {
             terminal.Write(Loc.Get("combat.target_monster_random", monsters.Count));
         }
@@ -13997,8 +14025,8 @@ public partial class CombatEngine
 
         if (string.IsNullOrWhiteSpace(input) && allowRandom)
         {
-            // Random target
-            return null;
+            // 1.3.9: the last target chosen in this fight while it lives, else random
+            return last >= 0 ? last : null;
         }
 
         // v0.61.2: Q/C/X = cancel the spell/ability entirely (no mana/stamina spent,
@@ -14016,6 +14044,7 @@ public partial class CombatEngine
             int index = targetNum - 1;
             if (monsters[index].IsAlive)
             {
+                _lastChosenTarget = monsters[index];   // 1.3.9: Enter takes it again
                 return index;
             }
             else
@@ -15153,12 +15182,12 @@ public partial class CombatEngine
             {
                 ShowDungeonCombatMenuStandard(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
                 // Combat tip is visual-only.
-                ShowCombatTipIfNeeded(player);
+                ShowCombatTipIfNeeded(player, DungeonMenuTipKeys);
             }
 
             // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
             if (!GameConfig.ElectronMode)
-                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn);
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
 
             if (!GameConfig.ElectronMode)
             {

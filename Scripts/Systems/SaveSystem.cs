@@ -861,6 +861,7 @@ namespace UsurperRemake.Systems
                 DistrictsMainStreet = player.DistrictsMainStreet, // 2.0: Main Street layout preference
                 ClassicTipDraws = player.ClassicTipDraws, // v1.1.14: switch-to-classic tip count
                 MenuKeysNeedEnter = player.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
+                WebMenuKeysNeedEnter = player.WebMenuKeysNeedEnter, // 1.3.9: the web client's menu keys preference
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,

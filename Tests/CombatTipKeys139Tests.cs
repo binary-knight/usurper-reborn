@@ -286,7 +286,7 @@ public class CombatTipKeys139Tests
         if (classTips.TryGetValue(cls, out var own)) tipKeys.AddRange(own);
         foreach (var key in tipKeys)
         foreach (var lang in Langs)
-            BracketKeys(Loc.GetIn(lang, key)).Except(keys).Should().BeEmpty( "{0} {1} {2}: '{3}'", cls, key, lang, Loc.GetIn(lang, key));
+            BracketKeys(Loc.GetIn(lang, key, "I")).Except(keys).Should().BeEmpty( "{0} {1} {2}: '{3}'", cls, key, lang, Loc.GetIn(lang, key, "I"));
     }
 
     [Theory]
@@ -302,7 +302,7 @@ public class CombatTipKeys139Tests
             var t = new TerminalEmulator(new MemoryStream(), s.Stream);
             var engine = new CombatEngine(t);
             engine.SeedRandomForTests(139);
-            for (int i = 0; i < 1500; i++) Invoke(engine, "ShowCombatTipIfNeeded", hero);
+            for (int i = 0; i < 1500; i++) Invoke(engine, "ShowCombatTipIfNeeded", hero, CombatEngine.DungeonMenuTipKeys);
             t.StreamWriterInternal?.Flush();
             var lines = Strip(Encoding.UTF8.GetString(s.Stream.ToArray())).Split('\n').Where(l => l.Trim().Length > 0).ToList();
             lines.Should().NotBeEmpty();
@@ -313,7 +313,7 @@ public class CombatTipKeys139Tests
             }
             string all = string.Join(" ", lines.Select(l => l.Trim()));
             foreach (var key in ((string[])typeof(CombatEngine).GetField("CombatTipKeys", SF)!.GetValue(null)!))
-                all.Should().Contain(HintSystem.WordWrap(Loc.GetIn(lang, key), 77)[0], "{0}: the run drew {1}", cls, key);
+                all.Should().Contain(HintSystem.WordWrap(Loc.GetIn(lang, key, "I"), 77)[0], "{0}: the run drew {1}", cls, key);
         }
     }
 
@@ -353,7 +353,7 @@ public class CombatTipKeys139Tests
             BracketKeys(Loc.GetIn(lang, tip)).Should().BeEmpty("{0} {1}: '{2}'", tip, lang, Loc.GetIn(lang, tip));
         }
         // the potion tip's key is the menu's Use Item row
-        var potionKey = BracketKeys(Loc.GetIn(lang, "combat.tip_healing_potions")).Single();
+        var potionKey = BracketKeys(Loc.GetIn(lang, "combat.tip_healing_potions", CombatEngine.DungeonMenuTipKeys.PotionKey)).Single();
         menu.Split('\n').Single(l => l.Contains("[" + potionKey + "]")).Should().Contain(Loc.GetIn(lang, "combat.use_item_potions_short", hero.Healing, hero.MaxPotions).Trim());
     }
 

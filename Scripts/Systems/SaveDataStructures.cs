@@ -513,6 +513,7 @@ namespace UsurperRemake.Systems
         public bool ClassicMainStreet { get; set; }  // v1.1.14: true when the classic layout is shown; still written for older builds, no longer read for the layout
         public bool DistrictsMainStreet { get; set; }  // 2.0: districts Main Street layout; old saves read false (classic)
         public bool MenuKeysNeedEnter { get; set; } = true;  // v1.1.15: console menus wait for Enter; old saves read true
+        public bool WebMenuKeysNeedEnter { get; set; } = false;  // 1.3.9: web client menus wait for Enter; old saves read false (one key)
         public int ClassicTipDraws { get; set; }  // v1.1.14: switch-to-classic tip draws so far; old saves read 0
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public bool AutoRedistributeXP { get; set; } = true; // Auto-redistribute XP when teammates die

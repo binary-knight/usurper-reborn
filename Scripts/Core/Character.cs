@@ -177,6 +177,7 @@ public class Character
     public bool DistrictsMainStreet { get; set; }    // 2.0: Main Street in districts instead of the classic layout (off by default, chosen in Settings)
     public bool ClassicMainStreet => !DistrictsMainStreet; // v1.1.14 save field, now derived: true when the classic layout is shown
     public bool MenuKeysNeedEnter { get; set; } = true; // v1.1.15: single-player console menus wait for Enter (on by default)
+    public bool WebMenuKeysNeedEnter { get; set; } = false; // 1.3.9: web client menus wait for Enter; off by default (one-key menus on the web)
     public int ClassicTipDraws { get; set; }         // v1.1.14: district Main Street draws that showed the switch-to-classic tip (stops at 10)
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
     public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat

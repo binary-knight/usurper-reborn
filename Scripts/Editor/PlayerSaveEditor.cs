@@ -1731,6 +1731,7 @@ internal static class PlayerSaveEditor
         p.DistrictsMainStreet = EditorIO.PromptBool("Districts Main Street layout (instead of classic)", p.DistrictsMainStreet); // 2.0
         p.ClassicMainStreet = !p.DistrictsMainStreet; // v1.1.14 field kept true when classic is shown, for older builds
         p.MenuKeysNeedEnter = EditorIO.PromptBool("Menu keys need Enter (single-player console)", p.MenuKeysNeedEnter); // v1.1.15
+        p.WebMenuKeysNeedEnter = EditorIO.PromptBool("Menu keys need Enter (web client)", p.WebMenuKeysNeedEnter); // 1.3.9
         p.ClassicTipDraws = EditorIO.PromptInt("Switch-to-classic tip draws shown (0-10, 10 = no more)", p.ClassicTipDraws, min: 0, max: 10); // v1.1.14
         p.DateFormatPreference = EditorIO.PromptInt("DateFormat (0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD)", p.DateFormatPreference, min: 0, max: 2);
         p.AutoRedistributeXP = EditorIO.PromptBool("Auto-redistribute XP when teammates die", p.AutoRedistributeXP);
