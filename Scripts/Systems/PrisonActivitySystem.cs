@@ -169,7 +169,7 @@ public class PrisonActivitySystem
     private string PerformShadowBoxing(Character prisoner)
     {
         // No permanent stat gain — just restores stamina
-        prisoner.CurrentCombatStamina = Math.Min(prisoner.CurrentCombatStamina + 10, 100);
+        prisoner.CurrentCombatStamina = Math.Min(prisoner.CurrentCombatStamina + 10, prisoner.MaxCombatStamina);   // 1.3.10: the maximum, not 100
 
         return Loc.Get("prison.activity_shadow_boxing");
     }

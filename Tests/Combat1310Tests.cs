@@ -66,4 +66,48 @@ public class Combat1310Tests
         }
         finally { SessionContext.Current = saved; }
     }
+
+    // ------------------------------------------------------------------ G6: fight stamina never above its maximum
+
+    [Fact]
+    public void CombatStamina_StartsAtTheMaximum_NotAFixed100()
+    {
+        var hero = new Character { Level = 2, Stamina = 7 };
+        hero.MaxCombatStamina.Should().BeLessThan(100, "a low level character's maximum");
+        hero.CurrentCombatStamina.Should().Be(hero.MaxCombatStamina, "a new character starts full, at its own maximum");
+        var big = new Character { Level = 40, Stamina = 60 };
+        big.CurrentCombatStamina.Should().Be(big.MaxCombatStamina, "and a maximum above 100 is full too");
+    }
+
+    [Fact]
+    public void CombatStamina_ALoadedSave_ShowsItsMaximum()
+    {
+        var hero = new Character { Name1 = "Hero", Name2 = "Hero", Level = 2, Stamina = 7, BaseStamina = 7, HP = 50, MaxHP = 50, BaseMaxHP = 50 };
+        hero.CurrentCombatStamina = 100;   // what every save loaded into before 1.3.10
+        var data = (UsurperRemake.Systems.PlayerData)typeof(SaveSystem).GetMethod("SerializePlayer", F)!.Invoke(SaveSystem.Instance, new object[] { hero })!;
+        data = JsonSerializer.Deserialize<UsurperRemake.Systems.PlayerData>(JsonSerializer.Serialize(data))!;
+        Character loaded;
+        try { loaded = (Character)typeof(GameEngine).GetMethod("RestorePlayerFromSaveData", F)!.Invoke(GameEngine.Instance, new object[] { data })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+        loaded.MaxCombatStamina.Should().BeLessThan(100);
+        loaded.CurrentCombatStamina.Should().Be(loaded.MaxCombatStamina, "a load shows 78/78, never 100/78");
+    }
+
+    [Fact]
+    public void CombatStamina_AMaximumThatDrops_LowersIt_AndPrisonShadowBoxingStopsAtTheMaximum()
+    {
+        var hero = new Character { Level = 10, Stamina = 30, BaseStamina = 30, HP = 100, MaxHP = 100, BaseMaxHP = 100 };
+        hero.RecalculateStats();
+        hero.CurrentCombatStamina = hero.MaxCombatStamina;
+        long before = hero.MaxCombatStamina;
+        hero.BaseStamina = 10;
+        hero.RecalculateStats();
+        hero.MaxCombatStamina.Should().BeLessThan(before);
+        hero.CurrentCombatStamina.Should().Be(hero.MaxCombatStamina, "a dropped maximum lowers the current value");
+
+        var prisoner = new Character { Level = 2, Stamina = 7, HP = 50, MaxHP = 50 };
+        prisoner.CurrentCombatStamina = prisoner.MaxCombatStamina - 3;
+        typeof(PrisonActivitySystem).GetMethod("PerformShadowBoxing", F)!.Invoke(PrisonActivitySystem.Instance, new object[] { prisoner });
+        prisoner.CurrentCombatStamina.Should().Be(prisoner.MaxCombatStamina, "shadow boxing stops at the maximum, not at 100");
+    }
 }
