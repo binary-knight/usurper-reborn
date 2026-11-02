@@ -318,6 +318,48 @@ public class CombatSingleKeys139Tests
         DrawDungeonMenu(Hero(), Mode.Compact, "hu").Should().Contain("[X]Seb");
     }
 
+    private static string Compact(Character hero, bool pvp, bool worst, bool follower, string lang)
+    {
+        using var s = new Scope("ssh", hero, Mode.Compact, lang);
+        if (pvp) return DrawPvpMenu(hero, Mode.Compact, lang);
+        var r = Dungeon(hero, s, "");
+        if (worst) r.Engine.BossContext = new BossCombatContext { CanSave = true };
+        var classInfo = Enumerable.Range(1, worst ? 9 : 1).Select(i => ($"{i}", "Slash", true)).ToList();
+        Invoke(r.Engine, "ShowDungeonCombatMenuBBS", hero, true, true, classInfo, follower, worst ? GodDomain.Light : GodDomain.None);
+        return Plain(s.Bytes(r.Term));
+    }
+
+    public static IEnumerable<object[]> LangsData() => Langs.Select(l => new object[] { l });
+
+    /// <summary>
+    /// 1.3.9 round 2 (c1): the current speed ([X]Nrml, [X]Fast, [X]Inst) was to come back only if every compact row fits
+    /// 79 columns in all 5 languages. It does not: the Hungarian full house first row is 80 columns with either label,
+    /// so the row keeps [X]Spd. This holds the row the speed key is on within 79 columns, and the typical menu that
+    /// held two rows before the change at two rows.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(LangsData))]
+    public void TheCompactSpeedKey_ShowsSpd_AndItsRowFits79Columns(string lang)
+    {
+        foreach (var cls in new[] { CharacterClass.Warrior, CharacterClass.Assassin, CharacterClass.Paladin, CharacterClass.Barbarian, CharacterClass.Cleric })
+        foreach (var speed in new[] { CombatSpeed.Normal, CombatSpeed.Fast, CombatSpeed.Instant })
+        foreach (bool worst in new[] { false, true })
+        foreach (bool pvp in new[] { false, true })
+        {
+            var hero = Hero(cls);
+            hero.CombatSpeed = speed;
+            hero.PoisonVials = worst ? 12 : 2;
+            if (worst) { hero.ManaPotions = 14; hero.Healing = 13; hero.HerbHealing = 11; }
+            string text = Compact(hero, pvp, worst, false, lang);
+            var rows = text.TrimEnd('\n').Split('\n');
+            var speedRow = rows.Single(r => r.Contains("[X]"));
+            speedRow.Should().Contain("[X]" + Loc.GetIn(lang, "combat.bbs_speed"), "{0} {1}: the key says what it does", lang, cls);
+            speedRow.Length.Should().BeLessThanOrEqualTo(79, "{0} {1} {2} worst={3} pvp={4}: '{5}'", lang, cls, speed, worst, pvp, speedRow);
+            if (!worst && (pvp || cls != CharacterClass.Assassin))   // the Assassin's [K] row made three rows before 1.3.9 too
+                rows.Length.Should().Be(2, "{0} {1} pvp={2}: the usual menu keeps two rows:\n{3}", lang, cls, pvp, text);
+        }
+    }
+
     [Fact]
     public void TheStandardBox_LinesUpTheKeys()
     {

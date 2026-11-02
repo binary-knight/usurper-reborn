@@ -728,7 +728,8 @@ public class WebMenu200Tests
             ["Scripts/Locations/MainStreetWebMenu.cs"] = new[] { "EmitWebMenu" },
             ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu", "EmitWebMap" },
             ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter", "EmitWebFooterFor" },   // 1.3.9: EmitWebFooterFor, the status line and the prompt refresh
-            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters" },
+            ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters", "AutoCombatStopRequested" },   // 1.3.9: Client.Waiting at the stop key
+            ["Scripts/Systems/OpeningStorySystem.cs"] = new[] { "SkippableDelay" },   // 1.3.9: Client.Waiting at the story skip
         };
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "Scripts"), "*.cs", SearchOption.AllDirectories))
         {

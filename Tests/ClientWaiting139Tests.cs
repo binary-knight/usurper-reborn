@@ -276,6 +276,99 @@ public class ClientWaiting139Tests
         Waiting(followerOut.ToArray()).Should().Be(0);
     }
 
+    // ------------------------------------------------------------------ the two input polls (round 2)
+
+    /// <summary>A connection that has <paramref name="typed"/> waiting already, or nothing.</summary>
+    private sealed class Waiting_ : Stream, IReadableDataStream
+    {
+        private readonly byte[] _data; private int _pos;
+        public Waiting_(string typed) { _data = Encoding.UTF8.GetBytes(typed); }
+        public bool HasReadableData => _pos < _data.Length;
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int n = Math.Min(count, _data.Length - _pos);
+            Array.Copy(_data, _pos, buffer, offset, n); _pos += n; return n;
+        }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _data.Length;
+        public override long Position { get => _pos; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private static TerminalEmulator PollTerm(Scope s, string typed)
+    {
+        var t = new TerminalEmulator(new Waiting_(typed), s.Stream);
+        if (s.Ctx != null) s.Ctx.Terminal = t;
+        return t;
+    }
+
+    private static async Task<bool> AutoStop(TerminalEmulator t, int ms) =>
+        await new CombatEngine(t).AutoCombatStopRequested(ms);
+
+    private static async Task StorySkip(TerminalEmulator t, int ms)
+    {
+        var story = new OpeningStorySystem();
+        typeof(OpeningStorySystem).GetField("_terminal", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.SetValue(story, t);
+        await (Task)typeof(OpeningStorySystem).GetMethod("SkippableDelay", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(story, new object[] { ms })!;
+    }
+
+    [Fact]
+    public async Task TheAutoCombatStopKey_SendsOneFrame_WhenItStartsListening_NotOnEachPoll()
+    {
+        using var s = new Scope("web");
+        var t = PollTerm(s, "");
+        (await AutoStop(t, 200)).Should().BeFalse("no key came");
+        Waiting(s.Bytes(t)).Should().Be(1, "four polls, one frame");
+    }
+
+    [Fact]
+    public async Task TheAutoCombatStopKey_StillStops_OnAKey()
+    {
+        using var s = new Scope("web");
+        var t = PollTerm(s, "x");
+        (await AutoStop(t, 200)).Should().BeTrue();
+        Waiting(s.Bytes(t)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TheStorySkip_SendsOneFrame_WhenItStartsListening_NotOnEachPoll()
+    {
+        using var s = new Scope("web");
+        var t = PollTerm(s, "");
+        await StorySkip(t, 200);
+        Waiting(s.Bytes(t)).Should().Be(1, "four polls, one frame");
+    }
+
+    [Fact]
+    public async Task ThePolls_SendNothing_ToAnyOtherSession()
+    {
+        foreach (var kind in new[] { "mud_gmcp", "ssh", "screenreader", "web_nogmcp", "door" })
+        {
+            using var s = new Scope(kind);
+            var t = PollTerm(s, "");
+            await AutoStop(t, 100);
+            await StorySkip(t, 100);
+            Waiting(s.Bytes(t)).Should().Be(0, "{0} is not the web client", kind);
+        }
+    }
+
+    [Fact]
+    public async Task APollOnAnotherSessionsTerminal_IsNotSentToTheCurrentSession()
+    {
+        using var leader = new Scope("web");
+        var leaderTerm = leader.Term("");
+        var followerOut = new MemoryStream();
+        var followerTerm = new TerminalEmulator(new Waiting_(""), followerOut);
+        await AutoStop(followerTerm, 100);
+        await StorySkip(followerTerm, 100);
+        Waiting(leader.Bytes(leaderTerm)).Should().Be(0, "the follower rule: only the session that owns the terminal");
+    }
+
     // ------------------------------------------------------------------ the guard: no stream read without the frame
 
     private static string TerminalSource()
@@ -336,6 +429,83 @@ public class ClientWaiting139Tests
             if (!Guarded(m, first, new HashSet<MethodDeclarationSyntax>())) unguarded.Add(m.Identifier.Text);
         }
         return (readers, unguarded);
+    }
+
+    /// <summary>
+    /// Every method in Scripts that polls IsInputAvailable, and the ones of them that do not send Client.Waiting once
+    /// before the poll: before it in the method, and not inside the loop that polls (once, not on each poll).
+    /// </summary>
+    internal static (List<string> Pollers, List<string> Unguarded) ScanPolls(IEnumerable<(string File, string Source)> files)
+    {
+        var pollers = new List<string>();
+        var unguarded = new List<string>();
+        foreach (var (file, source) in files)
+        {
+            var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+            foreach (var m in root.DescendantNodes().OfType<BaseMethodDeclarationSyntax>())
+            {
+                var polls = m.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Where(c => c.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.Text == "IsInputAvailable"
+                             || c.Expression is IdentifierNameSyntax id && id.Identifier.Text == "IsInputAvailable").ToList();
+                if (polls.Count == 0) continue;
+                string name = file + ":" + (m is MethodDeclarationSyntax md ? md.Identifier.Text : m.Kind().ToString());
+                pollers.Add(name);
+                var sends = m.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(SendsWaiting).ToList();
+                bool ok = polls.All(p =>
+                {
+                    var loop = p.Ancestors().FirstOrDefault(a => a is WhileStatementSyntax || a is ForStatementSyntax || a is DoStatementSyntax || a is ForEachStatementSyntax);
+                    return sends.Any(snd => snd.SpanStart < p.SpanStart && (loop == null ? true : !loop.Span.Contains(snd.Span)));
+                });
+                if (!ok) unguarded.Add(name);
+            }
+        }
+        return (pollers, unguarded);
+    }
+
+    private static IEnumerable<(string File, string Source)> ScriptSources()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "UsurperReborn.sln"))) dir = Path.GetDirectoryName(dir);
+        foreach (var f in Directory.GetFiles(Path.Combine(dir!, "Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            string rel = Path.GetRelativePath(dir!, f).Replace('\\', '/');
+            if (rel == "Scripts/UI/TerminalEmulator.cs") continue;   // the poll itself; the terminal has no caller of it
+            yield return (rel, File.ReadAllText(f));
+        }
+    }
+
+    [Fact]
+    public void EveryInputPoll_SendsClientWaitingOnce_BeforeItPolls()
+    {
+        var (pollers, unguarded) = ScanPolls(ScriptSources());
+        unguarded.Should().BeEmpty("a poll the page does not know about would lock a web player's keys");
+        pollers.Should().BeEquivalentTo(new[] { "Scripts/Systems/CombatEngine.cs:AutoCombatStopRequested", "Scripts/Systems/OpeningStorySystem.cs:SkippableDelay" },
+            "the scan sees the two pollers");
+        Scan(TerminalSource()).Readers.Should().NotContain("IsInputAvailable", "the poll itself is not a read");
+    }
+
+    [Fact]
+    public void ThePollGuard_FailsOnAPollWithoutTheFrame_OrWithTheFrameOnEachPoll()
+    {
+        var files = ScriptSources().ToList();
+        var story = files.Single(f => f.File == "Scripts/Systems/OpeningStorySystem.cs");
+        const string send = "if (_terminal != null) UsurperRemake.Server.GmcpBridge.EmitWebWaiting(_terminal);";
+        story.Source.Should().Contain(send);
+        List<(string, string)> With(string src) => files.Select(f => f.File == story.File ? (f.File, src) : f).ToList();
+
+        ScanPolls(With(story.Source.Replace(send, ""))).Unguarded.Should().Contain("Scripts/Systems/OpeningStorySystem.cs:SkippableDelay", "no frame");
+
+        string perPoll = story.Source.Replace(send, "").Replace("                    if (_terminal != null && _terminal.IsInputAvailable())",
+            "                    " + send + "\n                    if (_terminal != null && _terminal.IsInputAvailable())");
+        perPoll.Should().NotBe(story.Source.Replace(send, ""));
+        ScanPolls(With(perPoll)).Unguarded.Should().Contain("Scripts/Systems/OpeningStorySystem.cs:SkippableDelay", "a frame on each poll");
+
+        string late = story.Source.Replace("            while (elapsed < milliseconds)", "            bool early = _terminal != null && _terminal.IsInputAvailable();\n            while (elapsed < milliseconds)")
+            .Replace(send, "").Replace("        private async Task SkippableDelay", "        private void Unused() { }\n        private async Task SkippableDelay");
+        ScanPolls(With(late)).Unguarded.Should().Contain("Scripts/Systems/OpeningStorySystem.cs:SkippableDelay");
+
+        var extra = files.Append(("Scripts/New.cs", "class N { void Poll(TerminalEmulator t) { while (true) { if (t.IsInputAvailable()) break; } } }")).ToList();
+        ScanPolls(extra).Unguarded.Should().Contain("Scripts/New.cs:Poll", "a new poller must send the frame");
     }
 
     [Fact]

@@ -1912,19 +1912,7 @@ public partial class CombatEngine
                     // Floor at one 50ms poll: Instant speed returns 0, which skipped
                     // the loop entirely and made auto-combat impossible to stop.
                     int delayMs = Math.Max(50, GetCombatDelay(500));
-                    int elapsed = 0;
-                    bool stopRequested = false;
-                    while (elapsed < delayMs)
-                    {
-                        if (terminal.IsInputAvailable())
-                        {
-                            terminal.FlushPendingInput();
-                            stopRequested = true;
-                            break;
-                        }
-                        await Task.Delay(50); // Check every 50ms
-                        elapsed += 50;
-                    }
+                    bool stopRequested = await AutoCombatStopRequested(delayMs);
 
                     if (stopRequested)
                     {
@@ -3465,6 +3453,27 @@ public partial class CombatEngine
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// The auto-combat stop key: true when a key arrives within <paramref name="delayMs"/> (polled every 50 ms; the
+    /// key is thrown away). 1.3.9: tells a web client session once, before the polls, that the game takes a key now.
+    /// </summary>
+    internal async Task<bool> AutoCombatStopRequested(int delayMs)
+    {
+        UsurperRemake.Server.GmcpBridge.EmitWebWaiting(terminal);
+        int elapsed = 0;
+        while (elapsed < delayMs)
+        {
+            if (terminal.IsInputAvailable())
+            {
+                terminal.FlushPendingInput();
+                return true;
+            }
+            await Task.Delay(50); // Check every 50ms
+            elapsed += 50;
+        }
+        return false;
     }
 
     /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>

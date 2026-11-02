@@ -40,6 +40,9 @@ namespace UsurperRemake.Systems
             int elapsed = 0;
             const int checkInterval = 50;
 
+            // 1.3.9: tell a web client session once, before the polls, that a key skips the story now
+            if (_terminal != null) UsurperRemake.Server.GmcpBridge.EmitWebWaiting(_terminal);
+
             while (elapsed < milliseconds)
             {
                 try
