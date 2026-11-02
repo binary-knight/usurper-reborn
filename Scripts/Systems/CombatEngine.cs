@@ -5090,7 +5090,7 @@ public partial class CombatEngine
             }
         }
 
-        // v0.57.2 — Abysswarden Corrupting Touch DoT: damages target AND heals caster each round.
+        // v0.57.2: Abysswarden Corrupting Touch DoT, damages target AND heals caster each round.
         // The ability's description says "Each tick heals you"; previously the implementation used
         // a generic Lifesteal status that only fired on player ATTACKS, not on DoT ticks, so the
         // heal felt absent mid-fight. Now applied per-round here next to poison.
