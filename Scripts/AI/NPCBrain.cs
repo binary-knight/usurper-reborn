@@ -638,7 +638,7 @@ public class NPCBrain
             });
         }
         
-        if (personality.IsLikelyToJoinGang() && owner.GangId == null)
+        if (personality.IsLikelyToJoinGang() && string.IsNullOrEmpty(owner.GangId))   // 1.3.10: "" after a load
         {
             actions.Add(new NPCAction 
             { 

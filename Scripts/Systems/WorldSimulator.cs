@@ -6689,7 +6689,8 @@ public class WorldSimulator
     
     private void ExecuteJoinGang(NPC npc, string targetId, WorldState world)
     {
-        if (string.IsNullOrEmpty(targetId) || npc.GangId != null) return;
+        // 1.3.10: no gang is an empty id (every loader sets ""), not only null
+        if (string.IsNullOrEmpty(targetId) || !string.IsNullOrEmpty(npc.GangId)) return;
         
         var gangLeader = world.GetNPCById(targetId);
         if (gangLeader == null || gangLeader.CurrentLocation != npc.CurrentLocation) return;
