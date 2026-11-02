@@ -199,6 +199,7 @@ public class WebMenu200Tests
     {
         GmcpBridge.IsWebClientPackage("Client.Menu").Should().BeTrue();
         GmcpBridge.IsWebClientPackage("Room.Detail").Should().BeTrue();
+        GmcpBridge.IsWebClientPackage("Client.Waiting").Should().BeTrue();
         GmcpBridge.IsWebClientPackage("Room.Info").Should().BeFalse();
         GmcpBridge.IsWebClientPackage("Comm.Channel.Text").Should().BeFalse();
         var emitTo = Source("Scripts/Server/GmcpBridge.cs");
@@ -719,8 +720,9 @@ public class WebMenu200Tests
         // watchdog code, which write to other sessions.
         var allowed = new Dictionary<string, string[]>
         {
-            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient", "EmitWebEnemies", "EmitWebFooterIfChanged", "EmitCombatEnemiesIfChanged" },
+            ["Scripts/Server/GmcpBridge.cs"] = new[] { "EmitWebClient", "EmitWebEnemies", "EmitWebFooterIfChanged", "EmitCombatEnemiesIfChanged", "EmitWebWaiting" },
             ["Scripts/Server/WebClientMenu.cs"] = new[] { "Emit" },
+            ["Scripts/UI/TerminalEmulator.cs"] = new[] { "ReadLineInteractiveAsync", "GetMaskedInput" },   // 1.3.9: Client.Waiting, at the start of each stream read
             ["Scripts/Locations/MainStreetWebMenu.cs"] = new[] { "EmitWebMenu" },
             ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu", "EmitWebMap" },
             ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter", "EmitWebFooterFor" },   // 1.3.9: EmitWebFooterFor, the status line and the prompt refresh
@@ -735,6 +737,7 @@ public class WebMenu200Tests
                 string callee = call.Expression.ToString();
                 bool sends = callee.EndsWith("EmitWebClient") || callee.EndsWith("WebClientMenu.Emit")
                     || callee.EndsWith("EmitWebEnemies") || callee.EndsWith("EmitWebFooterIfChanged")   // 2.0 phase 3a
+                    || callee.EndsWith("EmitWebWaiting")   // 1.3.9
                     || (callee.EndsWith("Emit") || callee.EndsWith("EmitTo"))
                         && GmcpBridge.WebClientPackages.Any(pkg => call.ArgumentList.ToString().Contains("\"" + pkg + "\""));
                 if (!sends) continue;

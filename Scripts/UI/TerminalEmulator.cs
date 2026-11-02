@@ -1863,6 +1863,9 @@ public partial class TerminalEmulator
             await _streamReadLock.WaitAsync();
             try
             {
+                // 1.3.9: tell a web client session the game is reading input, once per line read
+                UsurperRemake.Server.GmcpBridge.EmitWebWaiting(this);
+
                 var buffer = new System.Text.StringBuilder();
                 var charBuf = new char[1];
 
@@ -2296,6 +2299,9 @@ public partial class TerminalEmulator
     private async Task<string> ReadLineInteractiveAsync(string prompt)
     {
         if (_streamReader == null || _streamWriter == null) return string.Empty;
+
+        // 1.3.9: tell a web client session the game is reading input, once per line read
+        UsurperRemake.Server.GmcpBridge.EmitWebWaiting(this);
 
         // Ensure all pending output is flushed to the TCP stream before blocking on input.
         // Without this, MUD clients (Mudlet) may not render the prompt text because it's
