@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | A monster poisoned by the Gnoll's Poisonous Bite no longer hits harder, a boss's physical immunity and divine armor cut that poison, and the bite no longer comes from the Alchemist's thrown bombs.

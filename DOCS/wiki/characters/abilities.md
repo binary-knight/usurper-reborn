@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.9 | Enter at the target prompt of a single-target ability takes the last foe you picked by number in this fight while it lives.
 history: 1.3.8 | none
 history: 1.3.7 | The Alchemist's Philosopher's Bomb, Corrosive Cloud and Cataclysm Bomb deal more damage, Boss Slayer adds 4.5 percent to a class ability against Manwe, and a long quickbar row in screen reader mode or in the combat box continues on the next row.
 history: 1.3.6 | Attack and defense bonuses from different sources no longer add together, so the highest applies and the next returns when it ends, area abilities ask for no target and give no off-hand swing, Boss Slayer adds to class abilities against a boss or mini boss, and the stamina shown for abilities of level 50 and above is the cost charged.

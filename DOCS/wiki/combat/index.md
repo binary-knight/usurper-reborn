@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.9 | Auto-Combat is now the key O and combat speed the key X, Enter at the target prompt takes the last foe you picked by number in this fight while it lives, and a combat tip shows only when every key it names is one the combat menu uses.
 history: 1.3.8 | none
 history: 1.3.7 | Against Manwe the Creator's Ward stops 55 percent of what gear enchantments add after a hit, Godbane held or not.
 history: 1.3.6 | Magic resistance on your gear now cuts a monster's breath and spell damage by up to half, except an Old God's, a weakened monster sets 0.80 times its armor and Defense against your hits, Boss Slayer gear now adds its 10 percent to Power Attack, and U rescues each Downed ally once per fight.
