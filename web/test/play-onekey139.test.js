@@ -488,3 +488,65 @@ test('F3: a screen clear starts the read at the top of the screen: rows of the o
   read(p, ['scrolled away earlier', 'You hit it.', 'Choose action: '], 2, -1);
   assert.deepStrictEqual(p.el('combat-log').children.map((e) => e.textContent), ['You hit it.']);
 });
+
+// ---------------------------------------------------------------- Round 4: keys the game polls for and throws away
+
+for (const [name, storage] of VIEWS) {
+  test(name + ': every key typed after a poll frame until the next frame is consumed: none on the line, one key stays on', async () => {
+    const sent = [];
+    const p = await waitLoad(sent, storage);
+    frame(p, 'Client.Menu', fightMenu(3));
+    frame(p, 'Client.Waiting', { poll: true });
+    press(p, 's');
+    press(p, 'x');
+    dataOnly(p, 'q');
+    assert.deepStrictEqual(sent, ['s', 'x', 'q'], 'sent as typed: the game takes them');
+    waiting(p);
+    frame(p, 'Client.Menu', fightMenu(3));
+    press(p, 'a');
+    assert.deepStrictEqual(sent.slice(3), ['a\r'], 'after the stop the next menu key goes on one press');
+    waiting(p);
+    frame(p, 'Client.Menu', fightMenu(4));
+    press(p, 'x');
+    press(p, 'a');
+    assert.deepStrictEqual(sent.slice(4), ['x', 'a'], 'a normal read ends the poll: typed text counts again');
+  });
+
+  test(name + ': a poll frame drains a part typed line too; poll false, absent or not exactly true is a normal read', async () => {
+    for (const poll of [false, undefined, 'true', 1]) {
+      const sent = [];
+      const p = await waitLoad(sent, storage);
+      frame(p, 'Client.Waiting', { poll });
+      press(p, 'x');
+      waiting(p);
+      frame(p, 'Client.Menu', menu());
+      press(p, 'd');
+      assert.deepStrictEqual(sent, ['x', 'd'], 'x stays on the line: ' + String(poll));
+    }
+    const sent = [];
+    const p = await waitLoad(sent, storage);
+    press(p, 'z');
+    frame(p, 'Client.Waiting', { poll: true });
+    waiting(p);
+    frame(p, 'Client.Menu', menu());
+    press(p, 'd');
+    assert.deepStrictEqual(sent, ['z', 'd\r'], 'the poll\'s drain took the z typed before it');
+  });
+}
+
+test('Round 4: the Chronicle fight page shows no typed line for keys the poll consumed', async () => {
+  const sent = [];
+  const p = await waitLoad(sent, { playView: 'chronicle' });
+  frame(p, 'Char.Combat.Start', { enemies: FOE });
+  frame(p, 'Client.Menu', fightMenu(2));
+  fightScreen(p, ['Auto-combat running...', ''], -1);
+  press(p, 'x');
+  assert.strictEqual(typedLine(p), 'x', 'typed before the poll');
+  frame(p, 'Client.Waiting', { poll: true });
+  assert.strictEqual(typedLine(p), null, 'the poll frame drains it, and the page shows that at once');
+  press(p, 's');
+  assert.strictEqual(typedLine(p), null);
+  waiting(p);
+  fightScreen(p, ['[AUTO-COMBAT] Stopped.', 'Choose action: '], 1);
+  assert.strictEqual(typedLine(p), null, 'no false letter after the stop');
+});

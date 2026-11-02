@@ -640,6 +640,9 @@
             case 'Client.Waiting':
                 seenWaiting = true;
                 waitSince = -1;
+                polling = d.poll === true;
+                if (polling) lineTyped = '';
+                if (chronOn() && layoutNow() === 'fight') renderChronNow();
                 break;
             case 'Client.Menu':
                 chronMenu(d);
@@ -816,6 +819,9 @@
     var WAIT_MAX = 20000;
     var heldKey = null;     // the character of a held key's repeat in progress
     var seenWaiting = false;
+    // Client.Waiting with poll true: the game is polling for a key it throws away (the auto-combat stop key), and its
+    // drain takes every key pending. Until the next Client.Waiting, nothing typed goes on the line.
+    var polling = false;
     var waitSince = -1;     // Date.now() of the one key send being waited on, or -1
     function waitingForRead() {
         if (waitSince < 0) return false;
@@ -823,6 +829,7 @@
         return true;
     }
     function noteLine(data) {
+        if (polling) { lineTyped = ''; return; }
         var cr = data.lastIndexOf('\r');
         if (cr !== -1) { lineTyped = ''; data = data.slice(cr + 1); }
         data = data.replace(/\x1b\[20[01]~/g, '');
@@ -2183,7 +2190,7 @@
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
         state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = []; state.foot = {}; state.flog = [];
-        menuRound = false; lineTyped = ''; armedKey = null; heldKey = null; composing = false; seenWaiting = false; waitSince = -1;
+        menuRound = false; lineTyped = ''; armedKey = null; heldKey = null; composing = false; seenWaiting = false; waitSince = -1; polling = false;
         fightTail = -1;
         roomEnter = -1; clearMatched = 0; screenCleared();
         chronReset();
