@@ -244,7 +244,9 @@ public class CastleRest125Tests : IDisposable
         {
             var s = NewScreen("B", "Y", "");
             var prison = new PrisonLocation(null!, s.Term);   // a fresh location: nothing set its base player before
-            await prison.EnterLocation(hero, s.Term);
+            // 1.3.10: the paid bail walks the prisoner out to Main Street
+            var exit = await Assert.ThrowsAsync<LocationExitException>(() => prison.EnterLocation(hero, s.Term));
+            exit.DestinationLocation.Should().Be(GameLocation.MainStreet);
             return s.Text;
         });
         Capture("prison-enter-sr-en.txt", text);

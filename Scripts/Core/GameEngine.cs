@@ -5603,8 +5603,9 @@ public partial class GameEngine
             Thiefs = playerData.Thiefs,
             Brawls = playerData.Brawls,
             Assa = playerData.Assa,
-            DarkNr = playerData.DarkNr > 0 ? playerData.DarkNr : GameConfig.DefaultDarkDeeds,
-            ChivNr = playerData.ChivNr > 0 ? playerData.ChivNr : GameConfig.DefaultGoodDeeds,
+            // 1.3.10: the deed counts load as saved; a 0 left today stays 0 (the daily reset refills them)
+            DarkNr = Math.Max(0, playerData.DarkNr),
+            ChivNr = Math.Max(0, playerData.ChivNr),
             
             // Status — v0.57.12: retroactive paired-movement heal for pre-v0.57.12 saves that exceeded AlignmentCap
             // through bypass mutation sites. HealOverflow reduces the opposite scale by excess/2 and clamps.

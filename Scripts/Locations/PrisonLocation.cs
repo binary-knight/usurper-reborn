@@ -489,7 +489,9 @@ public partial class PrisonLocation : BaseLocation
         NewsSystem.Instance?.Newsy(true, Loc.Get("prison.news_bail_paid", playerName, $"{bailPaid:N0}"));
 
         await terminal.WaitForKey();
-        return true; // Exit prison
+        // 1.3.10: the freed player walks out to Main Street, as the escape and the served sentence do; a plain
+        // return ended the prison loop with no destination, which ended the session
+        throw new LocationExitException(GameLocation.MainStreet);
     }
 
     /// <summary>

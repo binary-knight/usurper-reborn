@@ -215,8 +215,10 @@ public class DormitoryLocation : BaseLocation
                 await ExamineSleeper();
                 return false;
             case 'G':
+                // 1.3.10: every sleep that happens leaves by an exception (Main Street, or logout online); a no or
+                // too little gold stays in the Dormitory instead of ending the location loop and the session
                 await GoToSleep();
-                return true;
+                return false;
             case 'K':
                 if (DoorMode.IsOnlineMode)
                     await AttackSleeper();
@@ -367,7 +369,16 @@ public class DormitoryLocation : BaseLocation
             return;
         }
 
-        // Single-player: classic behavior
+        // Single-player. 1.3.10: like the Inn and Home, a night's sleep only once it is late enough, and the night
+        // passes (world ticks to morning) instead of a new day at any hour
+        if (!DailySystemManager.CanRestForNight(currentPlayer))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("inn.sleep_not_late"));
+            await terminal.WaitForKey();
+            return;
+        }
+
         var confirm = await terminal.GetInput(Loc.Get("dormitory.stay_night"));
         if (!confirm.Equals("Y", StringComparison.OrdinalIgnoreCase))
             return;
@@ -381,10 +392,7 @@ public class DormitoryLocation : BaseLocation
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
 
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            await DailySystemManager.Instance.ForceDailyReset();
-        }
+        await DailySystemManager.Instance.RestAndAdvanceToMorning(currentPlayer);
 
         terminal.WriteLine(Loc.Get("dormitory.awaken_refreshed"), "green");
         await terminal.PressAnyKey();

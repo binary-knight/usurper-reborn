@@ -48,7 +48,7 @@ Online only: press O, then W Who's Online, C Chat, A [Arena](/wiki/en/online/are
 
 ## Lodging
 
-Lodging is the Dormitory. You can list and examine the other sleepers and sleep there. In single-player sleeping is free, restores you fully and starts a new day. Online a Dormitory bed costs {{balance:DormitorySleepCost}} gold; sleeping saves and logs you out, and leaves you open to attack while you sleep. Online you can also attack a sleeper for gold. The Inn also rents rooms online; see [the Inn](/wiki/en/world/rest/).
+Lodging is the Dormitory. You can list and examine the other sleepers and sleep there. In single-player sleeping is free and, as at the Inn and Home, only in the evening: you recover fully and wake the next morning. Online a Dormitory bed costs {{balance:DormitorySleepCost}} gold; sleeping saves and logs you out, and leaves you open to attack while you sleep. Online you can also attack a sleeper for gold. The Inn also rents rooms online; see [the Inn](/wiki/en/world/rest/).
 
 ## Level Master
 
