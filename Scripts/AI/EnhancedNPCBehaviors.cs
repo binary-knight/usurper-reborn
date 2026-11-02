@@ -523,6 +523,9 @@ public static class EnhancedNPCBehaviors
             // If candidate is already married, they must also be poly/open
             if (c.Married || c.IsMarried)
             {
+                // 1.3.10: an NPC married to a player is not wed to another NPC (the wedding would overwrite its
+                // SpouseName, and the player's widow notice reads it)
+                if (IsMarriedToAPlayer(c, candidates)) return false;
                 var cProfile = c.Brain?.Personality;
                 bool cIsPolyOrOpen = cProfile?.RelationshipPref == RelationshipPreference.Polyamorous
                                   || cProfile?.RelationshipPref == RelationshipPreference.OpenRelationship;
@@ -552,6 +555,21 @@ public static class EnhancedNPCBehaviors
 
         // Execute the marriage!
         ExecuteNPCMarriage(npc, chosen.Partner);
+    }
+
+    /// <summary>
+    /// 1.3.10: the NPC is married to a player: the player's romance record names it as a spouse (single-player), or
+    /// its SpouseName names no NPC on the roster (online, where the world sim has no player's romance record; the
+    /// same test as WorldSimulator.NotifyPlayerSpouseOfDeath).
+    /// </summary>
+    internal static bool IsMarriedToAPlayer(NPC npc, List<NPC> roster)
+    {
+        if (!(npc.Married || npc.IsMarried) || string.IsNullOrWhiteSpace(npc.SpouseName)) return false;
+        if (!string.IsNullOrEmpty(npc.ID) && RomanceTracker.Instance?.Spouses?.Any(s => s.NPCId == npc.ID) == true) return true;
+        string spouse = npc.SpouseName.Trim();
+        return !roster.Any(n => n != null && n != npc
+            && (string.Equals(n.Name2, spouse, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(n.Name1, spouse, StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>
