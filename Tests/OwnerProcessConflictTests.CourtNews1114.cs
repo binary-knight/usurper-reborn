@@ -58,7 +58,8 @@ public partial class OwnerProcessConflictTests
             var news = await CourtPoliticsNews("Newsworthy King", conflicts: 1);
 
             news.Should().ContainSingle("the delegate ran twice, but only the written run's news is posted");
-            (await StoredCourt()).ActivePlots.Should().BeEmpty("the plot ended in the written court");
+            // 1.3.10: carried out, the plot is gone; discovered, it stays listed for the king's arrest
+            (await StoredCourt()).ActivePlots.Should().OnlyContain(p => p.IsDiscovered, "the plot ended in the written court");
         }));
     }
 

@@ -7047,7 +7047,8 @@ public class WorldSimulator
             .Where(c => c.LoyaltyToKing < 40 && !c.IsPlotting)
             .ToList();
 
-        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count < 3)
+        // 1.3.10: a discovered plot waits in ActivePlots for the king's arrest; only the plots in motion count
+        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count(p => !p.IsDiscovered) < 3)
         {
             // Start a new plot
             var conspirators = unhappyMembers.Take(Random.Shared.Next(2, (Math.Min(4, unhappyMembers.Count)) + 1)).ToList();
@@ -7134,7 +7135,7 @@ public class WorldSimulator
             plot.IsDiscovered = true;
             plot.DiscoveredBy = "Royal Spymaster";
 
-            // Conspirators go to prison
+            // The conspirators leave the court (the king's Arrest Plotter jails any who is a real NPC)
             foreach (var conspirator in plot.Conspirators)
             {
                 var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
@@ -7157,7 +7158,7 @@ public class WorldSimulator
             };
             news.Add((true, Loc.Get(plotKey, CourtTitle(working), working.Name)));
 
-            working.ActivePlots.Remove(plot);
+            // 1.3.10: the discovered plot stays listed (it no longer advances) until the king arrests it
             return;
         }
 
