@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.8; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.9; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
@@ -19,7 +19,7 @@ Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, v
 
 | Main Street | Combat |
 |---|---|
-| ![Main Street, the town hub with its districts](DOCS/images/screenshot-main-street.png) | ![A dungeon fight, with the combat status panel](DOCS/images/screenshot-combat.png) |
+| ![Main Street in the districts layout](DOCS/images/screenshot-main-street.png) | ![A dungeon fight, with the combat status panel](DOCS/images/screenshot-combat.png) |
 
 | A dungeon room and its map | Character status |
 |---|---|
@@ -234,7 +234,7 @@ Total monsters killed, gold earned, time played, peak gold, deepest dungeon floo
 - CK-style parenting (24 scenarios with moral choices that shape your child's alignment).
 
 ### Game Preferences
-Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character. The Share combat data line (opt-in telemetry, see below) is there too; its answer covers the copy of the game, or the account on a BBS or server.
+Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character. Main Street opens in the classic layout; the districts layout is a choice in Settings, and on the web client so is whether menu keys act on one press (the default) or wait for Enter. The Share combat data line (opt-in telemetry, see below) is there too; its answer covers the copy of the game, or the account on a BBS or server.
 
 ## Estimated Playtime
 
@@ -250,7 +250,7 @@ Quick settings via the Preferences menu (compact, screen-reader, language, font 
 
 The official server is `play.usurper-reborn.net`. Multiple connection paths:
 
-- **Browser:** [usurper-reborn.net](https://usurper-reborn.net) with an embedded xterm.js terminal. No install. Easiest for new players.
+- **Browser:** [usurper-reborn.net](https://usurper-reborn.net) with an embedded xterm.js terminal, or the full page client at `/play/` (with a tap pad on phones). No install. Easiest for new players.
 - **SSH:** `ssh usurper@play.usurper-reborn.net -p 4000` (gateway password `play`). Once connected, you'll see the in-game register/login screen.
 - **MUD client:** `play.usurper-reborn.net 4000` raw TCP. Mudlet, MUSHclient, TinTin++, etc. GMCP enabled (live HP/MP/SP gauges, room info, character status, chat capture).
 - **Steam:** [Usurper Reborn on Steam](https://store.steampowered.com/app/4336570/Usurper_Reborn/), use the in-game `[O] Online Play` menu.

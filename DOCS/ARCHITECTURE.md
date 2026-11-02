@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.8; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.9; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.8. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.9. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -1670,7 +1670,7 @@ usurper-mud (port 4001) -> game server (multi-user, SQLite-backed, integrated wo
 ### Nginx
 **File**: `scripts-server/nginx-usurper.conf`
 
-Static files from `/opt/usurper/web/`. `/api/*` -> `127.0.0.1:3000`. `/ws` -> WebSocket with 24-hour timeout. SSL via Let's Encrypt certbot (auto-renewing). The SSE feeds (`/api/feed`, `/api/dash/feed`) have their own location with buffering off and a 24-hour read timeout; the `/api/` block rate-limits and proxies. The HTTPS redirect exemption for `/api/releases/latest` (Win7 TLS fallback path; v0.49.7) is added by `scripts-server/fix-nginx-http-releases.py`, not by the conf in the repo.
+Static files from `/opt/usurper/web/`. `/api/*` -> `127.0.0.1:3000`. `/ws` -> WebSocket with 24-hour timeout. SSL via Let's Encrypt certbot (auto-renewing). The SSE feeds (`/api/feed`, `/api/dash/feed`) have their own location with buffering off and a 24-hour read timeout; the `/api/` block rate-limits and proxies. The server block includes three snippets from `/etc/nginx/snippets/`: the CSP header (`nginx-csp.conf`), `Cache-Control: no-cache` for pages, styles, scripts and JSON files (`nginx-cache.conf`, with its map `nginx-cache-map.conf` installed in `/etc/nginx/conf.d/`), and a 404 for private files in the web folder (`nginx-private.conf`: names starting with a dot except `.well-known`, `.bak` copies, the package manifests, `node_modules` and the server scripts); `staticFilePath` in `web/ssh-proxy.js` refuses the same set (`PRIVATE_FILES`) when node serves the folder. The HTTPS redirect exemption for `/api/releases/latest` (Win7 TLS fallback path; v0.49.7) is added by `scripts-server/fix-nginx-http-releases.py`, not by the conf in the repo.
 
 ### Systemd Services
 - **haproxy** -- port-4000 multiplexer; SSH-version-line sniff routes "SSH-..." to sshd-usurper:4022, everything else to MudServer:4001 with a PROXY v2 header prepended (replaced sslh in v0.64.0)
@@ -1745,7 +1745,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.8"
+Version = "1.3.9"
 VersionName = "Reckoning"
 ```
 
