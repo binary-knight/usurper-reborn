@@ -587,5 +587,12 @@
   "play.chron.revives": "Resurr.",
   "play.chron.map_explored": "Mappa: {0}/{1} esplorate",
   "play.chron.map_label": "Mappa del piano, {0} stanze esplorate su {1}",
-  "play.chron.sheet": "Scheda del personaggio"
+  "play.chron.sheet": "Scheda del personaggio",
+  "play.combat.champion": "Campione",
+  "play.chron.low_hp": "PF bassi",
+  "play.chron.type_number": "Scrivi il numero, poi Invio: {0}",
+  "play.chron.cap_number": "N.",
+  "play.chron.more_keys": "Altri tasti",
+  "play.chron.keys_one": "Qui basta un tasto per scegliere; non serve Invio.",
+  "play.chron.keys_enter": "Premi un tasto, poi Invio. Un tasto qui sotto invia anche Invio."
 }
