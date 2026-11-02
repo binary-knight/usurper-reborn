@@ -1490,6 +1490,9 @@ Standalone and Steam builds ship with WezTerm AppImage / .exe + 8 font files in 
 ### Font Selection
 In-game `[7] Terminal Font` preference writes `font-choice.txt`; WezTerm reads and auto-reloads. Font scaling 0.85x-1.4x persists in localStorage (Electron client) or via the same prefs file.
 
+### Window Size
+The window opens at 80x50 the first time. After that it opens at the size the player last left it at: `wezterm.lua` saves `<cols> <rows>` to `window-size.txt` beside it on `window-resized` (not in full screen, only a size from 80x24 to 400x200 that changed) and reads it before setting `initial_cols` and `initial_rows`. A missing, unreadable or out of range file keeps 80x50, and every read and write is under `pcall`, so a folder that cannot be written simply does not remember. The file is read with `io.open`, never watched, so a resize does not reload the config, and releases do not ship it, so an update keeps the player's size.
+
 ### Linux Launcher Fallback
 `play.sh` rewritten in v0.52.6 with FUSE-fallback chain: WezTerm AppImage -> WezTerm with `APPIMAGE_EXTRACT_AND_RUN=1` -> system terminal emulators (gnome-terminal, konsole, alacritty, kitty, xterm) -> direct execution. Same chain in `play-accessible.sh` plus `--screen-reader` flag.
 

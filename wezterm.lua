@@ -23,8 +23,50 @@ config.hide_tab_bar_if_only_one_tab = false
 config.tab_bar_at_bottom = false
 config.enable_scroll_bar = false
 config.window_close_confirmation = 'NeverPrompt'
-config.initial_cols = 80
-config.initial_rows = 50
+-- Window size: 80x50 the first time; after that the size the player last left the window at.
+-- window-size.txt sits beside this file (like font-choice.txt) and holds "<cols> <rows>". A missing,
+-- unreadable or out of range file keeps the default; full screen is never saved. The file is read with
+-- io.open, not require, so writing it never reloads this config.
+local SIZE_FILE = config_dir .. sep .. 'window-size.txt'
+local MIN_COLS, MAX_COLS, MIN_ROWS, MAX_ROWS = 80, 400, 24, 200
+local function size_in_bounds(cols, rows)
+    return type(cols) == 'number' and type(rows) == 'number'
+        and cols == math.floor(cols) and rows == math.floor(rows)
+        and cols >= MIN_COLS and cols <= MAX_COLS and rows >= MIN_ROWS and rows <= MAX_ROWS
+end
+local function read_window_size()
+    local ok, cols, rows = pcall(function()
+        local f = io.open(SIZE_FILE, 'r')
+        if not f then return nil, nil end
+        local line = f:read('*l')
+        f:close()
+        if not line then return nil, nil end
+        local c, r = line:match('^%s*(%d+)%s+(%d+)%s*$')
+        return tonumber(c), tonumber(r)
+    end)
+    if ok and size_in_bounds(cols, rows) then return cols, rows end
+    return nil, nil
+end
+local saved_cols, saved_rows = read_window_size()
+config.initial_cols = saved_cols or 80
+config.initial_rows = saved_rows or 50
+local last_saved = { cols = config.initial_cols, rows = config.initial_rows }
+
+-- Save the size whenever the player resizes the window (only an in range size that changed; never full screen)
+wezterm.on('window-resized', function(window, pane)
+    pcall(function()
+        if window:get_dimensions().is_full_screen then return end
+        local dims = pane:get_dimensions()
+        local cols, rows = dims.cols, dims.viewport_rows
+        if not size_in_bounds(cols, rows) then return end
+        if cols == last_saved.cols and rows == last_saved.rows then return end
+        local f = io.open(SIZE_FILE, 'w')
+        if not f then return end
+        f:write(string.format('%d %d\n', cols, rows))
+        f:close()
+        last_saved.cols, last_saved.rows = cols, rows
+    end)
+end)
 config.window_padding = { left = 8, right = 8, top = 8, bottom = 8 }
 
 -- Themed title bar frame — dark navy with gold accents
