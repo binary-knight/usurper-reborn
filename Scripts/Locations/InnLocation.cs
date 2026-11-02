@@ -360,7 +360,7 @@ public class InnLocation : BaseLocation
             WriteSRMenuOption("G", Loc.Get("inn.drinking_game"));
             WriteSRMenuOption("U", Loc.Get("inn.gossip"));
             WriteSRMenuOption("E", Loc.Get("inn.rest"));
-            WriteSRMenuOption("O", $"{Loc.Get("inn.order_food")} (10 {Loc.Get("status.gold_label")})");
+            WriteSRMenuOption("O", Loc.Get("inn.order_food"));   // 1.3.10: the meals cost 15 gold and up, by level; the visual menu names no price
             terminal.WriteLine("");
 
             if (recruitableCompanions.Any())

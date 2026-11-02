@@ -1294,8 +1294,8 @@ public class SettlementLocation : BaseLocation
             new() { Key = "V", Label = Loc.Get("settlement.electron_view_buildings"), Category = "info", Icon = "buildings" },
             new() { Key = "C", Label = Loc.Get("settlement.electron_contribute"), Category = "service", Icon = "donate" },
             new() { Key = "P", Label = Loc.Get("settlement.electron_proposals"), Category = "team", Icon = "proposal" },
-            new() { Key = "T", Label = Loc.Get("settlement.electron_talk"), Category = "social", Icon = "talk" },
-            new() { Key = "O", Label = Loc.Get("settlement.electron_oracle"), Category = "info", Icon = "oracle" },
+            // 1.3.10: S, the services the text menu offers (there was no T or O key)
+            new() { Key = "S", Label = Loc.Get("settlement.electron_services"), Category = "service", Icon = "services" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

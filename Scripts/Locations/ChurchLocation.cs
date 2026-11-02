@@ -1434,12 +1434,13 @@ namespace UsurperRemake.Locations
                 return Loc.Get("church.align_good");
             else if (player.Chivalry == player.Darkness)
                 return Loc.Get("church.align_neutral");
-            else if (player.Darkness > player.Chivalry * 2)
-                return Loc.Get("church.align_evil");
+            // 1.3.10: the dark side mirrors the good side (more than 3x Demonic, more than 2x Very Evil, else Evil)
             else if (player.Darkness > player.Chivalry * 3)
+                return Loc.Get("church.align_demonic");
+            else if (player.Darkness > player.Chivalry * 2)
                 return Loc.Get("church.align_very_evil");
             else
-                return Loc.Get("church.align_demonic");
+                return Loc.Get("church.align_evil");
         }
         
         /// <summary>

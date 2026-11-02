@@ -145,7 +145,7 @@ namespace UsurperRemake.Systems
             await term.PressAnyKey();
 
             if (player != null)
-                HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player);
+                HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player, GameConfig.MenuTier3Level);   // 1.3.10: Progress opens at the full menu tier
             return true;
         }
     }

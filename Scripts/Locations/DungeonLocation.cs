@@ -549,7 +549,6 @@ public class DungeonLocation : BaseLocation
             ("", "white"),
             (Loc.Get("dungeon.tut.p1.move1"), "gray"),
             (Loc.Get("dungeon.tut.p1.move2"), "white"),
-            (Loc.Get("dungeon.tut.p1.move3"), "darkgray"),
         });
 
         // ── Screen 2: Entering a Room ──────────────────────────────────────────
@@ -579,7 +578,6 @@ public class DungeonLocation : BaseLocation
             (Loc.Get("dungeon.tut.p3.s"), "bright_green"),
             (Loc.Get("dungeon.tut.p3.t"), "bright_green"),
             (Loc.Get("dungeon.tut.p3.e"), "bright_green"),
-            (Loc.Get("dungeon.tut.p3.c"), "bright_green"),
             (Loc.Get("dungeon.tut.p3.num"), "bright_green"),
             (Loc.Get("dungeon.tut.p3.r"), "yellow"),
             ("", "white"),
@@ -658,7 +656,6 @@ public class DungeonLocation : BaseLocation
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.camp"), "bright_green"),
             (Loc.Get("dungeon.tut.p8.quit"), "bright_green"),
-            (Loc.Get("dungeon.tut.p8.back"), "bright_green"),
             (Loc.Get("dungeon.tut.p8.map"), "bright_green"),
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.tips"), "gray"),

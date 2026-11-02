@@ -7478,9 +7478,9 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
             }
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.stat_awakening_hint", currentPlayer))}"); // v1.1.12
+            terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.stat_awakening_hint", currentPlayer), GameConfig.MenuTier3Level)}"); // v1.1.12; 1.3.10: Progress opens at the full menu tier
             terminal.SetColor("white");
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer); // v1.1.12; 2.0: the player picks the layout text
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer, GameConfig.MenuTier3Level); // v1.1.12; 2.0: the player picks the layout text
             terminal.WriteLine("");
         }
 
