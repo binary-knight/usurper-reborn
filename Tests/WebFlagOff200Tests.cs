@@ -32,6 +32,8 @@ namespace UsurperReborn.Tests;
 /// To refresh the fixtures after a deliberate text change, run the test on the parent commit with the variable set.
 /// 1.3.9 (single combat keys) re-captured them on fix/combat-single-keys: the only difference is the combat menu rows
 /// for Auto-Combat and Speed ([AUTO] and [SPD] became [O] and [X]); every GMCP frame is the same.
+/// 1.3.10 (fix/combat-1310) re-captured them: the standard and screen reader fight menus list P, E, T, W and L (G3),
+/// and Char.Vitals combatSp is 306 of 306, not 100 (G6, the fight stamina starts at its maximum); nothing else.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WebFlagOff200Tests

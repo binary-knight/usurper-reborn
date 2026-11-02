@@ -1,4 +1,4 @@
-HP: 400/400, Gold: 1,234, Stamina: 100/306, Level 12, XP: 0% to next level, Revives: 0/3
+HP: 400/400, Gold: 1,234, Stamina: 306/306, Level 12, XP: 0% to next level, Revives: 0/3
 
 
 ---
@@ -150,6 +150,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -171,7 +176,7 @@ Bone Guard B attacks you!
 Bone Guard B attacks you!
 [66 damage vs 23 defense]
 43 damage gets through your defenses!
-ÿúÉChar.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}ÿðÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"alive":true}],"round":1}ÿð
+ÿúÉChar.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}ÿðÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"rank":"normal","alive":true}],"round":1}ÿð
   Round 2
 +----------------------------------------------------------+
 |                      COMBAT STATUS                       |
@@ -193,6 +198,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -206,7 +216,7 @@ Bone Guard B falls in combat!
 Bone Guard A attacks you!
 [Bone Guard A rolls: 18 + 14 = 32 vs DC 17]
 You dodge Bone Guard A's attack! (10% dodge)
-ÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":2}ÿð
+ÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":2}ÿð
   Round 3
 +----------------------------------------------------------+
 |                      COMBAT STATUS                       |
@@ -227,6 +237,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -241,7 +256,7 @@ Bone Guard A attacks you!
 Bone Guard A grazes you!
 [41 damage vs 23 defense]
 18 damage gets through your defenses!
-ÿúÉChar.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}ÿðÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":3}ÿð
+ÿúÉChar.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}ÿðÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":3}ÿð
   Round 4
 +----------------------------------------------------------+
 |                      COMBAT STATUS                       |
@@ -262,6 +277,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -273,6 +293,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -285,7 +310,7 @@ You crush Bone Guard A for 107 damage!
 Bone Guard A attacks you!
 [Bone Guard A rolls: 8 + 14 = 22 vs DC 17]
 You dodge Bone Guard A's attack! (10% dodge)
-ÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":4}ÿð
+ÿúÉChar.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":4}ÿð
   Round 5
 +----------------------------------------------------------+
 |                      COMBAT STATUS                       |
@@ -306,6 +331,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -317,6 +347,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant

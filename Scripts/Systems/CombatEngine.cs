@@ -462,10 +462,11 @@ public partial class CombatEngine
 
     /// <summary>
     /// 1.3.9: the keys a combat tip may name under each standard menu, with the potion key of that menu: the
-    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed);
+    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed),
+    /// and from 1.3.10 P, E, T, W and L (the tactics);
     /// the PvP menu (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and X and has no Auto-Combat.
     /// </summary>
-    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X" });
+    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X", "P", "E", "T", "W", "L" });   // 1.3.10: the tactics too
     internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "X" });
 
     /// <summary>
@@ -2933,12 +2934,13 @@ public partial class CombatEngine
 
     /// <summary>
     /// v1.2.2: one row of a compact BBS menu. Items are written in order; when the next item would pass
-    /// column 80 the row wraps before it and continues indented one space, so a longer translation never
-    /// runs past the edge of an 80 column terminal.
+    /// column 79 the row wraps before it and continues indented one space, so a longer translation never
+    /// runs past the edge of an 80 column terminal. 1.3.10 (G5): 79, not 80, as every other row; the Hungarian
+    /// full first row reached 80.
     /// </summary>
     internal sealed class BbsMenuRow
     {
-        internal const int Width = 80;
+        internal const int Width = 79;   // 1.3.10 (G5): 79, so a full row never reaches column 80
         private readonly TerminalEmulator t;
         private int col;
         internal BbsMenuRow(TerminalEmulator terminal) { t = terminal; }
@@ -3080,6 +3082,8 @@ public partial class CombatEngine
             row.Item("[K]", "bright_yellow", Loc.Get("combat.backstab_label") + " ", "darkgray");
         if (!isFollower && CanSmite(player))
             row.Item("[Z]", "bright_yellow", Loc.Get("combat.smite_label", player.SmiteChargesRemaining) + " ", "bright_white");
+        if (!isFollower && CanRage(player))   // 1.3.10 (G3)
+            row.Item("[G]", "bright_yellow", Loc.Get("combat.rage_label") + " ", "bright_red");
 
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
@@ -3305,6 +3309,15 @@ public partial class CombatEngine
         if (!isFollower && RescueOffered(player))
             terminal.WriteLine(Loc.Get("combat.rescue_menu_sr"));
 
+        // 1.3.10 (G3): the tactics, as the standard menu lists them
+        terminal.WriteLine($"  P - {Loc.Get("combat.power_attack")}");
+        terminal.WriteLine($"  E - {Loc.Get("combat.precise_strike")}");
+        terminal.WriteLine($"  T - {Loc.Get("combat.taunt")}");
+        terminal.WriteLine($"  W - {Loc.Get("combat.disarm")}");
+        terminal.WriteLine($"  L - {Loc.Get("combat.hide")}");
+        if (!isFollower && CanRage(player))
+            terminal.WriteLine($"  G - {Loc.Get("combat.rage_short")}");
+
         // Quickbar slots
         if (classInfo.Count > 0)
         {
@@ -3406,6 +3419,16 @@ public partial class CombatEngine
             }
         }
 
+        // 1.3.10 (G3): the tactics the fight takes from this prompt (Power Attack, Precise Strike, Taunt, Disarm, Hide),
+        // and Rage while the class can rage and is not raging; the compact menu showed them, this one did not
+        WriteBoxRow("[P] ", "white", Loc.Get("combat.power_attack"));
+        WriteBoxRow("[E] ", "white", Loc.Get("combat.precise_strike"));
+        WriteBoxRow("[T] ", "white", Loc.Get("combat.taunt"));
+        WriteBoxRow("[W] ", "white", Loc.Get("combat.disarm"));
+        WriteBoxRow("[L] ", "white", Loc.Get("combat.hide"));
+        if (!isFollower && CanRage(player))
+            WriteBoxRow("[G] ", "bright_red", Loc.Get("combat.rage_short"));
+
         // Quickbar slots [1]-[9]
         if (classInfo.Count > 0)
         {
@@ -3501,6 +3524,10 @@ public partial class CombatEngine
 
     /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>
     internal static bool CanBackstab(Character player) => player.GetClassCombatModifiers().BackstabMultiplier > 1f;
+
+    /// <summary>1.3.10 (G3): [G] Rage is for a class whose modifier allows it (the Barbarian), while not raging; the
+    /// fight prompt's own condition.</summary>
+    internal static bool CanRage(Character player) => player.GetClassCombatModifiers().RageAvailable && !player.IsRaging;
 
     /// <summary>1.3.2: [Z] Smite is for a class with daily smite charges (the Paladin), while one is left.</summary>
     internal static bool CanSmite(Character player) => player.GetClassCombatModifiers().SmiteCharges > 0 && player.SmiteChargesRemaining > 0;
@@ -15213,7 +15240,7 @@ public partial class CombatEngine
 
             // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
             if (!GameConfig.ElectronMode)
-                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered, hasTeammatesNeedingAid, canHealAlly), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
 
             if (!GameConfig.ElectronMode)
             {
@@ -15465,7 +15492,7 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "G":
-                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides
+                    if (CanRage(player))   // 1.3.2: the class modifier decides; 1.3.10: the menus share the condition
                     {
                         action.Type = CombatActionType.Rage;
                         return (action, false);

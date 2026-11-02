@@ -15313,6 +15313,7 @@
   "combat.out_of_smites": "Hai esaurito le cariche di punizione sacra!",
   "combat.backstab_label": "Pugnalata",
   "combat.smite_label": "Punizione ({0} rimaste)",
+  "combat.rage_label": "Furia",
   "combat.nothing_to_disarm": "Niente da disarmare!",
   "combat.disarm_failed": "Tentativo di disarmo fallito!",
   "combat.hide_shadows": "Ti fondi con le ombre, pronto a colpire!",
