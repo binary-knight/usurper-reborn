@@ -275,9 +275,11 @@ public static class DifficultySystem
     public static float GetMonsterDamageMultiplier() => GetMonsterDamageMultiplier(CurrentDifficulty);
 
     /// <summary>
-    /// Get player damage multiplier for current difficulty
+    /// Get player damage multiplier for current difficulty. 1.3.10: with the New Game+ damage unlock
+    /// (Tyrant's Aura, +15 percent) on top, so every player damage step that takes the difficulty takes it too.
     /// </summary>
-    public static float GetPlayerDamageMultiplier() => GetPlayerDamageMultiplier(CurrentDifficulty);
+    public static float GetPlayerDamageMultiplier() =>
+        GetPlayerDamageMultiplier(CurrentDifficulty) * UsurperRemake.Systems.MetaProgressionSystem.Instance.GetDamageMultiplier();
 
     /// <summary>
     /// Check if player can flee for current difficulty
@@ -295,14 +297,18 @@ public static class DifficultySystem
     public static bool IsPermadeath() => IsPermadeath(CurrentDifficulty);
 
     /// <summary>
-    /// Get healing multiplier for current difficulty
+    /// Get healing multiplier for current difficulty. 1.3.10: with the New Game+ healing unlock
+    /// (Healing Light, +25 percent) on top, at every heal that takes the difficulty.
     /// </summary>
-    public static float GetHealingMultiplier() => GetHealingMultiplier(CurrentDifficulty);
+    public static float GetHealingMultiplier() =>
+        GetHealingMultiplier(CurrentDifficulty) * UsurperRemake.Systems.MetaProgressionSystem.Instance.GetHealingMultiplier();
 
     /// <summary>
-    /// Get shop price multiplier for current difficulty
+    /// Get shop price multiplier for current difficulty. 1.3.10: with the New Game+ shop discount (Blessed
+    /// Commerce, 10 percent off) on top, so the Weapon, Armor and Magic shops take it.
     /// </summary>
-    public static float GetShopPriceMultiplier() => GetShopPriceMultiplier(CurrentDifficulty);
+    public static float GetShopPriceMultiplier() =>
+        GetShopPriceMultiplier(CurrentDifficulty) * (1f - UsurperRemake.Systems.MetaProgressionSystem.Instance.GetShopDiscount());
 
     /// <summary>
     /// Get affliction duration multiplier for current difficulty

@@ -449,6 +449,56 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.3.10: true once the god has been dealt with in any way (defeated, saved, allied, spared in the
+        /// dialogue or consumed): the states OldGodBossSystem counts as resolved. The town stories and the floor
+        /// hints read this; the enum bits they read before were never set.
+        /// </summary>
+        public bool IsGodResolved(OldGodType god) =>
+            OldGodStates.TryGetValue(god, out var state) && state.Status is
+                GodStatus.Defeated or GodStatus.Saved or GodStatus.Allied or GodStatus.Awakened or GodStatus.Consumed;
+
+        /// <summary>
+        /// 1.3.10: the floor hint "BOSS: ... awaits" stops once the god is dealt with for good: defeated, saved,
+        /// allied or consumed, the states OldGodBossSystem never meets again (a god spared in the dialogue, Awakened,
+        /// can still be met with its artifact, so its hint stays). The {god}_encountered flag is kept as a second
+        /// way: only the Temple writes one (Aurelion's); the other five were never written.
+        /// </summary>
+        public bool GodHintCleared(OldGodType god) =>
+            (OldGodStates.TryGetValue(god, out var state) && state.Status is
+                GodStatus.Defeated or GodStatus.Saved or GodStatus.Allied or GodStatus.Consumed)
+            || HasStoryFlag($"{god.ToString().ToLowerInvariant()}_encountered");
+
+        /// <summary>
+        /// 1.3.10: the major choices as saved (StorySystemsData.MajorChoices).
+        /// </summary>
+        public List<MajorChoiceSaveData> ExportMajorChoices() => MajorChoices.Values
+            .Select(c => new MajorChoiceSaveData { ChoiceId = c.ChoiceId, SelectedOption = c.SelectedOption, AlignmentImpact = c.AlignmentImpact })
+            .ToList();
+
+        /// <summary>
+        /// 1.3.10: a load puts back the chapter, the act it belongs to, the StoryFlag bits and the major choices.
+        /// Before 1.3.10 none was saved, so an old save loads at the first chapter with no bits and no choices.
+        /// </summary>
+        public void RestoreProgress(int chapter, int flagBits, IEnumerable<MajorChoiceSaveData>? choices)
+        {
+            CurrentChapter = Enum.IsDefined(typeof(StoryChapter), chapter) ? (StoryChapter)chapter : StoryChapter.Awakening;
+            UpdateCurrentAct();
+            StoryFlags = flagBits;
+            MajorChoices.Clear();
+            foreach (var c in choices ?? Enumerable.Empty<MajorChoiceSaveData>())
+            {
+                if (string.IsNullOrEmpty(c?.ChoiceId)) continue;
+                MajorChoices[c.ChoiceId] = new StoryChoice
+                {
+                    ChoiceId = c.ChoiceId,
+                    SelectedOption = c.SelectedOption ?? "",
+                    AlignmentImpact = c.AlignmentImpact,
+                    Timestamp = DateTime.Now
+                };
+            }
+        }
+
+        /// <summary>
         /// Get count of defeated gods
         /// </summary>
         public int GetDefeatedGodCount()

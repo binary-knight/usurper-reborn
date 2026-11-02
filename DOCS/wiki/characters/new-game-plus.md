@@ -68,9 +68,16 @@ Five prestige classes can be chosen at character creation on NG+: Tidesworn, Wav
 :::spoiler Spoiler: which ending unlocks which prestige class
 The Savior ending unlocks Tidesworn and Wavecaller. The Defiant ending unlocks Cyclebreaker. The Usurper ending unlocks Abysswarden and Voidreaver. The True Ending and the secret ending unlock all five.
 
-Ending bonuses for the next cycle: Usurper adds 10 Strength and 100 Darkness; Savior adds 100 Chivalry and knowledge of artifact locations; Defiant adds 0.25 to the experience multiplier and an ancient key; the True Ending adds 15 Strength, Defense and Stamina, artifact knowledge, the key and 0.5 to the experience multiplier.
+Ending bonuses for the next cycle: Usurper adds 10 Strength and 100 Darkness; Savior adds 100 Chivalry and knowledge of artifact locations; Defiant adds 0.25 to the experience multiplier and the Ancient Key; the True Ending adds 15 Strength, Defense and Stamina, artifact knowledge, the key and 0.5 to the experience multiplier. Artifact knowledge lists, in the story journal, each artifact you do not hold with the floor of the Old God who gives it. The Ancient Key is a keepsake and opens nothing.
 
-Lasting unlocks from a finished life: after the Usurper ending, a monster's attack is cut by 10 percent before your Defense is taken off it. After a life that ended with all 7 artifacts collected, the stats an artifact grants are 50 percent larger.
+Lasting unlocks from a finished life, which apply to every later character:
+
+- after the Usurper ending, your damage is 15 percent higher, and a monster's attack is cut by 10 percent before your Defense is taken off it;
+- after the Savior ending, healing is 25 percent stronger, and prices at the Weapon, Armor and Magic shops and the Dark Alley are 10 percent lower;
+- after the Defiant ending, every later cycle gets 0.25 on the experience multiplier; on the cycle right after a Defiant ending it is the same 0.25 the ending gives, not added twice;
+- after the True Ending, your nine stats are 15 percent higher, the artifact floors are listed in the journal, and seals give double experience;
+- after a life with 5,000 monster kills, an elite monster is 25 percent more likely;
+- after a life that ended with all 7 artifacts collected, the stats an artifact grants are 50 percent larger.
 
 The secret ending closes the cycle instead of offering NG+ or ascension.
 :::

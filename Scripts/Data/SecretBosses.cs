@@ -271,7 +271,7 @@ namespace UsurperRemake.Data
                     "",
                     "They reach up and touch your forehead.",
                     "",
-                    "MEMORIES FLOOD IN.",
+                    "VISIONS FLOOD IN.",
                     "",
                     "You have lived before. Many times.",
                     "You have loved before. And lost.",
@@ -279,7 +279,7 @@ namespace UsurperRemake.Data
                     "Sometimes you won. Sometimes you fell.",
                     "Always, you forgot.",
                     "",
-                    "'This time,' your echo whispers, 'remember everything.'",
+                    "'This time,' your echo whispers, 'try to remember.'",
                     "",
                     "They step back into the mirror and vanish.",
                     "",
@@ -385,7 +385,7 @@ namespace UsurperRemake.Data
                     "'Come home.'",
                     "",
                     "(You have gained the Wave Fragment: 'The Truth')",
-                    "(The True Ending is now available)"
+                    "(One step closer; the True Ending is still yours to earn)"
                 },
 
                 RewardXP = 100000,

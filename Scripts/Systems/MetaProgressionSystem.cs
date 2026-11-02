@@ -248,13 +248,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get XP multiplier based on unlocks
+        /// Get XP multiplier based on unlocks. 1.3.10: Mortal Pride gives the +25 percent the Defiant ending's
+        /// cycle bonus gives (its row says so); CycleSystem.CalculateCycleBonuses takes the larger of the two,
+        /// so the Defiant cycle does not get it twice. Only the row's number counts; no other unlock adds XP.
         /// </summary>
         public float GetXPMultiplier()
         {
             float multiplier = 1.0f;
-            if (HasBonus("MORTAL_PRIDE")) multiplier += 0.20f;
-            if (HasBonus("MULTIPLE_PATHS")) multiplier += 0.10f;
+            if (HasBonus("MORTAL_PRIDE")) multiplier += 0.25f;
             return multiplier;
         }
 
@@ -279,7 +280,8 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get monster flee chance reduction (Fear the Throne perk: enemies are -10% less likely to flee)
+        /// Fear the Throne: monsters deal 10 percent less damage (CombatEngine takes it off a monster's attack;
+        /// 1.3.10: the unlock row says so). The name is kept from when the text spoke of fleeing.
         /// </summary>
         public int GetMonsterFleeReduction() => HasBonus("FEAR_THE_THRONE") ? 10 : 0;
 
@@ -338,13 +340,13 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get rare monster spawn multiplier
+        /// Get rare monster spawn multiplier: Slayer makes an elite 25 percent more likely
+        /// (MonsterGenerator.EliteRollChance). 1.3.10: only the row's number; no other unlock adds to it.
         /// </summary>
         public float GetRareMonsterMultiplier()
         {
             float multiplier = 1.0f;
             if (HasBonus("SLAYER")) multiplier += 0.25f;
-            if (HasBonus("LEGEND_SLAYER")) multiplier += 0.25f;
             return multiplier;
         }
 

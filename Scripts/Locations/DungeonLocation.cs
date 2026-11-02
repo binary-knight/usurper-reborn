@@ -3055,25 +3055,25 @@ public class DungeonLocation : BaseLocation
         // Seal and boss floors
         if (floor == 15 && !story.CollectedSeals.Contains(SealType.FirstWar))
         { hint = Loc.Get("dungeon.guide_seal_2"); color = "bright_cyan"; }
-        else if (floor == 25 && !story.HasStoryFlag("maelketh_encountered"))
+        else if (floor == 25 && !story.GodHintCleared(OldGodType.Maelketh))
         { hint = Loc.Get("dungeon.guide_maelketh"); color = "bright_red"; }
         else if (floor == 30 && !story.CollectedSeals.Contains(SealType.Corruption))
         { hint = Loc.Get("dungeon.guide_seal_3"); color = "bright_cyan"; }
-        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        else if (floor == 40 && !story.GodHintCleared(OldGodType.Veloura))
         { hint = Loc.Get("dungeon.guide_veloura"); color = "bright_magenta"; }
         else if (floor == 45 && !story.CollectedSeals.Contains(SealType.Imprisonment))
         { hint = Loc.Get("dungeon.guide_seal_4"); color = "bright_cyan"; }
-        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        else if (floor == 55 && !story.GodHintCleared(OldGodType.Thorgrim))
         { hint = Loc.Get("dungeon.guide_thorgrim"); color = "bright_cyan"; }
         else if (floor == 60 && !story.CollectedSeals.Contains(SealType.Prophecy))
         { hint = Loc.Get("dungeon.guide_seal_5"); color = "bright_cyan"; }
-        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        else if (floor == 70 && !story.GodHintCleared(OldGodType.Noctura))
         { hint = Loc.Get("dungeon.guide_noctura"); color = "bright_magenta"; }
         else if (floor == 80 && !story.CollectedSeals.Contains(SealType.Regret))
         { hint = Loc.Get("dungeon.guide_seal_6"); color = "bright_cyan"; }
-        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        else if (floor == 85 && !story.GodHintCleared(OldGodType.Aurelion))
         { hint = Loc.Get("dungeon.guide_aurelion"); color = "bright_yellow"; }
-        else if (floor == 95 && !story.HasStoryFlag("terravok_encountered"))
+        else if (floor == 95 && !story.GodHintCleared(OldGodType.Terravok))
         { hint = Loc.Get("dungeon.guide_terravok"); color = "bright_yellow"; }
         else if (floor == 99 && !story.CollectedSeals.Contains(SealType.Truth))
         { hint = Loc.Get("dungeon.guide_seal_final"); color = "bright_cyan"; }
@@ -3919,7 +3919,7 @@ public class DungeonLocation : BaseLocation
                 hint = Loc.Get("dungeon.hint_paradox_child");
                 color = "bright_magenta";
             }
-            else if (!story.HasStoryFlag("maelketh_encountered"))
+            else if (!story.GodHintCleared(OldGodType.Maelketh))
             {
                 hint = Loc.Get("dungeon.hint_maelketh");
                 color = "bright_red";
@@ -3930,7 +3930,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_3");
             color = "bright_cyan";
         }
-        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        else if (floor == 40 && !story.GodHintCleared(OldGodType.Veloura))
         {
             hint = Loc.Get("dungeon.hint_veloura");
             color = "bright_magenta";
@@ -3940,7 +3940,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_4");
             color = "bright_cyan";
         }
-        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        else if (floor == 55 && !story.GodHintCleared(OldGodType.Thorgrim))
         {
             hint = Loc.Get("dungeon.hint_thorgrim");
             color = "bright_cyan";
@@ -3962,7 +3962,7 @@ public class DungeonLocation : BaseLocation
                 color = "bright_magenta";
             }
         }
-        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        else if (floor == 70 && !story.GodHintCleared(OldGodType.Noctura))
         {
             hint = Loc.Get("dungeon.hint_noctura");
             color = "bright_magenta";
@@ -3977,7 +3977,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_6");
             color = "bright_cyan";
         }
-        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        else if (floor == 85 && !story.GodHintCleared(OldGodType.Aurelion))
         {
             hint = Loc.Get("dungeon.hint_aurelion");
             color = "bright_yellow";
@@ -4001,7 +4001,7 @@ public class DungeonLocation : BaseLocation
                 hint = Loc.Get("dungeon.hint_destroy_darkness");
                 color = "bright_magenta";
             }
-            else if (!story.HasStoryFlag("terravok_encountered"))
+            else if (!story.GodHintCleared(OldGodType.Terravok))
             {
                 hint = Loc.Get("dungeon.hint_terravok");
                 color = "bright_yellow";
@@ -4302,6 +4302,16 @@ public class DungeonLocation : BaseLocation
             }
         }
 
+        // 1.3.10: the artifact floors, once a past cycle revealed them (the NG+ flag or the Artifact Memory unlock)
+        var artifactRows = ArtifactLocationRows(story);
+        if (artifactRows.Count > 0)
+        {
+            WriteSectionHeader(Loc.Get("dungeon.section_artifact_locations"), "bright_magenta");
+            terminal.SetColor("white");
+            foreach (var row in artifactRows) terminal.WriteLine(row);
+            terminal.WriteLine("");
+        }
+
         // What you know so far
         WriteSectionHeader(Loc.Get("dungeon.section_learned"), "bright_magenta");
         terminal.SetColor("white");
@@ -4332,6 +4342,32 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("gray");
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// 1.3.10: the journal rows of the artifact reveal: each artifact not yet held, with the floor of the Old God
+    /// who gives it (as the wiki lists it), and the Void Key, which comes once the other six are held. Empty
+    /// unless the NG+ cycle bonus set knows_artifact_locations or the Artifact Memory unlock is held.
+    /// </summary>
+    internal static List<string> ArtifactLocationRows(StoryProgressionSystem story)
+    {
+        var rows = new List<string>();
+        if (!story.HasStoryFlag("knows_artifact_locations") && !MetaProgressionSystem.Instance.ShouldRevealArtifactLocations())
+            return rows;
+        var gods = UsurperRemake.Data.OldGodsData.GetAllOldGods();
+        foreach (var artifact in ArtifactSystem.Instance.GetAllArtifacts().OrderBy(a => a.Type))
+        {
+            if (story.CollectedArtifacts.Contains(artifact.Type)) continue;
+            if (artifact.Type == ArtifactType.VoidKey)
+            {
+                rows.Add(Loc.Get("dungeon.artifact_location_void_key", artifact.LocName()));
+                continue;
+            }
+            var god = gods.Where(g => g.Type != OldGodType.Manwe && g.ArtifactDropped == artifact.Type)
+                .OrderBy(g => g.DungeonFloor).FirstOrDefault();
+            if (god != null) rows.Add(Loc.Get("dungeon.artifact_location_row", artifact.LocName(), god.DungeonFloor));
+        }
+        return rows;
     }
 
     private string GetChapterName(StoryChapter chapter)
@@ -4436,7 +4472,7 @@ public class DungeonLocation : BaseLocation
             steps.Add(Loc.Get("dungeon.step_descend"));
 
         // Story suggestions
-        if (!story.HasStoryFlag("met_stranger"))
+        if (!story.HasStoryFlag(OpeningSequenceSystem.MetFlag))   // 1.3.10: the flag the Stranger scene writes
             steps.Add(Loc.Get("dungeon.step_stranger"));
         if (story.CollectedSeals.Count < 7 && level >= 50)
             steps.Add(Loc.Get("dungeon.step_all_seals"));
