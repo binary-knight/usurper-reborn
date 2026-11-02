@@ -723,7 +723,7 @@ public class WebMenu200Tests
             ["Scripts/Server/WebClientMenu.cs"] = new[] { "Emit" },
             ["Scripts/Locations/MainStreetWebMenu.cs"] = new[] { "EmitWebMenu" },
             ["Scripts/Locations/DungeonLocation.cs"] = new[] { "EmitRoomDetail", "EmitRoomMenu", "EmitWebMap" },
-            ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter" },
+            ["Scripts/Locations/BaseLocation.cs"] = new[] { "EmitWebSheet", "EmitWebFooter", "EmitWebFooterFor" },   // 1.3.9: EmitWebFooterFor, the status line and the prompt refresh
             ["Scripts/Systems/CombatEngine.cs"] = new[] { "GetPlayerAction", "GetPlayerActionMultiMonster", "PlayerVsMonsters" },
         };
         foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "Scripts"), "*.cs", SearchOption.AllDirectories))

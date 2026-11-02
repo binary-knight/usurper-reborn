@@ -1015,6 +1015,10 @@ public partial class TerminalEmulator
 
     public async Task<string> GetInput(string prompt = "> ")
     {
+        // 1.3.9: a web client session's footer values (HP, level, gold, potions, XP) as they are now, before
+        // every prompt and pause; a no-op on every other session
+        UsurperRemake.Server.GmcpBridge.EmitWebRefreshIfChanged(this);
+
         // v1.1.13: a command typed at a pause is the answer to this prompt
         if (_pendingLine != null)
         {

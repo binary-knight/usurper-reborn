@@ -2521,12 +2521,18 @@ public abstract class BaseLocation
     /// of MaxPotions), and the lives counter and XP percent only where the line printed them. Sent only to a web client
     /// session, only for the character that session plays, and only when a value changed.
     /// </summary>
-    private void EmitWebFooter()
+    private void EmitWebFooter() => EmitWebFooterFor(currentPlayer);
+
+    /// <summary>
+    /// 2.0 phase 3a: Client.Footer for <paramref name="p"/>, with the values the status line would print. Sent by the
+    /// status line draw and (1.3.9) before each prompt (GmcpBridge.EmitWebRefreshIfChanged).
+    /// </summary>
+    internal static void EmitWebFooterFor(Character? p)
     {
-        if (!UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(currentPlayer)) return;
-        var lives = StatusLineLives(currentPlayer);
-        UsurperRemake.Server.GmcpBridge.EmitWebFooterIfChanged(currentPlayer.Healing, currentPlayer.MaxPotions,
-            lives?.Left, lives?.Max, lives == null ? null : lives.Value.Permadeath ? "lives" : "revives", StatusLineXpPercent(currentPlayer));
+        if (p == null || !UsurperRemake.Server.GmcpBridge.IsWebClientActive || !UsurperRemake.Server.GmcpBridge.IsSessionsOwnCharacter(p)) return;
+        var lives = StatusLineLives(p);
+        UsurperRemake.Server.GmcpBridge.EmitWebFooterIfChanged(p.Healing, p.MaxPotions,
+            lives?.Left, lives?.Max, lives == null ? null : lives.Value.Permadeath ? "lives" : "revives", StatusLineXpPercent(p));
     }
 
     /// <summary>
