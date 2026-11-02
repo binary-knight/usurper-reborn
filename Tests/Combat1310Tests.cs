@@ -174,4 +174,32 @@ public class Combat1310Tests
         Source("Scripts/Systems/CombatEngine.cs").Should().Contain("critical: monsterRoll.IsCriticalSuccess",
             "the monster attack passes its critical roll to the flavour line");
     }
+    // ------------------------------------------------------------------ G2: screen reader tips keep their keys
+
+    [Theory]
+    [MemberData(nameof(Langs))]
+    public void ScreenReaderTips_KeepEveryKeyInWords(string lang)
+    {
+        var keys = ((string[])typeof(CombatEngine).GetField("CombatTipKeys", S)!.GetValue(null)!).ToList();
+        keys.AddRange(((Dictionary<CharacterClass, string[]>)typeof(CombatEngine).GetField("ClassSpecificTipKeys", S)!.GetValue(null)!).Values.SelectMany(v => v));
+        int named = 0;
+        InLang(lang, () =>
+        {
+            foreach (var key in keys)
+            {
+                string raw = Loc.Get(key, "I");
+                string sr = CombatEngine.ScreenReaderTip(raw);
+                sr.Should().NotContain("[").And.NotContain("]", "{0} {1}: no bracket for the reader", lang, key);
+                foreach (Match m in Regex.Matches(raw, @"\[(\w+)\]"))
+                {
+                    named++;
+                    Regex.IsMatch(sr, $@"(^|[^\w]){Regex.Escape(m.Groups[1].Value)}([^\w]|$)").Should().BeTrue(
+                        "{0} {1}: the key {2} stays a word of its own in \"{3}\"", lang, key, m.Groups[1].Value, sr);
+                }
+            }
+        });
+        named.Should().BeGreaterThan(2, "the tips name keys");
+        CombatEngine.ScreenReaderTip("TIP: [D]efend halves it.").Should().Be("TIP: D - Defend halves it.");
+        Source("Scripts/Systems/CombatEngine.cs").Should().Contain("tip = ScreenReaderTip(tip);");
+    }
 }

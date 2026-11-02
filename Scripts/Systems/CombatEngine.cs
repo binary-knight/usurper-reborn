@@ -469,6 +469,17 @@ public partial class CombatEngine
     internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "X" });
 
     /// <summary>
+    /// 1.3.10 (G2): a combat tip for a screen reader, its keys kept in words as the screen reader menu names them
+    /// ("D - Defend"): a key joined to its word ("[D]efend") reads "D - Defend", a key on its own ("Press [X]") reads
+    /// "Press X". The brackets went before and "[D]efend" read "Defend", with no key.
+    /// </summary>
+    internal static string ScreenReaderTip(string tip)
+    {
+        tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\](\w+)", "$1 - $1$2");
+        return System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\]", "$1");
+    }
+
+    /// <summary>
     /// A tip every 5th round (10th at Fast or Instant), under the standard menu. 1.3.9: the potion tip names the
     /// shown menu's potion key, and a tip naming a key that menu does not list is not shown (the draw is the same,
     /// so seeded fights keep their numbers).
@@ -492,10 +503,7 @@ public partial class CombatEngine
             if (System.Text.RegularExpressions.Regex.Matches(tip, @"\[([^\]\s]+)\]").Any(m => Array.IndexOf(menu.Keys, m.Groups[1].Value) < 0))
                 return;
             if (GameConfig.ScreenReaderMode)
-            {
-                // Strip bracket-key formatting like [P]ower Attack → Power Attack
-                tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w)\]", "$1");
-            }
+                tip = ScreenReaderTip(tip);
             terminal.SetColor(ColorRole.Notice);
             foreach (var line in HintSystem.WordWrap(tip, 77))   // 1.3.9: within 79 columns in every language
                 terminal.WriteLine($"  {line}");
