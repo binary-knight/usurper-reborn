@@ -601,6 +601,7 @@ public class WebMenu200Tests
             items[k].Enabled.Should().BeTrue();
             var h = Hero(cls: CharacterClass.Barbarian);
             h.PoisonVials = 1; h.HerbHealing = 1;
+            h.HP = h.MaxHP / 2;   // 1.3.10 (B14): a potion at full health is refused before the turn
             var (action, _, _) = await PvpPrompt("door", h, k + "\nD\n");
             action.Type.Should().NotBe(CombatActionType.Defend, "{0} is taken", k);
         }
@@ -687,6 +688,87 @@ public class WebMenu200Tests
             var (action, _, _) = await MultiPrompt("web", Pal(), key + "\nD\n");
             action.Type.Should().Be(CombatActionType.Defend, "{0} with no ally is refused, as before", key);
         }
+    }
+
+    // ------------------------------------------------------------------ 1.3.10 B14: a heal that would restore little asks first
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task APotionForLittleHp_AsksFirst_NoSpendsNothing(string lang)
+    {
+        Character Hurt(long hp) { var h = Hero(); h.HP = hp; h.MaxHP = 400; h.Healing = 5; h.ManaPotions = 0; return h; }
+        var hero = Hurt(361);   // 39 missing, under 40 (10 percent)
+        var (no, _, text) = await MultiPrompt("door", hero, "I\nN\nD\n", lang: lang);
+        no.Type.Should().Be(CombatActionType.Defend, "No went back to the menu");
+        hero.Healing.Should().Be(5, "nothing was spent");
+        text.Should().Contain(Loc.GetIn(lang, "combat.potion_small_heal", 39, 400).Substring(0, 20));
+        // the question's rows (the scripted keys are not echoed, so the first row follows the action prompt here)
+        text.Split('\n').Select(r => r.Replace(Loc.GetIn(lang, "combat.choose_action"), "")).Should().OnlyContain(r => r.Length <= 79);
+        var (yes, _, _) = await MultiPrompt("door", Hurt(361), "I\nY\n", lang: lang);
+        yes.Type.Should().Be(CombatActionType.UseItem, "Yes drinks it");
+        var (plain, _, plainText) = await MultiPrompt("door", Hurt(360), "I\n", lang: lang);
+        plain.Type.Should().Be(CombatActionType.UseItem, "40 missing is 10 percent: no question");
+        plainText.Should().NotContain(Loc.GetIn(lang, "combat.potion_small_heal", 40, 400).Substring(0, 20));
+        var (full, _, fullText) = await MultiPrompt("door", Hurt(400), "I\nD\n", lang: lang);
+        full.Type.Should().Be(CombatActionType.Defend, "at full health the potion is refused, as before");
+        fullText.Should().Contain(Loc.GetIn(lang, "ui.no_usable_potions"));
+    }
+
+    private static Character Paladin(long hp)
+    {
+        var h = Hero(cls: CharacterClass.Paladin);
+        h.MaxHP = 400; h.HP = hp;
+        h.Quickbar[0] = "lay_on_hands";
+        h.CurrentCombatStamina = 200;
+        return h;
+    }
+
+    [Fact]
+    public async Task LayOnHands_AtFullHealth_IsRefusedBeforeItCostsAnything_AndAskesFirstForLittle()
+    {
+        var full = Paladin(400);
+        long st = full.CurrentCombatStamina;
+        var (a, _, text) = await MultiPrompt("door", full, "1\nD\n");
+        a.Type.Should().Be(CombatActionType.Defend, "refused, the menu came back");
+        full.CurrentCombatStamina.Should().Be(st, "no stamina spent");
+        text.Should().Contain(Loc.Get("combat.heal_no_one_hurt", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName));
+
+        var (no, _, noText) = await MultiPrompt("door", Paladin(395), "1\nN\nD\n");
+        no.Type.Should().Be(CombatActionType.Defend);
+        noText.Should().Contain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 5));
+        var (yes, _, _) = await MultiPrompt("door", Paladin(395), "1\nY\n");
+        yes.Type.Should().Be(CombatActionType.ClassAbility);
+        var (hurt, _, hurtText) = await MultiPrompt("door", Paladin(200), "1\n");
+        hurt.Type.Should().Be(CombatActionType.ClassAbility, "a real wound: no question");
+        hurtText.Should().NotContain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 200));
+    }
+
+    [Fact]
+    public async Task LayOnHands_ReadsTheAllies_ItCanHeal()
+    {
+        static Action<CombatEngine> With(Character ally) => e => typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(e, new List<Character> { ally });
+        var ally = new Character { Name2 = "Ally", HP = 380, MaxHP = 400 };
+        var (asked, _, text) = await MultiPrompt("door", Paladin(400), "1\nN\nD\n", setup: With(ally));
+        asked.Type.Should().Be(CombatActionType.Defend, "the ally misses 20 of 400: asked, and No");
+        text.Should().Contain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 20));
+        var wounded = new Character { Name2 = "Ally", HP = 100, MaxHP = 400 };
+        var (go, _, _) = await MultiPrompt("door", Paladin(400), "1\n", setup: With(wounded));
+        go.Type.Should().Be(CombatActionType.ClassAbility, "an ally with a real wound: no question");
+    }
+
+    [Fact]
+    public async Task Pvp_QuickHealForLittle_AsksFirst_AndAPotionAtFullHealthSpendsNoTurn()
+    {
+        var h = Hero(); h.MaxHP = 400; h.HP = 395; h.Healing = 3; h.ManaPotions = 0;
+        var (no, _, text) = await PvpPrompt("door", h, "Q\nN\nD\n");
+        no.Type.Should().Be(CombatActionType.Defend);
+        text.Should().Contain(Loc.Get("combat.potion_small_heal", 5, 400));
+        var f = Hero(); f.MaxHP = 400; f.HP = 400; f.Healing = 3; f.ManaPotions = 0;
+        var (full, _, fullText) = await PvpPrompt("door", f, "H\nD\n");
+        full.Type.Should().Be(CombatActionType.Defend, "refused before the turn");
+        fullText.Should().Contain(Loc.Get("combat.full_health"));
+        f.Healing.Should().Be(3);
     }
 
     // ------------------------------------------------------------------ the quickbar hint

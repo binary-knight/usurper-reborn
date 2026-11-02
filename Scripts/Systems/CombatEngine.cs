@@ -2809,6 +2809,25 @@ public partial class CombatEngine
                 }
             }
 
+            // 1.3.10 (B14): a healing potion at full health is refused before the turn is spent, and a quick heal for
+            // less than 10 percent of max HP asks first (H with a mana potion to use goes to the potion choice as before)
+            if (action.Type == CombatActionType.Heal || action.Type == CombatActionType.QuickHeal)
+            {
+                bool manaChoice = action.Type == CombatActionType.Heal && player.ManaPotions > 0 && player.Mana < player.MaxMana;
+                if (!manaChoice && player.Healing > 0)
+                {
+                    if (player.HP >= player.MaxHP)
+                    {
+                        terminal.WriteLine(Loc.Get("combat.full_health"), "yellow");
+                        await Pacing.Wait(GetCombatDelay(800));
+                        continue;
+                    }
+                    if (action.Type == CombatActionType.QuickHeal && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
+                }
+            }
+
             return action;
         }
     }
@@ -15287,6 +15306,10 @@ public partial class CombatEngine
                         await Pacing.Wait(GetCombatDelay(800));
                         continue;
                     }
+                    // 1.3.10 (B14): a healing potion for less than 10 percent of max HP asks first; No spends nothing
+                    if (hasHealPots && !hasManaPots && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
                     action.Type = CombatActionType.UseItem;
                     return (action, false);
 
@@ -32089,7 +32112,53 @@ public partial class CombatEngine
                 return (CombatActionType.ClassAbility, targetIdx, matched.slotId, 0, null, false);
             }
         }
+        // 1.3.10 (B14): a plain heal (Lay on Hands) with no one to heal is refused before it costs anything, and one
+        // that would restore little asks first
+        if (abilityDef != null && !await HealAbilityGate(player, abilityDef)) return null;
         return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, false);
+    }
+
+    /// <summary>
+    /// 1.3.10 (B14): true when the one healed is missing less than 10 percent of their max HP, so a heal restores less
+    /// than that. Full health is not a small heal; it is no heal (the callers refuse it).
+    /// </summary>
+    internal static bool SmallHeal(Character c) => c.HP < c.MaxHP && (c.MaxHP - c.HP) * 10 < c.MaxHP;
+
+    /// <summary>1.3.10 (B14): asks whether to heal anyway; Enter or No is No. Nothing is spent on No.</summary>
+    private async Task<bool> ConfirmHealAnyway(string message)
+    {
+        terminal.SetColor("yellow");
+        foreach (var row in UIHelper.WordWrap($"{message} {Loc.Get("ui.yn_default_no").TrimEnd()}", UIHelper.WrapWidth))
+            terminal.WriteLine(row);
+        return await terminal.AskYesNoAsync("> ", false);
+    }
+
+    /// <summary>1.3.10 (B14): a class ability that only heals (no effect, no buff), as Lay on Hands.</summary>
+    internal static bool IsPlainHealAbility(ClassAbilitySystem.ClassAbility a) =>
+        a.Type == ClassAbilitySystem.AbilityType.Heal && a.BaseHealing > 0 && string.IsNullOrEmpty(a.SpecialEffect)
+        && a.AttackBonus == 0 && a.DefenseBonus == 0;
+
+    /// <summary>
+    /// 1.3.10 (B14): before a plain heal ability is used from the player's own prompt: refused (nothing spent) when no
+    /// one it can heal (the player, and the living allies when it can target one) is hurt; asked first when everyone
+    /// hurt is missing less than 10 percent of their max HP. True to go on.
+    /// </summary>
+    private async Task<bool> HealAbilityGate(Character player, ClassAbilitySystem.ClassAbility ability)
+    {
+        if (!IsPlainHealAbility(ability)) return true;
+        var reach = new List<Character> { player };
+        if (ability.CanTargetAlly && currentTeammates != null)
+            reach.AddRange(currentTeammates.Where(t => t != null && t.IsAlive && t != player));
+        var hurt = reach.Where(c => c.HP < c.MaxHP).ToList();
+        if (hurt.Count == 0)
+        {
+            terminal.WriteLine(Loc.Get("combat.heal_no_one_hurt", ability.DisplayName), "yellow");
+            await Pacing.Wait(GetCombatDelay(1000));
+            return false;
+        }
+        if (hurt.All(SmallHeal))
+            return await ConfirmHealAnyway(Loc.Get("combat.heal_small_confirm", ability.DisplayName, hurt.Max(c => c.MaxHP - c.HP)));
+        return true;
     }
 
     /// <summary>
@@ -32166,7 +32235,9 @@ public partial class CombatEngine
             };
         }
 
-        // Handle ability quickbar slot
+        // Handle ability quickbar slot; 1.3.10 (B14): a plain heal with no one hurt is refused, a small one asks first
+        var healDef = ClassAbilitySystem.GetAbility(matched.slotId);
+        if (healDef != null && !await HealAbilityGate(player, healDef)) return null;
         return new CombatAction
         {
             Type = CombatActionType.ClassAbility,
