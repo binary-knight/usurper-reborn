@@ -30,12 +30,19 @@ public class EncounterInput139Tests
     /// </summary>
     private sealed class Connection : Stream, IReadableDataStream
     {
-        private readonly byte[] _before, _after;
+        private byte[] _before;
+        private readonly byte[] _after;
         private int _b, _a;
         public Connection(string typedBefore, string typedAfter)
         {
             _before = Encoding.UTF8.GetBytes(typedBefore);
             _after = Encoding.UTF8.GetBytes(typedAfter);
+        }
+        /// <summary>Bytes the player types now: they arrive on the connection and read as available.</summary>
+        public void Arrive(string typed)
+        {
+            var rest = _before.Skip(_b).Concat(Encoding.UTF8.GetBytes(typed)).ToArray();
+            _before = rest; _b = 0;
         }
         public bool HasReadableData => _b < _before.Length;
         public override int Read(byte[] buffer, int offset, int count)
@@ -74,13 +81,26 @@ public class EncounterInput139Tests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
+    /// <summary>The screen: when the text <paramref name="trigger"/> is drawn, <paramref name="typed"/> arrives.</summary>
+    private sealed class Screen : MemoryStream
+    {
+        private readonly Connection _c; private readonly string _trigger, _typed; private bool _done;
+        public Screen(Connection c, string trigger, string typed) { _c = c; _trigger = trigger; _typed = typed; }
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            base.Write(buffer, offset, count);
+            if (!_done && Encoding.UTF8.GetString(buffer, offset, count).Contains(_trigger)) { _done = true; _c.Arrive(_typed); }
+        }
+        public override void Write(ReadOnlySpan<byte> buffer) => Write(buffer.ToArray(), 0, buffer.Length);
+    }
+
     private static Character Walker() => new Character
     {
         Name1 = "walker", Name2 = "Walker", AI = CharacterAI.Human, Class = CharacterClass.Warrior, Race = CharacterRace.Human,
         Level = 5, HP = 100, MaxHP = 100, Gold = 500, Chivalry = 0,
     };
 
-    /// <summary>The beggar's prompt: G gives 10 gold, I walks past. G is also Guild Row on Main Street.</summary>
+    /// <summary>A beggar encounter: G gives 10 gold, I walks past. G is also Guild Row on Main Street.</summary>
     private static async Task<(Character who, EncounterResult result)> Beggar(TerminalEmulator t)
     {
         bool savedPacing = Pacing.Disabled;
@@ -89,8 +109,10 @@ public class EncounterInput139Tests
         {
             var who = Walker();
             var result = new EncounterResult();
-            var m = typeof(StreetEncounterSystem).GetMethod("ProcessBeggarEncounter", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var task = (Task)m.Invoke(StreetEncounterSystem.Instance, new object[] { who, result, t })!;
+            // the beggar, as the encounter roll starts it (ProcessEncounter, where every random encounter starts)
+            var m = typeof(StreetEncounterSystem).GetMethod("ProcessEncounter", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var task = (Task)m.Invoke(StreetEncounterSystem.Instance,
+                new object[] { who, StreetEncounterSystem.EncounterType.BeggarEncounter, GameLocation.MainStreet, result, t })!;
             (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(30)))).Should().Be(task, "the encounter must finish on the scripted input");
             await task;
             return (who, result);
@@ -140,17 +162,31 @@ public class EncounterInput139Tests
     }
 
     [Fact]
-    public void EveryEncounterPrompt_ReadsThroughTheFlushingHelpers()
+    public async Task AKeyTypedWhileTheOptionsDraw_AnswersIt()
+    {
+        // the encounter has begun; the player reads the options as they appear and types I before the prompt waits
+        var c = new Connection("G\n", "");
+        var screen = new Screen(c, Loc.Get("street_encounter.beggar.opt_rob"), "I\n");
+        var t = new TerminalEmulator(c, screen);
+        var (who, result) = await Beggar(t);
+        who.Gold.Should().Be(500, "the G from before the encounter is gone");
+        result.Message.Should().Be(Loc.Get("street_encounter.beggar.msg_ignored"), "the I typed while the options drew is the answer");
+    }
+
+    [Fact]
+    public void EveryEncounter_DiscardsEarlierInput_BeforeItsFirstLine()
     {
         var src = File.ReadAllText(Path.Combine(FloorAndStun1113Tests.RepoRoot(), "Scripts", "Systems", "StreetEncounterSystem.cs"));
-        // the two old ITerminal wrappers, which nothing calls, and the helpers themselves read directly
-        var direct = Regex.Matches(src, @"terminal\.(GetKeyInput|GetInput)\(").Count;
-        direct.Should().Be(4, "only the two unused wrappers and the two helpers read the terminal directly");
-        Regex.Matches(src, @"await EncounterKey\(terminal\)").Count.Should().Be(9, "the nine key prompts of the random encounters");
-        Regex.Matches(src, @"await EncounterLine\(terminal, ").Count.Should().Be(7, "the merchant prompt and the six consequence prompts");
-        Regex.IsMatch(src, @"TerminalGetKeyInput\(terminal\)|TerminalGetInput\(terminal").Should().BeFalse("the unused wrappers stay unused");
-        int hostile = src.IndexOf("private async Task ProcessHostileNPCEncounter(");
-        src.IndexOf("await EncounterKey(terminal)", hostile).Should().BeLessThan(src.IndexOf("private async Task ProcessPickpocketEncounter("),
-            "the hostile stranger's prompt, the one in the play test, reads through EncounterKey");
+        int dispatch = src.IndexOf("private async Task ProcessEncounter(");
+        int firstCase = src.IndexOf("switch (type)", dispatch);
+        src.IndexOf("BeginEncounter(terminal);", dispatch).Should().BeInRange(dispatch, firstCase, "every random encounter starts here");
+        Regex.Matches(src, @"await ProcessEncounter\(").Count.Should().Be(1, "the roll is the one way in");
+        foreach (var call in new[] { "await ExecuteGrudgeConfrontation(", "await ExecuteSpouseConfrontation(" })
+        {
+            int at = src.IndexOf(call);
+            at.Should().BeGreaterThan(0);
+            src.LastIndexOf("BeginEncounter(terminal);", at).Should().BeGreaterThan(src.LastIndexOf("MarkConsequenceFired();", at), "{0} starts after the discard", call);
+        }
+        Regex.Matches(src, @"FlushPendingInput\(").Count.Should().Be(1, "only BeginEncounter discards; the prompts read what was typed after it");
     }
 }

@@ -48,22 +48,13 @@ public class StreetEncounterSystem
     private async Task TerminalPressAnyKey(TerminalEmulator terminal) => await terminal.PressAnyKey();
 
     /// <summary>
-    /// 1.3.9 (play test B5): an encounter's own prompt. Whatever was typed before it (a key meant for the screen
-    /// the encounter interrupted, a line kept from a pause) is discarded first, so the answer is a key typed on
-    /// this prompt. Every choice prompt of a street and consequence encounter reads through one of these two.
+    /// 1.3.9 (play test B5): the start of an encounter, before its first line. Whatever was typed before it (a key
+    /// meant for the screen the encounter interrupted, a line the reader holds, a line kept from a pause) is
+    /// discarded, so its prompt reads a key typed once the encounter began, including one typed while its options
+    /// were still drawing. Every random encounter starts in ProcessEncounter and every consequence encounter in
+    /// CheckForConsequenceEncounter, and both call this first.
     /// </summary>
-    internal static async Task<string> EncounterKey(TerminalEmulator terminal)
-    {
-        terminal.FlushPendingInput(alsoReaderBuffer: true);
-        return await terminal.GetKeyInput();
-    }
-
-    /// <summary>1.3.9 (play test B5): EncounterKey for a prompt that reads a line.</summary>
-    internal static async Task<string> EncounterLine(TerminalEmulator terminal, string prompt)
-    {
-        terminal.FlushPendingInput(alsoReaderBuffer: true);
-        return await terminal.GetInput(prompt);
-    }
+    internal static void BeginEncounter(TerminalEmulator terminal) => terminal.FlushPendingInput(alsoReaderBuffer: true);
 
     /// <summary>
     /// Types of street encounters
@@ -235,6 +226,7 @@ public class StreetEncounterSystem
     private async Task ProcessEncounter(Character player, EncounterType type, GameLocation location,
         EncounterResult result, TerminalEmulator terminal)
     {
+        BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
         switch (type)
         {
             case EncounterType.HostileNPC:
@@ -329,7 +321,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.hostile.opt_talk")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         switch (choice)
         {
@@ -383,7 +375,7 @@ public class StreetEncounterSystem
             terminal.Write("I", "bright_yellow");
             terminal.WriteLine($"]{Loc.Get("street_encounter.pickpocket.opt_ignore")}", "white");
 
-            string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+            string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
             if (choice == "G")
             {
@@ -470,7 +462,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.brawl.opt_buy_drink")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         if (choice == "F")
         {
@@ -564,7 +556,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.challenge.opt_insult")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         if (choice == "A")
         {
@@ -625,7 +617,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.mugging.opt_run")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         // Invalid input defaults to fight — you can't ignore thugs
         if (choice != "S" && choice != "R")
@@ -791,7 +783,7 @@ public class StreetEncounterSystem
             terminal.WriteLine($"]{Loc.Get("street_encounter.hostile.opt_fight")}", "white");
         }
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         if (choice == "F")
         {
@@ -928,7 +920,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.romance.opt_flirt")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         if (GameConfig.IsAffirmative(choice) || choice == "F") // v1.1.15: yesno-exempt: F (flirt) is a third accept key alongside Y/N, not a plain yes/no
         {
@@ -1024,7 +1016,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"] {Loc.Get("street_encounter.merchant.no_thanks")}", "white");
         terminal.WriteLine("");
 
-        string choice = await EncounterLine(terminal, Loc.Get("street_encounter.merchant.buy_prompt"));
+        string choice = await terminal.GetInput(Loc.Get("street_encounter.merchant.buy_prompt"));
         if (int.TryParse(choice, out int itemChoice) && itemChoice >= 1 && itemChoice <= items.Count)
         {
             var item = items[itemChoice - 1];
@@ -1086,7 +1078,7 @@ public class StreetEncounterSystem
         terminal.WriteLine($"]{Loc.Get("street_encounter.beggar.opt_rob")}", "white");
         terminal.WriteLine("");
 
-        string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
         if (choice == "G" && player.Gold >= 10)
         {
@@ -1209,7 +1201,7 @@ public class StreetEncounterSystem
             terminal.Write("B", "bright_yellow");
             terminal.WriteLine($"]{Loc.Get("street_encounter.guard.opt_bribe")}", "white");
 
-            string choice = (await EncounterKey(terminal)).ToUpperInvariant();
+            string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
             if (choice == "S")
             {
@@ -2288,6 +2280,7 @@ public class StreetEncounterSystem
             if (grudgeNpc != null)
             {
                 MarkConsequenceFired();
+                BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
                 await ExecuteGrudgeConfrontation(grudgeNpc, player, terminal, result);
                 return result;
             }
@@ -2299,6 +2292,7 @@ public class StreetEncounterSystem
             if (jealousSpouse != null)
             {
                 MarkConsequenceFired();
+                BeginEncounter(terminal);   // 1.3.9: before the encounter's first line
                 await ExecuteSpouseConfrontation(jealousSpouse, player, terminal, result);
                 return result;
             }
@@ -2556,7 +2550,7 @@ public class StreetEncounterSystem
             UIHelper.DrawMenuOption(terminal, "R", Loc.Get("street_encounter.grudge.opt_run"), "dark_red", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "dark_red");
 
-            var choice = await EncounterLine(terminal, Loc.Get("street_encounter.grudge.your_response"));
+            var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
             // v1.2.0: a clean escape is no fight, so neither the victory nor the defeat branch applies
             bool fought = false;
@@ -2631,7 +2625,7 @@ public class StreetEncounterSystem
             UIHelper.DrawMenuOption(terminal, "R", Loc.Get("street_encounter.grudge.opt_run"), "bright_red", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_red");
 
-            var choice = await EncounterLine(terminal, Loc.Get("street_encounter.grudge.your_response"));
+            var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
             switch (choice.Trim().ToUpper())
             {
@@ -2721,7 +2715,7 @@ public class StreetEncounterSystem
             UIHelper.DrawMenuOption(terminal, "R", Loc.Get("street_encounter.grudge.opt_run"), "bright_red", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "bright_red");
 
-            var choice = await EncounterLine(terminal, Loc.Get("street_encounter.grudge.your_response"));
+            var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
             switch (choice.ToUpper())
             {
@@ -2881,7 +2875,7 @@ public class StreetEncounterSystem
         UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "bright_red", "bright_yellow", "white");
         UIHelper.DrawBoxBottom(terminal, "bright_red");
 
-        var choice = await EncounterLine(terminal, Loc.Get("street_encounter.grudge.your_response"));
+        var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
         switch (choice.ToUpper())
         {
@@ -3000,7 +2994,7 @@ public class StreetEncounterSystem
         UIHelper.DrawMenuOption(terminal, "I", Loc.Get("street_encounter.throne.opt_imprison"), "bright_yellow", "bright_yellow", "red");
         UIHelper.DrawBoxBottom(terminal, "bright_yellow");
 
-        var choice = await EncounterLine(terminal, Loc.Get("street_encounter.throne.your_decree"));
+        var choice = await terminal.GetInput(Loc.Get("street_encounter.throne.your_decree"));
 
         switch (choice.ToUpper())
         {
@@ -3174,7 +3168,7 @@ public class StreetEncounterSystem
         UIHelper.DrawMenuOption(terminal, "R", Loc.Get("street_encounter.grudge.opt_run"), "bright_red", "bright_yellow", "gray");
         UIHelper.DrawBoxBottom(terminal, "bright_red");
 
-        var choice = await EncounterLine(terminal, Loc.Get("street_encounter.grudge.your_response"));
+        var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
         switch (choice.ToUpper())
         {
