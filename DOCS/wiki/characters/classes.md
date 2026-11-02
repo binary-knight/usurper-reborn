@@ -1,8 +1,9 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/Character.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs, Scripts/Data/SpecializationData.cs, Scripts/Data/EquipmentData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/TeamCornerLocation.cs
+history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | The Voidreaver gains 1.5 Constitution a level and an existing Voidreaver received what its levels would have given, Void Hunger and Soul Eater act at each kill and Corruption Harvest at each poisoned kill, inside the fight, and a lost level takes 3 Constitution from an Abysswarden, as a level gives.
 history: 1.3.6 | An NPC Bard teammate now gives Bardic Inspiration and can inspire you, never itself, and class ability and spell descriptions now say what each one does.

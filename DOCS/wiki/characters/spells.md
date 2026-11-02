@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.9 | Enter at the target prompt of a single-target spell takes the last foe you picked by number in this fight while it lives.
 history: 1.3.8 | none
 history: 1.3.7 | Power Hat heals at least 20 percent of maximum HP, rising after level 75 to 50 percent at level 100, Unmaking costs 10 percent of current HP instead of 25, and the spell menu wraps a long description so no row passes 79 columns.
 history: 1.3.6 | Frost Touch and Ice Storm slow a boss at most 1 round, Steal Life and Energy Drain heal half of the damage dealt, Purifying Surge cures an ally's poison and disease, Cycle Rewind and Blood Pact act only on the caster, Summon Angel and Summon Demon ask for no target and give their attack bonus, and Death Kiss and Power Word: Kill no longer kill mini bosses outright.

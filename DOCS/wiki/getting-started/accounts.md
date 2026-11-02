@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.3.9 | The browser, MUD client and SSH login screens show a purple border and title, a green menu and a red Quit, and the SSH gateway no longer shows its relay startup lines.
 history: 1.3.8 | Loading a single-player character now starts clean, with no story, companions, party, faction or memories left from the character played before it, and the SSH relay keeps the game's last lines when its input ends first.
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -22,7 +23,7 @@ How you sign in, how many characters you can keep, and what you can set before y
 
 An online account is a username and a password kept by the game server. The browser, MUD client and SSH paths end at the same login screen, with four choices: L to log in, R to register, G to change the language of the login screen, and Q to quit.
 
-- **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen. On a server that sends mail, this screen adds F (Forgot password) after a failed login; see [forgotten passwords](#forgotten-passwords).
+- **Browser and MUD clients.** The Play buttons in the [website's Play section](/#connect) open the play page at /play/, a browser terminal, in a new tab. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen. On a server that sends mail, this screen adds F (Forgot password) after a failed login; see [forgotten passwords](#forgotten-passwords).
 - **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, a login screen with the same L, R, G and Q choices asks for your own username and password. Its G changes the language of these login screens only; it is not saved to an account registered there.
 - **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. When the server can keep you logged in, the game asks "Stay logged in on this computer?" after you type your username and password and before the login is sent: Y, N, or D to stop asking. See [staying logged in](#staying-logged-in).
 

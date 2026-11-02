@@ -1,8 +1,9 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none

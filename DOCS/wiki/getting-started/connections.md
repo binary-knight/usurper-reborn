@@ -1,8 +1,9 @@
 ---
 title: Ways to play
 path: /wiki/en/getting-started/connections/
-checked: 1.3.8
+checked: 1.3.9
 sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md
+history: 1.3.9 | The website's Play buttons open the play page at /play/, a full page terminal with a tap pad on phones, a View choice of the Classic page or the Chronicle book view, also before login, and single key menus, on by default and changed with E in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -20,7 +21,7 @@ history: 1.2.3 | none
 ---
 ## Browser and SSH
 
-The [website's Play section](/#connect) has the browser terminal and connection information. The browser displays the same text game; keep the tab open during a session. Connection addresses belong on the website rather than in this versioned rules reference.
+The [website's Play section](/#connect) has the connection information, and its Play buttons open the browser terminal, the play page at /play/, in a new tab. The browser displays the same text game; keep the tab open during a session. Connection addresses belong on the website rather than in this versioned rules reference.
 
 An SSH client is another way to reach a hosted game. Use the server operator's published connection instructions. A dropped connection is not the same as choosing to quit, so reconnect and inspect your character before continuing. Online, a reconnect waits for your old session to finish saving, usually under a second, before your character loads, and you stay listed as online.
 
