@@ -146,6 +146,8 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .prose.fight .chap { font-size: 24px; }
 .chron .prose.fight .chap-sub { margin: 4px 0 6px; }
 .chron .ev.aside { font-family: var(--term); font-variant-numeric: tabular-nums; letter-spacing: -.01em; font-size: 14px; }
+.chron .typedline { flex: none; margin-top: .3em; font-family: var(--term); font-size: 14px; color: var(--ink-0); overflow-wrap: anywhere; white-space: pre-wrap; }
+html.hc .chron .typedline { font-family: var(--mono); font-size: 18px; color: #fff; }
 .chron .rd { font-family: var(--display); letter-spacing: .2em; text-align: center; color: var(--st-ink); margin: .55em 0 .2em; font-size: 18px; }
 .chron .rd::before, .chron .rd::after { content: ""; display: inline-block; width: 46px; height: 1px; background: var(--st-ink); vertical-align: middle; margin: 0 12px; }
 
