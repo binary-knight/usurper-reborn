@@ -2,7 +2,7 @@
 title: The Sanctum
 path: /wiki/en/world/sanctum/
 checked: 1.3.8
-sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MonsterGenerator.cs
+sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -12,7 +12,7 @@ history: 1.3.3 | A Tournament of Honor champion of level 25 or more has more HP 
 history: 1.3.2 | The Sanctum turns an Evil character away at the door, as the Church does.
 history: 1.2.5 | Honor tournament champions and their drops are shown in each player's language, and the daily cost row is translated into all five languages.
 ---
-The Sanctum offers charity and the honor tournament. It is separate from the Temple and the Castle's political menu. Open it from Main Street in the Castle Grounds district with S. Its holy wards turn an Evil character away at the door, as the Church's do; every other alignment may enter.
+The Sanctum offers charity and the honor tournament. It is separate from the Temple and the Castle's political menu. From Main Street press + for the Sanctum. With the district layout, open the Castle Grounds district with C, then press S. Its holy wards turn an Evil character away at the door, as the Church's do; every other alignment may enter.
 
 ## How much do alms cost
 

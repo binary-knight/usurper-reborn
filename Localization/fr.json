@@ -18769,6 +18769,7 @@
   "castle.realm_at_peace": "Le royaume est en paix... pour l’instant.",
   "castle.wanted": "RECHERCHÉ:",
   "castle.visit_quest_hall": "Visitez la Salle des Quêtes dans la Rue des Métiers, près de la Rue Principale, pour réclamer les primes.",
+  "castle.visit_quest_hall.classic": "Visitez la Salle des Quêtes [2] sur la Grand-Rue pour réclamer les primes.",
   "castle.must_leave_team_challenge": "Pour défier le trône, vous devez abandonner votre équipe.",
   "castle.leave_team_crown": "Quitter votre équipe pour poursuivre la couronne? (Y/N): ",
   "castle.chosen_challenge": "Vous avez choisi de défier le trône!",

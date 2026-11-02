@@ -26,9 +26,13 @@ public class ClassicKeyHints200Tests
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
     private static readonly string[] Langs = { "en", "es", "fr", "hu", "it" };
 
-    /// <summary>One thing a text names: a place, a district by itself, or a key that is not a Main Street key.</summary>
-    internal sealed record Step(P? Place = null, G? District = null, string? Inside = null);
+    /// <summary>
+    /// One thing a text names: a place, a district by itself, or a key that is not a Main Street key. NameOnly: the
+    /// text names the place (and its district) in words with no bracketed key, so it must carry no key for it.
+    /// </summary>
+    internal sealed record Step(P? Place = null, G? District = null, string? Inside = null, bool NameOnly = false);
     private static Step At(P p) => new(Place: p);
+    private static Step Named(P p) => new(Place: p, NameOnly: true); // named in words, no key
     private static Step Row(G g) => new(District: g);
     private static Step In(string key) => new(Inside: key); // a key inside a place or in combat, not on Main Street
 
@@ -55,6 +59,7 @@ public class ClassicKeyHints200Tests
         ("hint.mana_spells.msg", new[] { At(P.MagicShop) }),
         ("hint.quest_system.msg", new[] { At(P.QuestHall) }),
         ("hint.getting_started.msg", new[] { Row(G.MerchantRow), At(P.Dungeons), Row(G.GuildRow) }),
+        ("castle.visit_quest_hall", new[] { Named(P.QuestHall) }),
     };
 
     /// <summary>The classic variants: the places they name, each by its key on the classic Main Street.</summary>
@@ -80,6 +85,7 @@ public class ClassicKeyHints200Tests
         ("hint.mana_spells.msg.classic", new[] { At(P.MagicShop) }),
         ("hint.quest_system.msg.classic", new[] { At(P.QuestHall) }),
         ("hint.getting_started.msg.classic", new[] { At(P.WeaponShop), At(P.ArmorShop), At(P.Dungeons), At(P.QuestHall), At(P.LevelMaster) }),
+        ("castle.visit_quest_hall.classic", new[] { At(P.QuestHall) }),
     };
 
     /// <summary>Texts whose keys are the same on both layouts, so they need no variant.</summary>
@@ -120,6 +126,7 @@ public class ClassicKeyHints200Tests
         var keys = new List<string>();
         foreach (var s in steps)
         {
+            if (s.NameOnly) continue; // named in words only: no key may stand for it
             if (s.Inside != null) keys.Add(s.Inside);
             else if (s.District != null)
             {
@@ -215,6 +222,14 @@ public class ClassicKeyHints200Tests
         Problems(DistrictTexts, false, l => Broken(l, "journal.next_heal", "[H]", "[1]")).Should().NotBeEmpty();
         // a district text that drops its district step
         Problems(DistrictTexts, false, l => Broken(l, "base.train_how", "[G]", "")).Should().NotBeEmpty();
+        // the castle line's classic variant pointing at the district key for the Quest Hall
+        Problems(ClassicTexts, true, l => Broken(l, "castle.visit_quest_hall.classic", "[2]", "[U]")).Should().NotBeEmpty();
+        // the castle line's classic variant with its key dropped
+        Problems(ClassicTexts, true, l => Broken(l, "castle.visit_quest_hall.classic", "[2]", "")).Should().NotBeEmpty();
+        // the castle line's district text gaining a key it is listed without
+        Problems(DistrictTexts, false, l => Broken(l, "castle.visit_quest_hall", "Quest Hall", "Quest Hall [2]")).Should().NotBeEmpty();
+        // the castle line's district text no longer naming Guild Row
+        Problems(DistrictTexts, false, l => Broken(l, "castle.visit_quest_hall", "Guild Row", "Merchant Row")).Should().NotBeEmpty();
     }
 
     // ---------- the helper, and every call site through it ----------
@@ -317,5 +332,90 @@ public class ClassicKeyHints200Tests
 
         string claim = string.Join("\n", JournalSystem.BuildClaimLines(hero).Select(l => l.Text));
         claim.Should().Contain(Loc.Get("journal.line_level_ready" + suffix)).And.Contain(Loc.Get("journal.line_training_points" + suffix, 5));
+    }
+
+    // ---------- the wiki guides: the classic path first, then the district path ----------
+
+    /// <summary>The guides that give a Main Street path, and the place each one opens.</summary>
+    internal static readonly (string Guide, P Place)[] GuidePaths =
+    {
+        ("online/arena.md", P.Arena), ("online/world-boss.md", P.WorldBoss), ("world/castle.md", P.Castle),
+        ("world/anchor-road.md", P.Challenges), ("world/sanctum.md", P.Sanctum), ("world/home.md", P.Home), ("world/story.md", P.Progress),
+    };
+
+    /// <summary>The classic key for a place: its menu row key, or its key on the online row.</summary>
+    private static string ClassicGuideKey(P place) =>
+        MainStreetLocation.ClassicOnlineItems.Any(i => i.Place == place)
+            ? MainStreetLocation.ClassicOnlineItems.Single(i => i.Place == place).Key
+            : ClassicKey(place);
+
+    internal static List<string> GuideProblems(Func<string, string> read)
+    {
+        var problems = new List<string>();
+        foreach (var (guide, place) in GuidePaths)
+        {
+            string text = read(guide);
+            var e = MainStreetLocation.StreetEntries.Single(x => x.Place == place);
+            var d = MainStreetLocation.Districts.Single(x => x.Group == e.Group);
+            string classic = $"From Main Street press {ClassicGuideKey(place)} for ";
+            string district = $"With the district layout, open the {En(d.NameKey).Replace("&", "and")} district with {d.Key}, then press {e.Key}.";
+            int c = text.IndexOf(classic, StringComparison.Ordinal), k = text.IndexOf(district, StringComparison.Ordinal);
+            if (c < 0) problems.Add($"{guide}: no classic path \"{classic}\"");
+            if (k < 0) problems.Add($"{guide}: no district path \"{district}\"");
+            if (c >= 0 && k >= 0 && c > k) problems.Add($"{guide}: the district path comes before the classic path");
+        }
+        return problems;
+    }
+
+    private static string Guide(string relative) => File.ReadAllText(Path.Combine(MainStreetDistricts1113Tests.RepoRoot(), "DOCS/wiki", relative));
+
+    [Fact]
+    public void EveryGuidePath_GivesTheClassicKeyFirst_ThenTheDistrictPath()
+    {
+        GuideProblems(Guide).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TheGuideNegatives_CatchAWrongKey_AMissingPath_AndTheWrongOrder()
+    {
+        string Swap(string g, string from, string to) { string t = Guide(g); t.Should().Contain(from); return t.Replace(from, to); }
+        // the Castle guide giving the district key as the classic key
+        GuideProblems(g => g == "world/castle.md" ? Swap(g, "press K for the Castle", "press C for the Castle") : Guide(g)).Should().NotBeEmpty();
+        // the Arena guide giving the district key for the online row
+        GuideProblems(g => g == "online/arena.md" ? Swap(g, "press 6 for", "press A for") : Guide(g)).Should().NotBeEmpty();
+        // the story guide without its district path
+        GuideProblems(g => g == "world/story.md" ? Swap(g, " With the district layout, open the Status district with S, then press P.", "") : Guide(g)).Should().NotBeEmpty();
+        // the Home guide with the district path first
+        GuideProblems(g =>
+        {
+            if (g != "world/home.md") return Guide(g);
+            const string classic = "From Main Street press H for Home.", district = "With the district layout, open the Home and Hearth district with H, then press H.";
+            return Swap(g, classic + " " + district, district + " " + classic);
+        }).Should().NotBeEmpty();
+    }
+
+    private static string RoyalBounties(Character hero)
+    {
+        var castle = new CastleLocation();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(new[] { "", "", "" }), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(castle, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(castle, hero);
+        ((System.Threading.Tasks.Task)typeof(CastleLocation).GetMethod("RoyalQuests", F)!.Invoke(castle, null)!).GetAwaiter().GetResult();
+        term.StreamWriterInternal?.Flush();
+        return Encoding.UTF8.GetString(output.ToArray());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheCastleBountyBoard_SendsThePlayerToTheQuestHall_ByTheirLayout(bool districts)
+    {
+        string board = RoyalBounties(new Character { Name1 = "Board", Name2 = "Board", DistrictsMainStreet = districts });
+        string suffix = districts ? "" : ".classic";
+        string other = districts ? ".classic" : "";
+        board.Should().Contain(Loc.Get("castle.visit_quest_hall" + suffix)).And.NotContain(Loc.Get("castle.visit_quest_hall" + other));
+        if (districts) board.Should().Contain("Guild Row").And.NotContain("Quest Hall [2]");
+        else board.Should().Contain("Quest Hall [2] on Main Street").And.NotContain("Guild Row");
     }
 }
