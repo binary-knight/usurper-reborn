@@ -2,7 +2,7 @@
 title: Enchanting
 path: /wiki/en/items/enchanting/
 checked: 1.3.8
-sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs
+sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | Against Manwe the Creator's Ward stops 55 percent of what gear enchantments add after a hit, Godbane held or not, and the Magic Shop says when an item's name is too long to carry the enchant's tag.
 history: 1.3.6 | Magic resistance now cuts monster breaths and spells, and spells in player fights, by up to half, except Old God attacks, Phoenix Fire and Frostbite add 30 weapon power with new chances and go on weapons only, one of each element, weapon effects and life steal work in player fights and on the world boss, and Boss Slayer adds to Power Attack and class abilities.
@@ -11,7 +11,7 @@ history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Enchant removal refuses a cursed item without charging, and enchanting a worn item or removing its enchant leaves it worn.
 ---
-The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; Phoenix Fire, Frostbite and the last three, the counters, go on a weapon only.
+The Magic Shop enchants equipment. From Main Street press M for the Magic Shop. With the district layout, open the Merchant Row district with M, then press M. In the shop press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; Phoenix Fire, Frostbite and the last three, the counters, go on a weapon only.
 
 ## Enchant list and costs
 

@@ -341,6 +341,7 @@ public class ClassicKeyHints200Tests
     {
         ("online/arena.md", P.Arena), ("online/world-boss.md", P.WorldBoss), ("world/castle.md", P.Castle),
         ("world/anchor-road.md", P.Challenges), ("world/sanctum.md", P.Sanctum), ("world/home.md", P.Home), ("world/story.md", P.Progress),
+        ("gods/index.md", P.Temple), ("world/healer.md", P.Healer), ("items/banking.md", P.Bank), ("items/enchanting.md", P.MagicShop),
     };
 
     /// <summary>The classic key for a place: its menu row key, or its key on the online row.</summary>
@@ -383,6 +384,8 @@ public class ClassicKeyHints200Tests
         GuideProblems(g => g == "world/castle.md" ? Swap(g, "press K for the Castle", "press C for the Castle") : Guide(g)).Should().NotBeEmpty();
         // the Arena guide giving the district key for the online row
         GuideProblems(g => g == "online/arena.md" ? Swap(g, "press 6 for", "press A for") : Guide(g)).Should().NotBeEmpty();
+        // the Healer guide giving the district key as the classic key
+        GuideProblems(g => g == "world/healer.md" ? Swap(g, "press 1 for the Healer", "press H for the Healer") : Guide(g)).Should().NotBeEmpty();
         // the story guide without its district path
         GuideProblems(g => g == "world/story.md" ? Swap(g, " With the district layout, open the Status district with S, then press P.", "") : Guide(g)).Should().NotBeEmpty();
         // the Home guide with the district path first
