@@ -122,6 +122,7 @@ public class ClassicMainStreetDefault200Tests
         string classicText = Draw(classic, 10);
         Regex.Matches(classicText, Regex.Escape(tip)).Count.Should().Be(0, "a classic player never sees the tip");
         classic.ClassicTipDraws.Should().Be(0);
+        MainStreetLocation.TakeClassicLayoutTip(new Character(), false).Should().BeNull("the tip itself refuses a classic player");
 
         var opted = Hero();
         opted.HintsShown.Add(MainStreetLocation.DistrictsNoticeHint);
