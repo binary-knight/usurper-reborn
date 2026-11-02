@@ -411,6 +411,107 @@ public class ClientWaiting139Tests
         strip(web).Should().Be(strip(ssh), "the frames are out of band; the text is the same");
     }
 
+    /// <summary>
+    /// A connection the player types on in turns: O at the menu, then a key while the round plays out (it waits on
+    /// the connection, so a poll sees it), then the answers to whatever comes after, which arrive only when read.
+    /// </summary>
+    private sealed class Turns : Stream, IReadableDataStream
+    {
+        private readonly List<(byte[] Bytes, bool Waiting)> _chunks;
+        private int _i, _pos;
+        public Turns(params (string Text, bool Waiting)[] chunks) { _chunks = chunks.Select(c => (Encoding.UTF8.GetBytes(c.Text), c.Waiting)).ToList(); }
+        public bool HasReadableData => _i < _chunks.Count && _chunks[_i].Waiting && _i > 0 && _i == _readUpTo;
+        private int _readUpTo;   // a chunk waits only once everything before it has been read
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_i >= _chunks.Count) return 0;
+            var c = _chunks[_i].Bytes;
+            int n = Math.Min(count, c.Length - _pos);
+            Array.Copy(c, _pos, buffer, offset, n);
+            _pos += n;
+            if (_pos >= c.Length) { _i++; _pos = 0; _readUpTo = _i; }
+            return n;
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) => Task.FromResult(Read(buffer, offset, count));
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>A fight won in round one under auto-combat, with QZQ typed during the round; the text the session saw.</summary>
+    private static async Task<string> AutoFightEndsInRoundOne(string kind)
+    {
+        bool hitRoll = GameConfig.PlayerHitRollEnabled;
+        try
+        {
+            GameConfig.PlayerHitRollEnabled = false;   // the first swing lands, so the fight ends in round one
+            using var s = new Scope(kind);
+            var hero = new Character
+            {
+                Name1 = "Auto", Name2 = "Auto", AI = CharacterAI.Human, Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 10,
+                HP = 90000, MaxHP = 90000, BaseMaxHP = 90000, Strength = 900, BaseStrength = 900, Defence = 400, BaseDefence = 400,
+                Dexterity = 300, BaseDexterity = 300, Agility = 200, BaseAgility = 200, Constitution = 30, BaseConstitution = 30,
+                Intelligence = 20, BaseIntelligence = 20, Wisdom = 20, BaseWisdom = 20, Stamina = 100, BaseStamina = 100,
+                Mental = 80, Gold = 0, Healing = 0, AutoHeal = false, CombatSpeed = CombatSpeed.Instant,
+            };
+            var t = new TerminalEmulator(new Turns(("O\n", false), ("QZQ\n", true), (string.Concat(Enumerable.Repeat("\n", 60)), false)), s.Stream);
+            t.ServerEchoes = true;   // a line read echoes what it reads, so the text shows whether QZQ was read
+            if (s.Ctx != null) { s.Ctx.Terminal = t; s.Ctx.InitializeSystems(); }
+            var engine = new CombatEngine(t);
+            engine.SeedRandomForTests(1394);
+            var rat = new Monster { Name = "Rat", Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 1, Gold = 0, IsActive = true };
+            var task = engine.PlayerVsMonsters(hero, new List<Monster> { rat }, offerMonkEncounter: false);
+            (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60)))).Should().Be(task, "the fight ends");
+            var result = await task;
+            result.Outcome.Should().Be(CombatOutcome.Victory);
+            return TextOf(s.Bytes(t));
+        }
+        finally { GameConfig.PlayerHitRollEnabled = hitRoll; }
+    }
+
+    private static string TextOf(byte[] b)
+    {
+        var o = new List<byte>();
+        for (int i = 0; i < b.Length; i++)
+        {
+            if (i + 2 < b.Length && b[i] == 0xFF && b[i + 1] == 0xFA && b[i + 2] == 0xC9)
+            {
+                int end = i + 3;
+                while (end + 1 < b.Length && !(b[end] == 0xFF && b[end + 1] == 0xF0)) end++;
+                i = end + 1; continue;
+            }
+            o.Add(b[i]);
+        }
+        return Encoding.UTF8.GetString(o.ToArray());
+    }
+
+    [Fact]
+    public async Task AFightEndingInRoundOne_UnderAutoCombat_DropsTheWebStopKey()
+    {
+        var text = await AutoFightEndsInRoundOne("web");
+        text.Should().Contain(Loc.Get("combat.auto_combat_on").Substring(0, 12), "auto-combat ran");
+        text.Should().NotContain(Loc.Get("combat.auto_running"), "the fight ended before the stop key was polled");
+        text.Should().NotContain("QZQ", "the web page sent it as the stop key; no prompt after the fight reads it");
+    }
+
+    [Theory]
+    [InlineData("ssh")]
+    [InlineData("mud_gmcp")]
+    [InlineData("web_nogmcp")]
+    public async Task AFightEndingInRoundOne_UnderAutoCombat_KeepsOtherSessionsTypeAhead(string kind)
+    {
+        var text = await AutoFightEndsInRoundOne(kind);
+        text.Should().Contain(Loc.Get("combat.auto_combat_on").Substring(0, 12));
+        text.Should().NotContain(Loc.Get("combat.auto_running"), "the fight ended before the stop key was polled");
+        text.Should().Contain("QZQ", "{0} keeps its type-ahead: the next prompt reads it", kind);
+    }
+
     [Fact]
     public async Task TheStorySkip_SendsOneFrame_WhenItStartsListening_NotOnEachPoll()
     {

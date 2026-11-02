@@ -557,13 +557,14 @@ public static class GmcpBridge
     /// lock as EmitVitalsToFollower does. Web client sessions only; the frame goes straight to the owner's stream, so
     /// a spectator (mirrored from the terminal's text) never gets it.
     /// </summary>
-    public static void EmitWebWaiting(TerminalEmulator reading) => EmitWebWaiting(reading, OwnerOfTerminal);
+    public static void EmitWebWaiting(TerminalEmulator reading) => EmitWebWaiting(reading, OwnerOfTerminal);   // the result only matters to a poll
 
     /// <summary>
     /// 1.3.9: Client.Waiting {"poll": true}, for a poll that throws away the key it catches (the auto-combat stop key,
     /// the story skip), so the page knows that key is not typed on a line. Same owner and lock rule as a read.
     /// </summary>
-    public static void EmitWebPollWaiting(TerminalEmulator polling) => EmitWebWaiting(polling, OwnerOfTerminal, poll: true);
+    /// <returns>True when the frame was sent (a web client session owns the terminal).</returns>
+    public static bool EmitWebPollWaiting(TerminalEmulator polling) => EmitWebWaiting(polling, OwnerOfTerminal, poll: true);
 
     private static SessionContext? OwnerOfTerminal(TerminalEmulator reading)
     {
@@ -577,20 +578,21 @@ public static class GmcpBridge
         return null;
     }
 
-    internal static void EmitWebWaiting(TerminalEmulator reading, Func<TerminalEmulator, SessionContext?> resolve, bool poll = false)
+    internal static bool EmitWebWaiting(TerminalEmulator reading, Func<TerminalEmulator, SessionContext?> resolve, bool poll = false)
     {
         var ctx = SessionContext.Current;
         if (ctx == null || (ctx.Terminal != null && !ReferenceEquals(ctx.Terminal, reading)))
         {
             try { ctx = resolve(reading); }
-            catch { return; }
+            catch { return false; }
             // A new login under the same name has its own terminal; this terminal is not its.
-            if (ctx == null || !ReferenceEquals(ctx.Terminal, reading)) return;
+            if (ctx == null || !ReferenceEquals(ctx.Terminal, reading)) return false;
         }
-        if (!ctx.WebClient) return;
+        if (!ctx.WebClient) return false;
         var owner = ctx;
         object? payload = poll ? new { poll = true } : null;   // a line read sends the empty frame
         reading.RunUnderWriterLock(() => TryWriteFrame(owner, "Client.Waiting", payload, owner.Username));
+        return true;
     }
 
     /// <summary>

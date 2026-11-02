@@ -1621,6 +1621,7 @@ public partial class CombatEngine
         // Main combat loop
         int roundNumber = 0;
         bool autoCombat = false; // Auto-combat toggle
+        _webPollPending = false;
         bool leaderDeathAnnounced = false;
 
         // Combat continues as long as ANY party member is alive (not just leader)
@@ -2180,6 +2181,15 @@ public partial class CombatEngine
 
             // Short pause between rounds
             await Pacing.Wait(GetCombatDelay(1000));
+        }
+
+        // 1.3.9: the fight ended under auto-combat before it polled for the stop key it told the web page about; the
+        // page sent that key as a stop key, so it must not reach the next prompt. A web client session only: every
+        // other session keeps its type-ahead as before.
+        if (_webPollPending)
+        {
+            _webPollPending = false;
+            terminal.FlushPendingInput();
         }
 
         // v0.60.0, issue #87: hoist the kill-tracking sweep so it runs for EVERY
@@ -3459,13 +3469,18 @@ public partial class CombatEngine
     /// The auto-combat stop key: true when a key arrives within <paramref name="delayMs"/> (polled every 50 ms; the
     /// key is thrown away). 1.3.9: tells a web client session once, before the polls, that the game takes a key now.
     /// </summary>
+    /// <summary>1.3.9: a web client session was told the stop key is taken and the fight has not polled for it since.</summary>
+    private bool _webPollPending;
+
     internal async Task<bool> AutoCombatStopRequested(int delayMs)
     {
-        UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal);
+        if (UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal)) _webPollPending = true;
         int elapsed = 0;
         while (elapsed < delayMs)
         {
-            if (terminal.IsInputAvailable())
+            bool keyed = terminal.IsInputAvailable();
+            _webPollPending = false;   // it has polled since the frame
+            if (keyed)
             {
                 terminal.FlushPendingInput();
                 return true;
@@ -15320,7 +15335,7 @@ public partial class CombatEngine
                 case "AUTO":
                     // 1.3.9: a key typed from here on stops auto-combat at its first poll (the connection holds it),
                     // so a web client hears now, not when the first round has played out
-                    UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal);
+                    if (UsurperRemake.Server.GmcpBridge.EmitWebPollWaiting(terminal)) _webPollPending = true;
                     // Enable auto-combat mode
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine("");
