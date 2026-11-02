@@ -28,7 +28,12 @@ const regexOf = (line) => {
   const m = /^location ~ (\S+) \{ return 404; \}$/.exec(line);
   return m ? m[1] : null;
 };
-const DENY = RULES.map(regexOf).filter(Boolean).map((r) => new RegExp(r));   // eslint-disable-line security/detect-non-literal-regexp
+// the same three patterns as literals; a test below checks each against the snippet's text
+const DENY = [
+  /\/\.(?!well-known\/)/,
+  /\.bak$/,
+  /^\/(?:package(?:-lock)?\.json|ssh-proxy\.js|gmcp-split\.js|wiki-bot\.js|wiki-search\.js|dash-npcs\.js|dash-monster-names\.js|dash-observatory\.js)$/,
+];
 const nginxRefuses = (uri) => DENY.some((r) => r.test(uri)) || uri.startsWith('/node_modules/');
 
 // every page and asset in the web folder: everything but node_modules, the tests, dot files and the private names
@@ -49,6 +54,11 @@ test('the snippet is exactly four 404 rules: dot names but .well-known, .bak, th
     'location ~ ^/(?:package(?:-lock)?\\.json|ssh-proxy\\.js|gmcp-split\\.js|wiki-bot\\.js|wiki-search\\.js|dash-npcs\\.js|dash-monster-names\\.js|dash-observatory\\.js)$ { return 404; }',
     'location ^~ /node_modules/ { return 404; }',
   ]);
+});
+
+test('the literal patterns the tests use are the snippet\'s own', () => {
+  // a literal escapes each slash; nginx writes it bare
+  assert.deepEqual(DENY.map((r) => r.source.replace(/\\\//g, '/')), RULES.map(regexOf).filter(Boolean));
 });
 
 test('the main server block includes the snippet after the cache snippet and before its first location', () => {
