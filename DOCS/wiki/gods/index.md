@@ -2,7 +2,7 @@
 title: Gods and faith
 path: /wiki/en/gods/
 checked: 1.3.8
-sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/Character.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/Character.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -20,7 +20,7 @@ You worship one god at a time. The Temple's ten gods and the player-gods compete
 
 ## Choose a god at the Temple
 
-1. From Main Street, open Guild Row with G and press T for the Temple. It appears in the menu after your first few levels.
+1. From Main Street press T for the Temple. With the district layout, open the Guild Row district with G, then press T. It appears in the menu after your first few levels.
 2. Press A to enter the Nave of the Gods.
 3. Press W, "Worship a god, or change your god".
 4. The altars are listed. Type the god's name, or part of it, and confirm with Y when asked whether you are sure. Press Enter at the list to cancel.

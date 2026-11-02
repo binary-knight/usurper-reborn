@@ -2,7 +2,7 @@
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
 checked: 1.3.8
-sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/AmnesiaSystem.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MoralParadoxSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodEchoSystem.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs
+sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/AmnesiaSystem.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MoralParadoxSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodEchoSystem.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | A new character that is not NG+ now starts with no recovered memories, and loading a single-player save starts the story clean, with no seals, artifacts or Old God states left from the character played before it.
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -32,7 +32,7 @@ The Old Gods are ancient bosses deep in the dungeon. Each encounter needs a mini
 
 ## The Awakening
 
-The Awakening measures what your character comes to understand. It rises through stages from loss, mercy and wonder: companions, sparing a beaten foe, dreams, visions, discoveries, Wave Fragments and the songs of the Old Gods. Each of the seven stages brings a lasting boon: 3 Wisdom at stage 1, then more mana, experience, HP, damage and less damage taken, all listed under [Awakening boons](/wiki/en/characters/stats/#awakening-boons). Read your Ocean Journal from Main Street: Status district, then Progress. The last stage has its own condition, which the journal describes.
+The Awakening measures what your character comes to understand. It rises through stages from loss, mercy and wonder: companions, sparing a beaten foe, dreams, visions, discoveries, Wave Fragments and the songs of the Old Gods. Each of the seven stages brings a lasting boon: 3 Wisdom at stage 1, then more mana, experience, HP, damage and less damage taken, all listed under [Awakening boons](/wiki/en/characters/stats/#awakening-boons). Your Ocean Journal is under Progress. From Main Street press P for Progress. With the district layout, open the Status district with S, then press P. The last stage has its own condition, which the journal describes.
 
 ## Endings: how to get each ending
 

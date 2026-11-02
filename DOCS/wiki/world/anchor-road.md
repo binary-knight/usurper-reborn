@@ -2,7 +2,7 @@
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
 checked: 1.3.8
-sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs
+sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | Weapon enchants and life steal now work in bounty hunting and gang war fights, and magic resistance cuts a spell's damage there by up to half.
@@ -18,7 +18,7 @@ history: 1.2.5 | A refused Sellsword Hall turn-in now says why in words, and the
 history: 1.2.4 | none
 history: 1.2.3 | none
 ---
-Anchor Road is the town's challenge ground. From Main Street open the Castle Grounds district with C, then press C for Challenges. It appears once the full town menu unlocks.
+Anchor Road is the town's challenge ground. From Main Street press C for Challenges. With the district layout, open the Castle Grounds district with C, then press C. It appears once the full town menu unlocks.
 
 ## Challenges
 

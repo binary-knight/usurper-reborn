@@ -479,6 +479,7 @@ public partial class MainStreetLocation
         "base.training_points_hint", "base.train_how", "base.stat_awakening_hint",
         "hint.awakening.msg", "hint.low_hp.msg", "hint.first_level_up.msg", "hint.level_master.msg", "hint.mana_spells.msg",
         "hint.quest_system.msg", "hint.getting_started.msg",
+        "castle.visit_quest_hall",
     };
 
     /// <summary>

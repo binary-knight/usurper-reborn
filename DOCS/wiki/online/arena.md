@@ -2,7 +2,7 @@
 title: The Arena
 path: /wiki/en/online/arena/
 checked: 1.3.8
-sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | Weapon enchants and life steal now work in Arena fights, and magic resistance cuts a spell's damage there by up to half.
@@ -22,7 +22,7 @@ The Arena is the online game's player-versus-player ground. It exists only in on
 
 ## Where is the Arena
 
-From Main Street open the Online district with O, then press A for the Arena. The Online district does not appear in single-player. The Anchor Road Gauntlet is a different, monster-based challenge.
+From Main Street press 6 for the Arena; it is on the online row of the classic menu. With the district layout, open the Online district with O, then press A. The Arena does not appear in single-player. The Anchor Road Gauntlet is a different, monster-based challenge.
 
 ## How a fight works
 

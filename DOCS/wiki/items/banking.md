@@ -2,7 +2,7 @@
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
 checked: 1.3.8
-sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs
+sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -13,7 +13,7 @@ history: 1.3.2 | A bank robbery you lose leaves you at 1 HP and the bank takes i
 history: 1.2.5 | Bank screens, bank news and the bank's guards are shown in all five languages.
 history: 1.2.4 | The Bank's count of robbery attempts for the day is kept across server restarts.
 ---
-Gold on hand and bank gold are separate balances. The Bank, on Guild Row (G, then B), offers deposits, withdrawals, interest, loans, a guard job, transfers (online only) and a robbery. Shop prices, selling and haggling are in [shops](/wiki/en/items/shops/).
+Gold on hand and bank gold are separate balances. The Bank offers deposits, withdrawals, interest, loans, a guard job, transfers (online only) and a robbery. From Main Street press B for the Bank. With the district layout, open the Guild Row district with G, then press B. Shop prices, selling and haggling are in [shops](/wiki/en/items/shops/).
 
 ## Bank interest
 

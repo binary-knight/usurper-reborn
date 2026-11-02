@@ -6180,7 +6180,7 @@ public class CastleLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("castle.visit_quest_hall"));
+        terminal.WriteLine(Loc.Get(MainStreetLocation.StreetTextKey("castle.visit_quest_hall", currentPlayer)));
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         await terminal.PressAnyKey();

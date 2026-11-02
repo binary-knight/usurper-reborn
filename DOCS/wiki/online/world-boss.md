@@ -2,7 +2,7 @@
 title: The world boss
 path: /wiki/en/online/world-boss/
 checked: 1.3.8
-sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs
+sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | Your attack, Power Attack and Precise Strike now set off your main hand weapon's effects on the world boss, your gear's life steal heals you there, and Titan's Resolve on world boss armor gives 5 percent more maximum HP in place of defense.
@@ -15,7 +15,7 @@ A world boss is a shared online fight: every player who joins fights the same bo
 
 ## Where is the world boss
 
-From Main Street open the Online district with O, then press B for World Boss. You need level {{balance:WorldBossMinLevel}} to join. Rewards from a boss that fell while you were away are paid the next time you open it.
+From Main Street press 7 for the World Boss; it is on the online row of the classic menu. With the district layout, open the Online district with O, then press B. You need level {{balance:WorldBossMinLevel}} to join. Rewards from a boss that fell while you were away are paid the next time you open it.
 
 ## When does the world boss spawn
 
