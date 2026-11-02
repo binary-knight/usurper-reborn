@@ -42,6 +42,7 @@ public class OpeningStranger125Tests
     {
         Name1 = name, Name2 = name, AI = CharacterAI.Human, Class = CharacterClass.Warrior, Race = CharacterRace.Human,
         Level = level, Mental = 50, HP = 100, MaxHP = 100, MentalHintShown = true, Gold = 100,
+        DistrictsMainStreet = true, // the answers left after the scene must be no-ops on the districts menu (classic 3 lists the NPCs)
     };
 
     private static string Plain(MemoryStream output) =>
