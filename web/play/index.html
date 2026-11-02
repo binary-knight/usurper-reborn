@@ -575,6 +575,7 @@
                 state.enemies = units(d.enemies, 30).map(function (u) { u.alive = true; return u; });
                 state.foes = [];
                 state.round = 0;
+                menuRound = false;
                 state.party = [];
                 state.result = null;
                 state.death = null;
@@ -591,7 +592,9 @@
                 break;
             case 'Char.Combat.Enemies':
                 state.enemies = units(d.enemies, 30);
-                state.round = fin(d.round);
+                // This frame comes at a round's end, and only when a foe changed. Once a combat Client.Menu has given
+                // the round, that is what the page follows.
+                if (!menuRound) state.round = fin(d.round);
                 renderCombat();
                 chronFrame();
                 break;
@@ -782,6 +785,7 @@
     function sendToGame(data) {
         if (!ws || ws.readyState !== 1) return;
         ws.send(data);
+        noteLine(data);
         // Whatever the game prints after an Enter is the next screen, so the pad reads only below it.
         if (typeof data === 'string' && data.indexOf('\r') !== -1) { enterCount++; drawStarted(1500); }
         if (typeof data === 'string' && data.indexOf('\r') !== -1 && terminal) {
@@ -790,6 +794,41 @@
                 inputMark = terminal.registerMarker(0) || null;
             } catch (e) { inputMark = null; }
         }
+    }
+
+    // ---- One key menus: a menu key typed on an empty line goes with its Enter ----
+    // When the current Client.Menu has oneKey true and the line is empty, one key press that is one of that menu's keys
+    // (in any case) sends the character and Enter. It never fires with text on the line, for / (slash commands and
+    // chat), with no current menu (text, name and number prompts), during an IME composition, or for a paste: only a
+    // real key stroke arms it, so input that comes with no key stroke (paste, a composition's result) goes as typed.
+    var lineTyped = '';     // what the player has put on the line since the last Enter
+    var armedKey = null;    // the character of the key stroke in progress
+    var composing = false;  // an IME composition is open
+    var menuRound = false;  // a combat Client.Menu in this fight has given the round
+    function noteLine(data) {
+        var cr = data.lastIndexOf('\r');
+        if (cr !== -1) { lineTyped = ''; data = data.slice(cr + 1); }
+        data = data.replace(/\x1b\[20[01]~/g, '');
+        if (data.charAt(0) === '\x1b') return;   // an arrow or function key puts nothing on the line
+        for (var i = 0; i < data.length; i++) {
+            var c = data.charCodeAt(i);
+            if (c === 0x7f || c === 8) lineTyped = lineTyped.slice(0, -1);
+            else if (c >= 0x20) lineTyped += data.charAt(i);
+        }
+    }
+    function keyStroke(e) {
+        armedKey = e && !e.repeat && !e.isComposing && !composing && e.keyCode !== 229 && !e.ctrlKey && !e.metaKey && !e.altKey
+            && typeof e.key === 'string' && e.key.length === 1 ? e.key : null;
+    }
+    function oneKeyFires(ch) {
+        var m = chron.menu;
+        if (!m || m.oneKey !== true || !current(chron.menuAt) || lineTyped !== '' || ch === '/') return false;
+        return m.groups.some(function (g) { return g.items.some(function (it) { return it.key.toUpperCase() === ch.toUpperCase(); }); });
+    }
+    function typedData(data) {
+        var ch = armedKey;
+        armedKey = null;
+        sendToGame(ch !== null && data === ch && oneKeyFires(ch) ? ch + '\r' : data);
     }
 
     // The room's exits belong to the screen the game drew with them: the compass shows only while
@@ -1146,7 +1185,9 @@
             if (items.length) groups.push({ label: str(g.label, 40), items: items });
         });
         var h = obj(d.hint);
-        return { screen: str(d.screen, 40), groups: groups, hint: h ? { text: str(h.text, 200), label: str(h.label, 40) } : null };
+        var screen = str(d.screen, 40), round = count(d.round);
+        return { screen: screen, groups: groups, hint: h ? { text: str(h.text, 200), label: str(h.label, 40) } : null,
+            oneKey: d.oneKey === true, round: FIGHT[screen] === 1 && round > 0 ? round : null };
     }
     function readDetail(d) {
         var dg = obj(d.danger) || {}, exits = [];
@@ -1167,6 +1208,8 @@
     function chronMenu(d) {
         chron.menu = readMenu(d);
         chron.menuAt = chron.seq;
+        // The round the game is on, in the frame it sends at each fight prompt.
+        if (chron.menu.round !== null) { state.round = chron.menu.round; menuRound = true; renderCombat(); }
         var s = chron.menu.screen;
         if (STREET[s] === 1) setLayout('street');
         else if (FIGHT[s] === 1 && state.inCombat) setLayout('fight');
@@ -2030,7 +2073,8 @@
         else if (typeof k === 'string' && k.length === 1) data = k;
         if (data === null) return;
         if (e.preventDefault) e.preventDefault();
-        sendToGame(data);
+        keyStroke(e);
+        typedData(data);
     });
     // A click on the page (not on a key, and not after selecting text to copy) gives the terminal the keyboard.
     document.getElementById('chron').addEventListener('click', function (e) {
@@ -2076,6 +2120,7 @@
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
         state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = []; state.foot = {}; state.flog = [];
+        menuRound = false; lineTyped = ''; armedKey = null; composing = false;
         fightTail = -1;
         roomEnter = -1; clearMatched = 0; screenCleared();
         chronReset();
@@ -2107,7 +2152,14 @@
             convertEol: true
         });
         terminal.open(document.getElementById('terminal'));
-        terminal.onData(sendToGame);
+        terminal.onData(typedData);
+        // In the capture phase on the parent, so the key stroke is noted before xterm turns it into data.
+        var termBox = document.getElementById('terminal');
+        termBox.addEventListener('keydown', keyStroke, true);
+        termBox.addEventListener('keyup', function () { armedKey = null; }, true);
+        termBox.addEventListener('paste', function () { armedKey = null; }, true);
+        termBox.addEventListener('compositionstart', function () { composing = true; armedKey = null; }, true);
+        termBox.addEventListener('compositionend', function () { composing = false; armedKey = null; }, true);
         document.getElementById('terminal').addEventListener('click', function () { if (!isTouch()) terminal.focus(); });
         // xterm focuses its textarea on mousedown, and a tap sends one, which would raise the phone
         // keyboard over the pad. On a touch screen only Type opens it; scrolling uses touch events.
@@ -2137,7 +2189,7 @@
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; },
         view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
-        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf
+        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf, typedData: typedData
     };
 
     populateLanguagePicker();
