@@ -5248,8 +5248,9 @@ function buildWhoResponse() {
 
     const lines = rows.map(row => {
       const isImmortal = row.is_immortal === 1 || row.is_immortal === true;
-      const rawName = row.display_name || row.username;
-      const name = row.noble_title ? `${row.noble_title} ${rawName}` : rawName;
+      // The character name only; the login name (online_players.username) is never sent.
+      const rawName = row.display_name || '';
+      const name = rawName && row.noble_title ? `${row.noble_title} ${rawName}` : rawName;
       const level = isImmortal ? (row.god_level || 1) : (row.level || 1);
       const className = isImmortal ? 'Immortal' : (CLASS_NAMES[row.class_id] || 'Unknown');
       const location = row.location || 'Unknown';

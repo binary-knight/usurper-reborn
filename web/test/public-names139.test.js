@@ -1,6 +1,6 @@
 'use strict';
-// 1.3.9: the public payloads of /api/stats, /api/dash/events and the SSE news event of /api/dash/feed carry
-// character names only, never a login name (news.player_name, players.username, online_players.username). The
+// 1.3.9: the public payloads of /api/stats, /api/dash/events and the SSE news event of /api/dash/feed, and the
+// Discord who reply, carry character names only, never a login name (news.player_name, players.username, online_players.username). The
 // sections are cut out of web/ssh-proxy.js and run in a vm context against an in memory game database made with
 // the tables' real DDL, read from the C# (SqlSaveBackend.cs).
 const test = require('node:test');
@@ -91,6 +91,17 @@ test('/api/dash/events: each news row carries id, message, category and time onl
   assert.strictEqual(events.length, 3);
   for (const e of events) assert.deepStrictEqual(Object.keys(e).sort(), ['category', 'id', 'message', 'time']);
   assertNoLogin(events, '/api/dash/events');
+  db.close();
+});
+
+test('the Discord who reply names characters, never a login name', () => {
+  const db = makeDb();
+  const section = cut(PROXY, 'function buildWhoResponse() {', 'function insertDiscordInbound(');
+  const { buildWhoResponse } = run(section, { db, CLASS_NAMES: {} }, 'buildWhoResponse');
+  const reply = buildWhoResponse();
+  assert.ok(reply.startsWith('**2 adventurers in-game:**'), reply);
+  assert.ok(reply.includes(`**${SHOWN_A}**`), reply);
+  for (const login of [LOGIN_A, LOGIN_B]) assert.ok(!reply.includes(login), `the who reply carries the login name ${login}: ${reply}`);
   db.close();
 });
 

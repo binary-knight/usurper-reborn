@@ -1,8 +1,9 @@
 ---
 title: Reporting bugs
 path: /wiki/en/getting-started/reporting-bugs/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Systems/BugReportSystem.cs, Scripts/Locations/BaseLocation.cs
+history: 1.3.9 | none
 history: 1.3.5 | none
 history: 1.3.2 | none
 history: 1.3.0 | none

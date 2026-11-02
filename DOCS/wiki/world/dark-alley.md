@@ -1,8 +1,9 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.3.8
-sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MonsterGenerator.cs
+checked: 1.3.9
+sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.3.9 | Main Street opens in the classic layout by default, where Y opens the Dark Alley; with the districts layout, chosen in Settings, it is A.
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -14,7 +15,7 @@ history: 1.3.0 | The Pit's reckless side bet is labelled 2.5x, the amount it pay
 history: 1.2.5 | The Pit monster, the street mugger and the Loan Shark enforcer are stored in English and shown in each player's language.
 history: 1.2.4 | In English, the Shadows standing line in the Dark Alley says "use" instead of "access".
 ---
-The Dark Alley combines underground commerce, risky training, drugs, pickpocketing, gambling, the Pit, loans and Shadows faction services. Open it from Main Street with A once the full town menu unlocks. Access and available services depend on your character and faction standing. Martial law can close the alley, and a stranger may approach you on the way in.
+The Dark Alley combines underground commerce, risky training, drugs, pickpocketing, gambling, the Pit, loans and Shadows faction services. From Main Street press Y for the Dark Alley once the full town menu unlocks. With the district layout, press A on Main Street. Access and available services depend on your character and faction standing. Martial law can close the alley, and a stranger may approach you on the way in.
 
 ## Shops
 

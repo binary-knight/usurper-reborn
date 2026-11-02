@@ -1,9 +1,9 @@
-<!-- doc: checked 1.3.8; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.9; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.3.8 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.3.9 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -19,7 +19,7 @@ Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, v
 
 | Main Street | Combat |
 |---|---|
-| ![Main Street, the town hub with its districts](DOCS/images/screenshot-main-street.png) | ![A dungeon fight, with the combat status panel](DOCS/images/screenshot-combat.png) |
+| ![Main Street in the districts layout](DOCS/images/screenshot-main-street.png) | ![A dungeon fight, with the combat status panel](DOCS/images/screenshot-combat.png) |
 
 | A dungeon room and its map | Character status |
 |---|---|
@@ -234,7 +234,7 @@ Total monsters killed, gold earned, time played, peak gold, deepest dungeon floo
 - CK-style parenting (24 scenarios with moral choices that shape your child's alignment).
 
 ### Game Preferences
-Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character. The Share combat data line (opt-in telemetry, see below) is there too; its answer covers the copy of the game, or the account on a BBS or server.
+Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character. Main Street opens in the classic layout; the districts layout is a choice in Settings, and on the web client so is whether menu keys act on one press (the default) or wait for Enter. The Share combat data line (opt-in telemetry, see below) is there too; its answer covers the copy of the game, or the account on a BBS or server.
 
 ## Estimated Playtime
 
@@ -250,7 +250,7 @@ Quick settings via the Preferences menu (compact, screen-reader, language, font 
 
 The official server is `play.usurper-reborn.net`. Multiple connection paths:
 
-- **Browser:** [usurper-reborn.net](https://usurper-reborn.net) with an embedded xterm.js terminal. No install. Easiest for new players.
+- **Browser:** [usurper-reborn.net](https://usurper-reborn.net) with an embedded xterm.js terminal, or the full page client at `/play/` (with a tap pad on phones). No install. Easiest for new players.
 - **SSH:** `ssh usurper@play.usurper-reborn.net -p 4000` (gateway password `play`). Once connected, you'll see the in-game register/login screen.
 - **MUD client:** `play.usurper-reborn.net 4000` raw TCP. Mudlet, MUSHclient, TinTin++, etc. GMCP enabled (live HP/MP/SP gauges, room info, character status, chat capture).
 - **Steam:** [Usurper Reborn on Steam](https://store.steampowered.com/app/4336570/Usurper_Reborn/), use the in-game `[O] Online Play` menu.
@@ -328,6 +328,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.3.9:** 32 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.9.md
 - **v1.3.8:** 11 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.8.md
 - **v1.3.7:** 18 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.7.md
 - **v1.3.6:** 79 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.6.md
@@ -408,7 +409,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.3.8)
+## Known Issues (v1.3.9)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -422,4 +423,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.3.8 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.3.9 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)

@@ -1,8 +1,9 @@
 ---
 title: The world boss
 path: /wiki/en/online/world-boss/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | Your attack, Power Attack and Precise Strike now set off your main hand weapon's effects on the world boss, your gear's life steal heals you there, and Titan's Resolve on world boss armor gives 5 percent more maximum HP in place of defense.

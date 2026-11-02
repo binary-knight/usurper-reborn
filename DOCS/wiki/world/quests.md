@@ -1,8 +1,9 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.3.8
+checked: 1.3.9
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.9 | The Castle's line that sends you to the Quest Hall names the keys of the Main Street layout you use.
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
