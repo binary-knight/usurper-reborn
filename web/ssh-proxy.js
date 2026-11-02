@@ -5673,13 +5673,24 @@ function startDiscordBridge() {
 // folder's index.html when it exists (the /account/forgot, /account/reset and /account/verify pages), else
 // the path plus .html. The path is percent-decoded once; a bad encoding, a NUL, a backslash or a result
 // outside the web folder gives null (the caller answers 403).
+// 2.0: the web folder also holds the server itself, so a private file gives null too: any name starting with a
+// dot (.env), a .bak copy, the package manifests, node_modules, and the server's own scripts, which no page loads.
+// scripts-server/nginx-private.conf refuses the same set when nginx serves the folder.
+const PRIVATE_FILES = new Set(['package.json', 'package-lock.json', 'ssh-proxy.js', 'gmcp-split.js', 'wiki-bot.js',
+  'wiki-search.js', 'dash-npcs.js', 'dash-monster-names.js', 'dash-observatory.js']);
+function isPrivateWebPath(base, f) {
+  const parts = path.relative(base, f).split(path.sep);
+  if (parts.some((s) => s.startsWith('.') || s.endsWith('.bak'))) return true;
+  if (parts[0] === 'node_modules') return true;
+  return parts.length === 1 && PRIVATE_FILES.has(parts[0]);
+}
 function staticFilePath(root, url, fsx) {
   let p;
   try { p = decodeURIComponent(String(url).split('?')[0]); } catch { return null; }
   if (p.includes('\0') || p.includes('\\')) return null;
   if (p === '/') p = '/index.html';
   const base = path.resolve(root);
-  const inside = (f) => f.startsWith(base + path.sep);
+  const inside = (f) => f.startsWith(base + path.sep) && !isPrivateWebPath(base, f);
   if (!path.extname(p)) {
     const folderIndex = path.resolve(base, '.' + p, 'index.html');
     if (inside(folderIndex) && fsx.existsSync(folderIndex) && fsx.statSync(folderIndex).isFile()) return folderIndex;
