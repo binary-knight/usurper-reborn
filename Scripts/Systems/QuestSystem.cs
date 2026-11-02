@@ -265,6 +265,14 @@ public partial class QuestSystem
     }
     
     /// <summary>
+    /// 1.3.10: true in the MUD, where the world reset and every session share one quest list. The world reset ages
+    /// each claimed quest once a day there, and a player's own daily reset does not. Elsewhere (single player, a door
+    /// session in its own process) the player's reset ages the quests as before.
+    /// </summary>
+    internal static bool WorldResetAgesQuests =>
+        UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Server.MudServer.Instance != null;
+
+    /// <summary>
     /// Process daily quest maintenance (Pascal: Quest aging and failure)
     /// </summary>
     public static void ProcessDailyQuestMaintenance()
@@ -1380,6 +1388,14 @@ public partial class QuestSystem
 
     public static void MergePlayerQuests(string playerName, List<QuestData> savedQuests)
     {
+        // 1.3.10: in the MUD the world reset aged this player's quests in the shared list while they were away, and
+        // failed the ones whose time ran out (with mail). The save holds the days from the last save, so the shared
+        // copy's days are kept, and a quest the world failed is not handed back.
+        var shared = new Dictionary<string, Quest>();
+        if (WorldResetAgesQuests && savedQuests != null)
+            foreach (var q in questDatabase)
+                if (!string.IsNullOrEmpty(q.Id) && savedQuests.Any(s => s.Id == q.Id)) shared[q.Id] = q;
+
         // Remove only THIS player's quests from the shared database
         questDatabase.RemoveAll(q =>
             string.Equals(q.Occupier, playerName, StringComparison.OrdinalIgnoreCase) ||
@@ -1430,6 +1446,12 @@ public partial class QuestSystem
                     : null,
                 MercContractTier = questData.MercContractTier > 0 ? questData.MercContractTier : 1
             };
+
+            if (shared.TryGetValue(quest.Id, out var sharedCopy) && !quest.Deleted)
+            {
+                if (sharedCopy.Deleted) continue;   // 1.3.10: failed (or ended) by the world while away
+                quest.OccupiedDays = Math.Max(quest.OccupiedDays, sharedCopy.OccupiedDays);
+            }
 
             foreach (var objData in questData.Objectives)
             {
