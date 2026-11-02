@@ -240,6 +240,29 @@ public class WebMenu200Tests
         Of(s.Bytes(t), "Room.Detail").Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MainStreet_OnTheClassicDefault_SendsTheClassicClientMenu(bool choseDistricts)
+    {
+        // 2.0: a character whose layout preference was never set; the web client gets the classic menu
+        var hero = new Character
+        {
+            Name1 = "webdefault", Name2 = "Webdefault", AI = CharacterAI.Human, Class = CharacterClass.Warrior, Race = CharacterRace.Human,
+            Level = 12, HP = 400, MaxHP = 400, BaseMaxHP = 400, MKills = 25, CombatSpeed = CombatSpeed.Instant,
+        };
+        hero.HintsShown.UnionWith(new[] { "menu_tier_1", "menu_tier_2", "menu_tier_3" });
+        if (choseDistricts) hero.DistrictsMainStreet = true;
+        using var s = new Scope("web", hero);
+        var t = s.Term();
+        Invoke(Street(hero, t), typeof(MainStreetLocation), "ShowMainStreetMenu");
+        var screens = Of(s.Bytes(t), "Client.Menu").Select(m => m.GetProperty("screen").GetString()).ToList();
+        if (choseDistricts)
+            screens.Should().Equal(new[] { "main_street" }, "a player who chose the districts gets the districts menu");
+        else
+            screens.Should().Equal(new[] { "main_street_classic" }, "the classic default sends the classic menu and never main_street");
+    }
+
     [Fact]
     public void DungeonRoom_SendsRoomDetailAndClientMenu_ToTheWebClient()
     {

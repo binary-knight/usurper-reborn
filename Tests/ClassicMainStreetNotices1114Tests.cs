@@ -40,13 +40,13 @@ public class ClassicMainStreetNotices1114Tests
     [Fact]
     public void TierRise_InClassic_AnnouncesTheClassicLine_Once()
     {
-        var hero = new Character { Name1 = "Rise", Name2 = "Rise", Level = 1, ClassicMainStreet = true };
+        var hero = new Character { Name1 = "Rise", Name2 = "Rise", Level = 1 }; // classic by default
         MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
         hero.Level = GameConfig.MenuTier3Level;
         MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().Equal(MainStreetLocation.ClassicUnlockLines(1, 3));
         MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
 
-        var districts = new Character { Name1 = "Dist", Name2 = "Dist", Level = 1 };
+        var districts = new Character { Name1 = "Dist", Name2 = "Dist", Level = 1, DistrictsMainStreet = true };
         MainStreetLocation.TakeTierUnlockAnnouncement(districts);
         districts.Level = GameConfig.MenuTier2Level;
         MainStreetLocation.TakeTierUnlockAnnouncement(districts).Should().Equal(MainStreetLocation.UnlockLines(1, 2), "the districts keep their own line");
@@ -101,7 +101,7 @@ public class ClassicMainStreetNotices1114Tests
         finally { GameConfig.CompactMode = compact; }
     }
 
-    private static Character Fresh() => new() { Name1 = "Tip", Name2 = "Tip", Level = 1, HP = 100, MaxHP = 100, AI = CharacterAI.Human };
+    private static Character Fresh() => new() { Name1 = "Tip", Name2 = "Tip", Level = 1, HP = 100, MaxHP = 100, AI = CharacterAI.Human, DistrictsMainStreet = true };
 
     [Theory]
     [InlineData("visual")]
@@ -129,7 +129,7 @@ public class ClassicMainStreetNotices1114Tests
     [Fact]
     public void Tip_ForAVeteran_FollowsTheNotice_StillTenTimes()
     {
-        var vet = new Character { Name1 = "Vet", Name2 = "Vet", Level = 7, MKills = 40, HP = 100, MaxHP = 100, AI = CharacterAI.Human };
+        var vet = new Character { Name1 = "Vet", Name2 = "Vet", Level = 7, MKills = 40, HP = 100, MaxHP = 100, AI = CharacterAI.Human, DistrictsMainStreet = true };
         vet.HintsShown.UnionWith(new[] { "menu_tier_1", "menu_tier_2", "menu_tier_3" });
         Draws(vet, 1, "visual", out string first).Should().Be(0, "the first draw shows the notice, which names Settings, and no tip");
         first.Should().Contain(Loc.Get("main_street.districts_notice"));
@@ -144,11 +144,11 @@ public class ClassicMainStreetNotices1114Tests
     {
         var hero = Fresh();
         Draws(hero, 4, "visual", out _).Should().Be(4);
-        hero.ClassicMainStreet = true;
+        hero.DistrictsMainStreet = false;
         Draws(hero, 5, "visual", out string classicText).Should().Be(0);
         classicText.Should().Contain("[D]Dungeons");
         hero.ClassicTipDraws.Should().Be(4, "classic draws do not count");
-        hero.ClassicMainStreet = false;
+        hero.DistrictsMainStreet = true;
         Draws(hero, 10, "visual", out _).Should().Be(6, "back on districts the count goes on from four");
     }
 

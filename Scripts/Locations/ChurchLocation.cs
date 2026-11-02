@@ -942,9 +942,9 @@ namespace UsurperRemake.Locations
 
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("church.marriage_how_to"), "white");
-                terminal.WriteLine(Loc.Get("church.marriage_step1"), "gray");
+                terminal.WriteLine(Loc.Get(MainStreetLocation.StreetTextKey("church.marriage_step1", currentPlayer)), "gray");
                 terminal.WriteLine(Loc.Get("church.marriage_step2"), "gray");
-                terminal.WriteLine(Loc.Get("church.marriage_step3"), "gray");
+                terminal.WriteLine(Loc.Get(MainStreetLocation.StreetTextKey("church.marriage_step3", currentPlayer)), "gray");
                 terminal.WriteLine(Loc.Get("church.marriage_step4"), "gray");
                 terminal.WriteLine(Loc.Get("church.marriage_step_note"), "gray");
                 await terminal.PressAnyKey();

@@ -174,7 +174,8 @@ public class Character
     public bool AutoLevelUp { get; set; } = true;  // auto-level when XP threshold met (on by default)
     public bool AutoEquipDisabled { get; set; }      // when true, shop purchases go straight to inventory
     public int AutoCombatHealPercent { get; set; } = GameConfig.AutoCombatHealPercentDefault; // v1.1.13: auto-combat drinks a potion at or below this HP %
-    public bool ClassicMainStreet { get; set; }      // v1.1.14: Main Street in the pre-1.1.13 layout instead of districts (off by default)
+    public bool DistrictsMainStreet { get; set; }    // 2.0: Main Street in districts instead of the classic layout (off by default, chosen in Settings)
+    public bool ClassicMainStreet => !DistrictsMainStreet; // v1.1.14 save field, now derived: true when the classic layout is shown
     public bool MenuKeysNeedEnter { get; set; } = true; // v1.1.15: single-player console menus wait for Enter (on by default)
     public int ClassicTipDraws { get; set; }         // v1.1.14: district Main Street draws that showed the switch-to-classic tip (stops at 10)
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD

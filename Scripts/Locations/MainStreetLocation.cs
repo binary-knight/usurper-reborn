@@ -263,7 +263,7 @@ public partial class MainStreetLocation : BaseLocation
         bool hintShown = false;
         if (currentPlayer.HP < currentPlayer.MaxHP * 0.25)
         {
-            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer.HintsShown);
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_LOW_HP, terminal, currentPlayer);
         }
 
         // v1.0.5: three hints that were defined and localized when the hint system shipped but
@@ -273,7 +273,7 @@ public partial class MainStreetLocation : BaseLocation
         if (!hintShown && !currentPlayer.AutoLevelUp && currentPlayer.Level < GameConfig.MaxLevel
             && currentPlayer.Experience >= GameConfig.GetExperienceForLevel(currentPlayer.Level + 1))
         {
-            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_LEVEL_UP, terminal, currentPlayer.HintsShown);
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_LEVEL_UP, terminal, currentPlayer);
         }
         if (!hintShown && currentPlayer.Inventory.Count > 0)
         {
@@ -289,13 +289,13 @@ public partial class MainStreetLocation : BaseLocation
         if (!hintShown && currentPlayer.MaxMana > 0 && currentPlayer.Class != CharacterClass.MysticShaman
             && SpellSystem.GetAvailableSpells(currentPlayer).Count == 0)
         {
-            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer.HintsShown);
+            hintShown = HintSystem.Instance.TryShowHint(HintSystem.HINT_MANA_SPELLS, terminal, currentPlayer);
         }
 
         // Show quest system hint for early players who have started fighting
         if (!hintShown && currentPlayer.Level <= 3 && currentPlayer.Statistics.TotalMonstersKilled >= 1)
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_QUEST_SYSTEM, terminal, currentPlayer.HintsShown);
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_QUEST_SYSTEM, terminal, currentPlayer);
         }
 
         // NPC story notification — hint about NPCs with available story content (v0.49.3)
@@ -378,7 +378,7 @@ public partial class MainStreetLocation : BaseLocation
                 && tickerStep.LocKey != "journal.next_delve_resume")
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(tickerStep.LocKey, tickerStep.Args))}");
+                terminal.WriteLine($"  {Loc.Get("journal.ticker", tickerStep.Text(currentPlayer))}");
                 terminal.SetColor("white");
             }
         }

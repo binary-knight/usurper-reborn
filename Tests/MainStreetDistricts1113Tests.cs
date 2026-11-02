@@ -149,7 +149,7 @@ public class MainStreetDistricts1113Tests
         var output = new MemoryStream();
         var term = new TerminalEmulator(new LineStream(lines), output);
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, term);
-        var hero = new Character { Name1 = "Street", Name2 = "Street", Level = level, HP = 100, MaxHP = 100, MKills = 3, AI = CharacterAI.Human };
+        var hero = new Character { Name1 = "Street", Name2 = "Street", Level = level, HP = 100, MaxHP = 100, MKills = 3, AI = CharacterAI.Human, DistrictsMainStreet = true };
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(street, hero);
         return (street, output);
     }
@@ -293,7 +293,7 @@ public class MainStreetDistricts1113Tests
     [Fact]
     public void TierRise_AnnouncesByDistrict_Once()
     {
-        var hero = new Character { Name1 = "Rise", Name2 = "Rise", Level = 1 };
+        var hero = new Character { Name1 = "Rise", Name2 = "Rise", Level = 1, DistrictsMainStreet = true };
         MainStreetLocation.TakeTierUnlockAnnouncement(hero).Should().BeEmpty();
         hero.Level = GameConfig.MenuTier3Level; // two tiers at once
         var lines = MainStreetLocation.TakeTierUnlockAnnouncement(hero);
@@ -445,6 +445,19 @@ public class MainStreetDistricts1113Tests
             {
                 if (v.ValueKind != JsonValueKind.String || !Prefixes.Any(key.StartsWith) || Unrelated.Any(key.StartsWith)) continue;
                 string s = v.GetString()!;
+                if (key.EndsWith(".classic"))
+                {
+                    // 2.0: a classic variant names the classic keys, so the district rule below does not apply; the
+                    // classic rule: no district by name and no [G] (ClassicKeyHints200Tests resolves each key)
+                    foreach (var d in MainStreetLocation.Districts)
+                    {
+                        string name = table[d.NameKey].GetString()!;
+                        if (s.Contains(name)) problems.Add($"{lang} {key}: a classic text names the district {name}");
+                        if (d.Key == "G" && s.Contains("[G]")) problems.Add($"{lang} {key}: a classic text has [G], the Guild Row key (no classic row draws it)");
+                    }
+                    if (!table.ContainsKey(key.Substring(0, key.Length - ".classic".Length))) problems.Add($"{lang} {key}: no district text it replaces");
+                    continue;
+                }
                 foreach (string old in new[] { "[1]", "[2]", "[$]", "[=]", "[Z]", "[Y]", "[>]", "[+]", "[K]", "[J]", "[L]", "[W/A]" })
                     if (s.Contains(old)) problems.Add($"{lang} {key}: {old}");
                 if ((s.Contains("[V]") || s.Contains("[U]") || s.Contains("[O]") || s.Contains("[B]")) && !s.Contains("[G]"))
@@ -458,6 +471,8 @@ public class MainStreetDistricts1113Tests
         problems.Should().BeEmpty();
         Loc.Get("base.train_how").Should().Contain("[G]").And.Contain("[V]").And.Contain("/train");
         Loc.Get("hint.getting_started.msg").Should().Contain("Merchant Row [M]").And.Contain("Guild Row [G]");
+        Loc.Get("base.train_how.classic").Should().Contain("[V]").And.Contain("/train").And.NotContain("[G]");
+        Loc.Get("hint.getting_started.msg.classic").Should().Contain("Quest Hall [2]").And.NotContain("Guild Row");
     }
 
     // ---------- evidence: the real screens, ANSI stripped (runs only with USURPER_SCREENS_OUT set) ----------
@@ -499,7 +514,7 @@ public class MainStreetDistricts1113Tests
         Screen("Main Street, level 10 (tier 3), online, BBS / compact", 10, true, false, true, Main);
         Screen("Guild Row, level 10 (tier 3), BBS / compact", 10, false, false, true, Guild);
         Screen("Help (?), level 10 (tier 3), online, visual", 10, true, false, false, Help);
-        var fresh = new Character { Name1 = "Vet", Name2 = "Vet", Level = 3, MKills = 9 };
+        var fresh = new Character { Name1 = "Vet", Name2 = "Vet", Level = 3, MKills = 9, DistrictsMainStreet = true };
         fresh.HintsShown.UnionWith(new[] { "menu_tier_1", "menu_tier_2" });
         sb.AppendLine("==================== Shown once: an existing level 3 character's first visit, then its rise to level 5 ====================");
         sb.AppendLine(MainStreetLocation.TakeDistrictsNotice(fresh));

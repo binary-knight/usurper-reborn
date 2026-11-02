@@ -53,7 +53,7 @@ public class WebFlagOff200Tests
             Level = 12, HP = 400, MaxHP = 400, BaseMaxHP = 400, Strength = 60, BaseStrength = 60, Defence = 20, BaseDefence = 20,
             Dexterity = 30, BaseDexterity = 30, Agility = 20, BaseAgility = 20, Constitution = 30, BaseConstitution = 30,
             Stamina = 100, BaseStamina = 100, Mental = 80, Gold = 1234, Healing = 3, MKills = 25, Experience = 0,
-            CombatSpeed = CombatSpeed.Instant, ScreenReaderMode = screenReader, ClassicMainStreet = classic,
+            CombatSpeed = CombatSpeed.Instant, ScreenReaderMode = screenReader, DistrictsMainStreet = !classic,
         };
         c.HintsShown.Add("menu_tier_1"); c.HintsShown.Add("menu_tier_2"); c.HintsShown.Add("menu_tier_3");
         return c;
@@ -147,7 +147,7 @@ public class WebFlagOff200Tests
             // Main Street, districts then classic, and the classic compact rows
             foreach (bool classic in new[] { false, true })
             {
-                hero.ClassicMainStreet = classic;
+                hero.DistrictsMainStreet = !classic;
                 var street = new MainStreetLocation();
                 var t = Term("");
                 typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, t);
@@ -156,7 +156,7 @@ public class WebFlagOff200Tests
                 if (classic) Invoke(street, typeof(MainStreetLocation), "WriteClassicLayoutBBSMenu");
                 t.StreamWriterInternal?.Flush();
             }
-            hero.ClassicMainStreet = false;
+            hero.DistrictsMainStreet = true;
 
             // The dungeon room view: the quiet room, then the room with monsters
             {

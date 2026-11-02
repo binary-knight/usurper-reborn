@@ -35,6 +35,9 @@ public static class JournalSystem
     {
         public string LocKey { get; init; } = "";
         public object[] Args { get; init; } = Array.Empty<object>();
+
+        /// <summary>2.0: the step's text for this player, with the classic or district Main Street keys.</summary>
+        public string Text(Character? player) => Loc.Get(MainStreetLocation.StreetTextKey(LocKey, player), Args);
     }
 
     // Old God boss floors in ascending order (Manwe excluded -- his floor-100
@@ -224,13 +227,13 @@ public static class JournalSystem
         if (player == null) return lines;
 
         if (player.TrainingPoints > 0)
-            lines.Add((Loc.Get("journal.line_training_points", player.TrainingPoints), "bright_green"));
+            lines.Add((Loc.Get(MainStreetLocation.StreetTextKey("journal.line_training_points", player), player.TrainingPoints), "bright_green"));
 
         try
         {
             if (!player.AutoLevelUp && player.Level < 100
                 && player.Experience >= GameConfig.GetExperienceForLevel(player.Level + 1))
-                lines.Add((Loc.Get("journal.line_level_ready"), "bright_green"));
+                lines.Add((Loc.Get(MainStreetLocation.StreetTextKey("journal.line_level_ready", player)), "bright_green"));
         }
         catch { }
 
@@ -244,7 +247,7 @@ public static class JournalSystem
                 var alignment = AlignmentSystem.Instance.GetAlignment(player);
                 if (alignment == AlignmentSystem.AlignmentType.Good
                     || alignment == AlignmentSystem.AlignmentType.Holy)
-                    lines.Add((Loc.Get("journal.line_free_blessing"), "bright_cyan"));
+                    lines.Add((Loc.Get(MainStreetLocation.StreetTextKey("journal.line_free_blessing", player)), "bright_cyan"));
             }
         }
         catch { }

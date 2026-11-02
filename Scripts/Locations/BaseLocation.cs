@@ -822,7 +822,7 @@ public abstract class BaseLocation
 
                     terminal.SetColor("yellow");
                     if (currentPlayer.TrainingPoints > 0)
-                        terminal.WriteLine($"  {Loc.Get("base.training_points_hint")}");
+                        terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.training_points_hint", currentPlayer))}");
                     // v1.1.13: level 10 is a milestone worth a line of its own
                     if (ReachedLevelTenWithPoints(fromLevel, currentPlayer.Level, currentPlayer.TrainingPoints))
                     {
@@ -833,7 +833,7 @@ public abstract class BaseLocation
                     terminal.WriteLine("");
 
                     // Show Level Master hint on first level-up
-                    HintSystem.Instance.TryShowHint(HintSystem.HINT_LEVEL_MASTER, terminal, currentPlayer.HintsShown);
+                    HintSystem.Instance.TryShowHint(HintSystem.HINT_LEVEL_MASTER, terminal, currentPlayer);
 
                     // v0.60.3: GMCP Char.Skills.List re-emit on level-up so MUD clients
                     // see newly-unlocked abilities and spells without manual refresh.
@@ -2949,7 +2949,7 @@ public abstract class BaseLocation
             await NavigateToLocation(GameLocation.Master); // throws LocationExitException, like a menu exit
             return;
         }
-        terminal.WriteLine($"  {Loc.Get("base.train_how")}", "yellow");
+        terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.train_how", currentPlayer))}", "yellow");
         await Pacing.Wait(1500);
     }
 
@@ -3699,7 +3699,7 @@ public abstract class BaseLocation
 
         // NEXT STEP (always shown)
         var next = JournalSystem.GetNextStep(player);
-        string nextText = Loc.Get(next.LocKey, next.Args);
+        string nextText = next.Text(player);
         terminal.SetColor("bright_yellow");
         if (sr)
             terminal.WriteLine($"{Loc.Get("journal.section_next")}: {nextText}");
@@ -4472,7 +4472,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  {Loc.Get("prefs.auto_look")}: {(currentPlayer.AutoLook ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
-                terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)}"); // v1.1.14
                 if (MenuKeysSettingShown)
                     terminal.WriteLine($"  {Loc.Get("prefs.menu_keys_need_enter")}: {(currentPlayer.MenuKeysNeedEnter ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}"); // v1.1.15
                 terminal.WriteLine("");
@@ -4496,7 +4496,7 @@ public abstract class BaseLocation
                     terminal.WriteLine($"  L. {Loc.Get("prefs.toggle", Loc.Get("prefs.auto_look"))}");
                 terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
-                terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(currentPlayer.ClassicMainStreet)})"); // v1.1.14
+                terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)})"); // v1.1.14
                 if (MenuKeysSettingShown)
                     terminal.WriteLine($"  E. {Loc.Get("prefs.toggle", Loc.Get("prefs.menu_keys_need_enter"))}"); // v1.1.15
                 if (IsRunningInWezTerm())
@@ -4575,7 +4575,7 @@ public abstract class BaseLocation
                 if (!IsBBSSession && !GameConfig.ScreenReaderMode)
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
-                WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)}"); // v1.1.14
                 if (MenuKeysSettingShown)
                     WriteMenuOption("E", $"{Loc.Get("prefs.menu_keys_need_enter")}: {onOff(currentPlayer.MenuKeysNeedEnter)}"); // v1.1.15
                 if (IsRunningInWezTerm())
@@ -4739,9 +4739,9 @@ public abstract class BaseLocation
                     break;
 
                 case "S":
-                    // v1.1.14: Main Street layout, the districts (default) or the classic pre-1.1.13 menu
-                    currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
-                    terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
+                    // 2.0: Main Street layout, the classic menu (default) or the districts
+                    currentPlayer.DistrictsMainStreet = !currentPlayer.DistrictsMainStreet;
+                    terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(!currentPlayer.DistrictsMainStreet)), "green");
                     await GameEngine.Instance.SaveCurrentGame();
                     await Pacing.Wait(800);
                     break;
@@ -7455,9 +7455,9 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
             }
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("base.stat_awakening_hint")}"); // v1.1.12
+            terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.stat_awakening_hint", currentPlayer))}"); // v1.1.12
             terminal.SetColor("white");
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown); // v1.1.12
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer); // v1.1.12; 2.0: the player picks the layout text
             terminal.WriteLine("");
         }
 
