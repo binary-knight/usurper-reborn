@@ -1218,13 +1218,12 @@ function getDashEvents() {
   if (!db) return [];
   try {
     dashEventsCache = db.prepare(`
-      SELECT id, message, category, player_name, created_at
+      SELECT id, message, category, created_at
       FROM news ORDER BY created_at DESC LIMIT 500
     `).all().map(row => ({
       id: row.id,
       message: row.message,
       category: row.category,
-      playerName: row.player_name,
       time: row.created_at
     }));
     dashEventsCacheTime = now;
@@ -1432,9 +1431,10 @@ function getStats() {
       ORDER BY op.display_name
     `).all().map(row => {
       const isImmortal = row.is_immortal === 1 || row.is_immortal === true;
-      const rawName = row.display_name || row.username;
+      // The character name only; the login name (online_players.username) is never sent.
+      const rawName = row.display_name || '';
       return {
-        name: row.noble_title ? `${row.noble_title} ${rawName}` : rawName,
+        name: rawName && row.noble_title ? `${row.noble_title} ${rawName}` : rawName,
         level: isImmortal ? (row.god_level || 1) : (row.level || 1),
         className: isImmortal ? 'Immortal' : (CLASS_NAMES[row.class_id] || 'Unknown'),
         location: row.location || 'Unknown',
@@ -1634,12 +1634,11 @@ function getStats() {
     let news = [];
     try {
       news = db.prepare(`
-        SELECT message, category, player_name, created_at
+        SELECT message, category, created_at
         FROM news WHERE category != 'npc' ORDER BY created_at DESC LIMIT 10
       `).all().map(row => ({
         message: row.message,
         category: row.category,
-        playerName: row.player_name,
         time: row.created_at
       }));
     } catch (e) { /* news table may not exist */ }
