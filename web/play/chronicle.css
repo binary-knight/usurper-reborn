@@ -147,6 +147,9 @@ body.chron-read .chron .screen { font-size: 15px; }
 .chron .cbody.b-room { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
 /* The prose takes what the map, the exits and the keys leave, and scrolls inside when the room text is longer */
 .chron .cbody.b-room > .prose { flex: 1 1 auto; min-height: 6.5em; overflow: auto; }
+/* The street text keeps at least 12 lines beside the keys; when the page is too short for both, the right page scrolls */
+.chron[data-layout="street"] .recto { overflow-y: auto; }
+.chron .cbody.b-street { flex: 1 0 12em; }
 .chron .compcard { flex: none; align-items: center; }
 /* D3: the map and the exits side by side above the keys (2.0 phase 3a) */
 .chron .nav { flex: none; display: flex; justify-content: flex-end; align-items: stretch; gap: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
@@ -366,6 +369,9 @@ body.chron-read .chron .screen { font-size: 15px; }
     background: var(--page-edge); border-top: 3px double var(--rule); }
   .chron .dock > .foot { order: 1; border-top: 0; padding-top: 0; font-size: 12px; }
   .chron .dock > .kgroups, .chron .dock > .enterbar { order: 2; border: 0; padding: 0; }
+  /* on the street the keys follow the text instead of covering it */
+  .chron[data-layout="street"] .dock { position: static; }
+  .chron .cbody.b-street { flex: none; }
   .chron .frame { padding: 4px; }
   .chron .scene, .chron .scene.s-fight { height: 104px; background-size: 384px 192px; }
   .chron .scene.s-room { height: 150px; }
