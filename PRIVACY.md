@@ -1,7 +1,7 @@
 <!-- doc: checked 1.3.9; sources: Scripts/Systems/TelemetryStore.cs, Scripts/Systems/TelemetryUploader.cs, Scripts/Systems/TelemetryRow.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/VersionChecker.cs, Scripts/Systems/BugReportSystem.cs, Scripts/Systems/UserDataPaths.cs, Scripts/Systems/AccountMail.cs, Scripts/BBS, web/ssh-proxy.js -->
 # Privacy Policy
 
-**Usurper Reborn** - Last updated: October 2026
+**Usurper Reborn** - Last updated: November 2026
 
 ## Overview
 
@@ -93,6 +93,16 @@ When running as a BBS door game:
 ## Online Account Email (Optional)
 
 An online account may keep one email address, stored only with that account on the game server and used only to send password reset links and account notices (sent through the Resend mail service, with no tracking); remove it at any time with E on the character screen, which deletes it from the account. The address is never sold or shared, except with the mail service that delivers these messages. The address is optional; without one, a forgotten password can only be reset by the server's operator. A server that does not send mail asks for no address.
+
+## Public World Pages
+
+The project's website shows the online world on public pages, read from `/api/stats` and `/api/feed`, and for the Observatory page at `/dashboard` from `/api/dash/`. They show:
+- the news, the game's own lines about what happened in the world, which name characters;
+- the players online, the leaderboard, the ruler, the immortals and the arena results, by character name;
+- on the Observatory, the NPCs and their ties, the realm, the dungeon depths, the market and the fallen, each as a fixed set of fields. A player's character name appears there only as one of the ten top damage dealers of the current or latest world boss, as the ruler, as the god of the week, or as one of the 20 latest fallen heroes with that character's level, class, the killer when it is a monster or an NPC, and time of death;
+- an hourly world history of counts only, such as NPCs alive and players online.
+
+No field on these pages is read from an account's login name.
 
 ## Third-Party Services
 
