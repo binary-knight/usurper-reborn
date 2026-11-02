@@ -19020,6 +19020,7 @@
   "castle.realm_at_peace": "The realm is at peace... for now.",
   "castle.wanted": "WANTED:",
   "castle.visit_quest_hall": "Visit the Quest Hall in Guild Row, off Main Street, to claim bounties.",
+  "castle.visit_quest_hall.classic": "Visit the Quest Hall [2] on Main Street to claim bounties.",
   "castle.must_leave_team_challenge": "To challenge for the throne, you must abandon your team.",
   "castle.leave_team_crown": "Leave your team to pursue the crown? (Y/N): ",
   "castle.chosen_challenge": "You have chosen to challenge for the throne!",

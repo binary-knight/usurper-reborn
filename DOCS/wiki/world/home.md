@@ -2,7 +2,7 @@
 title: Home and family
 path: /wiki/en/world/home/
 checked: 1.3.8
-sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Core/Child.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs
+sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Core/Child.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.8 | none
 history: 1.3.7 | none
 history: 1.3.6 | none
@@ -14,7 +14,7 @@ history: 1.2.6 | A child's name given at birth or at Home cannot contain < > & o
 history: 1.2.5 | The Home screens are shown in all five languages, and long upgrade, trophy and pet rows wrap at 79 columns.
 history: 1.2.4 | Online your Home is private, and a spouse left alone for 21 days you were present writes you a letter.
 ---
-Your Home is a private base with rest, storage, upgrades and family life. Online, "Also here" is not shown at home, and say, emote, disconnect notices and other room lines from other players do not reach you there. From Main Street open the Home and Hearth district with H, then press H for Home. It appears after your first few levels.
+Your Home is a private base with rest, storage, upgrades and family life. Online, "Also here" is not shown at home, and say, emote, disconnect notices and other room lines from other players do not reach you there. From Main Street press H for Home. With the district layout, open the Home and Hearth district with H, then press H. It appears after your first few levels.
 
 ## The Home menu
 

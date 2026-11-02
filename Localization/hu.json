@@ -18788,6 +18788,7 @@
   "castle.realm_at_peace": "A birodalomban béke honol... egyelőre.",
   "castle.wanted": "KÖRÖZÖTT:",
   "castle.visit_quest_hall": "Látogasd meg a Küldetések Csarnokát a Mesterek utcájában, a Fő utca mellett, a vérdíjakért.",
+  "castle.visit_quest_hall.classic": "Látogasd meg a Küldetéscsarnokot [2] a Főutcán a vérdíjakért.",
   "castle.must_leave_team_challenge": "A trón megszerzéséhez el kell hagynod a csapatodat.",
   "castle.leave_team_crown": "Elhagyod a csapatodat a korona megszerzése érdekében? (Y = Igen/N = Nem): ",
   "castle.chosen_challenge": "Úgy döntöttél, harcba szállsz a trónért!",
