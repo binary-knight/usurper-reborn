@@ -364,7 +364,7 @@
     };
     var CHAT_MAX = 200;
     var LOG_MAX = 20;
-    var FLOG_MAX = 120;    // round text lines kept for the fight log
+    var FLOG_MAX = 400;    // round text lines kept for the fight log
 
     function el(tag, cls, text) {
         var e = document.createElement(tag);
@@ -473,7 +473,7 @@
 
         clear(logBox);
         // The round text as the game printed it, oldest first, then the foes killed.
-        flogLines().slice(-LOG_MAX * 3).forEach(function (line) { logBox.appendChild(el('span', 'ev', line)); });
+        flogLines().forEach(function (line) { logBox.appendChild(el('span', 'ev', line)); });
         state.log.forEach(function (line) { logBox.appendChild(el('span', null, t('play.combat.killed', [line]))); });
         var pane = document.getElementById('pane-combat');
         if (logBox.children.length) pane.scrollTop = pane.scrollHeight;
@@ -575,6 +575,7 @@
                 state.enemies = units(d.enemies, 30).map(function (u) { u.alive = true; return u; });
                 state.foes = [];
                 state.round = 0;
+                menuRound = false;
                 state.party = [];
                 state.result = null;
                 state.death = null;
@@ -591,7 +592,9 @@
                 break;
             case 'Char.Combat.Enemies':
                 state.enemies = units(d.enemies, 30);
-                state.round = fin(d.round);
+                // This frame comes at a round's end, and only when a foe changed. Once a combat Client.Menu has given
+                // the round, that is what the page follows.
+                if (!menuRound) state.round = fin(d.round);
                 renderCombat();
                 chronFrame();
                 break;
@@ -633,6 +636,13 @@
                 if (state.chat.length > CHAT_MAX) state.chat.shift();
                 if (openTab === 'chat') renderChat();
                 else document.getElementById('rail-chat').classList.add('new');
+                break;
+            case 'Client.Waiting':
+                seenWaiting = true;
+                waitSince = -1;
+                polling = d.poll === true;
+                if (polling) lineTyped = '';
+                if (chronOn() && layoutNow() === 'fight') renderChronNow();
                 break;
             case 'Client.Menu':
                 chronMenu(d);
@@ -782,6 +792,7 @@
     function sendToGame(data) {
         if (!ws || ws.readyState !== 1) return;
         ws.send(data);
+        noteLine(data);
         // Whatever the game prints after an Enter is the next screen, so the pad reads only below it.
         if (typeof data === 'string' && data.indexOf('\r') !== -1) { enterCount++; drawStarted(1500); }
         if (typeof data === 'string' && data.indexOf('\r') !== -1 && terminal) {
@@ -790,6 +801,70 @@
                 inputMark = terminal.registerMarker(0) || null;
             } catch (e) { inputMark = null; }
         }
+    }
+
+    // ---- One key menus: a menu key typed on an empty line goes with its Enter ----
+    // When the current Client.Menu has oneKey true and the line is empty, one key press that is one of that menu's keys
+    // (in any case) sends the character and Enter. It never fires with text on the line, for / (slash commands and
+    // chat), with no current menu (text, name and number prompts), during an IME composition, or for a paste: only a
+    // real key stroke arms it, so input that comes with no key stroke (paste, a composition's result) goes as typed.
+    var lineTyped = '';     // what the player has put on the line since the last Enter
+    var armedKey = null;    // the character of the key stroke in progress
+    var composing = false;  // an IME composition is open
+    var menuRound = false;  // a combat Client.Menu in this fight has given the round
+    // After a one key send, a typed key is dropped until the game next reads input (Client.Waiting), so a second press
+    // while the screen draws never sits on the line and turns one key off. Enter is never dropped, nor a key cap, a pad
+    // button or a paste. WAIT_MAX is the safety limit if a frame is lost. A game that has sent no Client.Waiting on
+    // this connection (an older server) gets no wait at all, or every press would be lost for WAIT_MAX.
+    var WAIT_MAX = 20000;
+    var heldKey = null;     // the character of a held key's repeat in progress
+    var seenWaiting = false;
+    // Client.Waiting with poll true: the game is polling for a key it throws away (the auto-combat stop key), and its
+    // drain takes every key pending. Until the next Client.Waiting, nothing typed goes on the line.
+    var polling = false;
+    var waitSince = -1;     // Date.now() of the one key send being waited on, or -1
+    function waitingForRead() {
+        if (waitSince < 0) return false;
+        if (Date.now() - waitSince >= WAIT_MAX) { waitSince = -1; return false; }
+        return true;
+    }
+    function noteLine(data) {
+        if (polling) { lineTyped = ''; return; }
+        var cr = data.lastIndexOf('\r');
+        if (cr !== -1) { lineTyped = ''; data = data.slice(cr + 1); }
+        data = data.replace(/\x1b\[20[01]~/g, '');
+        if (data.charAt(0) === '\x1b') return;   // an arrow or function key puts nothing on the line
+        for (var i = 0; i < data.length; i++) {
+            var c = data.charCodeAt(i);
+            if (c === 0x7f || c === 8) lineTyped = lineTyped.slice(0, -1);
+            else if (c >= 0x20) lineTyped += data.charAt(i);
+        }
+    }
+    function keyStroke(e) {
+        armedKey = e && !e.repeat && !e.isComposing && !composing && e.keyCode !== 229 && !e.ctrlKey && !e.metaKey && !e.altKey
+            && typeof e.key === 'string' && e.key.length === 1 ? e.key : null;
+        heldKey = e && e.repeat && !e.isComposing && !composing && !e.ctrlKey && !e.metaKey && !e.altKey
+            && typeof e.key === 'string' && e.key.length === 1 ? e.key : null;
+    }
+    function oneKeyFires(ch) {
+        var m = chron.menu;
+        if (!m || m.oneKey !== true || !current(chron.menuAt) || lineTyped !== '' || ch === '/') return false;
+        return m.groups.some(function (g) { return g.items.some(function (it) { return it.key.toUpperCase() === ch.toUpperCase(); }); });
+    }
+    function typedData(data) {
+        var ch = armedKey, held = heldKey;
+        armedKey = null;
+        heldKey = null;
+        if (data === ch || data === held) {
+            if (waitingForRead()) return;
+            if (data === ch && oneKeyFires(ch)) {
+                sendToGame(ch + '\r');
+                if (seenWaiting) waitSince = Date.now();
+                return;
+            }
+        }
+        sendToGame(data);
+        if (chronOn() && layoutNow() === 'fight') renderChronNow();   // the part typed line on the page
     }
 
     // The room's exits belong to the screen the game drew with them: the compass shows only while
@@ -1146,7 +1221,9 @@
             if (items.length) groups.push({ label: str(g.label, 40), items: items });
         });
         var h = obj(d.hint);
-        return { screen: str(d.screen, 40), groups: groups, hint: h ? { text: str(h.text, 200), label: str(h.label, 40) } : null };
+        var screen = str(d.screen, 40), round = count(d.round);
+        return { screen: screen, groups: groups, hint: h ? { text: str(h.text, 200), label: str(h.label, 40) } : null,
+            oneKey: d.oneKey === true, round: FIGHT[screen] === 1 && round > 0 ? round : null };
     }
     function readDetail(d) {
         var dg = obj(d.danger) || {}, exits = [];
@@ -1167,6 +1244,8 @@
     function chronMenu(d) {
         chron.menu = readMenu(d);
         chron.menuAt = chron.seq;
+        // The round the game is on, in the frame it sends at each fight prompt.
+        if (chron.menu.round !== null) { state.round = chron.menu.round; menuRound = true; renderCombat(); }
         var s = chron.menu.screen;
         if (STREET[s] === 1) setLayout('street');
         else if (FIGHT[s] === 1 && state.inCombat) setLayout('fight');
@@ -1328,17 +1407,43 @@
         });
         return { rows: out, start: start < at.length ? at[start] : out.length };
     }
-    function readScreen() {
-        var buf = terminal && terminal.buffer && terminal.buffer.active;
+    function readScreen(given, givenMark) {
+        var buf = given || (terminal && terminal.buffer && terminal.buffer.active);
         if (!buf || typeof buf.getLine !== 'function') return;
-        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
+        var mark = given ? givenMark : inputMark && !inputMark.isDisposed ? inputMark.line : -1;
         var s = screenOf(buf, mark);
         chron.rows = s.rows;
         chron.start = s.start;
         chron.cursorText = s.cursorText;
         chron.cursorRow = s.cursorRow;
         chron.rowsSeq = chron.seq;
-        captureFight();
+        var f = fightRowsOf(buf, mark);
+        captureFight(f.rows, f.cursor);
+    }
+    // F3: the round text of this draw, read from the whole buffer. The visible screen is too short for it: the status and
+    // menu boxes fill a Classic terminal, and a long draw (Auto-Combat) runs past 50 rows.
+    var FIGHT_READ_MAX = 800;
+    function fightRowsOf(buf, mark) {
+        var top = Number(buf.baseY) || 0, cy = top + (Number(buf.cursorY) || 0), floor = top - 1;
+        if (typeof mark === 'number' && isFinite(mark) && mark >= 0) floor = mark;
+        var from = cy;
+        for (var y = cy; y > floor && cy - y < FIGHT_READ_MAX; y--) {
+            var l = buf.getLine(y);
+            var text = l && typeof l.translateToString === 'function' ? String(l.translateToString(true)) : '';
+            if (y !== cy && PREV_PROMPT.test(text)) break;
+            from = y;
+        }
+        // a continued row belongs to the row above it, even when the read stopped between them
+        var rows = [], wrapped = [];
+        for (y = from; y <= cy; y++) {
+            var line = buf.getLine(y), next = buf.getLine(y + 1);
+            rows.push(runsOf(line, !!(next && next.isWrapped === true)));
+            wrapped.push(y > from && !!line && line.isWrapped === true);
+        }
+        var cx = Number(buf.cursorX) || 0, cl = buf.getLine(cy), typed = false;
+        if (cl && typeof cl.translateToString === 'function') typed = /\S/.test(String(cl.translateToString(false, 0, cx)));
+        var joined = joinWrapped(rows, wrapped, 0).rows;
+        return { rows: joined, cursor: typed || cx > 0 ? joined.length - 1 : -1 };
     }
     // The viewport as joined rows, where the current screen starts in them, and the cursor's row as text.
     function screenOf(buf, mark) {
@@ -1396,13 +1501,15 @@
         var texts = rows.map(function (r) { return typeof r === 'string' ? r : rowText(r); });
         var lastText = -1;
         texts.forEach(function (s, i) { if (s.trim()) lastText = i; });
+        // the same prompt printed earlier in this draw: an empty Enter makes the game ask again
+        var asked = typeof cursor === 'number' && cursor >= 0 && cursor < texts.length ? texts[cursor].trim() : '';
         var out = [];
         texts.forEach(function (s, i) {
             // a row drawn only in block characters is the monster's picture; the plate shows the foe instead
             if (!s.trim() || FIGHT_BOX.test(s) || /^[\s▀-▟■]+$/.test(s)) return;
             // the prompt: the row the cursor waits on, with what the player has typed so far ("Choose action: I"), or
             // a last row shaped like a prompt
-            if (i === cursor || (i === lastText && /[:?>]\s*$/.test(s))) return;
+            if (i === cursor || (i === lastText && /[:?>]\s*$/.test(s)) || (asked && s.trim() === asked)) return;
             var line = unbox(s), cmds = scanCommands([s]);
             // A menu line opens with a key; a sentence that names a key ("Use [1] Power Strike") is kept.
             if (cmds.length && /^\[/.test(line) && (!known || cmds.every(function (c) { return known[c.key.toUpperCase()] === 1; }))) return;
@@ -1413,24 +1520,25 @@
     var fightTail = -1;   // the draw in which Char.Combat.End came: its last lines still belong to the fight
     // Each draw's lines replace that draw's entry, so text that arrives in pieces is read once. Rows read before the
     // current draw began are never stored under it.
-    function captureFight() {
+    function captureFight(rows, cursor) {
         if (!(state.inCombat || (fightTail >= 0 && fightTail === chron.seq)) || chron.rowsSeq !== chron.seq) return;
         var known = null, m = chron.menu;
         if (m && FIGHT[m.screen] === 1 && current(chron.menuAt)) {
             known = Object.create(null);
             m.groups.forEach(function (g) { g.items.forEach(function (it) { known[it.key.toUpperCase()] = 1; }); });
         }
-        var lines = fightEvents(chron.rows.slice(chron.start), known, chron.cursorRow - chron.start);
+        var lines = rows ? fightEvents(rows, known, cursor) : fightEvents(chron.rows.slice(chron.start), known, chron.cursorRow - chron.start);
         var top = state.flog[state.flog.length - 1];
         if (top && top.seq === chron.seq) {
             if (top.lines.join('\n') === lines.join('\n')) return;
             top.lines = lines;
         } else if (lines.length) state.flog.push({ seq: chron.seq, lines: lines });
         else return;
-        var total = 0;
-        for (var i = state.flog.length - 1; i >= 0; i--) {
-            total += state.flog[i].lines.length;
-            if (total > FLOG_MAX && i < state.flog.length - 1) { state.flog = state.flog.slice(i + 1); break; }
+        var over = flogLines().length - FLOG_MAX;
+        while (over > 0) {
+            var old = state.flog[0];
+            if (old.lines.length <= over) { over -= old.lines.length; state.flog.shift(); }
+            else { old.lines = old.lines.slice(over); over = 0; }
         }
         renderCombat();
     }
@@ -1799,6 +1907,11 @@
                 log.appendChild(el('div', 'ev a' + Math.min(4, lines.length - 1 - i) + (/^[\[(]/.test(text) ? ' aside' : ''), text));
             });
             if (state.round > 0) log.appendChild(el('div', 'rd now', t('play.combat.round', [num(state.round)])));
+            // F2: what is typed so far, as the terminal shows it. The game holds it, so the page never hides it.
+            if (lineTyped) {
+                var at = chron.rows[chron.cursorRow], row = at ? rowText(at).replace(/\s+$/, '') : '';
+                log.appendChild(el('div', 'typedline', row.slice(-lineTyped.length) === lineTyped ? row : lineTyped));
+            }
             pr.appendChild(log);
             body.appendChild(pr);
             // Never a line cut at the top: the oldest go until the rest fit.
@@ -2030,7 +2143,8 @@
         else if (typeof k === 'string' && k.length === 1) data = k;
         if (data === null) return;
         if (e.preventDefault) e.preventDefault();
-        sendToGame(data);
+        keyStroke(e);
+        typedData(data);
     });
     // A click on the page (not on a key, and not after selecting text to copy) gives the terminal the keyboard.
     document.getElementById('chron').addEventListener('click', function (e) {
@@ -2076,6 +2190,7 @@
     document.getElementById('reconnect').addEventListener('click', function () {
         state.inCombat = false; state.enemies = []; state.party = []; state.result = null; state.death = null; state.log = [];
         state.vitals = null; state.status = null; state.room = null; state.exits = {}; state.footer = null; state.foes = []; state.foot = {}; state.flog = [];
+        menuRound = false; lineTyped = ''; armedKey = null; heldKey = null; composing = false; seenWaiting = false; waitSince = -1; polling = false;
         fightTail = -1;
         roomEnter = -1; clearMatched = 0; screenCleared();
         chronReset();
@@ -2107,7 +2222,14 @@
             convertEol: true
         });
         terminal.open(document.getElementById('terminal'));
-        terminal.onData(sendToGame);
+        terminal.onData(typedData);
+        // In the capture phase on the parent, so the key stroke is noted before xterm turns it into data.
+        var termBox = document.getElementById('terminal');
+        termBox.addEventListener('keydown', keyStroke, true);
+        termBox.addEventListener('keyup', function () { armedKey = null; heldKey = null; }, true);
+        termBox.addEventListener('paste', function () { armedKey = null; heldKey = null; }, true);
+        termBox.addEventListener('compositionstart', function () { composing = true; armedKey = null; heldKey = null; }, true);
+        termBox.addEventListener('compositionend', function () { composing = false; armedKey = null; }, true);
         document.getElementById('terminal').addEventListener('click', function () { if (!isTouch()) terminal.focus(); });
         // xterm focuses its textarea on mousedown, and a tap sends one, which would raise the phone
         // keyboard over the pad. On a touch screen only Type opens it; scrolling uses touch events.
@@ -2137,7 +2259,7 @@
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; },
         view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
-        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf
+        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf, typedData: typedData, readScreen: readScreen
     };
 
     populateLanguagePicker();
