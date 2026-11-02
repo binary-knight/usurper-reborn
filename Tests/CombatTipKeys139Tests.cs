@@ -211,7 +211,7 @@ public class CombatTipKeys139Tests
         foreach (var (cls, tip) in HintSystem.ClassCombatTips)
         foreach (var lang in Langs)
         {
-            var text = Loc.GetIn(lang, tip.LocKey);
+            var text = Loc.GetIn(lang, tip.TipKey);
             for (int i = 0; i < tip.SlotIds.Length; i++)
                 text.Should().Contain("[{" + i + "}]", "{0} {1}: the key of entry {2} comes from the bar", cls, lang, i);
             BracketKeys(text).Where(k => !k.StartsWith("{")).Except(new[] { "A" }).Should().BeEmpty( "{0} {1}: besides the bar, only [A]", cls, lang);
@@ -315,6 +315,46 @@ public class CombatTipKeys139Tests
             foreach (var key in ((string[])typeof(CombatEngine).GetField("CombatTipKeys", SF)!.GetValue(null)!))
                 all.Should().Contain(HintSystem.WordWrap(Loc.GetIn(lang, key), 77)[0], "{0}: the run drew {1}", cls, key);
         }
+    }
+
+    /// <summary>The action each tip is about, by the label the menus print for it.</summary>
+    private static readonly (string Tip, string Label)[] TipActions =
+    {
+        ("combat.tip_power_attack", "combat.power_attack"),
+        ("combat.tip_exact_strike", "combat.precise_strike"),
+        ("combat.tip_taunt", "combat.taunt"),
+        ("combat.tip_disarm", "combat.disarm_label"),
+        ("combat.tip_hide", "combat.hide"),
+    };
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void ATipAboutAnActionTheStandardMenuDoesNotList_NamesNoKey(string lang)
+    {
+        // a key on the menu is not enough: [I] is on it, but as Use Item, not Disarm
+        var hero = Fresh(CharacterClass.Warrior);
+        string menu;
+        using (var s = new Scope(hero, Mode.Standard, lang))
+        {
+            var t = new TerminalEmulator(new MemoryStream(), s.Stream);
+            var engine = new CombatEngine(t);
+            var classInfo = (List<(string key, string name, bool available)>)Invoke(engine, "GetClassSpecificActions", hero)!;
+            Invoke(engine, "ShowDungeonCombatMenuStandard", hero, false, false, classInfo, false, GodDomain.None);
+            t.StreamWriterInternal?.Flush();
+            menu = Strip(Encoding.UTF8.GetString(s.Stream.ToArray()));
+        }
+        foreach (var (tip, label) in TipActions)
+        {
+            menu.Should().NotContain(Loc.GetIn(lang, label).Trim(), "{0}: the standard menu does not list it, or this tip may name its key", label);
+            BracketKeys(Loc.GetIn(lang, tip)).Should().BeEmpty("{0} {1}: '{2}'", tip, lang, Loc.GetIn(lang, tip));
+        }
+        // the potion tip's key is the menu's Use Item row
+        var potionKey = BracketKeys(Loc.GetIn(lang, "combat.tip_healing_potions")).Single();
+        menu.Split('\n').Single(l => l.Contains("[" + potionKey + "]")).Should().Contain(Loc.GetIn(lang, "combat.use_item_potions_short", hero.Healing, hero.MaxPotions).Trim());
     }
 
     [Fact]

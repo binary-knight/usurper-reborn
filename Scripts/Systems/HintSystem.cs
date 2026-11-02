@@ -69,7 +69,7 @@ namespace UsurperRemake.Systems
         /// them. The tip takes each entry's key from the quickbar the combat menu shows, so it never names a slot the
         /// entry is not in (a Paladin's bar is [1] Power Strike, [2] Lay on Hands, while the tip used to say the reverse).
         /// </summary>
-        internal static readonly Dictionary<CharacterClass, (string LocKey, string[] SlotIds)> ClassCombatTips = new()
+        internal static readonly Dictionary<CharacterClass, (string TipKey, string[] SlotIds)> ClassCombatTips = new()
         {
             [CharacterClass.Magician] = ("hint.class_combat.magician", new[] { "spell:1" }),
             [CharacterClass.Cleric] = ("hint.class_combat.cleric", new[] { "spell:1" }),
@@ -96,7 +96,7 @@ namespace UsurperRemake.Systems
             {
                 var keys = tip.SlotIds.Select(quickbarKeyOf).ToArray();
                 if (keys.All(k => !string.IsNullOrEmpty(k)))
-                    return Loc.Get(tip.LocKey, keys.Cast<object>().ToArray());
+                    return Loc.Get(tip.TipKey, keys.Cast<object>().ToArray());
             }
             return Loc.Get(hasQuickbar ? "hint.class_combat.default" : "hint.class_combat.attack_only");
         }

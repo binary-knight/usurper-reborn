@@ -49,7 +49,7 @@ public class ClassicKeyHints200Tests
         ("base.train_how", new[] { At(P.LevelMaster) }),
         ("base.stat_awakening_hint", new[] { At(P.Progress) }),
         ("hint.awakening.msg", new[] { At(P.Progress) }),
-        ("hint.low_hp.msg", new[] { At(P.Healer), In("H") }),
+        ("hint.low_hp.msg", new[] { At(P.Healer), In("I") }),   // 1.3.9: potions in combat are [I] Use Item
         ("hint.first_level_up.msg", new[] { At(P.LevelMaster) }),
         ("hint.level_master.msg", new[] { At(P.LevelMaster) }),
         ("hint.mana_spells.msg", new[] { At(P.MagicShop) }),
@@ -74,7 +74,7 @@ public class ClassicKeyHints200Tests
         ("base.train_how.classic", new[] { At(P.LevelMaster) }),
         ("base.stat_awakening_hint.classic", new[] { At(P.Progress) }),
         ("hint.awakening.msg.classic", new[] { At(P.Progress) }),
-        ("hint.low_hp.msg.classic", new[] { At(P.Healer), In("H") }),
+        ("hint.low_hp.msg.classic", new[] { At(P.Healer), In("I") }),
         ("hint.first_level_up.msg.classic", new[] { At(P.LevelMaster) }),
         ("hint.level_master.msg.classic", new[] { At(P.LevelMaster) }),
         ("hint.mana_spells.msg.classic", new[] { At(P.MagicShop) }),
