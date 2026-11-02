@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.8; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.9; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
@@ -225,6 +225,7 @@ Players can connect directly from a web browser at `https://usurper-reborn.net`.
 - **xterm.js** in the browser provides the terminal emulator UI
 - **The play page** at `/play/` is a full page terminal, 80 columns, with a status line and a Combat and Chat drawer filled from GMCP
 - **Live Stats Dashboard** on the landing page shows who's online, aggregate stats, highlights, and news
+- **The Observatory** at `/dashboard` is a public page of NPC and realm data. `ssh-proxy.js` answers `/api/dash/people`, `profile`, `ties`, `realm`, `movers`, `depths`, `market`, `fallen` (`web/dash-observatory.js`) and `history` from the read only database; each sends an allow-listed set of fields, and any other `/api/dash/` path answers 404
 
 ### Stats API Response
 ```json
@@ -245,7 +246,8 @@ The response also carries `immortals`, `pvpLeaderboard`, `economy`, `npcActiviti
 - `web/ssh-proxy.js` - Node.js HTTP + WebSocket server (ws + ssh2 + better-sqlite3)
 - `web/gmcp-split.js` - Telnet and GMCP splitter for `/ws?gmcp=1` connections
 - `web/package.json` - Node.js dependencies
-- `scripts-server/nginx-usurper.conf` - nginx reverse proxy config
+- `web/dashboard.html`, `web/dash-observatory.js`, `web/dash-npcs.js` - The Observatory page and the data builders behind its endpoints
+- `scripts-server/nginx-usurper.conf` - nginx reverse proxy config (it includes the CSP, cache and private files snippets beside it in `scripts-server/`)
 - `scripts-server/usurper-web.service` - systemd service for web proxy
 
 ## Account Mail (1.3.4)

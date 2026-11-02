@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.8; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
+<!-- doc: checked 1.3.9; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
 # Usurper Reborn - Online Server Deployment Guide
 
 ## Overview
@@ -233,7 +233,10 @@ Browser -> https://your-domain.com (nginx)
 **Components**:
 - `ssh-proxy.js` - Node.js server providing the WebSocket bridge to the game + Stats REST API
 - `index.html` - Landing page with xterm.js terminal emulator + live stats dashboard
+- `play/` - The full page client at `/play/`
+- `dashboard.html` - The Observatory at `/dashboard`, a public page fed by `/api/dash/` (an unknown `/api/dash/` path answers 404)
 - nginx proxies `/ws` (WebSocket) and `/api/` (HTTP) to Node.js on port 3000
+- The web folder also holds the service's own files (`.env`, `.bak` copies, `package.json`, `node_modules`, the server scripts). `nginx-private.conf` answers 404 for them and `ssh-proxy.js` refuses them when it serves the folder
 
 **Setup**:
 ```bash
@@ -290,7 +293,7 @@ The deploy job updates the game and the web files; it does not touch nginx. A ch
    sudo cp scripts-server/nginx-cache-map.conf /etc/nginx/conf.d/usurper-cache-map.conf
    sudo sed -i -E '/^\s*include \/etc\/nginx\/snippets\/usurper-csp\.conf;/a\    include /etc/nginx/snippets/usurper-cache.conf;' /etc/nginx/sites-enabled/usurper
    ```
-   Check first that the live file has exactly one CSP include line and no cache include, so the line is added once.
+   Check first that the live file has exactly one CSP include line and no cache include, so the line is added once. The private files rule is added the same way: copy `nginx-private.conf` to `/etc/nginx/snippets/usurper-private.conf` and include it after the CSP include, before the file's `location` blocks.
 5. Test: `sudo nginx -t`. If it fails, restore the backup, remove any files you added, and test again before going on.
 6. Reload: `sudo systemctl reload nginx`. A reload keeps open connections; a restart drops them.
 7. Check from outside: `curl -sI https://your-domain.com/play/` shows the headers the change should add.

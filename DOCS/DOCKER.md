@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.8; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
+<!-- doc: checked 1.3.9; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
 # Usurper Reborn: Docker Deployment Guide
 
 Host your own Usurper Reborn MUD server using Docker.
@@ -135,7 +135,7 @@ In this compose stack nginx passes every page to the web service, which serves `
 ## Connecting
 
 ### Browser
-Open `http://your-server` in a browser. Click "Play Now" for the embedded terminal.
+Open `http://your-server` in a browser. Click "Play Now" for the embedded terminal, or open `http://your-server/play/` for the full page client.
 
 ### SSH (requires additional sshd setup)
 The Docker setup doesn't include an SSH server. Players connect via the browser terminal or raw TCP. For SSH access, run sshd on the host (or in a container that has the game binary) with a `ForceCommand` of `UsurperReborn --mud-relay --mud-port 4000`; the relay puts the terminal in raw mode and forwards to the game server with the player's login. `DOCS/SERVER_DEPLOYMENT.md` has the full sshd setup used on the public server.
@@ -179,7 +179,7 @@ All dashboards are accessible via the web interface:
 | URL | Description | Auth Required |
 |-----|-------------|---------------|
 | `/` | Landing page with embedded terminal + live stats | No |
-| `/dashboard` | NPC analytics (activities, relationships, timeline) | No |
+| `/dashboard` | The Observatory: public NPC and realm pages (people, ties, realm, depths, market, fallen) | No |
 | `/steam` | Steam client download and setup page | No |
 | `/balance` | Combat balance analytics (win rates, damage stats) | Yes |
 | `/admin` | Server admin panel (bans, player edits, config, world wipe) | Yes |
