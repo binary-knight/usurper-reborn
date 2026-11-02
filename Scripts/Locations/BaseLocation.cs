@@ -822,7 +822,7 @@ public abstract class BaseLocation
 
                     terminal.SetColor("yellow");
                     if (currentPlayer.TrainingPoints > 0)
-                        terminal.WriteLine($"  {Loc.Get("base.training_points_hint")}");
+                        terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.training_points_hint", currentPlayer))}");
                     // v1.1.13: level 10 is a milestone worth a line of its own
                     if (ReachedLevelTenWithPoints(fromLevel, currentPlayer.Level, currentPlayer.TrainingPoints))
                     {
@@ -833,7 +833,7 @@ public abstract class BaseLocation
                     terminal.WriteLine("");
 
                     // Show Level Master hint on first level-up
-                    HintSystem.Instance.TryShowHint(HintSystem.HINT_LEVEL_MASTER, terminal, currentPlayer.HintsShown);
+                    HintSystem.Instance.TryShowHint(HintSystem.HINT_LEVEL_MASTER, terminal, currentPlayer);
 
                     // v0.60.3: GMCP Char.Skills.List re-emit on level-up so MUD clients
                     // see newly-unlocked abilities and spells without manual refresh.
@@ -2949,7 +2949,7 @@ public abstract class BaseLocation
             await NavigateToLocation(GameLocation.Master); // throws LocationExitException, like a menu exit
             return;
         }
-        terminal.WriteLine($"  {Loc.Get("base.train_how")}", "yellow");
+        terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.train_how", currentPlayer))}", "yellow");
         await Pacing.Wait(1500);
     }
 
@@ -3699,7 +3699,7 @@ public abstract class BaseLocation
 
         // NEXT STEP (always shown)
         var next = JournalSystem.GetNextStep(player);
-        string nextText = Loc.Get(next.LocKey, next.Args);
+        string nextText = next.Text(player);
         terminal.SetColor("bright_yellow");
         if (sr)
             terminal.WriteLine($"{Loc.Get("journal.section_next")}: {nextText}");
@@ -7455,9 +7455,9 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("ocean.journal_boons", string.Join(", ", awakeningBoons))}");
             }
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("base.stat_awakening_hint")}"); // v1.1.12
+            terminal.WriteLine($"  {Loc.Get(MainStreetLocation.StreetTextKey("base.stat_awakening_hint", currentPlayer))}"); // v1.1.12
             terminal.SetColor("white");
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer?.HintsShown); // v1.1.12
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, terminal, currentPlayer); // v1.1.12; 2.0: the player picks the layout text
             terminal.WriteLine("");
         }
 

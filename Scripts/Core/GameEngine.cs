@@ -3029,7 +3029,7 @@ public partial class GameEngine
                     {
                         terminal.WriteLine("");
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine($"  {Loc.Get("journal.ticker", Loc.Get(loginStep.LocKey, loginStep.Args))}");
+                        terminal.WriteLine($"  {Loc.Get("journal.ticker", loginStep.Text(currentPlayer))}");
                         terminal.SetColor("white");
                     }
                 }
@@ -5267,7 +5267,7 @@ public partial class GameEngine
         bool getsAldricQuest = !isNgPlus && isFreshChar;
         if (isFreshChar && !getsAldricQuest)
         {
-            HintSystem.Instance.TryShowHint(HintSystem.HINT_GETTING_STARTED, terminal, currentPlayer.HintsShown);
+            HintSystem.Instance.TryShowHint(HintSystem.HINT_GETTING_STARTED, terminal, currentPlayer);
             await terminal.PressAnyKey();
         }
         else if (getsAldricQuest && !currentPlayer.HintsShown.Contains(HintSystem.HINT_GETTING_STARTED))
