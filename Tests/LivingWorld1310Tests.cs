@@ -98,6 +98,7 @@ public class LivingWorld1310Tests : IDisposable
         profile.RelationshipPref = pref;
         npc.Personality = profile;
         npc.Brain = new NPCBrain(npc, profile);
+        npc.Memory = npc.Brain.Memory;   // as NPC.EnsureSystemsInitialized aliases it
         return npc;
     }
 
