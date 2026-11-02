@@ -51,7 +51,7 @@ public class Bump139Tests
         Regex.Matches(notes, "(?m)^### (.+)$").Select(m => m.Groups[1].Value).Should().Equal(Groups);
         notes.Should().NotContain("Known issues").And.NotContain("Known Issues");
         string[] bullets = Bullets(notes);
-        bullets.Length.Should().Be(31);
+        bullets.Length.Should().Be(32);
         foreach (string b in bullets) ChangeLine.IsMatch(b).Should().BeTrue(b);
         bullets.Distinct().Count().Should().Be(bullets.Length);
         notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l =>
@@ -87,7 +87,7 @@ public class Bump139Tests
         string[] lines = readme.Split('\n');
         int bullet = Array.FindIndex(lines, l => l.StartsWith("- **v1.3.9:**", StringComparison.Ordinal));
         bullet.Should().BeGreaterThan(0);
-        lines[bullet].Should().Be("- **v1.3.9:** 31 changes; the Changelist is in " + NotesPath);
+        lines[bullet].Should().Be("- **v1.3.9:** 32 changes; the Changelist is in " + NotesPath);
         lines[bullet + 1].Should().StartWith("- **v1.3.8:** 11 changes;", "the newest bullet comes first");
     }
 
@@ -121,7 +121,7 @@ public class Bump139Tests
             dict["r1.road_now_t"].Should().Contain("1.3.9", lang);
             dict["r1.road_now_d"].Should().Contain("1.3.9", lang).And.NotContain("TODO", lang);
             dict["r1.road_139_t"].Should().MatchRegex(@"^1\.3\.9 ?: \S", lang);
-            dict["r1.road_139_d"].Should().Contain("31", lang);
+            dict["r1.road_139_d"].Should().Contain("32", lang);
             foreach (string n in next) dict["r1.road_" + n + "_when"].Should().Contain(after[n], $"{lang} {n}");
             foreach (var pair in dict.Where(p => p.Key.StartsWith("r1.road_", StringComparison.Ordinal)))
                 DashOrEmoji.IsMatch(pair.Value).Should().BeFalse($"{lang} {pair.Key}");
@@ -136,7 +136,7 @@ public class Bump139Tests
             + "the size you left it. Fixes to the website, the play page and the game round it out. The roadmap below says what comes next.");
         en["r1.road_139_d"].Should().Be("Shipped: the play page with its Chronicle view, a book page layout with monster pictures, floor "
             + "scenes and a room map, single key menus on the web, the Observatory page of public world data and the classic Main Street "
-            + "back as the default, with 31 changes in all.");
+            + "back as the default, with 32 changes in all.");
         en["r1.road_20_d"].Should().Be("The Chronicle view on the play page grows into a full graphical client for the same living world, "
             + "in the browser and in a desktop app on Steam, with book pages for the shops, the town and the screens that still show as text.");
     }

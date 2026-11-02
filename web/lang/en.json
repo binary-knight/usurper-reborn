@@ -458,7 +458,7 @@
   "r1.road_136_t": "1.3.6: Class audit",
   "r1.road_136_d": "Shipped: five enchant rules (a real magic resistance, poison over several rounds, Titan's Resolve for max HP, enchants for companions, abilities, PvP and world bosses, and stronger Phoenix Fire and Frostbite), and an audit of every ability and spell of all seventeen classes, with 79 changes in all so each does what its text says.",
   "r1.road_139_t": "1.3.9: The Chronicle view",
-  "r1.road_139_d": "Shipped: the play page with its Chronicle view, a book page layout with monster pictures, floor scenes and a room map, single key menus on the web, the Observatory page of public world data and the classic Main Street back as the default, with 31 changes in all.",
+  "r1.road_139_d": "Shipped: the play page with its Chronicle view, a book page layout with monster pictures, floor scenes and a room map, single key menus on the web, the Observatory page of public world data and the classic Main Street back as the default, with 32 changes in all.",
   "r1.road_138_t": "1.3.8: Allies and saves",
   "r1.road_138_d": "Shipped: an order to tell an ally to wait in a cleared room, allies who remember a fallen teammate, single player loads that start clean, NPC opinions that hold across a load and an SSH relay that keeps the game's last lines, with 11 changes in all.",
   "r1.road_137_t": "1.3.7: Class tuning",

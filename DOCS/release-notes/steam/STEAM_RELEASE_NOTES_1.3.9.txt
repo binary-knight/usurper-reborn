@@ -9,6 +9,7 @@
 [*]Fixed the Observatory sending private fields for children and NPCs (#189, #190)
 [*]Fixed unknown Observatory data paths answering with the page instead of a 404 (#195)
 [*]Adjusted the web server to refuse its own settings, backup and script files (#209)
+[*]Adjusted the website's public news, online list and Discord who reply to send character names only (#218)
 [/list]
 [h3]Play page[/h3]
 [list]
