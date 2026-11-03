@@ -886,6 +886,18 @@ public static partial class GameConfig
         return ManaPotionBaseCost + (long)(sq * ManaPotionQuadraticFactor);
     }
 
+    /// <summary>
+    /// 1.3.10 (P12): a healing or mana potion bought at a dungeon outpost or from a street merchant costs the
+    /// town price for the buyer's level (above) times this, so the town curve holds away from town.
+    /// </summary>
+    public const double SettlementPotionPriceMultiplier = 1.25;
+
+    public static long GetSettlementHealingPotionCost(int level) =>
+        (long)(GetHealingPotionCost(level) * SettlementPotionPriceMultiplier);
+
+    public static long GetSettlementManaPotionCost(int level) =>
+        (long)(GetManaPotionCost(level) * SettlementPotionPriceMultiplier);
+
     // Reforging constants (endgame gold sink)
     public const int ReforgeCostMultiplier = 50;       // Cost = level * level * this
     // v0.60.0 alpha balance review: endgame gold sink. Pre-cap formula gave

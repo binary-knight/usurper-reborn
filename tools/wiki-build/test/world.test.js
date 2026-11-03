@@ -87,7 +87,8 @@ test("outposts: the heal price and share, and supplies at the floor's price", ()
     "30 gold, restores 30 percent of missing HP and mana",
   ]);
   assert.equal(row(html, "20")[1], "None");
-  assert.match(row(html, "65")[2], /Healing Potion 175/);
+  assert.match(row(html, "65")[2], /Healing Potion \(1\.25 x the town price\)/);
+  assert.match(row(html, "65")[2], /Antidote 140/);
   assert.match(row(html, "35")[1], /^74 gold, restores 40 percent/);
 });
 

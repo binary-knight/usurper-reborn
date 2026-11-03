@@ -726,10 +726,13 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(74, One(outposts, "35", "floor").GetProperty("healCost").GetInt64());
         Assert.Equal(201, One(outposts, "65", "floor").GetProperty("healCost").GetInt64());
         Assert.Equal(0.4, One(outposts, "35", "floor").GetProperty("healShareOfMissing").GetDouble(), 3);
-        // base price x (1 + floor / 10)
+        // base price x (1 + floor / 10); 1.3.10: a potion is the town price for the buyer's level x 1.25, no floor price
         var goods = One(outposts, "65", "floor").GetProperty("goods").EnumerateArray().ToArray();
-        Assert.Equal(25 * 7, One(goods, "heal_potion").GetProperty("price").GetInt64());
+        Assert.Equal(JsonValueKind.Null, One(goods, "heal_potion").GetProperty("price").ValueKind);
+        Assert.Equal(1.25, One(goods, "heal_potion").GetProperty("townPriceFactor").GetDouble(), 3);
+        Assert.Equal(1.25, One(goods, "mana_potion").GetProperty("townPriceFactor").GetDouble(), 3);
         Assert.Equal(60 * 7, One(goods, "firebloom").GetProperty("price").GetInt64());
+        Assert.Equal(JsonValueKind.Null, One(goods, "firebloom").GetProperty("townPriceFactor").ValueKind);
     }
 
     [Fact]
