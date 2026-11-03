@@ -52,7 +52,7 @@ public class Bump1310Tests
         Regex.Matches(notes, "(?m)^### (.+)$").Select(m => m.Groups[1].Value).Should().Equal(Groups);
         notes.Should().NotContain("Known issues").And.NotContain("Known Issues");
         string[] bullets = Bullets(notes);
-        bullets.Length.Should().Be(84);
+        bullets.Length.Should().Be(85);
         foreach (string b in bullets) ChangeLine.IsMatch(b).Should().BeTrue(b);
         bullets.Distinct().Count().Should().Be(bullets.Length);
         notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l =>
@@ -88,7 +88,7 @@ public class Bump1310Tests
         string[] lines = readme.Split('\n');
         int bullet = Array.FindIndex(lines, l => l.StartsWith("- **v1.3.10:**", StringComparison.Ordinal));
         bullet.Should().BeGreaterThan(0);
-        lines[bullet].Should().Be("- **v1.3.10:** 84 changes; the Changelist is in " + NotesPath);
+        lines[bullet].Should().Be("- **v1.3.10:** 85 changes; the Changelist is in " + NotesPath);
         lines[bullet + 1].Should().StartWith("- **v1.3.9:** 32 changes;", "the newest bullet comes first");
     }
 }

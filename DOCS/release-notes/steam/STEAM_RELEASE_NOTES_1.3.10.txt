@@ -95,6 +95,7 @@
 [*]Fixed the outpost and street merchant taking gold for a potion you cannot carry (#233)
 [*]Added a way to take back an offline Auction House listing, and unsold listings return after 30 days (#233)
 [*]Fixed the Crown discount, Merchant's Favor, alignment ability and inheritance texts to state what they do (#233)
+[*]Fixed the daily maintenance screen listing an alive bonus and a town pot that paid nothing; both are removed (#233)
 [/list]
 [h3]Settlements and outposts[/h3]
 [list]
