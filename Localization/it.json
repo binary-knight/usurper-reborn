@@ -29444,7 +29444,7 @@
   "dungeon.settlement_buy_prompt": "Compra: ",
   "dungeon.settlement_item_torch": "Torcia incantata",
   "dungeon.settlement_item_lockpick": "Set di grimaldelli",
-  "dungeon.settlement_item_smoke_bomb": "Fumogeno (aiuta la fuga)",
+  "dungeon.settlement_item_smoke_bomb": "Polvere fumogena (+2 Agilità)",
   "dungeon.camp_header": "Accampamento del rifugio",
   "dungeon.news_seal_found": "{0} ha scoperto un antico Sigillo! ({1}/7 raccolti)",
   "dungeon.divine_combat_penalties": "(Penalità in combattimento: {0}% danni, {1}% difesa)",

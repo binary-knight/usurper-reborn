@@ -29455,7 +29455,7 @@
   "dungeon.settlement_buy_prompt": "Comprar: ",
   "dungeon.settlement_item_torch": "Antorcha encantada",
   "dungeon.settlement_item_lockpick": "Juego de ganzúas",
-  "dungeon.settlement_item_smoke_bomb": "Bomba de humo (para huir)",
+  "dungeon.settlement_item_smoke_bomb": "Polvo de humo (+2 Agilidad)",
   "dungeon.camp_header": "Campamento del refugio",
   "dungeon.news_seal_found": "¡{0} ha descubierto un Sello antiguo! ({1}/7 reunidos)",
   "dungeon.divine_combat_penalties": "(Penalizaciones de combate: {0}% de daño, {1}% de defensa)",

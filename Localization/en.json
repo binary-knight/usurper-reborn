@@ -29941,7 +29941,7 @@
   "dungeon.settlement_buy_prompt": "Buy: ",
   "dungeon.settlement_item_torch": "Enchanted Torch",
   "dungeon.settlement_item_lockpick": "Lockpick Set",
-  "dungeon.settlement_item_smoke_bomb": "Smoke Bomb (flee aid)",
+  "dungeon.settlement_item_smoke_bomb": "Smoke Powder (+2 Agility)",
   "dungeon.camp_header": "Safe Haven Camp",
   "dungeon.news_seal_found": "{0} has discovered an ancient Seal! ({1}/7 collected)",
   "dungeon.divine_combat_penalties": "(Combat penalties: {0}% damage, {1}% defense)",

@@ -20,6 +20,9 @@ namespace UsurperReborn.Tests;
 /// 1.3.10 audit, piece FS (settlements), his picks P6A and P12A:
 /// P12. Outpost and street merchant healing and mana potions cost the town price for the buyer's level x1.25
 ///      (they cost 25 or 30 x (1 + floor / 10), or 40 + 3 x level, a few percent of the town price late on).
+/// L4-11. The Rat King's Market sold "Smoke Bomb (flee aid)", which gives +2 Agility for one fight and no flee help
+///      (flight rolls on Dexterity; the real smoke bomb is the Black Market's guaranteed escape). It is renamed to what
+///      it does: Smoke Powder (+2 Agility), in every language.
 /// All in memory.
 /// </summary>
 [Collection("SharedGameSingletons")]
@@ -124,6 +127,43 @@ public class Settlement1310Tests : IDisposable
             result.Add(((string)t.GetField("Name")!.GetValue(item)!, (long)t.GetField("Price")!.GetValue(item)!));
         }
         return result;
+    }
+
+    // ---------- L4-11: the outpost smoke bomb says what it does ----------
+
+    private static readonly string[] Langs = { "en", "es", "fr", "hu", "it" };
+
+    [Fact]
+    public void The_outpost_smoke_powder_names_its_agility_and_promises_no_flight()
+    {
+        var expected = new Dictionary<string, (string agility, string[] notWords)>
+        {
+            ["en"] = ("+2 Agility", new[] { "flee", "Bomb" }),
+            ["es"] = ("+2 Agilidad", new[] { "huir", "Bomba" }),
+            ["fr"] = ("+2 Agilit\u00e9", new[] { "fuir", "Fumig\u00e8ne (" }),
+            ["hu"] = ("+2 Mozg\u00e9konys\u00e1g", new[] { "menek\u00fcl", "bomba" }),
+            ["it"] = ("+2 Agilit\u00e0", new[] { "fuga", "Fumogeno (" }),
+        };
+        foreach (var lang in Langs)
+        {
+            string name = Loc.GetIn(lang, "dungeon.settlement_item_smoke_bomb");
+            var (agility, notWords) = expected[lang];
+            name.Should().Contain(Regex.Unescape(agility), lang);
+            foreach (var w in notWords) name.Should().NotContain(Regex.Unescape(w), lang);
+            name.Length.Should().BeLessThanOrEqualTo(29, lang);
+        }
+        foreach (var lang in new[] { "en", "hu" })
+            Loc.GetIn(lang, "dungeon.settlement_item_smoke_bomb").Length.Should().BeLessThanOrEqualTo(25, $"{lang} fits the 25 column name field");
+    }
+
+    [Fact]
+    public void The_outpost_smoke_powder_still_gives_two_agility_for_one_fight_and_no_smoke_bomb()
+    {
+        var hero = Hero("Powder Buyer");
+        var (d, _) = Dungeon(hero, 20);
+        typeof(DungeonLocation).GetMethod("ApplySettlementPurchase", F)!.Invoke(d, new object[] { hero, "smoke_bomb" });
+        hero.SmokeBombs.Should().Be(0, "it is not the Black Market's guaranteed escape");
+        hero.TimedStatBuffs.Should().ContainSingle(b => b.Source == "settlement_smoke_bomb" && b.Stat == StatKind.Agility && b.Amount == 2 && b.CombatsLeft == 1);
     }
 
     // ---------- P12: potion prices away from town ----------

@@ -29444,7 +29444,7 @@
   "dungeon.settlement_buy_prompt": "Acheter : ",
   "dungeon.settlement_item_torch": "Torche enchantée",
   "dungeon.settlement_item_lockpick": "Jeu de crochets",
-  "dungeon.settlement_item_smoke_bomb": "Fumigène (aide à fuir)",
+  "dungeon.settlement_item_smoke_bomb": "Poudre fumigène (+2 Agilité)",
   "dungeon.camp_header": "Camp du havre sûr",
   "dungeon.news_seal_found": "{0} a découvert un Sceau ancien ! ({1}/7 réunis)",
   "dungeon.divine_combat_penalties": "(Pénalités de combat : {0}% de dégâts, {1}% de défense)",

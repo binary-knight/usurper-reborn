@@ -29750,7 +29750,7 @@
   "dungeon.settlement_buy_prompt": "Vásárlás: ",
   "dungeon.settlement_item_torch": "Bűvös fáklya",
   "dungeon.settlement_item_lockpick": "Zárnyitó készlet",
-  "dungeon.settlement_item_smoke_bomb": "Füstbomba (menekülés)",
+  "dungeon.settlement_item_smoke_bomb": "Füstpor (+2 Mozgékonyság)",
   "dungeon.camp_header": "Menedéktábor",
   "dungeon.news_seal_found": "{0} ősi Pecsétet talált! ({1}/7 összegyűjtve)",
   "dungeon.divine_combat_penalties": "(Harci büntetés: {0}% sebzés, {1}% védelem)",
