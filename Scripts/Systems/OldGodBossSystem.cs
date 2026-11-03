@@ -1299,6 +1299,10 @@ namespace UsurperRemake.Systems
         {
             StoryProgressionSystem.Instance.UpdateGodState(boss.Type, GodStatus.Allied);
 
+            // 1.3.10: an alliance with Manwe is his saving; the objectives read manwe_saved
+            if (boss.Type == OldGodType.Manwe)
+                StoryProgressionSystem.Instance.SetStoryFlag("manwe_saved", true);
+
             if (boss.Type == OldGodType.Noctura)
             {
                 terminal.WriteLine("");

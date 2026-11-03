@@ -70,7 +70,9 @@ A god killed or saved leaves 2 of its crafting material, and each of the first s
 :::
 
 :::spoiler Spoiler: ending conditions
-The ending is decided when Manwe is resolved, by a fight, a save or an alliance; it is not picked from a menu. If the session ends before the ending plays, it plays at your next login. The game checks the endings in this order and the first that fits is yours: the secret Dissolution ending, the True Ending, the older True Ending rule, Usurper, Savior, then Defiant. So Usurper wins over Savior when both fit.
+The ending is decided when Manwe is resolved, by a fight, a save or an alliance; it is not picked from a menu. If the session ends before the ending plays, it plays at your next login. The game checks the endings in this order and the first that fits is yours: the secret Dissolution ending, the True Ending, the older True Ending rule, your last answer to Manwe, Usurper, Savior, then Defiant. So Usurper wins over Savior when both fit.
+
+**Your answer to Manwe.** If you tell him you do not want to fight, two answers follow. "Walk away from creation" allies him and gives the Defiant ending whatever your alignment. "Let me take the burden from you" starts a test fight; once you win it, or accept his offer during it, you get the Savior ending, or the Usurper ending when the Usurper rule below already fits. Any other answer leaves the ending to the rules below.
 
 Alignment here is Chivalry minus Darkness.
 
@@ -87,7 +89,9 @@ A Blood Price of {{balance:MurderWeightEndingBlock}} or more closes the True End
 :::spoiler Spoiler: story chapters and the moral choices
 Four events move the story's chapter forward: meeting the Stranger, a first visit to floor 45, holding all six god artifacts (when the final artifact appears), and a first visit to floor 100. No other event or conversation sets a chapter, so the chapters between them never come. The chapter is kept in the save.
 
-Five moral choices are written, each offered once and each waiting for a chapter: the possessed child on floor 25, Veloura's cure on floor 65, freeing Terravok on floor 80, destroying the darkness on floor 95 (with the Sunforged Blade), and a final choice on floor 100. With the chapters above, a floor by floor descent never offers the possessed child, whose floor checks it only on the first visit; Veloura's cure and freeing Terravok come only on a first visit to their floor after the final artifact; destroying the darkness is checked on every visit to floor 95 once the final artifact is held. No code offers the final choice.
+Five moral choices are written, each offered once. Four are offered on any visit to their floor once their condition is met, whatever the chapter: the possessed child on floor 25 once you hold the seal of floor 15; Veloura's cure on floor 65 once you hold the Soulweaver's Loom, Veloura is saved and Lyris travels with you; freeing Terravok on floor 80 while Terravok still sleeps; destroying the darkness on floor 95 once you hold the Sunforged Blade. Waking Terravok on floor 80 does not settle his fate: he is still met on floor 95. The fifth, a final choice on floor 100, waits for a chapter, and no code offers it.
+
+The ending screen gives one line for the answer to each of the four choices you made, and one for what you told Mira in her quest of mercy.
 :::
 
 Secret boss definitions are in the [boss reference](/wiki/en/monsters/bosses/).
