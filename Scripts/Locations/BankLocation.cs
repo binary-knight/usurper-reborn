@@ -1711,7 +1711,7 @@ public class BankLocation : BaseLocation
             new() { Key = "L", Label = Loc.Get("bank.menu_loans"), Category = "credit", Icon = "loan" },
             new() { Key = "I", Label = Loc.Get("bank.menu_interest"), Category = "info", Icon = "info" },
             new() { Key = "A", Label = Loc.Get("bank.menu_account"), Category = "info", Icon = "account" },
-            new() { Key = "G", Label = currentPlayer.BankGuard ? Loc.Get("bank.menu_guard_resign") : Loc.Get("bank.menu_guard"), Category = "duty", Icon = "guard" },
+            new() { Key = currentPlayer.BankGuard ? "X" : "G", Label = currentPlayer.BankGuard ? Loc.Get("bank.menu_guard_resign") : Loc.Get("bank.menu_guard"), Category = "duty", Icon = "guard" },   // 1.3.10: X resigns
             new() { Key = "O", Label = Loc.Get("bank.menu_robbery"), Category = "evil", Icon = "robbery" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };

@@ -192,6 +192,10 @@ public class CastleLocation : BaseLocation
             WriteSRMenuOption("U", Loc.Get("castle.court"));
             WriteSRMenuOption("E", Loc.Get("castle.estate"));
             WriteSRMenuOption("B", Loc.Get("castle.bodyguards"));
+            // 1.3.10: the keys the visual menu shows and the handler takes
+            WriteSRMenuOption("V", Loc.Get("castle.bbs_courtyard_statues"));
+            WriteSRMenuOption("Y", Loc.Get("castle.bbs_sponsor_heir"));
+            WriteSRMenuOption("Z", Loc.Get("castle.bbs_bloodlines"));
             terminal.WriteLine("");
             WriteSRMenuOption("R", Loc.Get("castle.return"));
             terminal.WriteLine("");
@@ -437,6 +441,9 @@ public class CastleLocation : BaseLocation
             if (FactionSystem.Instance?.HasCastleAccess() == true)
                 WriteSRMenuOption("L", Loc.Get("castle.armory"));
 
+            // 1.3.10: the keys the visual menu shows and the handler takes
+            WriteSRMenuOption("V", Loc.Get("castle.bbs_courtyard_statues"));
+            WriteSRMenuOption("Z", Loc.Get("castle.bbs_bloodlines"));
             WriteSRMenuOption("R", Loc.Get("castle.return"));
             terminal.WriteLine("");
         }
@@ -9692,7 +9699,7 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("castle.siege_team_retreats"));
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("castle.siege_guards_defeated", guardsDefeated, Math.Max(1, totalGuards)));
+            terminal.WriteLine(Loc.Get("castle.siege_guards_beaten", guardsDefeated, Math.Max(1, totalGuards)));   // 1.3.10: the tally, not the success line
             currentPlayer.HP = Math.Max(1, currentPlayer.HP / 2);
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("castle.siege_lost_half_hp"));

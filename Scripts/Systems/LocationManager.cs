@@ -165,20 +165,43 @@ public class LocationManager
             }
         }
 
-        // Town locations: pull from the static navigation table. Key by the
-        // destination's enum name so Mudlet's mapper script can label edges
-        // sensibly (Inn, Church, Bank, etc.) -- single-word locations are the
-        // common case and read cleanly.
-        if (navigationTable != null && navigationTable.TryGetValue(locationId, out var dests))
+        // Town locations: the exits the menus really offer (1.3.10; the Pascal navigation table named places
+        // that are not registered and left out ones Main Street reaches). Key by the destination's enum name so
+        // Mudlet's mapper script can label edges sensibly (Inn, Church, Bank, etc.).
+        bool settlement = SettlementSystem.Instance?.State.IsEstablished == true;
+        foreach (var dest in TownExits(locationId, currentPlayer?.Level ?? 1, UsurperRemake.BBS.DoorMode.IsOnlineMode, settlement, locations.ContainsKey))
         {
-            foreach (var dest in dests)
-            {
-                string destName = dest.ToString().ToLowerInvariant();
-                exits[destName] = (int)dest;
-            }
+            // LoveCorner and RoyalOrphanage share the value 77; the exit is Love Street's
+            string destName = dest == GameLocation.LoveCorner ? "lovecorner" : dest.ToString().ToLowerInvariant();
+            exits[destName] = (int)dest;
         }
 
         return exits;
+    }
+
+    /// <summary>
+    /// 1.3.10: the town exits a screen's menu offers. Main Street's are the places its keys open for this player
+    /// (the StreetEntries table both Main Street layouts draw, unlocked by the player's menu tier, online mode and an
+    /// established settlement); every other registered town screen leaves to Main Street. The prison, the Pantheon
+    /// and the SysOp console have no walking exit. The navigation table stays for /train and wizard goto.
+    /// </summary>
+    internal static List<GameLocation> TownExits(GameLocation from, int level, bool online, bool settlement, Func<GameLocation, bool> registered)
+    {
+        if (!registered(from)) return new List<GameLocation>();
+        if (from == GameLocation.MainStreet)
+        {
+            var view = new MainStreetLocation.StreetView(MainStreetLocation.TierForLevel(level), online, settlement);
+            return MainStreetLocation.StreetEntries
+                .Where(e => MainStreetLocation.IsUnlocked(e, view))
+                .Select(e => MainStreetLocation.DestinationOf(e.Place, online))
+                .Where(d => d.HasValue && registered(d.Value))
+                .Select(d => d!.Value)
+                .Distinct()
+                .ToList();
+        }
+        if (from is GameLocation.Prison or GameLocation.Prisoner or GameLocation.Pantheon or GameLocation.SysOpConsole)
+            return new List<GameLocation>();
+        return new List<GameLocation> { GameLocation.MainStreet };
     }
 
     private void InitializeNavigationTable()

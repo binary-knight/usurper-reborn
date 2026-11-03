@@ -1644,7 +1644,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_street.gift_your_gold", $"{currentPlayer.Gold:N0}"));
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput(Loc.Get("love_street.what_buy"));
+        var input = await terminal.GetInput(Loc.Get("love_street.what_buy", gifts.Length));
         if (!int.TryParse(input, out int choice) || choice < 1 || choice > gifts.Length)
         {
             terminal.WriteLine(Loc.Get("love_street.come_back_shop"), "gray");

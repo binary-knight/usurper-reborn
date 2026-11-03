@@ -145,7 +145,12 @@ namespace UsurperRemake.Systems
             await term.PressAnyKey();
 
             if (player != null)
-                HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player);
+            {
+                // 1.3.10: a districts player below the full menu tier is told from which level Progress opens
+                string awakeningHint = MainStreetLocation.AwakeningTextKey("hint.awakening.msg", player);
+                if (awakeningHint.EndsWith(".early")) HintSystem.Instance.TryShowHintWithMessage(HintSystem.HINT_AWAKENING, awakeningHint, term, player.HintsShown);
+                else HintSystem.Instance.TryShowHint(HintSystem.HINT_AWAKENING, term, player);
+            }
             return true;
         }
     }

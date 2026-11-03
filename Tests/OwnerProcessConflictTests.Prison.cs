@@ -47,7 +47,9 @@ public partial class OwnerProcessConflictTests
             CastleLocation.GetCurrentKing()!.Prisoners["Pat"].BailAmount.Should().Be(bail);
 
             // paying at once meets the stored amount
-            (await RunPrison<bool>(Prison("Y", "", ""), "HandlePayBail", pat)).Should().BeTrue("the granted bail is the stored one");
+            // 1.3.10: a paid bail walks the player out to Main Street
+            (await Assert.ThrowsAsync<LocationExitException>(() => RunPrison<bool>(Prison("Y", "", ""), "HandlePayBail", pat)))
+                .DestinationLocation.Should().Be(GameLocation.MainStreet, "the granted bail is the stored one");
             pat.Gold.Should().Be(50_000 - bail);
             pat.DaysInPrison.Should().Be(0);
             var stored = await StoredCourt();
@@ -60,7 +62,8 @@ public partial class OwnerProcessConflictTests
             pat.DaysInPrison = 7;
             await RunPrison(Prison("1", "", ""), "HandlePetitionKing", pat);
             await NewOsm(_db).LoadRoyalCourtFromWorldState();
-            (await RunPrison<bool>(Prison("Y", "", ""), "HandlePayBail", pat)).Should().BeTrue("the bail survives a reload");
+            (await Assert.ThrowsAsync<LocationExitException>(() => RunPrison<bool>(Prison("Y", "", ""), "HandlePayBail", pat)))
+                .DestinationLocation.Should().Be(GameLocation.MainStreet, "the bail survives a reload");
             pat.DaysInPrison.Should().Be(0);
         }));
     }
