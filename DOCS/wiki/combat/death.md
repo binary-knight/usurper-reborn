@@ -60,7 +60,7 @@ On Nightmare difficulty death is permanent: the save is deleted. There is no men
 
 ## Resurrect online: resurrections
 
-Online, each death spends one resurrection automatically and you wake at the Temple with half your maximum HP. A death with no resurrections left erases the character. A new character starts with 3; the server can set this from 0 to 99.
+Online, each death spends one resurrection automatically and you wake at the Temple with half your maximum HP. After the death page the game says a life was spent and how many are left, and the Temple's hall says it once more when you arrive. A death with no resurrections left erases the character. A new character starts with 3; the server can set this from 0 to 99.
 
 ### Getting resurrections back
 

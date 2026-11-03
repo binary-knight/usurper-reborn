@@ -400,6 +400,14 @@ namespace UsurperRemake.Systems
                     break;
             }
 
+            // 1.3.10: the Mortal Pride unlock (+25 percent, from a Defiant ending) for every later cycle. The larger of
+            // it and this ending's own extra counts, never both, so the cycle after a Defiant ending is not doubled.
+            float baseExp = 1.0f + (0.1f * cycle);
+            float endingExtra = bonuses.ExpMultiplier - baseExp;
+            float unlockExtra = MetaProgressionSystem.Instance.GetXPMultiplier() - 1.0f;
+            if (unlockExtra > endingExtra)
+                bonuses.ExpMultiplier = baseExp + unlockExtra;
+
             return bonuses;
         }
 
@@ -519,7 +527,7 @@ namespace UsurperRemake.Systems
             }
 
             // Check for special bonuses from endings
-            if (story.HasStoryFlag("keeps_artifact_knowledge") || story.HasStoryFlag("knows_artifact_locations"))
+            if (story.HasStoryFlag("knows_artifact_locations"))   // 1.3.10: the flag ApplyCycleBonuses writes
             {
                 bonuses.Add(Loc.Get("opening.cycle_artifacts_revealed"));
             }
@@ -561,6 +569,9 @@ namespace UsurperRemake.Systems
             // Must have balanced alignment
             var alignment = player.Chivalry - player.Darkness;
             if (Math.Abs(alignment) > 200) return false;
+
+            // 1.3.10: the Blood Price closes this older rule too, as it closes the enhanced True Ending
+            if (player.MurderWeight >= GameConfig.MurderWeightEndingBlock) return false;
 
             return true;
         }

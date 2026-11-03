@@ -2000,7 +2000,9 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("merc.contract_issued_by", quest.GetDisplayInitiator())}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {quest.GetDisplayComment()}");
+        // 1.3.10: the posting is word wrapped to 79 columns
+        foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(quest.GetDisplayComment(), UsurperRemake.UI.UIHelper.WrapWidth - 2))
+            terminal.WriteLine($"  {row}");
         terminal.WriteLine("");
 
         if (quest.Objectives != null && quest.Objectives.Count > 0)
@@ -2023,8 +2025,10 @@ public class AnchorRoadLocation : BaseLocation
         long previewGold = (long)(quest.BountyGold * rankMul);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("merc.contract_reward_line", previewGold));
+        // 1.3.10: the days to finish it, and what failing costs (no gold or standing is taken; it only fails)
+        terminal.WriteLine(Loc.Get("merc.contract_days_line", quest.DaysToComplete));
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("merc.contract_penalty_line", quest.Penalty));
+        terminal.WriteLine(Loc.Get("merc.contract_penalty_line"));
         terminal.WriteLine("");
 
         // Daily-cap check.
@@ -2042,14 +2046,17 @@ public class AnchorRoadLocation : BaseLocation
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(Loc.Get("merc.contract_claim_prompt")))
         {
-            quest.Occupier = currentPlayer.Name2;
-            quest.OccupierRace = currentPlayer.Race;
-            quest.OccupierSex = (byte)currentPlayer.Sex;
-            quest.OccupiedDays = 0;
-            currentPlayer.MercContractsClaimedToday++;
-
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("merc.contract_claimed_msg")}");
+            // 1.3.10: claimed only while still free (another player may have taken it since the board was drawn)
+            if (QuestSystem.TryClaimMercContract(currentPlayer, quest))
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine($"  {Loc.Get("merc.contract_claimed_msg")}");
+            }
+            else
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("merc.contract_taken")}");
+            }
             await Pacing.Wait(1500);
         }
     }

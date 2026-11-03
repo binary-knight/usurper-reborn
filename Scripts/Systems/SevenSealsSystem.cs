@@ -205,8 +205,9 @@ namespace UsurperRemake.Systems
             ArchetypeTracker.Instance.RecordSealCollected();
 
             // Award experience
-            player.Experience += seal.RewardXP;
-            terminal.WriteLine(Loc.Get("seals.xp_gained", seal.RewardXP), "cyan");
+            long sealXP = RewardXPFor(seal);
+            player.Experience += sealXP;
+            terminal.WriteLine(Loc.Get("seals.xp_gained", sealXP), "cyan");
             terminal.WriteLine("");
 
             // Grant wave fragments for Ocean Philosophy integration
@@ -232,6 +233,10 @@ namespace UsurperRemake.Systems
 
             return true;
         }
+
+        /// <summary>1.3.10: a seal's experience, doubled by the New Game+ Seal Resonance unlock.</summary>
+        internal static long RewardXPFor(SealData seal) =>
+            MetaProgressionSystem.Instance.SealsGiveDoubleBonus() ? seal.RewardXP * 2L : seal.RewardXP;
 
         /// <summary>
         /// Display the seal discovery sequence

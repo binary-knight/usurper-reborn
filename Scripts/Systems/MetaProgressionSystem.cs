@@ -238,6 +238,15 @@ namespace UsurperRemake.Systems
         #region NG+ Bonuses
 
         /// <summary>
+        /// 1.3.10 (supervisor ruling 2026-11-03): the damage, healing, shop, stat, elite, seal and artifact reveal
+        /// unlocks apply only to a character on cycle 2 or later (StoryProgressionSystem.CurrentCycle, per character
+        /// and per session online). A new cycle 1 character made after an ending gets none of them. The unlocks that
+        /// already applied on cycle 1 before 1.3.10 (Fear the Throne, Artifact Hunter, Survivor's Guilt, titles,
+        /// prestige classes) are not gated here.
+        /// </summary>
+        private static bool InNewGamePlus => StoryProgressionSystem.Instance.CurrentCycle >= 2;
+
+        /// <summary>
         /// Get the starting level bonus for NG+
         /// </summary>
         public int GetStartingLevelBonus()
@@ -248,13 +257,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get XP multiplier based on unlocks
+        /// Get XP multiplier based on unlocks. 1.3.10: Mortal Pride gives the +25 percent the Defiant ending's
+        /// cycle bonus gives (its row says so); CycleSystem.CalculateCycleBonuses takes the larger of the two,
+        /// so the Defiant cycle does not get it twice. Only the row's number counts; no other unlock adds XP.
         /// </summary>
         public float GetXPMultiplier()
         {
             float multiplier = 1.0f;
-            if (HasBonus("MORTAL_PRIDE")) multiplier += 0.20f;
-            if (HasBonus("MULTIPLE_PATHS")) multiplier += 0.10f;
+            if (HasBonus("MORTAL_PRIDE")) multiplier += 0.25f;
             return multiplier;
         }
 
@@ -264,6 +274,7 @@ namespace UsurperRemake.Systems
         public float GetDamageMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("TYRANTS_AURA")) multiplier += 0.15f;
             return multiplier;
         }
@@ -274,12 +285,14 @@ namespace UsurperRemake.Systems
         public float GetHealingMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("HEALING_LIGHT")) multiplier += 0.25f;
             return multiplier;
         }
 
         /// <summary>
-        /// Get monster flee chance reduction (Fear the Throne perk: enemies are -10% less likely to flee)
+        /// Fear the Throne: monsters deal 10 percent less damage (CombatEngine takes it off a monster's attack;
+        /// 1.3.10: the unlock row says so). The name is kept from when the text spoke of fleeing.
         /// </summary>
         public int GetMonsterFleeReduction() => HasBonus("FEAR_THE_THRONE") ? 10 : 0;
 
@@ -299,6 +312,7 @@ namespace UsurperRemake.Systems
         public float GetShopDiscount()
         {
             float discount = 0f;
+            if (!InNewGamePlus) return discount;   // 1.3.10: NG+ characters only
             if (HasBonus("BLESSED_COMMERCE")) discount += 0.10f;
             return discount;
         }
@@ -309,6 +323,7 @@ namespace UsurperRemake.Systems
         public float GetStatMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("OCEANS_BLESSING")) multiplier += 0.15f;
             return multiplier;
         }
@@ -318,7 +333,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool ShouldRevealArtifactLocations()
         {
-            return HasBonus("ARTIFACT_MEMORY");
+            return InNewGamePlus && HasBonus("ARTIFACT_MEMORY");   // 1.3.10: NG+ characters only
         }
 
         /// <summary>
@@ -334,17 +349,18 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool SealsGiveDoubleBonus()
         {
-            return HasBonus("SEAL_RESONANCE");
+            return InNewGamePlus && HasBonus("SEAL_RESONANCE");   // 1.3.10: NG+ characters only
         }
 
         /// <summary>
-        /// Get rare monster spawn multiplier
+        /// Get rare monster spawn multiplier: Slayer makes an elite 25 percent more likely
+        /// (MonsterGenerator.EliteRollChance). 1.3.10: only the row's number; no other unlock adds to it.
         /// </summary>
         public float GetRareMonsterMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("SLAYER")) multiplier += 0.25f;
-            if (HasBonus("LEGEND_SLAYER")) multiplier += 0.25f;
             return multiplier;
         }
 

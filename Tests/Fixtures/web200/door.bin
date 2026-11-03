@@ -86,6 +86,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -97,6 +102,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║

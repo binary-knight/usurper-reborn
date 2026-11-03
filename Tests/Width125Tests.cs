@@ -169,7 +169,8 @@ public class Width125Tests
         Regex.IsMatch(combat, @"terminal\.WriteLine\((abilityResult|spellResult)\.Message\)").Should().BeFalse("ability and spell messages are wrapped");
         Regex.IsMatch(combat, @"terminal\.WriteLine\(attackMessage").Should().BeFalse("attack messages are wrapped");
         Regex.Matches(combat, Regex.Escape("terminal.WriteLine($\"  {Loc.Get(\"combat.share_label\", shareLine)}\");")).Count
-            .Should().Be(2, "the share line is written whole, to be copied as one line");
+            .Should().Be(1, "the boss kill share line is written whole, to be copied as one line");
+        combat.Should().Contain("foreach (var row in ShareRows(shareLine))", "1.3.10 (C5): the death page's share line wraps at word bounds");
         Src("Server/RoomRegistry.cs").Should().Contain("UIHelper.AnsiRows(\"\u001b[90m\", $\"  {buildMessage(lang)}\")", "room actions are wrapped");
         Src("Locations/LoveStreetLocation.cs").Should().Contain("UIHelper.WrapAfterPrefix(\" - \", news)").And.NotContain("terminal.WriteLine($\" - {news}\")");
         Src("Locations/PantheonLocation.cs").Should().Contain("UIHelper.WriteRow(terminal, $\"  {item}\")").And.NotContain("terminal.WriteLine($\"  {item}\")");

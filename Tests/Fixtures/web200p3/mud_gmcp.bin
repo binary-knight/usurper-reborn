@@ -1,4 +1,4 @@
-[90m[90mHP: [92m[92m400[90m[90m/[92m[92m400[90m[90m | Gold: [33m[33m1,234[90m[90m | Stamina: [33m[33m100[90m[90m/[33m[33m306[90m[90m | Level [36m[36m12[90m[90m | Revives: [91m[91m0[90m[90m/3[90m[90m ([37m[37m0%[90m[90m)
+[90m[90mHP: [92m[92m400[90m[90m/[92m[92m400[90m[90m | Gold: [33m[33m1,234[90m[90m | Stamina: [33m[33m306[90m[90m/[33m[33m306[90m[90m | Level [36m[36m12[90m[90m | Revives: [91m[91m0[90m[90m/3[90m[90m ([37m[37m0%[90m[90m)
 
 [2J[H[96m[96m╔══════════════════════════════════════════════════════════════════════════════╗
 [0m[96m║                               CHARACTER STATUS                               ║
@@ -157,6 +157,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -179,7 +184,7 @@
 [0m[90m[37mBone Guard B[0m attacks you!
 [0m[90m[90m[66 damage vs 23 defense]
 [0m[91m[91m43 damage gets through your defenses!
-[0m���Char.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"alive":true}],"round":1}��
+[0m���Char.Vitals {"hp":320,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":90,"maxHp":260,"isBoss":false,"rank":"normal","alive":true}],"round":1}��
 [90m[90m  Round 2
 [0m[96m[96m╔══════════════════════════════════════════════════════════╗
 [0m[96m║                      COMBAT STATUS                       ║
@@ -200,6 +205,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -214,7 +224,7 @@
 [31m[31m[31m[31mBone Guard A attacks you!
 [0m[90m[90m[Bone Guard A rolls: 18 + 14 = 32 vs DC 17]
 [0m[96m[96mYou dodge Bone Guard A's attack! (10% dodge)
-[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":2}��
+[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":260,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":2}��
 [90m[90m  Round 3
 [0m[96m[96m╔══════════════════════════════════════════════════════════╗
 [0m[96m║                      COMBAT STATUS                       ║
@@ -234,6 +244,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -249,7 +264,7 @@
 [0m[90m[37mBone Guard A[0m grazes you!
 [0m[90m[90m[41 damage vs 23 defense]
 [0m[91m[91m18 damage gets through your defenses!
-[0m���Char.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":3}��
+[0m���Char.Vitals {"hp":302,"maxHp":484,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}�����Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":161,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":3}��
 [90m[90m  Round 4
 [0m[96m[96m╔══════════════════════════════════════════════════════════╗
 [0m[96m║                      COMBAT STATUS                       ║
@@ -269,6 +284,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -280,6 +300,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -293,7 +318,7 @@
 [31m[31m[31m[31mBone Guard A attacks you!
 [0m[90m[90m[Bone Guard A rolls: 8 + 14 = 22 vs DC 17]
 [0m[96m[96mYou dodge Bone Guard A's attack! (10% dodge)
-[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"alive":false}],"round":4}��
+[0m���Char.Combat.Enemies {"enemies":[{"name":"Bone Guard A","level":8,"hp":54,"maxHp":260,"isBoss":false,"rank":"normal","alive":true},{"name":"Bone Guard B","level":8,"hp":0,"maxHp":260,"isBoss":false,"rank":"normal","alive":false}],"round":4}��
 [90m[90m  Round 5
 [0m[96m[96m╔══════════════════════════════════════════════════════════╗
 [0m[96m║                      COMBAT STATUS                       ║
@@ -313,6 +338,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║
@@ -324,6 +354,11 @@
 [0m[32m[32m║ [93m[93m[A] [32m[32mAttack                            [32m[32m║
 [0m[32m[32m║ [93m[93m[D] [36m[36mDefend                            [32m[32m║
 [0m[32m[32m║ [93m[93m[I] [35m[35mUse Item (Potions: 3/31)          [32m[32m║
+[0m[32m[32m║ [93m[93m[P] [37m[37mPower Attack                      [32m[32m║
+[0m[32m[32m║ [93m[93m[E] [37m[37mPrecise Strike                    [32m[32m║
+[0m[32m[32m║ [93m[93m[T] [37m[37mTaunt                             [32m[32m║
+[0m[32m[32m║ [93m[93m[W] [37m[37mDisarm                            [32m[32m║
+[0m[32m[32m║ [93m[93m[L] [37m[37mHide                              [32m[32m║
 [0m[32m[32m║ [93m[93m[R] [37m[37mFlee                              [32m[32m║
 [0m[32m[32m║ [93m[93m[O] [36m[36mAuto-Combat                       [32m[32m║
 [0m[32m[32m║ [93m[93m[X] [90m[90mCombat Speed: Instant             [32m[32m║

@@ -522,9 +522,9 @@ public class RestEngine125Tests : IDisposable
         {
             var s = NewScreen("");
             await InLanguage("hu", async () => { await SplashScreen.Show(s.Term); return 0; }, screenReader: sr);
-            s.Text.Should().Contain(L("hu", "splash.press_any_key"));
+            s.Text.Should().Contain(L("hu", "splash.press_enter"));   // 1.3.10 (B13): a stream session's splash reads a line
             if (sr) s.Text.Should().Contain(L("hu", "splash.tagline").Trim());
-            NoEnglishLeft(s.Text, sr ? new[] { "splash.tagline", "splash.press_any_key" } : new[] { "splash.press_any_key" });
+            NoEnglishLeft(s.Text, sr ? new[] { "splash.tagline", "splash.press_enter" } : new[] { "splash.press_enter" });
             Capture($"splash-hu-{(sr ? "sr" : "art")}.txt", s.Text);
         }
         foreach (var lang in AllLanguages)
@@ -535,7 +535,7 @@ public class RestEngine125Tests : IDisposable
         }
         var en = NewScreen("");
         await InLanguage("en", async () => { await SplashScreen.Show(en.Term); return 0; }, screenReader: true);
-        en.Text.Should().Contain("  USURPER REBORN").And.Contain("  A modern recreation of the classic 1993 BBS door game").And.Contain("Press any key...");
+        en.Text.Should().Contain("  USURPER REBORN").And.Contain("  A modern recreation of the classic 1993 BBS door game").And.Contain("Press Enter...");
     }
 
     [Fact]

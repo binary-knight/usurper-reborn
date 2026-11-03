@@ -69,8 +69,33 @@ namespace UsurperRemake.Systems
             floor.EntranceRoomId = floor.Rooms.First().Id;
             floor.CurrentRoomId = floor.EntranceRoomId;
 
+            NumberRepeatedRoomNames(floor);
+
             return floor;
         }
+
+        /// <summary>
+        /// 1.3.10 (play test A4): room names are unique on a floor. Each theme gives one name per room type, so a floor of
+        /// 15 to 25 rooms repeats names ("Hall of the Ancestors" twice). The first room with a name, in room order
+        /// (room_0 first), keeps it; each later room with the same name gets the next numeral (II, III, ...). No random
+        /// number is drawn, so the floor seed gives the same layout, rooms, monsters, events and features as before.
+        /// </summary>
+        internal static void NumberRepeatedRoomNames(DungeonFloor floor)
+        {
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var room in floor.Rooms)
+            {
+                if (string.IsNullOrEmpty(room.Name)) continue;
+                seen.TryGetValue(room.Name, out int count);
+                seen[room.Name] = ++count;
+                if (count > 1) room.Name = Loc.Get("dg.room_name_repeat", room.Name, RoomNumeral(count));
+            }
+        }
+
+        private static readonly string[] Numerals = { "", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+            "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX", "XXI", "XXII", "XXIII", "XXIV", "XXV" };
+
+        internal static string RoomNumeral(int n) => n >= 1 && n < Numerals.Length ? Numerals[n] : n.ToString();
 
         private static DungeonTheme GetThemeForLevel(int level)
         {

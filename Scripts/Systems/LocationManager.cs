@@ -14,6 +14,9 @@ public class LocationManager
 {
     private Dictionary<GameLocation, BaseLocation> locations;
     private GameLocation currentLocationId;
+
+    /// <summary>1.3.10 (play test N3): the location the player was in before the current one was entered.</summary>
+    internal GameLocation PreviousLocationId { get; set; }
     private BaseLocation currentLocation;
     private TerminalEmulator terminal;
     private Character currentPlayer;
@@ -326,6 +329,7 @@ public class LocationManager
         
         // Update current location
         var previousLocation = currentLocationId;
+        PreviousLocationId = previousLocation;   // 1.3.10 (N3): Main Street reads where the player came from
         currentLocationId = locationId;
         currentLocation = locations[locationId];
         

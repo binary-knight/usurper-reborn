@@ -131,13 +131,18 @@ P. Potions
 Q. Leave dungeon
 
 HP:  400/400  Potions: 3/31  Gold: 1,234  Lv 12  XP 0/40900
-ÿúÉChar.Vitals {"hp":400,"maxHp":400,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":100,"maxCombatSp":306}ÿð
+ÿúÉChar.Vitals {"hp":400,"maxHp":400,"mp":0,"maxMp":0,"sp":100,"mental":80,"maxMental":100,"combatSp":306,"maxCombatSp":306}ÿð
 Dungeon Combat Menu
 
 Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant
@@ -149,6 +154,11 @@ Actions:
   A - Attack
 D - Defend, reduces damage by 50 percent
 I - Use Item, Potions: HP:3
+  P - Power Attack
+  E - Precise Strike
+  T - Taunt
+  W - Disarm
+  L - Hide
 R - Retreat, attempt to flee
 O - Auto-Combat Mode
 X - Combat Speed, currently Instant

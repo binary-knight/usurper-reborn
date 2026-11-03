@@ -223,6 +223,10 @@ public partial class CombatEngine
     // Current player reference for combat speed setting
     private Character currentPlayer;
 
+    /// <summary>1.3.10: true when the damage is this fight's own player's, so the New Game+ damage unlock applies;
+    /// a teammate's, a companion's or a grouped player's damage does not take it.</summary>
+    private bool OwnDamage(Character attacker) => ReferenceEquals(attacker, currentPlayer);
+
     /// <summary>
     /// 1.3.2: divine wrath's cut for this fight, in percent: the fight's player deals this much less with a
     /// basic swing and has this much less defence against a monster's hit. The dungeon sets it on the engine
@@ -462,11 +466,23 @@ public partial class CombatEngine
 
     /// <summary>
     /// 1.3.9: the keys a combat tip may name under each standard menu, with the potion key of that menu: the
-    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed);
+    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed),
+    /// and from 1.3.10 P, E, T, W and L (the tactics);
     /// the PvP menu (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and X and has no Auto-Combat.
     /// </summary>
-    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X" });
+    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X", "P", "E", "T", "W", "L" });   // 1.3.10: the tactics too
     internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "X" });
+
+    /// <summary>
+    /// 1.3.10 (G2): a combat tip for a screen reader, its keys kept in words as the screen reader menu names them
+    /// ("D - Defend"): a key joined to its word ("[D]efend") reads "D - Defend", a key on its own ("Press [X]") reads
+    /// "Press X". The brackets went before and "[D]efend" read "Defend", with no key.
+    /// </summary>
+    internal static string ScreenReaderTip(string tip)
+    {
+        tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\](\w+)", "$1 - $1$2");
+        return System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\]", "$1");
+    }
 
     /// <summary>
     /// A tip every 5th round (10th at Fast or Instant), under the standard menu. 1.3.9: the potion tip names the
@@ -492,10 +508,7 @@ public partial class CombatEngine
             if (System.Text.RegularExpressions.Regex.Matches(tip, @"\[([^\]\s]+)\]").Any(m => Array.IndexOf(menu.Keys, m.Groups[1].Value) < 0))
                 return;
             if (GameConfig.ScreenReaderMode)
-            {
-                // Strip bracket-key formatting like [P]ower Attack → Power Attack
-                tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w)\]", "$1");
-            }
+                tip = ScreenReaderTip(tip);
             terminal.SetColor(ColorRole.Notice);
             foreach (var line in HintSystem.WordWrap(tip, 77))   // 1.3.9: within 79 columns in every language
                 terminal.WriteLine($"  {line}");
@@ -2800,6 +2813,25 @@ public partial class CombatEngine
                 }
             }
 
+            // 1.3.10 (B14): a healing potion at full health is refused before the turn is spent, and a quick heal for
+            // less than 10 percent of max HP asks first (H with a mana potion to use goes to the potion choice as before)
+            if (action.Type == CombatActionType.Heal || action.Type == CombatActionType.QuickHeal)
+            {
+                bool manaChoice = action.Type == CombatActionType.Heal && player.ManaPotions > 0 && player.Mana < player.MaxMana;
+                if (!manaChoice && player.Healing > 0)
+                {
+                    if (player.HP >= player.MaxHP)
+                    {
+                        terminal.WriteLine(Loc.Get("combat.full_health"), "yellow");
+                        await Pacing.Wait(GetCombatDelay(800));
+                        continue;
+                    }
+                    if (action.Type == CombatActionType.QuickHeal && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
+                }
+            }
+
             return action;
         }
     }
@@ -2925,12 +2957,13 @@ public partial class CombatEngine
 
     /// <summary>
     /// v1.2.2: one row of a compact BBS menu. Items are written in order; when the next item would pass
-    /// column 80 the row wraps before it and continues indented one space, so a longer translation never
-    /// runs past the edge of an 80 column terminal.
+    /// column 79 the row wraps before it and continues indented one space, so a longer translation never
+    /// runs past the edge of an 80 column terminal. 1.3.10 (G5): 79, not 80, as every other row; the Hungarian
+    /// full first row reached 80.
     /// </summary>
     internal sealed class BbsMenuRow
     {
-        internal const int Width = 80;
+        internal const int Width = 79;   // 1.3.10 (G5): 79, so a full row never reaches column 80
         private readonly TerminalEmulator t;
         private int col;
         internal BbsMenuRow(TerminalEmulator terminal) { t = terminal; }
@@ -3072,6 +3105,8 @@ public partial class CombatEngine
             row.Item("[K]", "bright_yellow", Loc.Get("combat.backstab_label") + " ", "darkgray");
         if (!isFollower && CanSmite(player))
             row.Item("[Z]", "bright_yellow", Loc.Get("combat.smite_label", player.SmiteChargesRemaining) + " ", "bright_white");
+        if (!isFollower && CanRage(player))   // 1.3.10 (G3)
+            row.Item("[G]", "bright_yellow", Loc.Get("combat.rage_label") + " ", "bright_red");
 
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
@@ -3297,6 +3332,15 @@ public partial class CombatEngine
         if (!isFollower && RescueOffered(player))
             terminal.WriteLine(Loc.Get("combat.rescue_menu_sr"));
 
+        // 1.3.10 (G3): the tactics, as the standard menu lists them
+        terminal.WriteLine($"  P - {Loc.Get("combat.power_attack")}");
+        terminal.WriteLine($"  E - {Loc.Get("combat.precise_strike")}");
+        terminal.WriteLine($"  T - {Loc.Get("combat.taunt")}");
+        terminal.WriteLine($"  W - {Loc.Get("combat.disarm")}");
+        terminal.WriteLine($"  L - {Loc.Get("combat.hide")}");
+        if (!isFollower && CanRage(player))
+            terminal.WriteLine($"  G - {Loc.Get("combat.rage_short")}");
+
         // Quickbar slots
         if (classInfo.Count > 0)
         {
@@ -3398,6 +3442,16 @@ public partial class CombatEngine
             }
         }
 
+        // 1.3.10 (G3): the tactics the fight takes from this prompt (Power Attack, Precise Strike, Taunt, Disarm, Hide),
+        // and Rage while the class can rage and is not raging; the compact menu showed them, this one did not
+        WriteBoxRow("[P] ", "white", Loc.Get("combat.power_attack"));
+        WriteBoxRow("[E] ", "white", Loc.Get("combat.precise_strike"));
+        WriteBoxRow("[T] ", "white", Loc.Get("combat.taunt"));
+        WriteBoxRow("[W] ", "white", Loc.Get("combat.disarm"));
+        WriteBoxRow("[L] ", "white", Loc.Get("combat.hide"));
+        if (!isFollower && CanRage(player))
+            WriteBoxRow("[G] ", "bright_red", Loc.Get("combat.rage_short"));
+
         // Quickbar slots [1]-[9]
         if (classInfo.Count > 0)
         {
@@ -3493,6 +3547,10 @@ public partial class CombatEngine
 
     /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>
     internal static bool CanBackstab(Character player) => player.GetClassCombatModifiers().BackstabMultiplier > 1f;
+
+    /// <summary>1.3.10 (G3): [G] Rage is for a class whose modifier allows it (the Barbarian), while not raging; the
+    /// fight prompt's own condition.</summary>
+    internal static bool CanRage(Character player) => player.GetClassCombatModifiers().RageAvailable && !player.IsRaging;
 
     /// <summary>1.3.2: [Z] Smite is for a class with daily smite charges (the Paladin), while one is left.</summary>
     internal static bool CanSmite(Character player) => player.GetClassCombatModifiers().SmiteCharges > 0 && player.SmiteChargesRemaining > 0;
@@ -3851,7 +3909,7 @@ public partial class CombatEngine
         attackPower = (long)(attackPower * rollMultiplier);
 
         // Apply difficulty modifier to player damage
-        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(attacker));
 
         // Sunforged Blade artifact: +100% damage vs undead and demons (+200% during Manwe fight)
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -5648,7 +5706,8 @@ public partial class CombatEngine
         }
 
         // Use colored combat message
-        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
+        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random,
+            critical: monsterRoll.IsCriticalSuccess);   // v1.1.14: the engine RNG; 1.3.10: no graze line after a critical
         foreach (var row in CombatMessages.Rows(attackMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
         // Check for shield block (20% chance to block, halves incoming damage)
@@ -14871,7 +14930,7 @@ public partial class CombatEngine
 
                         // Difficulty modifier
                         long preDiffAttack = attackPower;
-                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(player));
 
                         // Grief effects
                         var griefFx = GriefSystem.Instance.GetCurrentEffects();
@@ -15204,7 +15263,7 @@ public partial class CombatEngine
 
             // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
             if (!GameConfig.ElectronMode)
-                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered, hasTeammatesNeedingAid, canHealAlly), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
 
             if (!GameConfig.ElectronMode)
             {
@@ -15251,6 +15310,10 @@ public partial class CombatEngine
                         await Pacing.Wait(GetCombatDelay(800));
                         continue;
                     }
+                    // 1.3.10 (B14): a healing potion for less than 10 percent of max HP asks first; No spends nothing
+                    if (hasHealPots && !hasManaPots && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
                     action.Type = CombatActionType.UseItem;
                     return (action, false);
 
@@ -15456,7 +15519,7 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "G":
-                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides
+                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides; CanRage is the same test
                     {
                         action.Type = CombatActionType.Rage;
                         return (action, false);
@@ -15767,7 +15830,7 @@ public partial class CombatEngine
             // 1.3.2: the class's BackstabMultiplier (the Assassin's 3)
             long backstabDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * (double)player.GetClassCombatModifiers().BackstabMultiplier);
             backstabDamage += random.Next(1, 20);
-            backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
+            backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage, OwnDamage(player));
 
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
@@ -15879,7 +15942,7 @@ public partial class CombatEngine
         powerDamage = (long)(powerDamage * rollMultiplier);
 
         // Difficulty
-        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
+        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage, OwnDamage(player));
 
         // Sunforged Blade vs undead/demons
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -15997,7 +16060,7 @@ public partial class CombatEngine
         defense = ApplyArmorPiercing(defense, player);
 
         long damage = Math.Max(1, attackPower - defense);
-        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(player));
 
         terminal.SetColor("bright_cyan");
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_hit", MonsterNames.Display(target), damage));
@@ -16054,7 +16117,7 @@ public partial class CombatEngine
 
         // Soul Strike: Chivalry-based holy damage
         long holyDamage = (player.Chivalry / 10) + (player.Level * 5) + random.Next(10, 30);
-        holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage);
+        holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage, OwnDamage(player));
 
         terminal.SetColor("bright_yellow");
         UIHelper.WriteRow(terminal, Loc.Get("combat.soul_strike_damage", holyDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
@@ -16089,7 +16152,7 @@ public partial class CombatEngine
         // Smite: 150% damage + level bonus (with weapon soft cap)
         long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
-        smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
+        smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage, OwnDamage(player));
 
         terminal.SetColor("bright_white");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_damage", smiteDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
@@ -16135,7 +16198,7 @@ public partial class CombatEngine
         defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut, the Defence half here
         defense = ApplyArmorPiercing(defense, player);
         rangedDamage = Math.Max(1, rangedDamage - defense);
-        rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
+        rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage, OwnDamage(player));
 
         terminal.SetColor("green");
         UIHelper.WriteRow(terminal, Loc.Get("combat.ranged_hit", MonsterNames.Display(target), rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
@@ -16667,7 +16730,7 @@ public partial class CombatEngine
                     ohDamage = player.Strength + GetEffectiveWeapPow(player.SwingWeapPow(offHand: true)) + random.Next(1, 15);
                     double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
                     ohDamage = (long)(ohDamage * ohMod);
-                    ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+                    ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage, OwnDamage(player));
                 }
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
@@ -19376,7 +19439,7 @@ public partial class CombatEngine
                     // Fallback if spell didn't set damage
                     totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
                 }
-                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
+                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage, OwnDamage(player));
                 await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true, spellCaster: player);
             }
 
@@ -19443,7 +19506,7 @@ public partial class CombatEngine
                 long dealt = 0;   // 1.3.6 G9 (Q7): the HP this cast's hit took from the target
                 if (damage > 0)
                 {
-                    damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                    damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(player));
                     damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
                     if (spellResult.SpecialEffect == "ignore_half_defense")
                         await ApplySpellDamageIgnoringArmor(target, damage, result, spellInfo.Name, player, 50);   // 1.3.4: Echo of Tomorrow
@@ -23934,6 +23997,38 @@ public partial class CombatEngine
     /// Display a paste-able death narrative after the player dies.
     /// Creates a roguelike-style "tombstone" summary of the character's journey.
     /// </summary>
+    /// <summary>
+    /// The death page's opening: the screen cleared, then "YOU DIED" and the art. 1.3.10 (C5): the words are a plain line
+    /// in the reader's language above the art (the art spelled them "Y O U   D I E D" between block glyphs, which the web
+    /// page read as "YOUDIED"), and the HP the page shows is sent first: the last Char.Vitals went out at the round's
+    /// prompt, so the page kept that HP (1 of 155 after Death's Door) under "YOU DIED".
+    /// </summary>
+    internal async Task ShowDeathBanner(Character player, List<Character>? teammates)
+    {
+        if (player.HP < 0) player.HP = 0;
+        UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(teammates);   // as beside every leader vitals send in combat
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            terminal.WriteLine("");
+        }
+        else
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
+            terminal.WriteLine("");
+        }
+    }
+
+    /// <summary>1.3.10 (C5): the death story's share line as rows of at most 79 columns, each indented two spaces.</summary>
+    internal static List<string> ShareRows(string shareLine) =>
+        UIHelper.WordWrap(Loc.Get("combat.share_label", shareLine), UIHelper.WrapWidth - 2).Select(r => "  " + r).ToList();
+
     private async Task ShowDeathSummary(CombatResult result)
     {
         var player = result.Player;
@@ -23995,7 +24090,8 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         string shareLine = Loc.Get("combat.share_death", playerName, className, player.Level, killerName, totalKills.ToString("N0"), deepestFloor);
-        terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
+        foreach (var row in ShareRows(shareLine))   // 1.3.10 (C5): wrapped at word bounds, not split at column 80
+            terminal.WriteLine(row);
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
@@ -24700,21 +24796,7 @@ public partial class CombatEngine
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
 
-        terminal.ClearScreen();
-
-        // Display dramatic death art
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
-            terminal.WriteLine("");
-        }
-        else
-        {
-            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
-            terminal.WriteLine("");
-        }
+        await ShowDeathBanner(result.Player, result.Teammates);
         await Pacing.Wait(GetCombatDelay(1000));
 
         // Show NPC teammate reactions to player death
@@ -24859,6 +24941,8 @@ public partial class CombatEngine
             int restoredHP = (int)(result.Player.MaxHP * 0.5);
 
             ShowDivineRestore(restoredHP, result.Player.MaxHP, rezLeft, max);
+            // 1.3.10 (C5): the Temple's screen clears this page a few seconds later, so its hall says it once more
+            result.Player.PendingLifeNotice = rezLeft == 0 ? Loc.Get("death.final_warning") : Loc.Get("death.rez_remaining", rezLeft, max);
             // v0.65.6: lives are renewable now -- say so at the moment the
             // player is most afraid, or the countdown reads as a death spiral.
             terminal.SetColor("gray");
@@ -26052,7 +26136,7 @@ public partial class CombatEngine
             long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
             double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
             ohDamage = (long)(ohDamage * ohMod);
-            ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+            ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage, OwnDamage(player));
 
             monster.HP -= Math.Max(1, ohDamage);
             result.TotalDamageDealt += Math.Max(1, ohDamage);
@@ -30473,7 +30557,7 @@ public partial class CombatEngine
         attackPower = (long)(attackPower * rollMultiplier);
 
         // Difficulty modifier
-        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(attacker));
 
         // Sunforged Blade artifact bonus vs undead/demons
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -30553,7 +30637,7 @@ public partial class CombatEngine
         }
 
         long damage = Math.Max(1, attackPower - defense);
-        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(attacker));
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("combat.precise_strike_lands", damage));
@@ -30598,7 +30682,7 @@ public partial class CombatEngine
 
             long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
             long actual = Math.Max(1, damage - defense);
-            actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual);
+            actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual, OwnDamage(attacker));
             terminal.WriteLine(Loc.Get("combat.shoot_arrow", actual), "bright_green");
             target.HP = Math.Max(0, target.HP - actual);
             result.CombatLog.Add($"Player ranged hits {target.Name} for {actual}");
@@ -30650,7 +30734,7 @@ public partial class CombatEngine
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         long actual = Math.Max(1, damage - defense);
-        actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual);
+        actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual, OwnDamage(player));
 
         terminal.SetColor("yellow");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_evil", MonsterNames.Display(target), actual));
@@ -32053,7 +32137,59 @@ public partial class CombatEngine
                 return (CombatActionType.ClassAbility, targetIdx, matched.slotId, 0, null, false);
             }
         }
+        // 1.3.10 (B14): a plain heal (Lay on Hands) with no one to heal is refused before it costs anything, and one
+        // that would restore little asks first
+        if (abilityDef != null && !await HealAbilityGate(player, abilityDef)) return null;
         return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, false);
+    }
+
+    /// <summary>
+    /// 1.3.10 (B14): true when the one healed is missing less than 10 percent of their max HP, so a heal restores less
+    /// than that. Full health is not a small heal; it is no heal (the callers refuse it).
+    /// </summary>
+    internal static bool SmallHeal(Character c) => c.HP < c.MaxHP && (c.MaxHP - c.HP) * 10 < c.MaxHP;
+
+    /// <summary>1.3.10 (B14): asks whether to heal anyway; Enter or No is No. Nothing is spent on No.</summary>
+    private async Task<bool> ConfirmHealAnyway(string message)
+    {
+        terminal.SetColor("yellow");
+        foreach (var row in UIHelper.WordWrap($"{message} {Loc.Get("ui.yn_default_no").TrimEnd()}", UIHelper.WrapWidth))
+            terminal.WriteLine(row);
+        return await terminal.AskYesNoAsync("> ", false);
+    }
+
+    /// <summary>1.3.10 (B14): the refusal of a plain heal no one needs, as rows of at most 79 columns.</summary>
+    internal static List<string> NoOneHurtRows(ClassAbilitySystem.ClassAbility a) =>
+        UIHelper.WordWrap(Loc.Get("combat.heal_no_one_hurt", a.DisplayName), UIHelper.WrapWidth);
+
+    /// <summary>1.3.10 (B14): a class ability that only heals (no effect, no buff), as Lay on Hands.</summary>
+    internal static bool IsPlainHealAbility(ClassAbilitySystem.ClassAbility a) =>
+        a.Type == ClassAbilitySystem.AbilityType.Heal && a.BaseHealing > 0 && string.IsNullOrEmpty(a.SpecialEffect)
+        && a.AttackBonus == 0 && a.DefenseBonus == 0;
+
+    /// <summary>
+    /// 1.3.10 (B14): before a plain heal ability is used from the player's own prompt: refused (nothing spent) when no
+    /// one it can heal (the player, and the living allies when it can target one) is hurt; asked first when everyone
+    /// hurt is missing less than 10 percent of their max HP. True to go on.
+    /// </summary>
+    private async Task<bool> HealAbilityGate(Character player, ClassAbilitySystem.ClassAbility ability)
+    {
+        if (!IsPlainHealAbility(ability)) return true;
+        var reach = new List<Character> { player };
+        if (ability.CanTargetAlly && currentTeammates != null)
+            reach.AddRange(currentTeammates.Where(t => t != null && t.IsAlive && t != player));
+        var hurt = reach.Where(c => c.HP < c.MaxHP).ToList();
+        if (hurt.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            foreach (var row in NoOneHurtRows(ability))   // within 79 columns: a Hungarian name makes the line longer
+                terminal.WriteLine(row);
+            await Pacing.Wait(GetCombatDelay(1000));
+            return false;
+        }
+        if (hurt.All(SmallHeal))
+            return await ConfirmHealAnyway(Loc.Get("combat.heal_small_confirm", ability.DisplayName, hurt.Max(c => c.MaxHP - c.HP)));
+        return true;
     }
 
     /// <summary>
@@ -32130,7 +32266,9 @@ public partial class CombatEngine
             };
         }
 
-        // Handle ability quickbar slot
+        // Handle ability quickbar slot; 1.3.10 (B14): a plain heal with no one hurt is refused, a small one asks first
+        var healDef = ClassAbilitySystem.GetAbility(matched.slotId);
+        if (healDef != null && !await HealAbilityGate(player, healDef)) return null;
         return new CombatAction
         {
             Type = CombatActionType.ClassAbility,

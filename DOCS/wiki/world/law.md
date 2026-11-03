@@ -83,7 +83,7 @@ You can do 3 activities a day. Each one but Shadow Boxing raises an attribute by
 - **Meditation:** Wisdom, and a tenth of your maximum HP back.
 - **Stretching:** Stamina, and a twentieth of your maximum HP back.
 - **Planning:** Charisma.
-- **Shadow Boxing:** 10 combat stamina back, up to 100.
+- **Shadow Boxing:** 10 combat stamina back, up to your maximum.
 - **Praying:** 10 to 20 Chivalry when your Chivalry is higher than your Darkness, otherwise 10 to 20 Darkness.
 
 ## Getting out of prison
@@ -96,6 +96,6 @@ You can do 3 activities a day. Each one but Shadow Boxing raises an attribute by
 
 ## Bounties
 
-The ruler posts bounties on criminals, and a citizen can report a crime at a royal audience. An unpaid royal loan can put a bounty on you. Read the bounty board at the Quest Hall. Defeating a bounty target pays the reward, but a win in an honor duel does not pay a kill contract on the NPC; a bounty on a player goes to whoever beats them in a duel or the [Arena](/wiki/en/online/arena/). Very feared characters can also meet bounty hunters in the street.
+The ruler posts bounties on criminals, and a citizen can report a crime at a royal audience. An unpaid royal loan can put a bounty on you. Read the bounty board at the Quest Hall. Defeating a bounty target pays the reward unless another player claimed that bounty, but a win in an honor duel does not pay a kill contract on the NPC; a bounty on a player goes to whoever beats them in a duel or the [Arena](/wiki/en/online/arena/). Very feared characters can also meet bounty hunters in the street.
 
 Judicar rewards appropriate prison orders and treats theft as a taboo. See the [god pages](/wiki/en/gods/) for deeds and taboos.

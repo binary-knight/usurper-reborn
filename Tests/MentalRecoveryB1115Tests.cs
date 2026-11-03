@@ -365,7 +365,8 @@ public class MentalRecoveryB1115Tests
         Method(src, "DisplayLocationSR").Should().Contain("WriteSRMenuOption(\"T\"").And.Contain("WriteSRMenuOption(\"W\"");
         Method(src, "DisplayLocationBBS").Should().Contain("(\"T\", \"bright_yellow\"").And.Contain("(\"W\", \"bright_yellow\"");
         var menu = Method(src, "ShowMenu");
-        menu.Should().Contain("terminal.Write(\"T\");").And.Contain("terminal.Write(\"W\");");
+        menu.Should().Contain("MenuGridRows(MenuRows(), 79)");   // 1.3.10: the rows are cells laid out by MenuGridRows
+        src.Should().Contain("C(\"T\", \"therapy\")").And.Contain("C(\"W\", \"willow\")");
         Method(src, "ShowFullMenu").Should().Contain("healer.menu_therapy").And.Contain("healer.menu_willow");
     }
 
