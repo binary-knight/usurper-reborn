@@ -322,129 +322,81 @@ public class HealerLocation : BaseLocation
         terminal.WriteLine(Loc.Get("healer.services_available"));
         terminal.WriteLine("");
 
-        // Row 1 - Healing services
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("H");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_heal_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("F");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_full_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("B");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_potions_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("M");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("healer.menu_mana_suffix"));
-
-        // Row 2 - Disease services
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("P");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_poison_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("C");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_disease_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("D");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_decurse_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("N");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("healer.menu_antidotes_suffix"));
-
-        // Row 3 - Addiction & Navigation
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("A");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_addiction_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("T");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_therapy_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("W");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("healer.menu_willow_suffix"));
-
-        // Row 4 - Status & Navigation
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("S");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("healer.menu_status_suffix"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("R");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("healer.menu_return_suffix"));
+        // 1.3.10 (play test B16): the rows as cells, laid out by MenuGridRows, so no label runs into the next key
+        // ("[D] Decurse Item[N] Buy Antidotes") in any language
+        foreach (var row in MenuGridRows(MenuRows(), 79))
+        {
+            foreach (var (key, label, pad) in row)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(key);
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.Write(" " + label + new string(' ', pad));
+            }
+            terminal.WriteLine("");
+        }
         terminal.WriteLine("");
 
         ShowStatusLine();
+    }
+
+    /// <summary>1.3.10 (play test B16): the visual menu's four rows of (key, label) cells.</summary>
+    internal static List<List<(string Key, string Label)>> MenuRows()
+    {
+        (string, string) C(string key, string suffix) => (key, Loc.Get($"healer.menu_{suffix}_suffix").Trim());
+        return new()
+        {
+            new() { C("H", "heal"), C("F", "full"), C("B", "potions"), C("M", "mana") },
+            new() { C("P", "poison"), C("C", "disease"), C("D", "decurse"), C("N", "antidotes") },
+            new() { C("A", "addiction"), C("T", "therapy"), C("W", "willow") },
+            new() { C("S", "status"), C("R", "return") },
+        };
+    }
+
+    /// <summary>
+    /// 1.3.10 (play test B16): menu rows laid out as " [K] Label" cells, each cell followed by its padding. Columns are
+    /// as wide as the widest label in them plus two spaces, when every row then fits the width; otherwise each row's
+    /// cells are packed two spaces apart and wrap to a new line before the width. A cell never touches the next key.
+    /// </summary>
+    internal static List<List<(string Key, string Label, int Pad)>> MenuGridRows(List<List<(string Key, string Label)>> rows, int width)
+    {
+        int cols = rows.Max(r => r.Count);
+        var colWidth = new int[cols];
+        foreach (var r in rows)
+            for (int i = 0; i < r.Count - 1; i++)
+                colWidth[i] = Math.Max(colWidth[i], r[i].Label.Length + 2);
+        bool fits = rows.All(r => r.Select((c, i) => i < r.Count - 1 ? 5 + colWidth[i] : 5 + c.Label.Length).Sum() <= width);
+        var outRows = new List<List<(string, string, int)>>();
+        foreach (var r in rows)
+        {
+            if (fits)
+            {
+                outRows.Add(r.Select((c, i) => (c.Key, c.Label, i < r.Count - 1 ? colWidth[i] - c.Label.Length : 0)).ToList());
+                continue;
+            }
+            var line = new List<(string, string, int)>();
+            int used = 0;
+            foreach (var c in r)
+            {
+                int len = 5 + c.Label.Length;
+                if (line.Count > 0 && used + 2 + len > width)
+                {
+                    line[^1] = (line[^1].Item1, line[^1].Item2, 0);
+                    outRows.Add(line);
+                    line = new List<(string, string, int)>();
+                    used = 0;
+                }
+                if (line.Count > 0) { line[^1] = (line[^1].Item1, line[^1].Item2, 2); used += 2; }
+                line.Add((c.Key, c.Label, 0));
+                used += len;
+            }
+            outRows.Add(line);
+        }
+        return outRows;
     }
 
     private void ShowFullMenu()

@@ -652,7 +652,10 @@ public class DungeonLocation : BaseLocation
         });
 
         // ── Screen 8: Rest, Return & Tips ─────────────────────────────────────
-        await Page(Loc.Get("dungeon.tut.p8.title"), "cyan", new()
+        // 1.3.10 (play test B11): the reach rule from the table the level change uses (it said +-10 for every level)
+        var reachLines = FloorReachRuleLines(73);
+        var reachRows = reachLines.Select((l, i) => (i == 0 ? Loc.Get("dungeon.tut.p8.t1", l) : "    " + l, "white")).ToList();
+        await Page(Loc.Get("dungeon.tut.p8.title"), "cyan", new List<(string text, string color)>
         {
             (Loc.Get("dungeon.tut.p8.l1"), "white"),
             ("", "white"),
@@ -662,7 +665,8 @@ public class DungeonLocation : BaseLocation
             (Loc.Get("dungeon.tut.p8.map"), "bright_green"),
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.tips"), "gray"),
-            (Loc.Get("dungeon.tut.p8.t1"), "white"),
+        }.Concat(reachRows).Concat(new List<(string text, string color)>
+        {
             (Loc.Get("dungeon.tut.p8.t2"), "white"),
             (Loc.Get("dungeon.tut.p8.t3"), "white"),
             (Loc.Get("dungeon.tut.p8.t4"), "white"),
@@ -670,7 +674,7 @@ public class DungeonLocation : BaseLocation
             (Loc.Get("dungeon.tut.p8.t6"), "white"),
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.outro"), "bright_yellow"),
-        });
+        }).ToList());
 
         term.WriteLine(Loc.Get("dungeon.tut.complete"), "bright_green");
         await Pacing.Wait(1500);
@@ -7516,10 +7520,23 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private static int GetFloorReachAllowance(int playerLevel)
     {
-        if (playerLevel <= 5) return 3;
-        if (playerLevel <= 15) return 5;
-        if (playerLevel <= 30) return 8;
-        return 10;
+        foreach (var (maxLevel, allowance) in FloorReachBands)
+            if (playerLevel <= maxLevel) return allowance;
+        return FloorReachTopAllowance;
+    }
+
+    /// <summary>1.3.10 (play test B11): the reach bands, highest level of each band and its allowance; above the last band
+    /// the allowance is FloorReachTopAllowance. One table for the rule, the level change screen and the tutorial.</summary>
+    internal static readonly (int MaxLevel, int Allowance)[] FloorReachBands = { (5, 3), (15, 5), (30, 8) };
+    internal const int FloorReachTopAllowance = 10;
+
+    /// <summary>1.3.10 (play test B11): the reach rule in words, from FloorReachBands, wrapped to the given width.</summary>
+    internal static List<string> FloorReachRuleLines(int width)
+    {
+        var b = FloorReachBands;
+        string rule = Loc.Get("dungeon.reach_rule", b[0].Allowance, b[0].MaxLevel, b[1].Allowance, b[1].MaxLevel,
+            b[2].Allowance, b[2].MaxLevel, FloorReachTopAllowance);
+        return HintSystem.WordWrap(rule, width);
     }
 
     private async Task ChangeDungeonLevel()
@@ -7537,6 +7554,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.current_level", currentDungeonLevel), "white");
         terminal.WriteLine(Loc.Get("dungeon.your_level", playerLevel), "cyan");
         terminal.WriteLine(Loc.Get("dungeon.deepest_accessible", maxAccessible, reachAllowance), "yellow");
+        foreach (var line in FloorReachRuleLines(77)) terminal.WriteLine($"  {line}", "gray");   // 1.3.10 (B11): the whole rule
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("dungeon.enter_target_level"));
@@ -7687,14 +7705,13 @@ public class DungeonLocation : BaseLocation
         if (encounterRoll < MonsterEncounterChance)
         {
             await MonsterEncounter();
+            await Pacing.Wait(1000);
+            await terminal.PressAnyKey();
         }
         else
         {
-            await SpecialEventEncounter();
+            await SpecialEventEncounter();   // 1.3.10 (B7): each event ends with its own Enter prompt
         }
-
-        await Pacing.Wait(1000);
-        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -8310,7 +8327,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chivalry_increases_slightly"));
         }
 
-        await Pacing.Wait(1500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8372,7 +8389,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.encounter_wiser", xpGain));
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8490,7 +8507,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.portal_avoid"));
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8752,7 +8769,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(1500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9045,7 +9062,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chest_leave_alone"), "gray");
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9192,7 +9209,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9283,7 +9300,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.damsel_ignore_2"), "gray");
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9363,7 +9380,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.wounded_leave_2"), "gray");
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9493,7 +9510,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.shrine_leave"), "gray");
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9690,7 +9707,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.trap_reflexes_save"));
             terminal.WriteLine(Loc.Get("dungeon.trap_dodge_entirely", currentPlayer.Agility));
-            await Pacing.Wait(1500);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9751,7 +9768,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9791,7 +9808,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_no_gold"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades_disappointed"), "gray");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9802,7 +9819,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_coward"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades"), "gray");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9841,7 +9858,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine(Loc.Get("dungeon.ghost_fades_shadows"), "gray");
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9909,7 +9926,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
     
     /// <summary>
@@ -10569,7 +10586,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.witch_doctor_no_gold"), "gray");
         }
         
-        await Pacing.Wait(3000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
     
     /// <summary>
@@ -15630,14 +15647,14 @@ public class DungeonLocation : BaseLocation
         if (player.Gold < cost)
         {
             terminal.WriteLine($"\"{(settlement.Id == "rat_king_market" ? Loc.Get("dungeon.settlement_no_gold_rat") : Loc.Get("dungeon.settlement_no_gold"))}\"", "yellow");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
         if (player.HP >= player.MaxHP && player.Mana >= player.MaxMana)
         {
             terminal.WriteLine(Loc.Get("dungeon.settlement_no_heal_needed"), "cyan");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -15667,7 +15684,7 @@ public class DungeonLocation : BaseLocation
         // Broadcast to group
         BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_settlement_healed", player.Name, settlement.Name)}\u001b[0m");
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     private async Task SettlementTrade(Character player, DungeonSettlement settlement)
@@ -15718,7 +15735,7 @@ public class DungeonLocation : BaseLocation
                 if (player.Gold < item.cost)
                 {
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
-                    await Pacing.Wait(1500);
+                    await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
                 }
                 else
                 {
@@ -15728,7 +15745,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.settlement_purchased", item.name));
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("church.blood_gold_cost", item.cost));
-                    await Pacing.Wait(1500);
+                    await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
                 }
             }
         }

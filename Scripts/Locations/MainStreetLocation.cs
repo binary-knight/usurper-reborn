@@ -1745,10 +1745,10 @@ public partial class MainStreetLocation : BaseLocation
     }
 
     // Helper methods
-    private string GetTownName()
-    {
-        return "Usurper"; // Could be configurable
-    }
+    /// <summary>1.3.10 (play test B17): the town the opening story names (opening_story.goal_dorashire); it said Usurper.</summary>
+    internal const string TownName = "Dorashire";
+
+    private string GetTownName() => TownName;
     
     private string GetTimeOfDay()
     {

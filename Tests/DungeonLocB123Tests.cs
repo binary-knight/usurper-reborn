@@ -380,7 +380,7 @@ public class DungeonLocB123Tests
         var settlement = Settlement();
         string text = await InLanguage(lang, async () =>
         {
-            var (term, output) = Term();
+            var (term, output) = Term("\n");   // 1.3.10: Enter after the result
             var hero = Hero();
             hero.HP = 1;
             var d = Dungeon(term, hero, 100);

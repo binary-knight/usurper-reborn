@@ -15,7 +15,7 @@ history: 1.3.0 | An NPC on a player's team is no longer picked to challenge an N
 history: 1.2.5 | A player in any language can no longer take a second royal quest, and a royal quest to clear a dungeon floor now asks you to clear a floor.
 history: 1.2.4 | none
 ---
-The Castle is where the realm's ruler holds court. From Main Street press K for the Castle. With the district layout, open the Castle Grounds district with C, then press K. It appears in the menu after your first few levels.
+The Castle is where the realm's ruler holds court. From Main Street press K for the Castle. With the district layout, open the Castle Grounds district with C, then press K. While the Castle is the only place open there (levels 3 and 4), C opens it at once. It appears in the menu after your first few levels.
 
 ## Visiting as a commoner
 

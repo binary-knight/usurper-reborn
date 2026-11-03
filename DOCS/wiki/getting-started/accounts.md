@@ -89,7 +89,7 @@ After you log in, the character screen lists your characters with level, class a
 - **2**: Play your alt character
 - **M**: Create Alt Character, when the slot is open
 - **D**: Delete Alt Character
-- **N**: Create your main character, or replace it
+- **N**: Create your main character; with one, start over (shown apart, in red, at the foot of the screen under START OVER)
 - **I, H, B, C**: The story so far, Usurper history, the BBS and server list, credits
 - **A**: Screen reader mode on or off
 - **Z**: Compact mode on or off
