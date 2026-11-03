@@ -602,7 +602,10 @@ public class Castle125Tests : IDisposable
         {
             for (int i = 0; i < CastleLocation.RoyalQuestTypes.Length; i++)
             {
-                L("en", $"castle.quest_type_{i}").Should().Be(CastleLocation.RoyalQuestTypes[i]);
+                // 1.3.10: type 4 is shown as the dungeon boss kill that completes it; the English description it is
+                // stored and read by stays
+                if (i == 4) L("en", "castle.quest_type_4").Should().NotBe(CastleLocation.RoyalQuestTypes[4]);
+                else L("en", $"castle.quest_type_{i}").Should().Be(CastleLocation.RoyalQuestTypes[i]);
                 L("hu", $"castle.quest_type_{i}").Should().NotBe(CastleLocation.RoyalQuestTypes[i]);
                 var quest = QuestSystem.CreateRoyalAudienceQuest(Hero(), "Queen Test", 2, 100, 100, CastleLocation.RoyalQuestTypes[i]);
                 try
