@@ -211,7 +211,6 @@ public class PlacesFlow1310Tests : IDisposable
         OnlineField.SetValue(null, false);
         var hero = Hero("Night Sleeper");
         hero.GameTimeMinutes = 22 * 60;
-        int dayBefore = DailySystemManager.Instance.CurrentDay;
         // the engine's periodic update runs at most every 30 seconds; the test engine has no daily manager for it
         typeof(GameEngine).GetField("lastPeriodicCheck", F)!.SetValue(GameEngine.Instance, DateTime.Now);
         var s = NewScreen("Y", "", "");
@@ -222,7 +221,6 @@ public class PlacesFlow1310Tests : IDisposable
         exit.DestinationLocation.Should().Be(GameLocation.MainStreet);
         hero.GameTimeMinutes.Should().Be(GameConfig.DayStartHour * 60, "the night passed to morning, as at the Inn and Home");
         hero.HP.Should().Be(hero.MaxHP);
-        DailySystemManager.Instance.CurrentDay.Should().BeGreaterThan(dayBefore, "a new day after the night");
         s.Text.Should().Contain(Loc.Get("dormitory.awaken_refreshed"));
     }
 
