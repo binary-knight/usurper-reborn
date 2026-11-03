@@ -776,6 +776,13 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task CheckFloorStoryEvents(Character player, TerminalEmulator term)
     {
+        // 1.3.10: a quest target placed on this floor is announced on arrival
+        if (QuestSystem.FindPlacedTarget(player, currentDungeonLevel) is { } placedHere)
+        {
+            term.SetColor("bright_cyan");
+            UsurperRemake.UI.UIHelper.WriteWrapped(term, Loc.Get("quest.placed.floor_hint", QuestSystem.PlacedTargetName(placedHere.Objective)));
+        }
+
         // Check for PreFloor70 Stranger encounter on floors 60-69
         if (currentDungeonLevel >= 60 && currentDungeonLevel <= 69)
         {
@@ -5211,6 +5218,13 @@ public class DungeonLocation : BaseLocation
             }
         }
 
+        // 1.3.10: a quest's named target waits in its room on its floor (QuestSystem.PlaceTargets)
+        if (await TryFightPlacedTarget(targetRoom))
+        {
+            RequestRedisplay();
+            return;
+        }
+
         // If room has monsters and player enters, auto-engage (ambush chance)
         if (targetRoom.HasMonsters && !targetRoom.IsCleared)
         {
@@ -5919,6 +5933,50 @@ public class DungeonLocation : BaseLocation
 
         RequestRedisplay();
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// 1.3.10: when the player enters the room where a held quest's named target waits on this floor, the target
+    /// fights them (the room's own monsters stay for afterwards). Killing it completes the objective through the
+    /// combat engine's kill credit (QuestSystem.OnMonsterKilled). Returns true when the fight ran.
+    /// </summary>
+    private async Task<bool> TryFightPlacedTarget(DungeonRoom room)
+    {
+        var player = GetCurrentPlayer();
+        if (player == null || currentFloor == null) return false;
+        if (QuestSystem.FindPlacedTarget(player, currentDungeonLevel) is not { } placed) return false;
+        if (QuestSystem.PlacedTargetRoomId(currentFloor, placed.Quest) != room.Id) return false;
+
+        var target = QuestSystem.CreatePlacedTargetMonster(placed.Quest, placed.Objective, dungeonRandom);
+        if (!GameConfig.ScreenReaderMode)
+            terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("dungeon.section_combat"));
+        terminal.WriteLine("");
+        terminal.SetColor("bright_yellow");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("quest.placed.appears", MonsterNames.Display(target)));
+        terminal.WriteLine("");
+        await Pacing.Wait(1500);
+
+        var combatEngine = new CombatEngine(terminal);
+        var combatResult = await combatEngine.PlayerVsMonsters(player, new List<Monster> { target }, teammates);
+        DropFallenGroupedPlayers();
+
+        if (combatResult.ShouldReturnToTemple)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
+            await Pacing.Wait(2000);
+            await NavigateToLocation(GameLocation.Temple);
+            return true;
+        }
+
+        if (player.HP > 0 && combatResult.Outcome == CombatOutcome.Victory && placed.Objective.IsComplete)
+        {
+            terminal.SetColor("bright_green");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("quest.placed.slain", MonsterNames.Display(target)));
+        }
+        await terminal.PressAnyKey();
+        return true;
     }
 
     private static readonly Dictionary<DungeonTheme, string[]> BossNamePool = new()
@@ -7027,7 +7085,7 @@ public class DungeonLocation : BaseLocation
     /// Old God floors are hard gates - players MUST defeat the god before going deeper.
     /// Seal floors are NOT hard gates - players can skip seals (affects endings only).
     /// </summary>
-    private int GetMaxAccessibleFloor(Character player, int requestedFloor)
+    internal static int GetMaxAccessibleFloor(Character player, int requestedFloor)
     {
         if (player == null)
             return requestedFloor;

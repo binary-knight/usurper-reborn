@@ -74,7 +74,7 @@ Your rank comes from the contracts you have completed, and it sets how many cont
 
 ### Sellsword contract pay
 
-A contract pays your level x {{balance:MercContractBaseGoldTier1}} x the contract's pay factor in gold, times your rank's pay factor when you turn it in. Its count is the contract's base count + your level / 5, except Bandits on the Trade Road, which needs 3 kills at any level of the Bandit Scouts and Mountain Bandits of the [wilderness](/wiki/en/world/wilderness/). At level 30, Unhallowed Dead (pay factor 1.0, base count 3) pays 4,500 gold for 9 Zombie kills before your rank's factor.
+A contract pays your level x {{balance:MercContractBaseGoldTier1}} x the contract's pay factor in gold, times your rank's pay factor when you turn it in. Its count is the contract's base count + your level / 5, except Bandits on the Trade Road, which needs 3 kills at any level of the Bandit Scouts and Mountain Bandits of the [wilderness](/wiki/en/world/wilderness/); while you hold it, they are met in 3 fights in 8 there, not 1 in 8. At level 30, Unhallowed Dead (pay factor 1.0, base count 3) pays 4,500 gold for 9 Zombie kills before your rank's factor.
 
 {{table:merc-contracts}}
 

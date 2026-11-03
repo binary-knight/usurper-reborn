@@ -24,7 +24,7 @@ Online the server's daily reset at 7 PM Eastern does the same once a day for the
 
 ## What does each world event do
 
-An event can change shop prices, the experience and the gold of a monster fight you win. Several events at once multiply, and the totals are held to x0.25 to x4.0 for prices, x0.5 to x3.0 for experience and x0.25 to x3.0 for gold. The prices are those of the Weapon, Armor and Magic shops and the Dark Alley; the Healer shows the change but does not charge it. The last column shows when the daily roll can draw the event. Of the events marked No, only the Gold Rush and The Realm Celebrates come another way (above); the others never start.
+An event can change shop prices, the experience and the gold of a monster fight you win. Several events at once multiply, and the totals are held to x0.25 to x4.0 for prices, x0.5 to x3.0 for experience and x0.25 to x3.0 for gold. The prices are those of the Weapon, Armor and Magic shops and the Dark Alley; the Healer shows the change but does not charge it. The last column shows when the daily roll can draw the event. Of the events marked No, only the Gold Rush and The Realm Celebrates come another way (above); the others never start. While a Bandit Raid runs, bandits show up 3 times as often in the [wilderness](/wiki/en/world/wilderness/).
 
 {{table:world-events}}
 

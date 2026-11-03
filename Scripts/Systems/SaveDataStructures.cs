@@ -1530,6 +1530,8 @@ namespace UsurperRemake.Systems
         public int CurrentProgress { get; set; }
         public bool IsOptional { get; set; }
         public int BonusReward { get; set; }
+        // 1.3.10: the dungeon floor a placed quest target waits on; 0 (and every save before 1.3.10) for none
+        public int TargetFloor { get; set; }
     }
 
     /// <summary>

@@ -547,7 +547,7 @@ module.exports = [
   ["E106","what does each settlement building give","/wiki/en/world/settlement/","Tavern (Built): +10 percent experience from fights","first"],
   ["E107","how many quests can i take a day","/wiki/en/world/quests/","You can claim 3 quests a day at the Quest Hall","miss: fact outside the excerpt"],
   ["E108","how much does a quest pay","/wiki/en/world/quests/","Experience: your level x 100, 500 or 1,000","first"],
-  ["E109","how many monsters does a kill quest ask for","/wiki/en/world/quests/","A monster bounty asks for a number of kills by its kind (3 to 7)","first"],
+  ["E109","how many monsters does a kill quest ask for","/wiki/en/world/quests/","A monster bounty asks you to kill one named criminal","first"],
   ["E110","how many quests can i hold at once","","","gap: only royal quest one at a time stated; no general hold limit"],
   ["E111","why do companions talk in the dungeon","/wiki/en/world/dungeon/","entering a new room has a 15% chance that one of them makes a remark","miss: combat/companions/ ranks first"],
   ["E112","does the floor boss have helpers","/wiki/en/monsters/bosses/","The boss therefore fights alone or with the rest of that group","first"],

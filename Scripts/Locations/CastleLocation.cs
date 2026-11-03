@@ -7265,6 +7265,8 @@ public class CastleLocation : BaseLocation
                         }
                     }
 
+                    QuestSystem.WritePlacedTargetLines(terminal, quest);   // 1.3.10: the artifact thief's floor
+
                     NewsSystem.Instance?.Newsy(true, Loc.Get("castle.news_royal_quest", currentPlayer.DisplayName, KingTitle(), currentKing.Name));
                 }
                 else
