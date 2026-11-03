@@ -7244,7 +7244,11 @@ public class CastleLocation : BaseLocation
                         terminal.WriteLine(Loc.Get("castle.quest_objective", Loc.Get($"castle.quest_type_{questType}")));   // the objective holds the English description
                         if (quest.Objectives[0].RequiredProgress > 1)
                         {
-                            terminal.WriteLine(Loc.Get("castle.quest_target", QuestTargetLabel(quest.Objectives[0].TargetName), quest.Objectives[0].RequiredProgress));
+                            // 1.3.10: a monster quest counts any monster (its objective names no target); the named
+                            // monster was often one the player could not reach
+                            terminal.WriteLine(quest.Objectives[0].ObjectiveType == QuestObjectiveType.KillMonsters
+                                ? Loc.Get("castle.quest_target_any", quest.Objectives[0].RequiredProgress)
+                                : Loc.Get("castle.quest_target", QuestTargetLabel(quest.Objectives[0].TargetName), quest.Objectives[0].RequiredProgress));
                         }
                     }
 

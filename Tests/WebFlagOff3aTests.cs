@@ -30,6 +30,8 @@ namespace UsurperReborn.Tests;
 /// [I] now, play test B4), the same line in every session. A byte match says the old code and the new
 /// code wrote the same terminal text and the same GMCP frames for these sessions, and no new package appeared. The
 /// second test says the same without the fixtures: none of the new packages in any stream.
+/// 1.3.10 (fix/combat-1310) re-captured them: the fight menus list P, E, T, W and L (G3), the status line shows Stamina
+/// 306/306, not 100/306 (G6), and each Char.Combat.Enemies enemy carries rank (B12); nothing else.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WebFlagOff3aTests

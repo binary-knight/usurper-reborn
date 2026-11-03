@@ -50,7 +50,8 @@ namespace UsurperRemake.UI
         };
 
         /// <summary>
-        /// Player death screen
+        /// Player death screen. 1.3.10 (C5): the spaced "Y O U   D I E D" inside block glyphs is gone (the web page and a
+        /// screen reader read it as "YOUDIED"); the caller writes death.you_died above the art as plain text.
         /// </summary>
         public static readonly string[] Death = new[]
         {
@@ -60,12 +61,6 @@ namespace UsurperRemake.UI
             "              ░     █▀▀█  ▀█▀  █▀▀█           ░",
             "              ░     █▄▄▀   █   █▀▀▀           ░",
             "              ░     █  █  ▀█▀  █              ░",
-            "              ░                               ░",
-            "              ░  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄   ░",
-            "              ░  █                       █   ░",
-            "              ░  █   Y O U   D I E D    █   ░",
-            "              ░  █                       █   ░",
-            "              ░  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   ░",
             "              ░                               ░",
             "              ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
             "[gray]           Your spirit fades into the void...[/]"

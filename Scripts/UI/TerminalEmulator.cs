@@ -1730,6 +1730,9 @@ public partial class TerminalEmulator
     /// <summary>v1.1.13: MUD stream (MUD, telnet, web, relay) and BBS socket modes read a whole line at a pause.</summary>
     private bool IsLineBasedPause => (_streamWriter != null && _streamReader != null) || ShouldUseBBSAdapter();
 
+    /// <summary>1.3.10 (play test B13): true when a pause here waits for Enter (a line), not for any one key.</summary>
+    internal bool PauseNeedsEnter => IsLineBasedPause;
+
     /// <summary>v1.1.13: a pause that reads a line; a non-empty line is kept as the next prompt's answer.</summary>
     private async Task PauseForLine(string message)
     {

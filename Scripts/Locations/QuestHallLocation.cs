@@ -359,7 +359,8 @@ public class QuestHallLocation : BaseLocation
 
     private async Task TurnInQuest()
     {
-        var quests = QuestSystem.GetPlayerQuests(currentPlayer.Name2);
+        // 1.3.10: Sellsword contracts are turned in at the Sellsword Hall
+        var quests = QuestSystem.GetPlayerQuests(currentPlayer.Name2).Where(q => !q.IsMercContract).ToList();
 
         if (quests.Count == 0)
         {

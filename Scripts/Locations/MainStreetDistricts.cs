@@ -265,17 +265,71 @@ public partial class MainStreetLocation
 
     /// <summary>
     /// v1.1.13: a district or hub. Shows its unlocked places, takes one valid key (a typo asks again),
-    /// and does it. Every place is left back to Main Street, and so is every screen shown here.
+    /// and does it. 1.3.10 (play test N3): a place left with its own return key comes back to this district (the
+    /// district is kept in _returnDistrict and drawn again on the way back), and a screen shown here returns to it too;
+    /// R leaves to Main Street. A district with one open place opens that place at once (Castle Grounds and Home and
+    /// Hearth at menu tier 2), so there is no screen with a single choice, and that place leads back to Main Street.
     /// </summary>
     private async Task<bool> EnterDistrict(District district)
     {
-        var places = PlacesIn(district.Group, CurrentStreetView());
-        if (places.Count == 0) return false;
-        DrawDistrict(district, places);
-        var keys = places.Select(p => p.Key).Append(ReturnKey).ToList();
-        string pick = await terminal.GetValidChoice(Loc.Get("ui.your_choice"), keys, ReturnKey);
-        if (pick == ReturnKey) return false;
-        return await VisitPlace(places.First(p => p.Key == pick).Place);
+        while (true)
+        {
+            var places = PlacesIn(district.Group, CurrentStreetView());
+            if (places.Count == 0) return false;
+            if (places.Count == 1) return await VisitPlace(places[0].Place);
+            DrawDistrict(district, places);
+            var keys = places.Select(p => p.Key).Append(ReturnKey).ToList();
+            string pick = await terminal.GetValidChoice(Loc.Get("ui.your_choice"), keys, ReturnKey);
+            if (pick == ReturnKey) return false;
+            var place = places.First(p => p.Key == pick).Place;
+            var destination = DestinationOf(place, DoorMode.IsOnlineMode);
+            if (destination != null) { _returnDistrict = district; _returnFrom = destination.Value; }
+            bool left = await VisitPlace(place);   // a place with its own screen is left by LocationExitException
+            _returnDistrict = null;
+            if (left) return true;
+        }
+    }
+
+    /// <summary>1.3.10 (play test N3): the district a place was entered from, and the location that place is.</summary>
+    private District? _returnDistrict;
+    private GameLocation _returnFrom;
+
+    /// <summary>
+    /// 1.3.10 (play test N3): the district to show on entering Main Street, taken once: the one a place was entered
+    /// from, when the player comes straight back from that place, still has the districts layout and nothing more
+    /// urgent waits (alive, not jailed, no collapse due); null otherwise.
+    /// </summary>
+    internal District? TakeReturnDistrict(GameLocation cameFrom)
+    {
+        var district = _returnDistrict;
+        _returnDistrict = null;
+        if (district == null || cameFrom != _returnFrom || UseClassicLayout || currentPlayer == null || !currentPlayer.IsAlive
+            || currentPlayer.DaysInPrison > 0 || MentalSystem.CollapseDue(currentPlayer)) return null;
+        return district;
+    }
+
+    /// <summary>1.3.10 (play test N3): back from a place to the district it was entered from. True when a place is left to.</summary>
+    internal async Task<bool> ShowReturnDistrict(GameLocation cameFrom)
+    {
+        var district = TakeReturnDistrict(cameFrom);
+        return district != null && await EnterDistrict(district);
+    }
+
+    protected override async Task LocationLoop()
+    {
+        if (await ShowReturnDistrict(LocationManager.Instance.PreviousLocationId)) return;
+        await base.LocationLoop();
+    }
+
+    /// <summary>
+    /// 1.3.10 (play test B17): the description a district shows: its ".early" text while some of its places are still
+    /// locked by the menu tier (Guild Row's names priests and bankers, whose Temple and Bank open at tier 2).
+    /// </summary>
+    internal static string DistrictDescKey(District d, StreetView v)
+    {
+        string early = d.DescKey + ".early";
+        bool allOpen = StreetEntries.Where(e => e.Group == d.Group).All(e => e.Tier <= v.Tier);
+        return !allOpen && Loc.Has(early) ? early : d.DescKey;
     }
 
     private void DrawDistrict(District district, List<StreetEntry> places)
@@ -286,7 +340,7 @@ public partial class MainStreetLocation
         if (IsScreenReader)
         {
             terminal.WriteLine(name, "bright_white");
-            terminal.WriteLine(Loc.Get(district.DescKey), "gray");
+            terminal.WriteLine(Loc.Get(DistrictDescKey(district, CurrentStreetView())), "gray");
             terminal.WriteLine("");
             foreach (var p in places) terminal.WriteLine($"  {p.Key} - {Loc.Get(p.LabelKey)}", "white");
             terminal.WriteLine($"  {ReturnKey} - {back}", "white");
@@ -301,7 +355,7 @@ public partial class MainStreetLocation
             terminal.Write(name);
             terminal.SetColor("bright_blue");
             terminal.WriteLine(" ═══");
-            terminal.WriteLine(Loc.Get(district.DescKey), "gray");
+            terminal.WriteLine(Loc.Get(DistrictDescKey(district, CurrentStreetView())), "gray");
             WritePackedRow(places.Select(p => (p.Key, Loc.Get(p.LabelKey), p.Color))
                 .Append((ReturnKey, back, "gray")));
             terminal.WriteLine("");
@@ -309,7 +363,7 @@ public partial class MainStreetLocation
         }
         WriteBoxHeader(name, "bright_cyan");
         terminal.WriteLine("");
-        terminal.WriteLine($"  {Loc.Get(district.DescKey)}", "gray");
+        terminal.WriteLine($"  {Loc.Get(DistrictDescKey(district, CurrentStreetView()))}", "gray");
         terminal.WriteLine("");
         foreach (var p in places) WriteKeyedLine(p.Key, Loc.Get(p.LabelKey), p.Color);
         terminal.WriteLine("");

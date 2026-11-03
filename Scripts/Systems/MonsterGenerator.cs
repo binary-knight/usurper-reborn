@@ -618,6 +618,11 @@ public static class MonsterGenerator
         : realFloor <= 30 ? GameConfig.EliteChanceFloors11To30
         : GameConfig.EliteChanceFloors31Plus;
 
+    /// <summary>1.3.10: the chance the encounter roll uses: the floor's elite chance, times the New Game+ rare
+    /// monster unlock (Slayer, 25 percent more often). EliteChance stays the floor's own figure.</summary>
+    internal static double EliteRollChance(int realFloor) =>
+        EliteChance(realFloor) * UsurperRemake.Systems.MetaProgressionSystem.Instance.GetRareMonsterMultiplier();
+
     /// <summary>True when an encounter can hold an elite: the switch is on, the caller is the dungeon (rules
     /// given; a boss room gives none) and the real floor has a chance. False draws nothing.</summary>
     internal static bool ElitesApply(EncounterRules? rules) =>
@@ -750,7 +755,7 @@ public static class MonsterGenerator
 
         // 1.2.8 elites: the last step, so every draw above is the one made without it. The champion
         // encounter returned earlier and never reaches this.
-        if (ElitesApply(rules) && random.NextDouble() < EliteChance(rules!.RealFloor))
+        if (ElitesApply(rules) && random.NextDouble() < EliteRollChance(rules!.RealFloor))
             PromoteElite(monsters, random, rules.RealFloor);
 
         return monsters;

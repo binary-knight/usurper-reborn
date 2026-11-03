@@ -65,6 +65,11 @@
         .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--blood-text); }
         .bar.mp i { background: var(--mana); }
         .bar.foe i { background: var(--foe); }
+        .meter.low .bar { outline: 2px solid var(--blood-text); outline-offset: 1px; }
+        .meter.low #hp-num { color: var(--blood-text); font-weight: 600; }
+        .low-tag { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--bg-ink); background: var(--blood-text); padding: 1px 6px; }
+        .unit.low .bar { outline: 1px solid var(--blood-text); outline-offset: 1px; }
+        .tag.low { color: var(--blood-text); }
         .label { color: var(--ash); }
         .room { color: var(--gold); }
 
@@ -214,7 +219,7 @@
             </div></div>
         </div>
         <div class="vitals" id="vitals">
-            <span class="meter" id="hp-meter" hidden><span class="label" data-i18n="play.hp">HP</span><span class="bar"><i id="hp-fill"></i></span><span id="hp-num"></span></span>
+            <span class="meter" id="hp-meter" hidden><span class="label" data-i18n="play.hp">HP</span><span class="bar"><i id="hp-fill"></i></span><span id="hp-num"></span><span id="hp-low" class="low-tag" hidden data-i18n="play.chron.low_hp">Low HP</span></span>
             <span class="meter" id="mp-meter" hidden><span class="label" data-i18n="play.mp">MP</span><span class="bar mp"><i id="mp-fill"></i></span><span id="mp-num"></span></span>
             <span id="sp-wrap" hidden><span class="label" data-i18n="play.stamina">Stamina</span> <span id="sp-num"></span></span>
             <span id="level" hidden></span>
@@ -406,6 +411,9 @@
             document.getElementById('sp-num').textContent = num(v.combatSp) + '/' + num(v.maxCombatSp);
             document.getElementById('hp-fill').style.width = pct(v.hp, v.maxHp) + '%';
             document.getElementById('hp-num').textContent = num(v.hp) + '/' + num(v.maxHp);
+            var low = lowHp(v.hp, v.maxHp);
+            hpMeter.classList.toggle('low', low);
+            document.getElementById('hp-low').hidden = !low;
             document.getElementById('mp-fill').style.width = pct(v.mp, v.maxMp) + '%';
             document.getElementById('mp-num').textContent = num(v.mp) + '/' + num(v.maxMp);
         }
@@ -428,15 +436,27 @@
         var head = el('div', 'unit-head');
         var name = el('span', 'unit-name', str(u.name, 60));
         if (Number(u.level) > 0) name.appendChild(el('span', 'tag', t('play.combat.level', [num(u.level)])));
-        if (u.isBoss) name.appendChild(el('span', 'tag', t('play.combat.boss')));
+        if (rankTag(u)) name.appendChild(el('span', 'tag', rankTag(u)));
         if (u.downed) name.appendChild(el('span', 'tag', t('play.combat.downed')));
         else if (out) name.appendChild(el('span', 'tag', t('play.combat.dead')));
+        else if (kind !== 'foe' && lowHp(u.hp, u.maxHp)) { row.classList.add('low'); name.appendChild(el('span', 'tag low', t('play.chron.low_hp'))); }
         head.appendChild(name);
         head.appendChild(el('span', 'unit-hp', num(u.hp) + '/' + num(u.maxHp)));
         row.appendChild(head);
         row.appendChild(bar(kind, u.hp, u.maxHp));
         return row;
     }
+
+    // B12: the chip an enemy's rank earns: Boss or Champion from rank when the frame carries it (none for "normal"), and
+    // Boss from isBoss when it does not.
+    function rankTag(u) {
+        if (u.rank) return u.rank === 'boss' ? t('play.combat.boss') : u.rank === 'champion' ? t('play.combat.champion') : '';
+        return u.isBoss ? t('play.combat.boss') : '';
+    }
+    // C4: low HP is at or below a quarter of the maximum (and above 0): the card, the rule and the Classic meter say so in
+    // words, not by colour alone.
+    var LOW_HP = 0.25;
+    function lowHp(hp, maxHp) { return maxHp > 0 && hp > 0 && hp <= maxHp * LOW_HP; }
 
     function renderCombat() {
         var enemyGroup = document.getElementById('enemy-group');
@@ -451,7 +471,7 @@
         clear(enemyList);
         state.enemies.forEach(function (m) { enemyList.appendChild(unitRow(m, 'foe', 'alive')); });
         enemyGroup.hidden = !state.enemies.length;
-        document.getElementById('combat-round').textContent = state.round > 0 ? t('play.combat.round', [num(state.round)]) : '';
+        document.getElementById('combat-round').textContent = state.round > 0 && !state.death ? t('play.combat.round', [num(state.round)]) : '';
 
         clear(partyList);
         state.party.forEach(function (m) { partyList.appendChild(unitRow(m, '', 'isAlive')); });
@@ -541,7 +561,9 @@
                 name: str(u.name, 60), level: fin(u.level),
                 hp: fin(u.hp), maxHp: fin(u.maxHp),
                 isBoss: u.isBoss === true, alive: u.alive !== false, isAlive: u.isAlive !== false, downed: u.downed === true,
-                isPlayer: u.isPlayer === true
+                isPlayer: u.isPlayer === true,
+                // B12: the enemy's rank when the game sends it ("boss", "champion" or "normal"); without it, isBoss decides
+                rank: u.rank === 'boss' || u.rank === 'champion' || u.rank === 'normal' ? u.rank : null
             };
         });
     }
@@ -623,13 +645,17 @@
                 // The last round's text can still be on its way to the terminal: the log keeps reading this draw.
                 fightTail = chron.seq;
                 state.result = { outcome: str(d.outcome, 40), kills: fin(d.kills), xpGained: fin(d.xpGained), goldGained: fin(d.goldGained) };
+                // R12: the Combat button's dot says a fight is on; it goes when the fight ends
+                document.getElementById('rail-combat').classList.remove('new');
                 renderCombat();
                 setLayout('text');
                 break;
             case 'Char.Death':
                 state.death = { killer: str(d.killer, 60) };
                 renderCombat();
-                chronFrame();
+                // C5: the death screen is the game's own text page; the fight page and its round marker end here
+                if (chron.layout === 'fight') setLayout('text');
+                else chronFrame();
                 break;
             case 'Comm.Channel.Text':
                 state.chat.push({ channel: str(d.channel, 20).toLowerCase(), talker: str(d.talker, 60), text: str(d.text, 1000) });
@@ -641,6 +667,7 @@
                 seenWaiting = true;
                 waitSince = -1;
                 polling = d.poll === true;
+                if (!polling) { chron.waitAt = chron.seq; if (chronOn()) renderChronNow(); }
                 if (polling) lineTyped = '';
                 if (chronOn() && layoutNow() === 'fight') renderChronNow();
                 break;
@@ -849,6 +876,7 @@
     function oneKeyFires(ch) {
         var m = chron.menu;
         if (!m || m.oneKey !== true || !current(chron.menuAt) || lineTyped !== '' || ch === '/') return false;
+        if (chron.shown && chron.shownAt === chron.menuAt && chron.shown[ch.toUpperCase()] === 1) return true;   // B10: the key the dock shows
         return m.groups.some(function (g) { return g.items.some(function (it) { return it.key.toUpperCase() === ch.toUpperCase(); }); });
     }
     function typedData(data) {
@@ -875,18 +903,40 @@
     }
     // The game starts a new screen with ESC [ 2 J. xterm erases in place and moves the cursor to the
     // top, so the row of the last Enter no longer marks where the new screen begins.
+    var clearAt = -1;       // where in the last chunk seesClear found the end of its last ESC [ 2 J
     function seesClear(bytes) {
         var found = false;
+        clearAt = -1;
         for (var i = 0; i < bytes.length; i++) {
             var b = bytes[i];
             clearMatched = b === [0x1b, 0x5b, 0x32, 0x4a][clearMatched] ? clearMatched + 1 : (b === 0x1b ? 1 : 0);
-            if (clearMatched === 4) { found = true; clearMatched = 0; }
+            if (clearMatched === 4) { found = true; clearMatched = 0; clearAt = i + 1; }
         }
         return found;
     }
     function screenCleared() {
         try { if (inputMark) inputMark.dispose(); } catch (e) {}
         inputMark = null;
+    }
+    // R11: an xterm marker on the first row of the screen the game last cleared to. A terminal made taller (Classic to
+    // Chronicle sets 50 rows) pulls rows of earlier screens back into view above it; the current screen never reaches
+    // above this row. Set once the clear is written, at the top of the emptied view.
+    var clearMark = null;
+    function markClear() {
+        try {
+            if (clearMark) clearMark.dispose();
+            var b = terminal.buffer.active;
+            clearMark = terminal.registerMarker(-(Number(b.cursorY) || 0)) || null;
+        } catch (e) { clearMark = null; }
+    }
+    // The row above the current screen: the later of the last Enter's row and the row above the last clear, or -1.
+    function floorOf(enterLine, clearLine) {
+        var a = typeof enterLine === 'number' && isFinite(enterLine) ? enterLine : -1;
+        var c = typeof clearLine === 'number' && isFinite(clearLine) && clearLine >= 0 ? clearLine - 1 : -1;
+        return Math.max(a, c, -1);
+    }
+    function screenFloor() {
+        return floorOf(inputMark && !inputMark.isDisposed ? inputMark.line : -1, clearMark && !clearMark.isDisposed ? clearMark.line : -1);
     }
 
     function compassExits(exits) {
@@ -910,23 +960,34 @@
         var y = top + (Number(buf.cursorY) || 0);
         var floor = typeof after === 'number' && isFinite(after) ? after : -1;
         if (floor >= top) top = floor + 1;
-        for (var first = true; y >= top && rows.length < 60; y--, first = false) {
+        // N8: blank rows under the cursor's prompt belong to it: a prompt the game ended with a line end ("Press Enter to
+        // continue..." and then the cursor on the empty row below) is this screen's prompt, not the last screen's.
+        for (var said = false; y >= top && rows.length < 60; y--) {
             var line = buf.getLine(y);
             var text = line && typeof line.translateToString === 'function' ? String(line.translateToString(true)) : '';
-            if (!first && PREV_PROMPT.test(text)) break;
+            if (said && PREV_PROMPT.test(text)) break;
             rows.unshift(text);
+            if (/\S/.test(text)) said = true;
         }
         return rows;
     }
 
     // Menu options as the game prints them: [D] Dungeons, [E]nter the dungeon, [AUTO] Auto-Combat.
     var COMMAND = /\[([^\[\]\s]{1,5})\]([a-z]*)([^\[\]║│]*)/g;
+    // R8: a label longer than LABEL_MAX ends at a word with an ellipsis, never in the middle of one; the key cap keeps the
+    // whole label for its title and its spoken name.
+    var LABEL_MAX = 40;
+    function shortLabel(label) {
+        if (label.length <= LABEL_MAX) return label;
+        var cut = label.slice(0, LABEL_MAX), sp = cut.lastIndexOf(' ');
+        return (sp > LABEL_MAX / 2 ? cut.slice(0, sp) : cut).replace(/[\s,;:.]+$/, '') + '\u2026';
+    }
     function scanCommands(rows) {
-        var out = [], seen = {};
-        rows.forEach(function (row) {
+        var found = [];
+        rows.forEach(function (row, r) {
             var m;
             COMMAND.lastIndex = 0;
-            while ((m = COMMAND.exec(row)) && out.length < 40) {
+            while ((m = COMMAND.exec(row)) && found.length < 80) {
                 var key = m[1];
                 // Status bars ([████░░]) and the prompt's [40hp 100st] are not options.
                 if (/[^\x21-\x7e]/.test(key) || /^\d+(hp|st)$/i.test(key)) continue;
@@ -935,29 +996,73 @@
                 var label = m[2] ? key + m[2] + (rest ? ' ' + rest : '') : rest;
                 // A key named inside a sentence ("in Settings [~].") does not claim the key.
                 if (/^to\b/i.test(label) || !/[A-Za-z0-9\u00C0-\u024F]/.test(label)) continue;
-                var k = key.toUpperCase();
-                if (seen[k]) continue;
-                seen[k] = 1;
-                out.push({ key: key, label: label.slice(0, 40) });
+                found.push({ key: key, label: label, row: r, col: m.index });
             }
+        });
+        // N5: a block of three or more rows set as two text columns (at most two keys a row, the second well to the right) is read down
+        // the left column, then down the right, as the screen reads; a packed row (three keys or more) keeps row order.
+        var ordered = [], i = 0;
+        while (i < found.length) {
+            var j = i;
+            while (j + 1 < found.length && found[j + 1].row - found[j].row <= 1) j++;
+            ordered = ordered.concat(columns(found.slice(i, j + 1)));
+            i = j + 1;
+        }
+        // One key per action (R15): a key or a label already taken (the Inn's [S] Status, then the quick [%] Status) is
+        // left out; the first one the screen prints stays.
+        var out = [], seen = {}, said = {};
+        ordered.forEach(function (c) {
+            var k = c.key.toUpperCase(), l = c.label.toLowerCase();
+            if (out.length >= 40 || seen[k] || said[l]) return;
+            seen[k] = 1;
+            said[l] = 1;
+            var o = { key: c.key, label: shortLabel(c.label) };
+            if (o.label !== c.label) o.full = c.label;   // the whole label, for the cap's title and spoken name
+            out.push(o);
         });
         return out;
     }
+    function columns(block) {
+        var rows = {}, firsts = [];
+        block.forEach(function (c) { (rows[c.row] = rows[c.row] || []).push(c); });
+        var keys = Object.keys(rows);
+        if (keys.length < 3) return block;   // two rows side by side read either way; a block of three or more is a column
+        var two = keys.every(function (r) { return rows[r].length <= 2 && (rows[r].length < 2 || rows[r][1].col - rows[r][0].col >= 12); });
+        if (!two || !keys.some(function (r) { return rows[r].length === 2; })) return block;
+        keys.forEach(function (r) { firsts.push(rows[r][0].col); });
+        var left = Math.min.apply(null, firsts), l = [], rt = [];
+        keys.forEach(function (r) {
+            rows[r].forEach(function (c, n) { (n === 0 && c.col - left < 6 ? l : rt).push(c); });
+        });
+        return l.concat(rt);
+    }
 
     // What the screen waits for, read from its shape so it holds in every language.
+    // B6: the game's "Press Enter to continue" and "Press any key to continue" in each language (ui.press_enter and
+    // ui.press_any_key in Localization/*.json). A screen whose last line asks for one waits for Enter: a key printed in
+    // a box above it (an achievement's tier tag, [S] or [B]) is not a choice.
+    var ENTER_ASKS = ['Press Enter to continue', 'Press any key to continue', 'Presiona Enter para continuar', 'Presiona cualquier tecla para continuar',
+        'Appuyez sur Entrée pour continuer', 'Appuyez sur une touche pour continuer', 'Nyomd meg az Entert a folytatáshoz',
+        'Nyomj meg egy gombot a folytatáshoz', 'Premi Invio per continuare', 'Premi un tasto per continuare'];
+    function asksEnter(text) {
+        var s = String(text).toLowerCase();
+        return ENTER_ASKS.some(function (a) { return s.indexOf(a.toLowerCase()) !== -1; });
+    }
     function promptOf(rows, cmds) {
-        var tail = rows.filter(function (r) { return r.trim(); }).slice(-2).join(' ');
+        var said = rows.filter(function (r) { return r.trim(); });
+        var tail = said.slice(-2).join(' ');
         var yn = /\(([A-Za-z])\/([A-Za-z])\)[\s:?>]*$/.exec(tail);
         if (yn) return { kind: 'yesno', yes: yn[1].toUpperCase(), no: yn[2].toUpperCase() };
+        if (said.length && asksEnter(said[said.length - 1])) return { kind: 'enter', asked: true };
         if (cmds.length) return { kind: 'menu' };
         if (/[:?]\s*$/.test(tail)) return { kind: 'text' };
         return { kind: 'enter' };
     }
 
-    function padButton(cls, key, label, onTap) {
+    function padButton(cls, key, label, onTap, full) {
         var b = el('button', cls);
         b.type = 'button';
-        b.setAttribute('aria-label', key + ', ' + label);
+        b.setAttribute('aria-label', key + ', ' + (full || label));
         b.appendChild(el('b', null, key));
         b.appendChild(el('span', null, label));
         b.addEventListener('click', onTap);
@@ -981,6 +1086,7 @@
         document.getElementById('pad').classList.toggle('keys-open', padKeys);
         if (padKeys) { renderKeyboard(box); return; }
         if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
+        if (p.asked) cmds = enterKeys(rows);
         // The compass shows only on the room screen itself: a menu drawn since the last Enter, no fight
         // on (an ambush starts one with no Enter after the move), and every exit the game sent offered
         // on screen as its key. A yes or no question in a room keeps its own two buttons.
@@ -1018,7 +1124,7 @@
         box.appendChild(el('div', 'pad-label', t('play.pad.on_screen')));
         var grid = el('div', 'chips');
         cmds.forEach(function (c) {
-            grid.appendChild(padButton('chip', c.key, c.label, function () { sendToGame(c.key + '\r'); }));
+            grid.appendChild(padButton('chip', c.key, c.label, function () { sendToGame(c.key + '\r'); }, c.full));
         });
         box.appendChild(grid);
     }
@@ -1041,8 +1147,7 @@
 
     function renderPadNow() {
         if (!terminal || document.getElementById('pad').hidden) return;
-        var mark = inputMark && !inputMark.isDisposed ? inputMark.line : -1;
-        renderPad(rowsFromBuffer(terminal.buffer && terminal.buffer.active, mark), roomFresh(roomEnter, enterCount));
+        renderPad(rowsFromBuffer(terminal.buffer && terminal.buffer.active, screenFloor()), roomFresh(roomEnter, enterCount));
     }
     function schedulePad() { clearTimeout(padTimer); padTimer = setTimeout(renderPadNow, 60); }
 
@@ -1090,19 +1195,53 @@
         rowsSeq: -1,      // the draw the rows were read in
         cursorRow: -1,    // the row of chron.rows the cursor waits on with text before it (a prompt), or -1
         textSeq: -1,      // the draw the text page last opened at its first line
-        textTop: 0        // where it put the text page then
+        textTop: 0,       // where it put the text page then
+        waitAt: -1        // the draw in which the game last said it reads a line (Client.Waiting)
     };
     var chronTimer = 0, drawTimer = 0;
     var STREET = { main_street: 1, main_street_classic: 1 }, FIGHT = { combat: 1, combat_pvp: 1 }, DIRS4 = { N: 1, S: 1, E: 1, W: 1 };
-    // Scene art by Room.Info num, the game's location id (GameLocation), which is the same in every language.
-    var TOWN = { 1: 'main-street', 2: 'inn', 4: 'temple', 5: 'weapon-shop', 8: 'dungeon', 19: 'bank', 21: 'healer', 47: 'temple', 70: 'castle', 504: 'wilderness' };
+    // Scene art by Room.Info num, the game's location id (GameLocation), which is the same in every language. A2: a place
+    // with no scene of its own takes the nearest one there is (the Armor Shop the weapon smith's, a bar or the dormitory the
+    // inn, the castle's rooms the castle, the Alchemist the healer's); a place with none near enough gets a plain plate
+    // with its name, never the class portrait.
+    var TOWN = { 1: 'main-street', 2: 'inn', 4: 'temple', 5: 'weapon-shop', 8: 'dungeon', 9: 'catacombs', 18: 'weapon-shop', 19: 'bank', 21: 'healer',
+        26: 'inn', 28: 'inn', 31: 'inn', 32: 'healer', 39: 'main-street', 47: 'temple', 70: 'castle', 71: 'castle', 72: 'castle', 73: 'castle',
+        74: 'castle', 80: 'castle', 81: 'castle', 200: 'main-street', 300: 'frozen-depths', 502: 'temple', 504: 'wilderness', 505: 'wilderness', 506: 'temple' };
     // Floor scenes by Room.Detail themeId, the DungeonTheme name, which is the same in every language.
     var THEMES = { Catacombs: 'catacombs', Sewers: 'sewers', Caverns: 'caverns', AncientRuins: 'ancient-ruins', DemonLair: 'demon-lair',
         FrozenDepths: 'frozen-depths', VolcanicPit: 'volcanic-pit', AbyssalVoid: 'abyssal-void' };
     // Enemy sprites by Client.Enemies family, the game's monster family name.
-    var SPRITES = { Goblinoid: 'goblin', Undead: 'skeleton', Orcish: 'orc', Draconic: 'dragon', Demonic: 'demon', Giant: 'giant', Beast: 'wolf-beast',
-        Elemental: 'elemental', Insectoid: 'spider-queen', Construct: 'golem', Fey: 'dark-fairy', Aquatic: 'sea-creature', Celestial: 'fallen-angel',
-        Shadow: 'shadow', Aberration: 'wraith' };
+    // A3: a family whose sprite fits none of its kind ('') shows the foe's name instead: Beast (the sprite is a werewolf, the
+    // family's wolves walk on four legs), Insectoid (the sprite is the spider queen herself) and Aberration (oozes).
+    var SPRITES = { Goblinoid: 'goblin', Undead: 'skeleton', Orcish: 'orc', Draconic: 'dragon', Demonic: 'demon', Giant: 'giant', Beast: '',
+        Elemental: 'elemental', Insectoid: '', Construct: 'golem', Fey: 'dark-fairy', Aquatic: 'sea-creature', Celestial: 'fallen-angel',
+        Shadow: 'shadow', Aberration: '' };
+    // A3: monsters drawn apart from their family, by their name as the game shows it in each language (monster.name.* in
+    // Localization/*.json), matched as whole words, so an affix ("Alpha", a champion title) still finds them. '' is a monster
+    // with no fitting sprite: its name shows. Only the sprites there are; no new art.
+    var SPRITE_NAMES = [
+        ['', ['Zombie', 'Zombi']],                                                                  // Undead: a zombie is not a skeleton
+        ['', ['Ghoul', 'Necrófago', 'Goule', 'Ghúl']],
+        ['wraith', ['Wraith', 'Espectro', 'Âme en Peine', 'Lidérc', 'Spettro']],
+        ['wraith', ['Lich', 'Liche']],
+        ['goblin', ['Kobold', 'Coboldo']],                                                          // Draconic: small, not the horned dragon
+        ['wolf-beast', ['Werewolf', 'Hombre Lobo', 'Loup-Garou', 'Vérfarkas', 'Lupo Mannaro']],     // Beast: the werewolves only
+        ['', ['Pixie', 'Duendecillo', 'Pixi', 'Folletto']],                                         // Fey: the dark fairy is no pixie
+        ['', ['Sprite', 'Lutin', 'Manó', 'Spiritello']],
+        ['', ['Treant', 'Ent', 'Sylvanien', 'Fapásztor']],
+        ['spider-queen', ['Spider Queen', 'Reina Araña', 'Reine Araignée', 'Pókkirálynő', 'Regina Ragno']],
+        ['spider-queen', ['Broodmother', 'Madre de Prole', 'Mère de Couvée', 'Fészekanya', 'Madre della Covata']]
+    ];
+    function spriteByName(name) {
+        var hit = null;
+        SPRITE_NAMES.forEach(function (row) {
+            if (hit !== null) return;
+            row[1].forEach(function (n) {
+                if (hit === null && new RegExp('(^|[^\\p{L}])' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^\\p{L}])', 'iu').test(name)) hit = row[0];
+            });
+        });
+        return hit;
+    }
     var MAP_KINDS = { here: 1, boss: 1, stairs: 1, cleared: 1, monsters: 1, safe: 1, unknown: 1 };
     // Client.Sheet slots, and where G2 sets each one around the portrait: a top row, a column each side, a bottom row.
     var SLOTS = ['MainHand', 'OffHand', 'Head', 'Body', 'Arms', 'Hands', 'Legs', 'Feet', 'Waist', 'Face', 'Cloak', 'Neck', 'LFinger', 'RFinger'];
@@ -1201,7 +1340,7 @@
     function chronFrame() { renderChronNow(); }
     function chronReset() {
         chron.layout = 'text'; chron.menu = null; chron.detail = null; chron.place = null; chron.sheet = null; chron.sheetAt = -1; chron.map = null;
-        chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1; chron.rowsSeq = -1; chron.textSeq = -1; chron.textTop = 0;
+        chron.rows = []; chron.start = 0; chron.cursorText = ''; chron.open = false; chron.menuAt = -1; chron.detailAt = -1; chron.rowsSeq = -1; chron.textSeq = -1; chron.textTop = 0; chron.waitAt = -1;
         clearTimeout(drawTimer); clearTimeout(chronTimer);
         renderChronNow();
     }
@@ -1410,7 +1549,7 @@
     function readScreen(given, givenMark) {
         var buf = given || (terminal && terminal.buffer && terminal.buffer.active);
         if (!buf || typeof buf.getLine !== 'function') return;
-        var mark = given ? givenMark : inputMark && !inputMark.isDisposed ? inputMark.line : -1;
+        var mark = given ? givenMark : screenFloor();
         var s = screenOf(buf, mark);
         chron.rows = s.rows;
         chron.start = s.start;
@@ -1507,6 +1646,11 @@
         texts.forEach(function (s, i) {
             // a row drawn only in block characters is the monster's picture; the plate shows the foe instead
             if (!s.trim() || FIGHT_BOX.test(s) || /^[\s▀-▟■]+$/.test(s)) return;
+            // R7: a tip box's edges and its title ("┌─── TIP ───"), and a heading set between rules ("═══ COMBAT ═══"),
+            // are frame, not text: the lines inside the tip stay
+            var fr = frameOf(s);
+            if (fr && fr.kind !== 'bs') return;
+            if (/^\s*[═─]{2,}\s*\S.*\S\s*[═─]{2,}\s*$/.test(s)) return;
             // the prompt: the row the cursor waits on, with what the player has typed so far ("Choose action: I"), or
             // a last row shaped like a prompt
             if (i === cursor || (i === lastText && /[:?>]\s*$/.test(s)) || (asked && s.trim() === asked)) return;
@@ -1554,8 +1698,11 @@
     function screenKeys(rows) {
         var cmds = scanCommands(rows), p = promptOf(rows, cmds);
         if (p.kind === 'yesno') cmds = [{ key: p.yes, label: t('play.pad.yes') }, { key: p.no, label: t('play.pad.no') }];
+        if (p.asked) cmds = enterKeys(rows);
         return { cmds: cmds, prompt: p };
     }
+    // The keys an Enter screen still takes (the map's [P] mini-map): those printed on their own line, not in a box.
+    function enterKeys(rows) { return scanCommands(rows.filter(function (r) { return !/^\s*[║│┃]/.test(r); })); }
     function sceneOf(lay) {
         if (lay === 'street') return 'main-street';
         var p = chron.place;
@@ -1597,15 +1744,18 @@
         var lay = layoutNow();
         var texts = chron.rows.map(rowText);
         var screen = texts.slice(chron.start);
-        var menu = menuFor(lay), keys = screenKeys(screen), known = Object.create(null);
-        (menu ? [].concat.apply([], menu.groups.map(function (g) { return g.items; })) : keys.cmds).forEach(function (c) { known[c.key.toUpperCase()] = 1; });
+        var menu = shownMenu(menuFor(lay), screen), keys = screenKeys(screen), known = Object.create(null);
+        (menu ? [].concat.apply([], menu.groups.map(function (g) { return g.items; })) : keys.cmds).forEach(function (c) { known[c.key.toUpperCase()] = 1; known['l:' + (c.full || c.label).toLowerCase()] = 1; });
+        if (menu && lay === 'street') streetMore(menu, screen).forEach(function (c) { known[c.key.toUpperCase()] = 1; known['l:' + (c.full || c.label).toLowerCase()] = 1; });
+        chron.shown = menu ? known : null;
+        chron.shownAt = chron.menuAt;
         document.getElementById('chron').setAttribute('data-layout', lay);
         document.body.classList.toggle('chron-lay', lay !== 'text');
         document.getElementById('text-toggle').setAttribute('aria-pressed', chron.textOnly ? 'true' : 'false');
         renderPlate(lay);
         renderHud(lay);
         var settle = renderBody(lay, known);
-        renderDock(menu, keys, screen);
+        renderDock(menu, keys, screen, lay);
         renderFoot();
         // The body's size is known only once the keys and the footer beside it are in: scroll and trim after them.
         if (typeof settle === 'function') settle();
@@ -1613,11 +1763,15 @@
 
     function renderPlate(lay) {
         var frame = document.getElementById('c-frame'), d = chron.detail, where = state.room || '', sh = lay === 'sheet' ? chron.sheet : null;
-        var scene = sh ? '' : sceneOf(lay), portrait = sh ? portraitOf(sh.classId) : lay === 'text' && !scene ? portraitOf() : '';
+        // A2: the class portrait belongs to the character sheet alone. Before the game names a place (login, the account
+        // menu, character creation) the plate shows the town under the game's name; a place with no scene, a plain plate.
+        var scene = sh ? '' : sceneOf(lay), portrait = sh ? portraitOf(sh.classId) : '';
+        var title = !sh && !scene && !where && !chron.place;
+        if (title) scene = 'main-street';
         var who = sh ? sh.name + (sh.basic.rows.length > 1 && sh.basic.rows[1].value ? ', ' + sh.basic.rows[1].value : '') : '';
         var cap = sh ? (who ? t('play.chron.plate', [who]) : '')
             : inRoom(lay) ? t('play.chron.plate_level', [d.theme || where, num(d.level)])
-            : portrait ? t('play.chron.plate', [state.status.name || where])
+            : title ? t('play.chron.plate', ['Usurper Reborn'])
             : where ? t('play.chron.plate', [where]) : '';
         clear(frame);
         frame.className = 'frame' + (portrait || sh ? ' fp' : '');
@@ -1636,7 +1790,7 @@
                 sc.style.backgroundImage = 'url("/play/art/scenes/' + scene + '.png")';
                 sc.setAttribute('role', 'img');
                 sc.setAttribute('aria-label', cap || where);
-            }
+            } else if (where && lay !== 'fight') sc.appendChild(el('span', 'place-name', where));   // A2: the plain place plate
             if (lay === 'fight') foesIn(sc);
             frame.appendChild(sc);
         }
@@ -1652,6 +1806,8 @@
     function spriteOf(i) {
         var f = state.foes[i], m = state.enemies[i];
         if (!f || !m || f.name !== m.name) return null;
+        var byName = spriteByName(f.name);
+        if (byName !== null) return byName;
         return own(SPRITES, f.family) ? SPRITES[f.family] : '';
     }
     function foesIn(sc) {
@@ -1706,15 +1862,18 @@
     }
     function chipsOf(tags) {
         var ch = el('div', 'cchips');
-        tags.forEach(function (x) { ch.appendChild(el('span', 'chipc', x)); });
+        tags.forEach(function (x) { ch.appendChild(el('span', 'chipc' + (x === t('play.chron.low_hp') ? ' low' : ''), x)); });
         return ch;
     }
     function vitCard(name, note, hp, maxHp, st, tags, out) {
-        var card = el('div', 'card' + (out ? ' out' : '')), vit = el('div', 'vit'), who = el('span', 'who');
+        var low = !out && lowHp(hp, maxHp);
+        var card = el('div', 'card' + (out ? ' out' : '') + (low ? ' low' : '')), vit = el('div', 'vit'), who = el('span', 'who');
         who.appendChild(el('span', 'nm', name));
         if (note) who.appendChild(el('small', null, note));
         vit.appendChild(who);
-        vit.appendChild(meter(t('play.hp'), '', hp, maxHp));
+        var hm = meter(t('play.hp'), '', hp, maxHp);
+        if (low) { hm.classList.add('low'); tags = [t('play.chron.low_hp')].concat(tags); }
+        vit.appendChild(hm);
         if (st) vit.appendChild(meter(t('play.chron.st'), 'st', st[0], st[1]));
         card.appendChild(vit);
         if (tags.length) card.appendChild(chipsOf(tags));
@@ -1762,7 +1921,7 @@
             tg.appendChild(meter(t('play.hp'), 'foe', m.hp, m.maxHp));
             card.appendChild(tg);
             var tags = [];
-            if (m.isBoss) tags.push(t('play.combat.boss'));
+            if (rankTag(m)) tags.push(rankTag(m));
             if (out) tags.push(t('play.combat.dead'));
             if (tags.length) card.appendChild(chipsOf(tags));
             ec.appendChild(card);
@@ -1772,10 +1931,20 @@
     }
 
     function unbox(s) { return s.replace(/^[\s─-╿]+|[\s─-╿]+$/g, ''); }
+    // A menu line opens with a key, or with a short name and a colon before its keys ("Quick Commands: [%] Status"); a
+    // sentence that names a key ("The Quest Hall (Main Street: Quest Hall [2]) offers bounties") is text and stays.
+    function menuShape(text) { var core = unbox(text); return /^\[/.test(core) || /^[^\[\]]{1,24}:\s*\[/.test(core); }
     function menuLine(text, known) {
+        if (!menuShape(text)) return false;
         var c = scanCommands([text]);
-        return c.length > 0 && c.every(function (x) { return known[x.key.toUpperCase()] === 1; });
+        // a key whose action the dock already has under another key ([%] Status beside the menu's S Status) is known too
+        return c.length > 0 && c.every(function (x) { return known[x.key.toUpperCase()] === 1 || known['l:' + (x.full || x.label).toLowerCase()] === 1; });
     }
+    // P4: the status line ("HP: 42/42 | Gold: 1,950 | Stamina ..." on the street, "HP: [████] 42/42 Potions ..." in a room)
+    // says what the footer under the keys says; the street and the room leave it out.
+    function statusLine(core) { return /\d[\d,.]*\/\d[\d,.]*\s*\|[^|]*\|[^|]*\|/.test(core) || /\[[█▓▒░ ]{5,}\]\s*\d[\d,.]*\/\d/.test(core); }
+    // A heading drawn between rules ("═══ Online ═══") or ending in a colon ("Exits:").
+    function headingLine(core) { return /:\s*$/.test(core) || /^[═─=]{2,}\s*\S.*\S\s*[═─=]{2,}$/.test(core.trim()); }
     // The screen's lines a layout does not place itself. Left out: menu lines whose every key is on the dock, box
     // rules, and the lines the frame names (the room name, the level header). Runs of blank lines become one.
     // With headings on (a room whose keys came from Client.Menu), a heading line ("Exits:") whose next line went to the
@@ -1791,10 +1960,11 @@
             if (menuLine(text, known)) return 'menu';
             if (dropLc[core.toLowerCase()] === 1) return 'gone';
             if (headings && headings.header && core.indexOf(headings.header) === 0) return 'gone';
+            if (headings && headings.status && statusLine(core)) return 'gone';
             return 'keep';
         });
         if (headings) for (var i = kind.length - 1; i >= 0; i--) {
-            if (kind[i] !== 'keep' || !/:\s*$/.test(unbox(rowText(rows[i])))) continue;
+            if (kind[i] !== 'keep' || !headingLine(rowText(rows[i]).replace(/^[\s│║]+|[\s│║]+$/g, ''))) continue;
             var j = i + 1;
             while (j < kind.length && kind[j] === 'blank') j++;
             if (j < kind.length && kind[j] === 'menu') kind[i] = 'gone';
@@ -1816,15 +1986,90 @@
         var n = (text.match(ART_CH) || []).length, ink = text.replace(/\s+/g, '').length;
         return n >= 8 && n * 2 >= ink;
     }
-    function screenPre(rows, cls) {
+    // R5, R14: a box the game draws in line characters is drawn by the page as a box: its rule rows become its top, middle
+    // and bottom edges (with the title they carry), its side bars its left and right edges, in the frame's colour. A side
+    // row the game leaves open on the right (tips, the combat status) still gets its right edge. Nothing wraps into loose
+    // segments, and no stray bar is left. One line per row, as before. A box drawn among art (a bar not at the row's
+    // start) stays as printed.
+    var FRAME_CH = /[─━═│║┃┌┐└┘├┤┬┴┼╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬]/g;
+    var FRAME_EDGE = { '╔': 'bt', '┌': 'bt', '╒': 'bt', '╓': 'bt', '╠': 'bm', '├': 'bm', '╞': 'bm', '╟': 'bm', '╚': 'bb', '└': 'bb', '╘': 'bb', '╙': 'bb', '║': 'bs', '│': 'bs', '┃': 'bs' };
+    function frameOf(text) {
+        var m = /^(\s*)(\S)/.exec(text);
+        if (!m || !own(FRAME_EDGE, m[2])) return null;
+        var kind = FRAME_EDGE[m[2]], indent = m[1].length, end = text.replace(/\s+$/, '').length;
+        if (kind === 'bs') {
+            var closed = end - indent > 1 && /[║│┃]/.test(text.charAt(end - 1));
+            return { kind: kind, indent: indent, width: end - indent, from: indent + 1, to: closed ? end - 1 : end, closed: closed };
+        }
+        if ((text.match(FRAME_CH) || []).length < 3) return null;
+        return { kind: kind, indent: indent, width: end - indent };
+    }
+    function sliceSegs(segs, from, to) {
+        var out = [], at = 0;
+        segs.forEach(function (r) {
+            var a = Math.max(from, at), b = Math.min(to, at + r.t.length);
+            if (b > a) out.push({ t: r.t.slice(a - at, b - at), c: r.c });
+            at += r.t.length;
+        });
+        return out;
+    }
+    // A rule row's title ("TIP", "MAIN STREET" inside a top edge) in its own colours, the line characters gone.
+    function titleSegs(segs) {
+        var out = segs.map(function (r) { return { t: r.t.replace(FRAME_CH, ' '), c: r.c }; });
+        var text = rowText(out), a = text.search(/\S/);
+        if (a < 0) return [];
+        return sliceSegs(out, a, text.replace(/\s+$/, '').length);
+    }
+    function frameColour(segs) {
+        for (var i = 0; i < segs.length; i++) if (/[─━═│║┃┌┐└┘├┤╔╗╚╝╠╣]/.test(segs[i].t)) return segs[i].c;
+        return '';
+    }
+    // The rows as the book shows them: per row its runs, and for a box row its edges. old: rows before this many are the
+    // last screen's (R10), set quieter.
+    function framed(rows) {
+        var box = null;
+        return rows.map(function (segs) {
+            var text = rowText(segs), f = frameOf(text);
+            if (f && f.kind === 'bt') box = { indent: f.indent, width: f.width, c: frameColour(segs) };
+            var inBox = !!(f && box && f.indent === box.indent);
+            if (f && f.kind === 'bs' && !inBox && !f.closed) f = null;   // a lone bar (a map's corridor) is text
+            if (!f) return { segs: segs, len: text.replace(/\s+$/, '').length };
+            var inner = f.kind === 'bs' ? sliceSegs(segs, f.from, f.to) : titleSegs(segs), it = rowText(inner);
+            var lead = it.search(/\S/), trail = it.length - it.replace(/\s+$/, '').length, centred = false;
+            // a title the game centred in its box ("║     MAIN STREET     ║") is centred by the page, so a narrow page keeps it whole
+            if (f.kind === 'bs' && lead >= 6 && Math.abs(lead - trail) <= 3) { inner = sliceSegs(inner, lead, it.length - trail); centred = true; }
+            var shape = { segs: inner, centred: centred, kind: f.kind, indent: f.indent,
+                width: inBox && f.kind !== 'bt' ? Math.max(box.width, f.kind === 'bs' ? 0 : f.width) : f.width, c: inBox ? box.c : frameColour(segs) };
+            shape.len = shape.indent + shape.width;
+            if (f.kind === 'bb') box = null;
+            return shape;
+        });
+    }
+    function screenPre(rows, cls, old) {
         var pre = el('pre', cls);
-        rows.forEach(function (segs) {
-            var ln = el('span', artRow(rowText(segs)) ? 'ln art' : 'ln');
+        framed(rows).forEach(function (row, i) {
+            var segs = row.segs;
+            var c = 'ln' + (row.kind ? ' bx ' + row.kind + (segs.length ? '' : ' bare') + (row.centred ? ' ctr' : '') + (row.c ? ' b' + row.c : '') : artRow(rowText(segs)) ? ' art' : '');
+            if (typeof old === 'number' && i < old) c += ' old';
+            var ln = el('span', c);
+            if (row.kind) {
+                ln.setAttribute('data-bi', row.indent);
+                ln.setAttribute('data-bw', row.width);
+                ln.style.marginLeft = row.indent + 'ch';
+                ln.style.width = row.width + 'ch';
+            }
             if (!segs.length) ln.textContent = ' ';
             segs.forEach(function (r) { ln.appendChild(el('span', r.c || null, r.t)); });
             pre.appendChild(ln);
         });
         return pre;
+    }
+    // R9: the longest row of a text page, in columns (40 to 80), so a desktop page sets its type to fit it and a table row
+    // never wraps to column 0.
+    function widest(rows) {
+        var n = 40;
+        framed(rows).forEach(function (r) { n = Math.max(n, Math.min(80, r.len)); });
+        return n;
     }
     function subLine(d) {
         var sub = el('div', 'chap-sub'), dot = function () { sub.appendChild(el('span', 'dot', ' · ')); };
@@ -1870,7 +2115,10 @@
         clear(body);
         body.className = 'cbody b-' + lay;
         if (lay === 'text') {
-            var pre = screenPre(chron.rows, 'screen');
+            var pre = screenPre(chron.rows, 'screen fit', chron.start);
+            var cols = widest(chron.rows);
+            pre.setAttribute('data-n', cols);
+            if (pre.style.setProperty) pre.style.setProperty('--n', String(cols));
             pre.id = 'c-screen';
             pre.setAttribute('tabindex', '0');
             pre.setAttribute('aria-label', t('play.chron.screen'));
@@ -1879,13 +2127,23 @@
             // the page stays on that line; once the reader scrolls, their place is kept until the next screen.
             var fresh = chron.rowsSeq === chron.seq && chron.textSeq !== chron.seq;
             return function () {
+                var first = pre.children[chron.start];
+                var y = first ? (Number(first.offsetTop) || 0) - (Number(pre.offsetTop) || 0) : 0;
+                // R10: the game streams on without clearing, so the last screen's rows sit above this one (set quieter).
+                // A short new screen still opens at the top of the window: room is left under it to scroll that far.
+                var room = (Number(pre.clientHeight) || 0) - ((Number(pre.scrollHeight) || 0) - y);
+                if (y > 0 && room > 0) {
+                    var pad = el('span', 'ln spacer');
+                    pad.setAttribute('aria-hidden', 'true');
+                    pad.style.height = room + 'px';
+                    pre.appendChild(pad);
+                }
                 if (fresh || (chron.rowsSeq === chron.seq && old && oldTop === chron.textTop)) {
                     chron.textSeq = chron.seq;
-                    var first = pre.children[chron.start];
-                    var y = first ? (Number(first.offsetTop) || 0) - (Number(pre.offsetTop) || 0) : 0;
                     pre.scrollTop = Math.max(0, y);
                     chron.textTop = Number(pre.scrollTop) || 0;   // as the browser kept it, so a later draw can tell the reader moved
                 } else pre.scrollTop = old ? oldTop : atEnd ? pre.scrollHeight : 0;
+                wholeLines(pre);
             };
         }
         if (lay === 'sheet' && chron.sheet) {
@@ -1906,7 +2164,7 @@
             lines.forEach(function (text, i) {
                 log.appendChild(el('div', 'ev a' + Math.min(4, lines.length - 1 - i) + (/^[\[(]/.test(text) ? ' aside' : ''), text));
             });
-            if (state.round > 0) log.appendChild(el('div', 'rd now', t('play.combat.round', [num(state.round)])));
+            if (state.round > 0 && !state.death) log.appendChild(el('div', 'rd now', t('play.combat.round', [num(state.round)])));
             // F2: what is typed so far, as the terminal shows it. The game holds it, so the page never hides it.
             if (lineTyped) {
                 var at = chron.rows[chron.cursorRow], row = at ? rowText(at).replace(/\s+$/, '') : '';
@@ -1933,8 +2191,12 @@
             prose.appendChild(el('h1', 'chap', state.room));
             drop[state.room] = 1;
         }
-        var heads = lay === 'room' && d && menuFor(lay) ? { header: d.header } : null;
-        prose.appendChild(screenPre(proseRows(chron.rows.slice(chron.start), known, drop, heads), 'screen mini'));
+        var heads = lay === 'room' && d && menuFor(lay) ? { header: d.header, status: !!state.foot.hp }
+            : lay === 'street' && menuFor(lay) ? { header: '', status: !!state.foot.hp } : null;
+        var kept = proseRows(chron.rows.slice(chron.start), known, drop, heads), mini = screenPre(kept, 'screen mini fit'), cols = widest(kept);
+        mini.setAttribute('data-n', cols);
+        if (mini.style.setProperty) mini.style.setProperty('--n', String(cols));   // R6: a room or street line is not wrapped either
+        prose.appendChild(mini);
         body.appendChild(prose);
         if (lay === 'room' && d) {
             // D3: the map and the exits side by side above the keys
@@ -1942,6 +2204,20 @@
             if (mapOn()) nav.appendChild(mapCard(chron.map));
             nav.appendChild(compass(d));
             body.appendChild(nav);
+        }
+    }
+
+    // R9: the text window ends at a whole line: when the last line in view would be cut, the window stops above it.
+    function wholeLines(pre) {
+        var h = Number(pre.clientHeight) || 0, top = Number(pre.scrollTop) || 0, base = Number(pre.offsetTop) || 0;
+        if (!(h > 0)) return;
+        var lines = pre.children;
+        for (var i = 0; i < lines.length; i++) {
+            var a = (Number(lines[i].offsetTop) || 0) - base - top, b = a + (Number(lines[i].offsetHeight) || 0);
+            if (a < h && b > h + 1) {
+                if (a > h / 2) pre.style.maxHeight = Math.floor(a) + 'px';
+                return;
+            }
         }
     }
 
@@ -2043,39 +2319,82 @@
 
     // A key cap sends what a typed key does: the key, then Enter, as the pad's buttons do. After a click with the
     // mouse the terminal takes the keyboard again, so the next key typed goes to the game.
-    function keyCap(key, label, enabled) {
-        var b = el('button', 'kc' + (enabled ? '' : ' off'));
+    // X1: a cap that is not a letter (a digit, %, *) is set in the mono face, whose figures stand on the line. X2: "#" is no
+    // key but the shop's "type the item's number": its cap reads No. and sends nothing; it gives the terminal the keyboard
+    // for the number. A key of more letters keeps them (the game's key), in a wide cap.
+    function keyCap(key, label, enabled, full) {
+        var number = key === '#', whole = full || label;
+        var b = el('button', 'kc' + (enabled ? '' : ' off') + (number ? ' typenum' : ''));
         b.type = 'button';
         b.setAttribute('data-key', key);
-        b.setAttribute('aria-label', key + ', ' + label);
+        b.setAttribute('aria-label', number ? t('play.chron.type_number', [whole]) : key + ', ' + whole);
+        if (whole !== label || number) b.setAttribute('title', number ? t('play.chron.type_number', [whole]) : whole);
         if (!enabled) b.setAttribute('aria-disabled', 'true');
-        b.appendChild(el('span', 'cap' + (key.length > 2 ? ' wide' : key === 'Q' ? ' swash' : ''), key));
+        var cls = number ? ' wide num' : key.length > 2 ? ' wide' : key === 'Q' ? ' swash' : /^[^A-Za-z]$/.test(key) ? ' sym' : '';
+        b.appendChild(el('span', 'cap' + cls, number ? t('play.chron.cap_number') : key));
         b.appendChild(el('span', 'lb', label));
         b.addEventListener('click', function (e) {
             if (!enabled) return;
-            sendToGame(key + '\r');
-            if (terminal && !isTouch() && e && e.detail > 0) terminal.focus();
+            if (!number) sendToGame(key + '\r');
+            if (terminal && !isTouch() && (number || (e && e.detail > 0))) terminal.focus();
         });
         return b;
     }
-    function renderDock(menu, keys, screen) {
+    // B10: a Client.Menu key shows as the key the screen prints for the same action (the room's [*] Inventory and [%] Status,
+    // where the frame says I and =). The game takes both; the page shows, and sends, the one the player reads.
+    function shownMenu(menu, screen) {
+        if (!menu) return null;
+        var printed = Object.create(null);
+        scanCommands(screen).forEach(function (c) { printed[(c.full || c.label).toLowerCase()] = c.key; });
+        var taken = Object.create(null);
+        menu.groups.forEach(function (g) { g.items.forEach(function (it) { taken[it.key.toUpperCase()] = 1; }); });
+        var groups = menu.groups.map(function (g) {
+            return { label: g.label, items: g.items.map(function (it) {
+                var p = printed[it.label.toLowerCase()];
+                var key = p && p.toUpperCase() !== it.key.toUpperCase() && KEY_OK.test(p) && !taken[p.toUpperCase()] ? p : it.key;
+                return { key: key, label: it.label, enabled: it.enabled, sent: it.key };
+            }) };
+        });
+        return { screen: menu.screen, groups: groups, hint: menu.hint, oneKey: menu.oneKey, round: menu.round };
+    }
+    // P4: on the street, the keys the screen prints that the menu does not have (the quick keys: inventory, help, talk)
+    // join the dock as one more group, so their raw line leaves the street's text.
+    function streetMore(menu, screen) {
+        var keyIn = Object.create(null), labelIn = Object.create(null);
+        menu.groups.forEach(function (g) { g.items.forEach(function (it) { keyIn[it.key.toUpperCase()] = 1; labelIn[it.label.toLowerCase()] = 1; }); });
+        return scanCommands(screen.filter(menuShape)).filter(function (c) { return !keyIn[c.key.toUpperCase()] && !labelIn[(c.full || c.label).toLowerCase()]; })
+            .map(function (c) { return { key: c.key, label: c.label, full: c.full, enabled: true }; });
+    }
+    function renderDock(menu, keys, screen, lay) {
         var box = document.getElementById('c-keys'), bar = document.getElementById('c-enterbar');
-        var groups = menu ? menu.groups : keys.cmds.length
-            ? [{ label: t('play.pad.on_screen'), items: keys.cmds.map(function (c) { return { key: c.key, label: c.label, enabled: true }; }) }] : [];
+        var groups = menu ? menu.groups.slice() : keys.cmds.length
+            ? [{ label: t('play.pad.on_screen'), items: keys.cmds.map(function (c) { return { key: c.key, label: c.label, full: c.full, enabled: true }; }) }] : [];
+        if (menu && lay === 'street') {
+            var more = streetMore(menu, screen);
+            if (more.length) groups.push({ label: t('play.chron.more_keys'), items: more });
+        }
         clear(box);
         box.setAttribute('aria-label', t('play.chron.actions'));
         groups.forEach(function (g) {
             var grp = el('div', 'kgroup'), grid = el('div', 'grid');
             grp.setAttribute('role', 'group');
             if (g.label) { grp.setAttribute('aria-label', g.label); grp.appendChild(el('div', 'kh', g.label)); }
-            g.items.forEach(function (it) { grid.appendChild(keyCap(it.key, it.label, it.enabled)); });
+            g.items.forEach(function (it) { grid.appendChild(keyCap(it.key, it.label, it.enabled, it.full)); });
             grp.appendChild(grid);
             if (menu && menu.hint && menu.hint.text && menu.hint.label === g.label) grp.appendChild(el('div', 'khint', menu.hint.text));
             box.appendChild(grp);
         });
+        // N2: how the keys go to the game: one press where the page sends the key with its Enter (one-key menus), the key
+        // and then Enter everywhere else. A key cap always sends its Enter.
+        if (groups.length) box.appendChild(el('div', 'khint howto', menu && menu.oneKey === true ? t('play.chron.keys_one') : t('play.chron.keys_enter')));
         box.hidden = !groups.length;
         var said = screen.filter(function (r) { return r.trim(); });
-        var enter = !menu && keys.prompt.kind === 'enter' && said.length > 0;
+        // B6: the Enter key shows only while the game waits for a line (its Client.Waiting came in this draw; a server that
+        // never sends one is taken at its prompt's shape) and the connection is open, so a line still being printed ("Your
+        // chivalry increases by 54!") or the page's own "Connection closed" never becomes a key.
+        var waiting = seenWaiting ? chron.waitAt === chron.seq : true;
+        var open = !!ws && ws.readyState === 1;
+        var enter = !menu && keys.prompt.kind === 'enter' && said.length > 0 && waiting && open;
         clear(bar);
         bar.hidden = !enter;
         if (enter) {
@@ -2173,11 +2492,12 @@
         ws.onmessage = function (event) {
             if (typeof event.data === 'string') handleFrame(event.data);
             else if (terminal) {
-                var bytes = new Uint8Array(event.data);
-                if (seesClear(bytes)) { screenCleared(); drawStarted(300); }
+                var bytes = new Uint8Array(event.data), cut = -1;
+                if (seesClear(bytes)) { screenCleared(); drawStarted(300); cut = clearAt; }
                 else if (chron.open) drawQuiet(300);
                 var seq = chron.seq;
-                terminal.write(bytes, function () { schedulePad(); afterWrite(seq); });
+                if (cut >= 0) terminal.write(bytes.subarray(0, cut), markClear);
+                terminal.write(cut >= 0 ? bytes.subarray(cut) : bytes, function () { schedulePad(); afterWrite(seq); });
             }
         };
         ws.onclose = function () {
@@ -2193,6 +2513,8 @@
         menuRound = false; lineTyped = ''; armedKey = null; heldKey = null; composing = false; seenWaiting = false; waitSince = -1; polling = false;
         fightTail = -1;
         roomEnter = -1; clearMatched = 0; screenCleared();
+        try { if (clearMark) clearMark.dispose(); } catch (e) {}
+        clearMark = null;
         chronReset();
         renderCombat();
         renderVitals();
@@ -2259,7 +2581,8 @@
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; },
         view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
-        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf, typedData: typedData, readScreen: readScreen
+        drawStarted: drawStarted, drawEnded: drawEnded, chron: chron, screenOf: screenOf, typedData: typedData, readScreen: readScreen,
+        clearAt: function () { return clearAt; }, floorOf: floorOf, shortLabel: shortLabel, frameOf: frameOf, spriteByName: spriteByName
     };
 
     populateLanguagePicker();

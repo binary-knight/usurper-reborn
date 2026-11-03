@@ -114,7 +114,7 @@ public class MentalCollapseGaps1115Tests
 
     private static async Task<(int floor, string shown)> EnterPortal(Character hero, params string[] answers)
     {
-        var (dungeon, term, output) = Dungeon(hero, 10, new[] { "E" }.Concat(answers).ToArray());
+        var (dungeon, term, output) = Dungeon(hero, 10, new[] { "E" }.Concat(answers).Append("").ToArray());   // 1.3.10: Enter after the result
         await (Task)typeof(DungeonLocation).GetMethod("MysteriousPortalEncounter", F)!.Invoke(dungeon, null)!;
         term.StreamWriterInternal?.Flush();
         string shown = Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;]*[A-Za-z]", "");

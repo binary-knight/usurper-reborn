@@ -295,14 +295,18 @@ public static class DifficultySystem
     public static bool IsPermadeath() => IsPermadeath(CurrentDifficulty);
 
     /// <summary>
-    /// Get healing multiplier for current difficulty
+    /// Get healing multiplier for current difficulty. 1.3.10: with the New Game+ healing unlock
+    /// (Healing Light, +25 percent) on top, at every heal that takes the difficulty.
     /// </summary>
-    public static float GetHealingMultiplier() => GetHealingMultiplier(CurrentDifficulty);
+    public static float GetHealingMultiplier() =>
+        GetHealingMultiplier(CurrentDifficulty) * UsurperRemake.Systems.MetaProgressionSystem.Instance.GetHealingMultiplier();
 
     /// <summary>
-    /// Get shop price multiplier for current difficulty
+    /// Get shop price multiplier for current difficulty. 1.3.10: with the New Game+ shop discount (Blessed
+    /// Commerce, 10 percent off) on top, so the Weapon, Armor and Magic shops take it.
     /// </summary>
-    public static float GetShopPriceMultiplier() => GetShopPriceMultiplier(CurrentDifficulty);
+    public static float GetShopPriceMultiplier() =>
+        GetShopPriceMultiplier(CurrentDifficulty) * (1f - UsurperRemake.Systems.MetaProgressionSystem.Instance.GetShopDiscount());
 
     /// <summary>
     /// Get affliction duration multiplier for current difficulty
@@ -386,6 +390,16 @@ public static class DifficultySystem
     public static long ApplyPlayerDamageMultiplier(long baseDamage)
     {
         return (long)(baseDamage * GetPlayerDamageMultiplier());
+    }
+
+    /// <summary>
+    /// 1.3.10: the difficulty step, plus the New Game+ damage unlock (Tyrant's Aura, +15 percent) when the damage
+    /// is the player's own (ownDamage). A teammate's damage takes the one-argument step, without the unlock.
+    /// </summary>
+    public static long ApplyPlayerDamageMultiplier(long baseDamage, bool ownDamage)
+    {
+        float unlock = ownDamage ? UsurperRemake.Systems.MetaProgressionSystem.Instance.GetDamageMultiplier() : 1.0f;
+        return (long)(baseDamage * (GetPlayerDamageMultiplier() * unlock));
     }
 
     /// <summary>

@@ -650,7 +650,10 @@ public class DungeonLocation : BaseLocation
         });
 
         // ── Screen 8: Rest, Return & Tips ─────────────────────────────────────
-        await Page(Loc.Get("dungeon.tut.p8.title"), "cyan", new()
+        // 1.3.10 (play test B11): the reach rule from the table the level change uses (it said +-10 for every level)
+        var reachLines = FloorReachRuleLines(73);
+        var reachRows = reachLines.Select((l, i) => (i == 0 ? Loc.Get("dungeon.tut.p8.t1", l) : "    " + l, "white")).ToList();
+        await Page(Loc.Get("dungeon.tut.p8.title"), "cyan", new List<(string text, string color)>
         {
             (Loc.Get("dungeon.tut.p8.l1"), "white"),
             ("", "white"),
@@ -659,7 +662,8 @@ public class DungeonLocation : BaseLocation
             (Loc.Get("dungeon.tut.p8.map"), "bright_green"),
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.tips"), "gray"),
-            (Loc.Get("dungeon.tut.p8.t1"), "white"),
+        }.Concat(reachRows).Concat(new List<(string text, string color)>
+        {
             (Loc.Get("dungeon.tut.p8.t2"), "white"),
             (Loc.Get("dungeon.tut.p8.t3"), "white"),
             (Loc.Get("dungeon.tut.p8.t4"), "white"),
@@ -667,7 +671,7 @@ public class DungeonLocation : BaseLocation
             (Loc.Get("dungeon.tut.p8.t6"), "white"),
             ("", "white"),
             (Loc.Get("dungeon.tut.p8.outro"), "bright_yellow"),
-        });
+        }).ToList());
 
         term.WriteLine(Loc.Get("dungeon.tut.complete"), "bright_green");
         await Pacing.Wait(1500);
@@ -3052,25 +3056,25 @@ public class DungeonLocation : BaseLocation
         // Seal and boss floors
         if (floor == 15 && !story.CollectedSeals.Contains(SealType.FirstWar))
         { hint = Loc.Get("dungeon.guide_seal_2"); color = "bright_cyan"; }
-        else if (floor == 25 && !story.HasStoryFlag("maelketh_encountered"))
+        else if (floor == 25 && !story.GodHintCleared(OldGodType.Maelketh))
         { hint = Loc.Get("dungeon.guide_maelketh"); color = "bright_red"; }
         else if (floor == 30 && !story.CollectedSeals.Contains(SealType.Corruption))
         { hint = Loc.Get("dungeon.guide_seal_3"); color = "bright_cyan"; }
-        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        else if (floor == 40 && !story.GodHintCleared(OldGodType.Veloura))
         { hint = Loc.Get("dungeon.guide_veloura"); color = "bright_magenta"; }
         else if (floor == 45 && !story.CollectedSeals.Contains(SealType.Imprisonment))
         { hint = Loc.Get("dungeon.guide_seal_4"); color = "bright_cyan"; }
-        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        else if (floor == 55 && !story.GodHintCleared(OldGodType.Thorgrim))
         { hint = Loc.Get("dungeon.guide_thorgrim"); color = "bright_cyan"; }
         else if (floor == 60 && !story.CollectedSeals.Contains(SealType.Prophecy))
         { hint = Loc.Get("dungeon.guide_seal_5"); color = "bright_cyan"; }
-        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        else if (floor == 70 && !story.GodHintCleared(OldGodType.Noctura))
         { hint = Loc.Get("dungeon.guide_noctura"); color = "bright_magenta"; }
         else if (floor == 80 && !story.CollectedSeals.Contains(SealType.Regret))
         { hint = Loc.Get("dungeon.guide_seal_6"); color = "bright_cyan"; }
-        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        else if (floor == 85 && !story.GodHintCleared(OldGodType.Aurelion))
         { hint = Loc.Get("dungeon.guide_aurelion"); color = "bright_yellow"; }
-        else if (floor == 95 && !story.HasStoryFlag("terravok_encountered"))
+        else if (floor == 95 && !story.GodHintCleared(OldGodType.Terravok))
         { hint = Loc.Get("dungeon.guide_terravok"); color = "bright_yellow"; }
         else if (floor == 99 && !story.CollectedSeals.Contains(SealType.Truth))
         { hint = Loc.Get("dungeon.guide_seal_final"); color = "bright_cyan"; }
@@ -3916,7 +3920,7 @@ public class DungeonLocation : BaseLocation
                 hint = Loc.Get("dungeon.hint_paradox_child");
                 color = "bright_magenta";
             }
-            else if (!story.HasStoryFlag("maelketh_encountered"))
+            else if (!story.GodHintCleared(OldGodType.Maelketh))
             {
                 hint = Loc.Get("dungeon.hint_maelketh");
                 color = "bright_red";
@@ -3927,7 +3931,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_3");
             color = "bright_cyan";
         }
-        else if (floor == 40 && !story.HasStoryFlag("veloura_encountered"))
+        else if (floor == 40 && !story.GodHintCleared(OldGodType.Veloura))
         {
             hint = Loc.Get("dungeon.hint_veloura");
             color = "bright_magenta";
@@ -3937,7 +3941,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_4");
             color = "bright_cyan";
         }
-        else if (floor == 55 && !story.HasStoryFlag("thorgrim_encountered"))
+        else if (floor == 55 && !story.GodHintCleared(OldGodType.Thorgrim))
         {
             hint = Loc.Get("dungeon.hint_thorgrim");
             color = "bright_cyan";
@@ -3959,7 +3963,7 @@ public class DungeonLocation : BaseLocation
                 color = "bright_magenta";
             }
         }
-        else if (floor == 70 && !story.HasStoryFlag("noctura_encountered"))
+        else if (floor == 70 && !story.GodHintCleared(OldGodType.Noctura))
         {
             hint = Loc.Get("dungeon.hint_noctura");
             color = "bright_magenta";
@@ -3974,7 +3978,7 @@ public class DungeonLocation : BaseLocation
             hint = Loc.Get("dungeon.hint_seal_6");
             color = "bright_cyan";
         }
-        else if (floor == 85 && !story.HasStoryFlag("aurelion_encountered"))
+        else if (floor == 85 && !story.GodHintCleared(OldGodType.Aurelion))
         {
             hint = Loc.Get("dungeon.hint_aurelion");
             color = "bright_yellow";
@@ -3998,7 +4002,7 @@ public class DungeonLocation : BaseLocation
                 hint = Loc.Get("dungeon.hint_destroy_darkness");
                 color = "bright_magenta";
             }
-            else if (!story.HasStoryFlag("terravok_encountered"))
+            else if (!story.GodHintCleared(OldGodType.Terravok))
             {
                 hint = Loc.Get("dungeon.hint_terravok");
                 color = "bright_yellow";
@@ -4299,6 +4303,16 @@ public class DungeonLocation : BaseLocation
             }
         }
 
+        // 1.3.10: the artifact floors, once a past cycle revealed them (the NG+ flag or the Artifact Memory unlock)
+        var artifactRows = ArtifactLocationRows(story);
+        if (artifactRows.Count > 0)
+        {
+            WriteSectionHeader(Loc.Get("dungeon.section_artifact_locations"), "bright_magenta");
+            terminal.SetColor("white");
+            foreach (var row in artifactRows) terminal.WriteLine(row);
+            terminal.WriteLine("");
+        }
+
         // What you know so far
         WriteSectionHeader(Loc.Get("dungeon.section_learned"), "bright_magenta");
         terminal.SetColor("white");
@@ -4329,6 +4343,32 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("gray");
         await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// 1.3.10: the journal rows of the artifact reveal: each artifact not yet held, with the floor of the Old God
+    /// who gives it (as the wiki lists it), and the Void Key, which comes once the other six are held. Empty
+    /// unless the NG+ cycle bonus set knows_artifact_locations or the Artifact Memory unlock is held.
+    /// </summary>
+    internal static List<string> ArtifactLocationRows(StoryProgressionSystem story)
+    {
+        var rows = new List<string>();
+        if (!story.HasStoryFlag("knows_artifact_locations") && !MetaProgressionSystem.Instance.ShouldRevealArtifactLocations())
+            return rows;
+        var gods = UsurperRemake.Data.OldGodsData.GetAllOldGods();
+        foreach (var artifact in ArtifactSystem.Instance.GetAllArtifacts().OrderBy(a => a.Type))
+        {
+            if (story.CollectedArtifacts.Contains(artifact.Type)) continue;
+            if (artifact.Type == ArtifactType.VoidKey)
+            {
+                rows.Add(Loc.Get("dungeon.artifact_location_void_key", artifact.LocName()));
+                continue;
+            }
+            var god = gods.Where(g => g.Type != OldGodType.Manwe && g.ArtifactDropped == artifact.Type)
+                .OrderBy(g => g.DungeonFloor).FirstOrDefault();
+            if (god != null) rows.Add(Loc.Get("dungeon.artifact_location_row", artifact.LocName(), god.DungeonFloor));
+        }
+        return rows;
     }
 
     private string GetChapterName(StoryChapter chapter)
@@ -4433,7 +4473,7 @@ public class DungeonLocation : BaseLocation
             steps.Add(Loc.Get("dungeon.step_descend"));
 
         // Story suggestions
-        if (!story.HasStoryFlag("met_stranger"))
+        if (!story.HasStoryFlag(OpeningSequenceSystem.MetFlag))   // 1.3.10: the flag the Stranger scene writes
             steps.Add(Loc.Get("dungeon.step_stranger"));
         if (story.CollectedSeals.Count < 7 && level >= 50)
             steps.Add(Loc.Get("dungeon.step_all_seals"));
@@ -5705,9 +5745,7 @@ public class DungeonLocation : BaseLocation
             {
                 var boss = MonsterGenerator.GenerateMonster(effectiveMonsterLevel, isBoss: true, random: dungeonRandom);
                 boss.Name = GetBossName(currentFloor.Theme);
-                boss.Phrase = GetBossPhrase(currentFloor.Theme);
-                var bossTheme = currentFloor.Theme;
-                boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);
+                GiveFloorBossPhrase(boss, currentFloor.Theme);
                 if (monsters.Count == 0)
                     monsters.Add(boss);
                 else
@@ -5891,6 +5929,19 @@ public class DungeonLocation : BaseLocation
             return names[index];
         }
         return "Dungeon Boss";
+    }
+
+    /// <summary>
+    /// The floor boss's spoken line for the theme, in the reader's language. 1.3.10 (B16): the boss speaks it, so the
+    /// fight opens with "Tomb Sentinel says: ..." and not "Tomb Sentinel The dead do not rest here..." (a monster that
+    /// cannot speak has its phrase printed after its name as an action).
+    /// </summary>
+    internal static void GiveFloorBossPhrase(Monster boss, DungeonTheme theme)
+    {
+        boss.Phrase = GetBossPhrase(theme);
+        boss.CanSpeak = true;
+        var bossTheme = theme;
+        boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);
     }
 
     private static string GetBossPhrase(DungeonTheme theme)
@@ -7513,10 +7564,23 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private static int GetFloorReachAllowance(int playerLevel)
     {
-        if (playerLevel <= 5) return 3;
-        if (playerLevel <= 15) return 5;
-        if (playerLevel <= 30) return 8;
-        return 10;
+        foreach (var (maxLevel, allowance) in FloorReachBands)
+            if (playerLevel <= maxLevel) return allowance;
+        return FloorReachTopAllowance;
+    }
+
+    /// <summary>1.3.10 (play test B11): the reach bands, highest level of each band and its allowance; above the last band
+    /// the allowance is FloorReachTopAllowance. One table for the rule, the level change screen and the tutorial.</summary>
+    internal static readonly (int MaxLevel, int Allowance)[] FloorReachBands = { (5, 3), (15, 5), (30, 8) };
+    internal const int FloorReachTopAllowance = 10;
+
+    /// <summary>1.3.10 (play test B11): the reach rule in words, from FloorReachBands, wrapped to the given width.</summary>
+    internal static List<string> FloorReachRuleLines(int width)
+    {
+        var b = FloorReachBands;
+        string rule = Loc.Get("dungeon.reach_rule", b[0].Allowance, b[0].MaxLevel, b[1].Allowance, b[1].MaxLevel,
+            b[2].Allowance, b[2].MaxLevel, FloorReachTopAllowance);
+        return HintSystem.WordWrap(rule, width);
     }
 
     private async Task ChangeDungeonLevel()
@@ -7534,6 +7598,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.current_level", currentDungeonLevel), "white");
         terminal.WriteLine(Loc.Get("dungeon.your_level", playerLevel), "cyan");
         terminal.WriteLine(Loc.Get("dungeon.deepest_accessible", maxAccessible, reachAllowance), "yellow");
+        foreach (var line in FloorReachRuleLines(77)) terminal.WriteLine($"  {line}", "gray");   // 1.3.10 (B11): the whole rule
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("dungeon.enter_target_level"));
@@ -7684,14 +7749,13 @@ public class DungeonLocation : BaseLocation
         if (encounterRoll < MonsterEncounterChance)
         {
             await MonsterEncounter();
+            await Pacing.Wait(1000);
+            await terminal.PressAnyKey();
         }
         else
         {
-            await SpecialEventEncounter();
+            await SpecialEventEncounter();   // 1.3.10 (B7): each event ends with its own Enter prompt
         }
-
-        await Pacing.Wait(1000);
-        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -8307,7 +8371,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chivalry_increases_slightly"));
         }
 
-        await Pacing.Wait(1500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8369,7 +8433,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.encounter_wiser", xpGain));
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8487,7 +8551,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.portal_avoid"));
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -8749,7 +8813,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(1500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9042,7 +9106,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chest_leave_alone"), "gray");
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9189,7 +9253,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9280,7 +9344,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.damsel_ignore_2"), "gray");
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9360,7 +9424,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.wounded_leave_2"), "gray");
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9490,7 +9554,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.shrine_leave"), "gray");
         }
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9687,7 +9751,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.trap_reflexes_save"));
             terminal.WriteLine(Loc.Get("dungeon.trap_dodge_entirely", currentPlayer.Agility));
-            await Pacing.Wait(1500);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9748,7 +9812,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9788,7 +9852,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_no_gold"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades_disappointed"), "gray");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9799,7 +9863,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_coward"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades"), "gray");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -9838,7 +9902,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine(Loc.Get("dungeon.ghost_fades_shadows"), "gray");
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     /// <summary>
@@ -9906,7 +9970,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Pacing.Wait(2500);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
     
     /// <summary>
@@ -10566,7 +10630,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.witch_doctor_no_gold"), "gray");
         }
         
-        await Pacing.Wait(3000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
     
     /// <summary>
@@ -15627,14 +15691,14 @@ public class DungeonLocation : BaseLocation
         if (player.Gold < cost)
         {
             terminal.WriteLine($"\"{(settlement.Id == "rat_king_market" ? Loc.Get("dungeon.settlement_no_gold_rat") : Loc.Get("dungeon.settlement_no_gold"))}\"", "yellow");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
         if (player.HP >= player.MaxHP && player.Mana >= player.MaxMana)
         {
             terminal.WriteLine(Loc.Get("dungeon.settlement_no_heal_needed"), "cyan");
-            await Pacing.Wait(2000);
+            await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
             return;
         }
 
@@ -15664,7 +15728,7 @@ public class DungeonLocation : BaseLocation
         // Broadcast to group
         BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_settlement_healed", player.Name, settlement.Name)}\u001b[0m");
 
-        await Pacing.Wait(2000);
+        await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
     }
 
     private async Task SettlementTrade(Character player, DungeonSettlement settlement)
@@ -15715,7 +15779,7 @@ public class DungeonLocation : BaseLocation
                 if (player.Gold < item.cost)
                 {
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
-                    await Pacing.Wait(1500);
+                    await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
                 }
                 else
                 {
@@ -15725,7 +15789,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.settlement_purchased", item.name));
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("church.blood_gold_cost", item.cost));
-                    await Pacing.Wait(1500);
+                    await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
                 }
             }
         }

@@ -251,7 +251,9 @@ public class GmcpGroupVitals139Tests
 
         // Three leader-side Char.Vitals sends in combat are followed by the group send; the fourth, at
         // combat end, sits inside the leader's IsActive check, so the group send comes after that block.
-        CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);").Should().Be(4);
+        // 1.3.10 (C5): a fifth, at the death page (ShowDeathBanner), with the group send beside it
+        CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);").Should().Be(5);
+        CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);\n        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(teammates);").Should().Be(1);
         CountOf(combat, "GmcpBridge.EmitVitalsIfChanged(player);\n            UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(result.Teammates);").Should().Be(3);
         int end = combat.IndexOf("GmcpBridge.Emit(\"Char.Combat.End\"");
         end.Should().BeGreaterThan(0);

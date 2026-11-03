@@ -182,6 +182,16 @@ public partial class TempleLocation : BaseLocation
         WriteBoxHeader(Loc.Get("temple.header_visual"), "bright_cyan");
         terminal.WriteLine("");
 
+        // 1.3.10 (C5): after a death, the life it cost, once, on the screen the player lands on
+        if (!string.IsNullOrEmpty(currentPlayer.PendingLifeNotice))
+        {
+            terminal.SetColor("yellow");
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(currentPlayer.PendingLifeNotice, UsurperRemake.UI.UIHelper.WrapWidth))
+                terminal.WriteLine(row);
+            terminal.WriteLine("");
+            currentPlayer.PendingLifeNotice = null;
+        }
+
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.description_line1"));
         terminal.WriteLine(Loc.Get("temple.description_line2"));

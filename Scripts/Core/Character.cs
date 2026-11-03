@@ -598,7 +598,26 @@ public class Character
 
     // Combat Stamina System - resource for special abilities
     // Formula: MaxCombatStamina = 50 + (Stamina stat * 2) + (Level * 3) + armor weight bonus
-    public long CurrentCombatStamina { get; set; } = 100;
+    /// <summary>1.3.10 (C5): the line "A life was spent. Lives left: N of M." from the last death, shown once by the
+    /// Temple's hall, where a death lands; run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? PendingLifeNotice { get; set; }
+
+    // 1.3.10 (G6): the fight stamina is not saved, and it started at a fixed 100 on every new or loaded character,
+    // above the maximum of a low level character (100/78 on the status line). Until something sets it, it is now the
+    // maximum; RecalculateStats lowers it to a maximum that dropped (level, Stamina, armor).
+    private long? _currentCombatStamina;
+    public long CurrentCombatStamina
+    {
+        get => _currentCombatStamina ?? MaxCombatStamina;
+        set => _currentCombatStamina = value;
+    }
+
+    /// <summary>1.3.10 (G6): lowers the fight stamina to the maximum when the maximum is below it.</summary>
+    public void ClampCombatStamina()
+    {
+        if (_currentCombatStamina is long v && v > MaxCombatStamina) _currentCombatStamina = MaxCombatStamina;
+    }
     public long MaxCombatStamina
     {
         get
@@ -2076,6 +2095,10 @@ public class Character
         // 1.3.1: the Wisdom of completed companion griefs, added the same way; never stored
         Wisdom += GriefWisdomNow();
 
+        // 1.3.10: the New Game+ stat unlock (Ocean's Blessing, +15 percent to all stats), the player's only,
+        // before the stats feed HP, mana and defence; never stored
+        if (IsPlayer) ApplyMetaStatMultiplier(UsurperRemake.Systems.MetaProgressionSystem.Instance.GetStatMultiplier());
+
         // Apply stat-based bonuses AFTER equipment (stats may have been modified)
         // Constitution bonus to HP
         MaxHP += StatEffectsSystem.GetConstitutionHPBonus(Constitution, Level);
@@ -2163,6 +2186,17 @@ public class Character
             UsurperRemake.Systems.DebugLogger.Instance.LogDebug("STATS", $"HP clamped: {hpBefore} -> {HP} (MaxHP={MaxHP}, BaseMaxHP={BaseMaxHP})");
         }
         Mana = Math.Min(Mana, MaxMana);
+        ClampCombatStamina();   // 1.3.10 (G6): a maximum that dropped (level, Stamina, armor) lowers the fight stamina too
+    }
+
+    /// <summary>1.3.10: the New Game+ stat unlock on the nine attributes, inside RecalculateStats.</summary>
+    private void ApplyMetaStatMultiplier(float multiplier)
+    {
+        if (multiplier <= 1.0f) return;
+        long Up(long v) => (long)Math.Round(v * (double)multiplier);   // rounded: 1.15f is a hair under 1.15
+        Strength = Up(Strength); Dexterity = Up(Dexterity); Constitution = Up(Constitution);
+        Intelligence = Up(Intelligence); Wisdom = Up(Wisdom); Charisma = Up(Charisma);
+        Defence = Up(Defence); Stamina = Up(Stamina); Agility = Up(Agility);
     }
 
     // 1.2.0: what the last RecalculateStats put in and got out of the god boon segment. Runtime

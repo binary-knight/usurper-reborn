@@ -333,7 +333,7 @@ public class CombatTipKeys139Tests
     [InlineData("fr")]
     [InlineData("hu")]
     [InlineData("it")]
-    public void ATipAboutAnActionTheStandardMenuDoesNotList_NamesNoKey(string lang)
+    public void ATipAboutATactic_NamesNoKey_AndTheStandardMenuListsTheTactic(string lang)
     {
         // a key on the menu is not enough: [I] is on it, but as Use Item, not Disarm
         var hero = Fresh(CharacterClass.Warrior);
@@ -349,7 +349,9 @@ public class CombatTipKeys139Tests
         }
         foreach (var (tip, label) in TipActions)
         {
-            menu.Should().NotContain(Loc.GetIn(lang, label).Trim(), "{0}: the standard menu does not list it, or this tip may name its key", label);
+            // the standard box names Disarm by combat.disarm; combat.disarm_label is the compact menu's short form
+            string boxLabel = label == "combat.disarm_label" ? "combat.disarm" : label;
+            menu.Should().Contain(Loc.GetIn(lang, boxLabel).Trim(), "{0}: from 1.3.10 (G3) the standard menu lists the tactics", label);
             BracketKeys(Loc.GetIn(lang, tip)).Should().BeEmpty("{0} {1}: '{2}'", tip, lang, Loc.GetIn(lang, tip));
         }
         // the potion tip's key is the menu's Use Item row

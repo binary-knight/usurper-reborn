@@ -82,6 +82,12 @@ namespace UsurperRemake.Systems
         // encountered-tracking on the Main Street [P] Progress screen. List of god-type ints.
         public List<int>? OldGodsEncountered { get; set; }
 
+        // 1.3.10: the story chapter (StoryChapter as int), the StoryFlag bits and the major choices. An old save
+        // has none of them and loads at the first chapter with no bits and no choices.
+        public int CurrentChapter { get; set; }
+        public int StoryFlagBits { get; set; }
+        public List<MajorChoiceSaveData> MajorChoices { get; set; } = new();
+
         // God worship - player name -> god name
         public Dictionary<string, string> PlayerGods { get; set; } = new();
 
@@ -185,6 +191,14 @@ namespace UsurperRemake.Systems
         public DateTime LastInteraction { get; set; }
     }
 
+
+    /// <summary>1.3.10: one major story choice as saved (StoryProgressionSystem.MajorChoices).</summary>
+    public class MajorChoiceSaveData
+    {
+        public string ChoiceId { get; set; } = "";
+        public string SelectedOption { get; set; } = "";
+        public int AlignmentImpact { get; set; }
+    }
 
     public class CompanionSaveInfo
     {

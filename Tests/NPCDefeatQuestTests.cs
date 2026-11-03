@@ -110,7 +110,7 @@ public class NPCDefeatQuestTests
         var (hunter, target, _) = Wanted("Race Mark");
         long paid = 0;
         System.Threading.Tasks.Parallel.For(0, 16, _ =>
-            System.Threading.Interlocked.Add(ref paid, QuestSystem.AutoCompleteBountyForNPC(new Character { Name2 = "Racer", Level = 30 }, target.Name)));
+            System.Threading.Interlocked.Add(ref paid, QuestSystem.AutoCompleteBountyForNPC(new Character { Name2 = hunter.Name2, Level = 30 }, target.Name)));   // 1.3.10: the holder's sessions; another player's claimed bounty is not paid to them
         paid.Should().Be(5000);
     }
 

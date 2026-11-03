@@ -75,12 +75,18 @@ namespace UsurperRemake.UI
             terminal.Write(new string(' ', pad) + version);
             terminal.WriteLine("");
             terminal.SetColor("bright_white");
-            string prompt = UsurperRemake.Systems.Loc.Get("splash.press_any_key");
+            // 1.3.10 (play test B13): a session whose pause reads a line (MUD stream: web, telnet, SSH relay, MUD
+            // clients; BBS socket) says Enter; a console or door stdio session takes any one key as before
+            bool needsEnter = terminal is TerminalEmulator te && te.PauseNeedsEnter;
+            string prompt = UsurperRemake.Systems.Loc.Get(needsEnter ? "splash.press_enter" : "splash.press_any_key");
             int promptPad = (80 - prompt.Length) / 2;
             terminal.Write(new string(' ', promptPad) + prompt);
             terminal.SetColor("white");
 
             await terminal.WaitForKey("");
+            // 1.3.10 (play test B13): what was typed at the splash is not an answer to the next prompt (it showed up
+            // as "Your choice: x" on the account menu)
+            if (terminal is TerminalEmulator typed) typed.FlushPendingInput(alsoReaderBuffer: true);
             terminal.ClearScreen();
         }
     }

@@ -355,9 +355,42 @@ public class CombatSingleKeys139Tests
             var speedRow = rows.Single(r => r.Contains("[X]"));
             speedRow.Should().Contain("[X]" + Loc.GetIn(lang, "combat.bbs_speed"), "{0} {1}: the key says what it does", lang, cls);
             speedRow.Length.Should().BeLessThanOrEqualTo(79, "{0} {1} {2} worst={3} pvp={4}: '{5}'", lang, cls, speed, worst, pvp, speedRow);
-            if (!worst && (pvp || cls != CharacterClass.Assassin))   // the Assassin's [K] row made three rows before 1.3.9 too
+            // the Assassin's [K] row made three rows before 1.3.9 too; 1.3.10 (G3): the Barbarian's [G] Rage likewise
+            if (!worst && (pvp || (cls != CharacterClass.Assassin && cls != CharacterClass.Barbarian)))
                 rows.Length.Should().Be(2, "{0} {1} pvp={2}: the usual menu keeps two rows:\n{3}", lang, cls, pvp, text);
         }
+    }
+
+    /// <summary>
+    /// 1.3.10 (G5): every row of the compact menu fits 79 columns in every setup the 1.3.9 c1 measure took (5 languages,
+    /// 5 classes, 3 speeds, typical and full house, dungeon and PvP, owner and follower); the Hungarian full house first
+    /// row was 80.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(LangsData))]
+    public void EveryCompactRow_Fits79Columns_InEveryMeasuredSetup(string lang)
+    {
+        int setups = 0, widest = 0;
+        foreach (var cls in new[] { CharacterClass.Warrior, CharacterClass.Assassin, CharacterClass.Paladin, CharacterClass.Barbarian, CharacterClass.Cleric })
+        foreach (var speed in new[] { CombatSpeed.Normal, CombatSpeed.Fast, CombatSpeed.Instant })
+        foreach (bool worst in new[] { false, true })
+        foreach (bool pvp in new[] { false, true })
+        foreach (bool follower in new[] { false, true })
+        {
+            if (pvp && follower) continue;   // a PvP prompt has no follower
+            var hero = Hero(cls);
+            hero.CombatSpeed = speed;
+            hero.PoisonVials = worst ? 12 : 2;
+            if (worst) { hero.ManaPotions = 14; hero.Healing = 13; hero.HerbHealing = 11; }
+            foreach (var row in Compact(hero, pvp, worst, follower, lang).TrimEnd('\n').Split('\n'))
+            {
+                widest = Math.Max(widest, row.Length);
+                row.Length.Should().BeLessThanOrEqualTo(79, "{0} {1} {2} worst={3} pvp={4} follower={5}: '{6}'", lang, cls, speed, worst, pvp, follower, row);
+            }
+            setups++;
+        }
+        setups.Should().Be(90, "5 classes, 3 speeds, typical and full house, dungeon owner, dungeon follower and PvP");
+        widest.Should().BeGreaterThan(60, "the rows were measured");
     }
 
     [Fact]

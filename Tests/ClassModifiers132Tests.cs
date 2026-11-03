@@ -303,10 +303,17 @@ public class ClassModifiers132Tests
     }
 
     [Fact]
-    public void Rage_G_StaysOutOfTheMenus()
+    public void Rage_G_IsShown_ForABarbarianNotRaging_Only()
     {
+        // 1.3.10 (G3): every dungeon menu lists Rage while the fight prompt takes it (it stayed out of them before)
         foreach (var kind in Kinds)
-            Shows(Menu(Hero(CharacterClass.Barbarian), kind), kind, 'G').Should().BeFalse("{0} menu", kind);
+        {
+            Shows(Menu(Hero(CharacterClass.Barbarian), kind), kind, 'G').Should().BeTrue("{0} menu, a Barbarian", kind);
+            var raging = Hero(CharacterClass.Barbarian);
+            raging.IsRaging = true;
+            Shows(Menu(raging, kind), kind, 'G').Should().BeFalse("{0} menu, already raging", kind);
+            Shows(Menu(Hero(CharacterClass.Warrior), kind), kind, 'G').Should().BeFalse("{0} menu, a Warrior", kind);
+        }
     }
 
     [Fact]

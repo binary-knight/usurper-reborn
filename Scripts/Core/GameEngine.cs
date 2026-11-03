@@ -515,9 +515,7 @@ public partial class GameEngine
             if (altSave != null)
                 WriteMenuKey("2", Loc.Get("engine.menu_play", altSave.PlayerName));
             if (mainSave == null)
-                WriteMenuKey("N", Loc.Get("engine.menu_new_char"));
-            else
-                WriteMenuKey("N", Loc.Get("engine.menu_new_overwrite"));
+                WriteMenuKey("N", Loc.Get("engine.menu_new_char"));   // 1.3.10 (N6): the overwrite is apart, below
             if (canCreateAlt)
                 WriteMenuKey("M", Loc.Get("engine.menu_create_alt"));
             if (altSave != null)
@@ -540,6 +538,12 @@ public partial class GameEngine
 #if !STEAM_BUILD
             WriteMenuKey("@", Loc.Get("engine.menu_support"));
 #endif
+            if (mainSave != null)
+            {
+                terminal.WriteLine("");
+                WriteDangerKey("N", Loc.Get("engine.menu_new_overwrite", mainSave.PlayerName));
+                terminal.WriteLine("");
+            }
             WriteMenuKey("Q", Loc.Get("engine.menu_quit"));
             terminal.WriteLine("");
         }
@@ -557,9 +561,7 @@ public partial class GameEngine
             if (altSave != null)
                 WriteMenuKey("D", Loc.Get("engine.menu_delete_alt_full"));
             if (mainSave == null)
-                WriteMenuKey("N", Loc.Get("engine.menu_create_new"));
-            else
-                WriteMenuKey("N", Loc.Get("engine.menu_new_overwrite_full"));
+                WriteMenuKey("N", Loc.Get("engine.menu_create_new"));   // 1.3.10 (N6): the overwrite is apart, below
             if (showOnline)
                 WriteMenuKey("O", Loc.Get("engine.menu_online_full"));
 
@@ -623,6 +625,16 @@ public partial class GameEngine
                 WriteMenuKey("E", Loc.Get("engine.menu_email"));
             if (isSysOp || isOnlineAdmin)
                 WriteMenuKey("%", isSysOp ? Loc.Get("engine.menu_sysop_console") : Loc.Get("engine.menu_admin_console"));
+            // 1.3.10 (play test N6): starting over deletes the main character, so it is not beside the key that plays it:
+            // its own section at the foot, in red, naming the character; N still asks for DELETE before anything goes
+            if (mainSave != null)
+            {
+                terminal.WriteLine("");
+                terminal.SetColor("darkgray");
+                terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_start_over") : SectionRule("engine.section_start_over_visual"));
+                WriteDangerKey("N", Loc.Get("engine.menu_new_overwrite_full", mainSave.PlayerName));
+                terminal.WriteLine("");
+            }
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("red");
@@ -703,6 +715,7 @@ public partial class GameEngine
                     terminal.SetColor("bright_red");
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("engine.delete_main_warning"));
+                    terminal.WriteLine(Loc.Get("engine.delete_main_named", mainSave.PlayerName, mainSave.Level));   // 1.3.10 (N6)
                     if (altSave != null)
                         terminal.WriteLine(Loc.Get("engine.delete_alt_unaffected"));
                     var confirm = await terminal.GetInput(Loc.Get("engine.delete_confirm_prompt"));
@@ -963,27 +976,40 @@ public partial class GameEngine
     /// </summary>
     internal async Task BeginNewLifeAsync(string accountName)
     {
-        // Preserve player preferences before deleting old save
-        bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
-        bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
-        bool preserveWebMenuKeys = currentPlayer?.WebMenuKeysNeedEnter ?? false; // 1.3.9
-        var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
+        // Preserve player preferences before deleting old save. 1.3.10 (play test G4): CreateNewGame applies them before
+        // its first save; they were restored after it returned, which is after the whole new life was played (it ends
+        // in EnterGameWorld), so the new character was saved and played with the defaults.
+        _keptPrefs = KeptPrefs.Of(currentPlayer);
         // Use the active character key (could be main or alt)
         var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
         var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
         foreach (var save in ngpSaves)
             SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
         await CreateNewGame(activeKey);
-        // Restore preferences that CreateNewGame defaults from CLI flags
-        if (currentPlayer != null)
+    }
+
+    /// <summary>
+    /// 1.3.10 (play test G4): the preferences a character's next life keeps (NG+ and the renounce restart): screen
+    /// reader, menu keys need Enter, web one-key menus and orientation.
+    /// </summary>
+    internal sealed record KeptPrefs(bool ScreenReader, bool MenuKeysNeedEnter, bool WebMenuKeysNeedEnter, SexualOrientation Orientation)
+    {
+        internal static KeptPrefs? Of(Character? c) =>
+            c == null ? null : new KeptPrefs(c.ScreenReaderMode, c.MenuKeysNeedEnter, c.WebMenuKeysNeedEnter, c.Orientation);
+
+        internal void ApplyTo(Character c)
         {
-            currentPlayer.ScreenReaderMode = preserveScreenReader;
-            currentPlayer.Orientation = preserveOrientation;
-            currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
-            currentPlayer.WebMenuKeysNeedEnter = preserveWebMenuKeys; // 1.3.9
-            GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
+            c.ScreenReaderMode = ScreenReader;
+            c.MenuKeysNeedEnter = MenuKeysNeedEnter;
+            c.WebMenuKeysNeedEnter = WebMenuKeysNeedEnter;
+            c.Orientation = Orientation;
+            GameConfig.ScreenReaderMode = ScreenReader;
+            GameConfig.MenuKeysNeedEnter = MenuKeysNeedEnter;
         }
     }
+
+    /// <summary>1.3.10 (play test G4): set by a new-life restart, taken by the next CreateNewGame before its first save.</summary>
+    private KeptPrefs? _keptPrefs;
 
     public void _Ready()
     {
@@ -1437,6 +1463,7 @@ public partial class GameEngine
             if (PendingNewGamePlus)
             {
                 PendingNewGamePlus = false;
+                _keptPrefs = KeptPrefs.Of(currentPlayer);   // 1.3.10 (G4): the single-player NG+ keeps them too
                 await CreateNewGame("");
                 continue;
             }
@@ -3182,6 +3209,7 @@ public partial class GameEngine
                     if (PendingNewGamePlus)
                     {
                         PendingNewGamePlus = false;
+                        _keptPrefs = KeptPrefs.Of(currentPlayer);   // 1.3.10 (G4): this path kept none
                         var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? fileName;
                         var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
                         foreach (var save in ngpSaves)
@@ -5080,6 +5108,7 @@ public partial class GameEngine
         var newCharacter = await CreateNewPlayer(playerName);
         if (newCharacter == null)
         {
+            _keptPrefs = null;   // 1.3.10 (G4): no new life was made
             return; // Player cancelled creation
         }
 
@@ -5111,6 +5140,12 @@ public partial class GameEngine
 
         // v1.1.15: a new character starts with menu keys needing Enter; a prior character's choice does not carry over
         GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
+
+        // 1.3.10 (play test G4): a new life (NG+, the renounce restart) keeps the old character's preferences, from the
+        // first save on
+        var kept = _keptPrefs;
+        _keptPrefs = null;
+        kept?.ApplyTo(currentPlayer);
 
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
@@ -8412,6 +8447,24 @@ public partial class GameEngine
     }
 
     /// <summary>Helper to display a menu key option in the character selection screen.</summary>
+    /// <summary>1.3.10 (play test N6): a menu key that destroys something: red key and label, never the plain style.</summary>
+    private void WriteDangerKey(string key, string label)
+    {
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.WriteLine($"  {key}. {label}", "bright_red");
+            return;
+        }
+        terminal.SetColor("darkgray");
+        terminal.Write("  [");
+        terminal.SetColor("bright_red");
+        terminal.Write(key);
+        terminal.SetColor("darkgray");
+        terminal.Write("] ");
+        terminal.SetColor("red");
+        terminal.WriteLine(label);
+    }
+
     private void WriteMenuKey(string key, string label)
     {
         if (GameConfig.ScreenReaderMode)

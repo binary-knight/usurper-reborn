@@ -890,8 +890,11 @@ public class DailySystemManager
         }
         catch { /* Loan system error */ }
 
-        // Process Quest System daily maintenance
-        QuestSystem.ProcessDailyQuestMaintenance();
+        // Process Quest System daily maintenance. 1.3.10: in the MUD the world reset (WorldSimService) ages every
+        // claimed quest once a day; this ran once per player crossing the boundary, so each player's reset aged
+        // every other player's quests too
+        if (!QuestSystem.WorldResetAgesQuests)
+            QuestSystem.ProcessDailyQuestMaintenance();
         // v1.2: the bank's robbery reserve grows once per day (online: WorldSimService)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
             await BankVaultSystem.DailyRefill();
