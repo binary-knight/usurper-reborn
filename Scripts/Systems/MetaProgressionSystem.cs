@@ -238,6 +238,15 @@ namespace UsurperRemake.Systems
         #region NG+ Bonuses
 
         /// <summary>
+        /// 1.3.10 (supervisor ruling 2026-11-03): the damage, healing, shop, stat, elite, seal and artifact reveal
+        /// unlocks apply only to a character on cycle 2 or later (StoryProgressionSystem.CurrentCycle, per character
+        /// and per session online). A new cycle 1 character made after an ending gets none of them. The unlocks that
+        /// already applied on cycle 1 before 1.3.10 (Fear the Throne, Artifact Hunter, Survivor's Guilt, titles,
+        /// prestige classes) are not gated here.
+        /// </summary>
+        private static bool InNewGamePlus => StoryProgressionSystem.Instance.CurrentCycle >= 2;
+
+        /// <summary>
         /// Get the starting level bonus for NG+
         /// </summary>
         public int GetStartingLevelBonus()
@@ -265,6 +274,7 @@ namespace UsurperRemake.Systems
         public float GetDamageMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("TYRANTS_AURA")) multiplier += 0.15f;
             return multiplier;
         }
@@ -275,6 +285,7 @@ namespace UsurperRemake.Systems
         public float GetHealingMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("HEALING_LIGHT")) multiplier += 0.25f;
             return multiplier;
         }
@@ -301,6 +312,7 @@ namespace UsurperRemake.Systems
         public float GetShopDiscount()
         {
             float discount = 0f;
+            if (!InNewGamePlus) return discount;   // 1.3.10: NG+ characters only
             if (HasBonus("BLESSED_COMMERCE")) discount += 0.10f;
             return discount;
         }
@@ -311,6 +323,7 @@ namespace UsurperRemake.Systems
         public float GetStatMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("OCEANS_BLESSING")) multiplier += 0.15f;
             return multiplier;
         }
@@ -320,7 +333,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool ShouldRevealArtifactLocations()
         {
-            return HasBonus("ARTIFACT_MEMORY");
+            return InNewGamePlus && HasBonus("ARTIFACT_MEMORY");   // 1.3.10: NG+ characters only
         }
 
         /// <summary>
@@ -336,7 +349,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool SealsGiveDoubleBonus()
         {
-            return HasBonus("SEAL_RESONANCE");
+            return InNewGamePlus && HasBonus("SEAL_RESONANCE");   // 1.3.10: NG+ characters only
         }
 
         /// <summary>
@@ -346,6 +359,7 @@ namespace UsurperRemake.Systems
         public float GetRareMonsterMultiplier()
         {
             float multiplier = 1.0f;
+            if (!InNewGamePlus) return multiplier;   // 1.3.10: NG+ characters only
             if (HasBonus("SLAYER")) multiplier += 0.25f;
             return multiplier;
         }

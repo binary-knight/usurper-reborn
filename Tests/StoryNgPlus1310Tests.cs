@@ -97,6 +97,7 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A1_BlessedCommerce_TakesTenPercentOffTheShopPrice()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         DifficultySystem.ApplyShopPriceMultiplier(1000).Should().Be(1000, "no unlock, no discount");
         Unlock("BLESSED_COMMERCE");
         DifficultySystem.ApplyShopPriceMultiplier(1000).Should().BeInRange(899, 900, "the shops that take the difficulty step");
@@ -121,14 +122,120 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A1_TyrantsAura_AddsFifteenPercentDamage()
     {
-        DifficultySystem.ApplyPlayerDamageMultiplier(1000).Should().Be(1000);
+        Story.CurrentCycle = 2;   // an NG+ character
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000, ownDamage: true).Should().Be(1000);
         Unlock("TYRANTS_AURA");
-        DifficultySystem.ApplyPlayerDamageMultiplier(1000).Should().BeInRange(1149, 1150);
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000, ownDamage: true).Should().BeInRange(1149, 1150);
+    }
+
+    [Fact]
+    public void A1_TyrantsAura_LeavesTeammateDamageUnchanged()
+    {
+        Story.CurrentCycle = 2;
+        Unlock("TYRANTS_AURA");
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000, ownDamage: false).Should().Be(1000, "a teammate's damage");
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000).Should().Be(1000, "the one-argument step is the teammate's");
+
+        var src = Src("Scripts", "Systems", "CombatEngine.cs");
+        int tm = src.IndexOf("private async Task ProcessTeammateActionMultiMonster(", StringComparison.Ordinal);
+        int tmEnd = src.IndexOf("\n    private ", tm + 1, StringComparison.Ordinal);
+        var teammate = src.Substring(tm, tmEnd - tm);
+        teammate.Should().Contain("DifficultySystem.ApplyPlayerDamageMultiplier(Math.Max(1, tmPower));");
+        teammate.Should().NotContain("OwnDamage(");
+        var calls = System.Text.RegularExpressions.Regex.Matches(src, @"DifficultySystem\.ApplyPlayerDamageMultiplier\((.*)\);")
+            .Select(m => m.Groups[1].Value).ToList();
+        calls.Should().HaveCount(17);
+        calls.Where(c => c.Contains("OwnDamage(")).Should().HaveCount(16, "every other site asks whose damage it is");
+        src.Should().Contain("private bool OwnDamage(Character attacker) => ReferenceEquals(attacker, currentPlayer);");
+    }
+
+    /// <summary>Every unlock the cycle gate covers, held by a cycle 1 character.</summary>
+    private static readonly string[] Gated =
+        { "BLESSED_COMMERCE", "TYRANTS_AURA", "HEALING_LIGHT", "OCEANS_BLESSING", "SLAYER", "SEAL_RESONANCE", "ARTIFACT_MEMORY" };
+
+    private static void NoGatedBonus(string because)
+    {
+        DifficultySystem.ApplyShopPriceMultiplier(1000).Should().Be(1000, because);
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000, ownDamage: true).Should().Be(1000, because);
+        DifficultySystem.ApplyHealingMultiplier(1000).Should().Be(1000, because);
+        var hero = Hero();
+        hero.RecalculateStats();
+        hero.Strength.Should().Be(100, because);
+        ((double)typeof(MonsterGenerator).GetMethod("EliteRollChance", SNP | SP)!.Invoke(null, new object[] { 40 })!)
+            .Should().Be(GameConfig.EliteChanceFloors31Plus, because);
+        var seal = SevenSealsSystem.Instance.GetAllSeals().First();
+        ((long)typeof(SevenSealsSystem).GetMethod("RewardXPFor", SNP | SP)!.Invoke(null, new object[] { seal })!)
+            .Should().Be(seal.RewardXP, because);
+        ArtifactRows().Should().BeEmpty(because);
+    }
+
+    private static void EveryGatedBonus(string because)
+    {
+        DifficultySystem.ApplyShopPriceMultiplier(1000).Should().BeInRange(899, 900, because);
+        DifficultySystem.ApplyPlayerDamageMultiplier(1000, ownDamage: true).Should().BeInRange(1149, 1150, because);
+        DifficultySystem.ApplyHealingMultiplier(1000).Should().Be(1250, because);
+        var hero = Hero();
+        hero.RecalculateStats();
+        hero.Strength.Should().Be(115, because);
+        ((double)typeof(MonsterGenerator).GetMethod("EliteRollChance", SNP | SP)!.Invoke(null, new object[] { 40 })!)
+            .Should().BeApproximately(GameConfig.EliteChanceFloors31Plus * 1.25, 1e-9, because);
+        var seal = SevenSealsSystem.Instance.GetAllSeals().First();
+        ((long)typeof(SevenSealsSystem).GetMethod("RewardXPFor", SNP | SP)!.Invoke(null, new object[] { seal })!)
+            .Should().Be(seal.RewardXP * 2L, because);
+        ArtifactRows().Should().HaveCount(7, because);
+    }
+
+    [Fact]
+    public void A1_ACycle1CharacterMadeAfterAnEnding_GetsNoneOfTheGatedUnlocks_ACycle2CharacterGetsEach()
+    {
+        Unlock(Gated);
+        Story.CurrentCycle.Should().Be(1, "a new character that is not NG+");
+        NoGatedBonus("a cycle 1 character");
+        Story.CurrentCycle = 2;
+        EveryGatedBonus("a cycle 2 character");
+    }
+
+    [Fact]
+    public void A1_Online_TheGate_ReadsTheSessionsCharacter_AndItsAccountsUnlocks()
+    {
+        MetaProgressionSystem AccountMeta(params string[] bonuses)
+        {
+            var meta = (MetaProgressionSystem)RuntimeHelpers.GetUninitializedObject(typeof(MetaProgressionSystem));
+            var data = new MetaProgressionData();
+            foreach (var b in bonuses) data.UnlockedBonuses.Add(b);
+            typeof(MetaProgressionSystem).GetField("data", F)!.SetValue(meta, data);
+            typeof(MetaProgressionSystem).GetField("saveFilePath", F)!.SetValue(meta, Path.Combine(_dir, "saves", "meta_progression_acct.json"));
+            return meta;
+        }
+        var old = UsurperRemake.Server.SessionContext.Current;
+        try
+        {
+            // the fallback (single-player) story is NG+ and holds every unlock: the session reads neither
+            Story.CurrentCycle = 2;
+            Unlock(Gated);
+            var session = new UsurperRemake.Server.SessionContext { Username = "NgPlusAccount", CharacterKey = "NgPlusAccount" };
+            session.InitializeSystems();
+            session.Story = new StoryProgressionSystem();
+            session.MetaProgression = AccountMeta(Gated);
+            UsurperRemake.Server.SessionContext.Current = session;
+            NoGatedBonus("the session's character is on cycle 1");
+            session.Story.CurrentCycle = 2;
+            EveryGatedBonus("the session's character is on cycle 2 and its account holds the unlocks");
+
+            var other = new UsurperRemake.Server.SessionContext { Username = "OtherAccount", CharacterKey = "OtherAccount" };
+            other.InitializeSystems();
+            other.Story = new StoryProgressionSystem { CurrentCycle = 2 };
+            other.MetaProgression = AccountMeta();
+            UsurperRemake.Server.SessionContext.Current = other;
+            NoGatedBonus("another account's unlocks are not this account's");
+        }
+        finally { UsurperRemake.Server.SessionContext.Current = old; }
     }
 
     [Fact]
     public void A1_HealingLight_AddsTwentyFivePercentHealing()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         DifficultySystem.ApplyHealingMultiplier(1000).Should().Be(1000);
         Unlock("HEALING_LIGHT");
         DifficultySystem.ApplyHealingMultiplier(1000).Should().Be(1250);
@@ -137,6 +244,7 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A1_OceansBlessing_AddsFifteenPercentToThePlayersStats_NotToAnNpc()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         var before = Hero();
         before.RecalculateStats();
         before.Strength.Should().Be(100);
@@ -182,6 +290,7 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A1_Slayer_MakesElitesTwentyFivePercentMoreLikely()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         var roll = Method(typeof(MonsterGenerator), "EliteRollChance", SNP | SP);
         double baseChance = (double)roll.Invoke(null, new object[] { 40 })!;
         baseChance.Should().Be(GameConfig.EliteChanceFloors31Plus);
@@ -197,6 +306,7 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A1_SealResonance_DoublesTheSealExperience()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         var seal = SevenSealsSystem.Instance.GetAllSeals().First();
         var reward = Method(typeof(SevenSealsSystem), "RewardXPFor", SNP | SP);
         ((long)reward.Invoke(null, new object[] { seal })!).Should().Be(seal.RewardXP);
@@ -248,6 +358,7 @@ public class StoryNgPlus1310Tests : IDisposable
     [Fact]
     public void A2_ArtifactMemoryUnlock_AlsoReveals()
     {
+        Story.CurrentCycle = 2;   // an NG+ character
         Unlock("ARTIFACT_MEMORY");
         ArtifactRows().Should().HaveCount(7);
     }

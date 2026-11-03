@@ -275,11 +275,9 @@ public static class DifficultySystem
     public static float GetMonsterDamageMultiplier() => GetMonsterDamageMultiplier(CurrentDifficulty);
 
     /// <summary>
-    /// Get player damage multiplier for current difficulty. 1.3.10: with the New Game+ damage unlock
-    /// (Tyrant's Aura, +15 percent) on top, so every player damage step that takes the difficulty takes it too.
+    /// Get player damage multiplier for current difficulty
     /// </summary>
-    public static float GetPlayerDamageMultiplier() =>
-        GetPlayerDamageMultiplier(CurrentDifficulty) * UsurperRemake.Systems.MetaProgressionSystem.Instance.GetDamageMultiplier();
+    public static float GetPlayerDamageMultiplier() => GetPlayerDamageMultiplier(CurrentDifficulty);
 
     /// <summary>
     /// Check if player can flee for current difficulty
@@ -392,6 +390,16 @@ public static class DifficultySystem
     public static long ApplyPlayerDamageMultiplier(long baseDamage)
     {
         return (long)(baseDamage * GetPlayerDamageMultiplier());
+    }
+
+    /// <summary>
+    /// 1.3.10: the difficulty step, plus the New Game+ damage unlock (Tyrant's Aura, +15 percent) when the damage
+    /// is the player's own (ownDamage). A teammate's damage takes the one-argument step, without the unlock.
+    /// </summary>
+    public static long ApplyPlayerDamageMultiplier(long baseDamage, bool ownDamage)
+    {
+        float unlock = ownDamage ? UsurperRemake.Systems.MetaProgressionSystem.Instance.GetDamageMultiplier() : 1.0f;
+        return (long)(baseDamage * (GetPlayerDamageMultiplier() * unlock));
     }
 
     /// <summary>
