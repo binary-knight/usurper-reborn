@@ -556,6 +556,21 @@ public class WorldPicks1310Tests : IDisposable
         FitsInEnAndHu("petition.dying.legacy_savings", "  ");
     }
 
+    [Fact]
+    public async Task P7_TheMessage_NeverGoesToAStoryNpc()
+    {
+        var hero = Hero();
+        var elder = Npc("fcii_elder", "Fcii Elder", level: 30);
+        elder.Age = 74;
+        var story = Npc("fcii_story", "Fcii Story");
+        story.StoryRole = "Fcii Story Role";   // a story NPC's talk is scripted elsewhere and never reaches the hook
+        var townsfolk = Npc("fcii_townsfolk", "Fcii Townsfolk");
+        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(new[] { elder, story, townsfolk });
+        typeof(NPCPetitionSystem).GetField("_random", F)!.SetValue(NPCPetitionSystem.Instance, new ZeroRandom());
+        await Promise(hero, elder);
+        Field(Messages(hero).Cast<object>().Should().ContainSingle().Subject, "Recipient").Should().Be(townsfolk.Name2);
+    }
+
     private static bool Deliver(Character hero, NPC npc, Screen s)
     {
         var deliver = typeof(NPCPetitionSystem).GetMethod("DeliverDyingMessages", PS);
