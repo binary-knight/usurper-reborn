@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.10 | Fight stamina no longer stands above its maximum after a load or when its maximum drops.
 history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | The character creation screen describes Wisdom as mana pool, cheaper spells and healing, which is what it does.

@@ -1,8 +1,9 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.10 | The dungeon tutorial and the floor change screen state the floor reach rule: how far below your level you may go at each level.
 history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none

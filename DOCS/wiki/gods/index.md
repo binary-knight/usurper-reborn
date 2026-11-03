@@ -1,8 +1,9 @@
 ---
 title: Gods and faith
 path: /wiki/en/gods/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/Character.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.10 | none
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none
