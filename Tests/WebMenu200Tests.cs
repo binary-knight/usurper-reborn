@@ -481,10 +481,13 @@ public class WebMenu200Tests
         var exitGroup = Loc.Get("web.menu.exits");
         items.Where(i => i.Group == exitGroup).Select(i => i.Key).Should().BeEquivalentTo(room.Exits.Keys.Select(k => k.ToString().Substring(0, 1)));
         var actionKeys = items.Where(i => i.Group != exitGroup).Select(i => i.Key).ToList();
-        actionKeys.Should().BeEquivalentTo(CaseLabels("Scripts/Locations/DungeonLocation.cs", "ProcessRoomChoice"),
-            "the action keys are exactly the room handler's cases");
-        var list = (System.Collections.IEnumerable)Invoke(d, typeof(DungeonLocation), "RoomActions", room)!;
-        actionKeys.Should().Equal(list.Cast<object>().Select(a => (string)a.GetType().GetProperty("Key")!.GetValue(a)!), "and they are RoomActions, the list the handler reads");
+        var cases = CaseLabels("Scripts/Locations/DungeonLocation.cs", "ProcessRoomChoice");
+        var list = ((System.Collections.IEnumerable)Invoke(d, typeof(DungeonLocation), "RoomActions", room)!).Cast<object>().ToList();
+        list.Select(a => (string)a.GetType().GetProperty("Key")!.GetValue(a)!).Should().BeEquivalentTo(cases,
+            "RoomActions' keys are exactly the room handler's cases");
+        // 1.3.10 (play test B10): the menu sends the key the room prints (DrawKey: * and % for I and =), a global key
+        actionKeys.Should().Equal(list.Select(a => (string)a.GetType().GetProperty("DrawKey")!.GetValue(a)!), "and they are RoomActions, the list the handler reads");
+        actionKeys.Should().OnlyContain(k => cases.Contains(k) || GlobalKeys.Contains(k), "every listed key is a handler case or a global key");
     }
 
     [Fact]
@@ -502,7 +505,7 @@ public class WebMenu200Tests
         var items = Items(Of(s.Bytes(t), "Client.Menu").Single()).Where(i => i.Group == Loc.Get("web.menu.actions")).ToDictionary(i => i.Key);
         foreach (var k in new[] { "F", "T", "V", "X", "D", "R", "J", "U", "Y" })
             items[k].Enabled.Should().BeFalse("{0} is refused in this room", k);
-        foreach (var k in new[] { "M", "G", "I", "P", "=", "Q" })
+        foreach (var k in new[] { "M", "G", "*", "P", "%", "Q" })   // 1.3.10 (B10): * and %, the keys the room prints
             items[k].Enabled.Should().BeTrue("{0} is always taken", k);
         // the room text draws only what is enabled here
         var text = Plain(s.Bytes(t));
