@@ -519,7 +519,7 @@ const KIND_CASES = [
   ['death', `${H} has passed away peacefully at the age of 81. The soul moves on...`, 'worldsim.news_natural_death'],
   ['death', `⚱ ${H}, a Elf of 80 years, has passed away peacefully. The soul moves on...`, 'news.natural_death'],
   ['death', `${H} has been slain by ${H} and will not return. The realm mourns.`, 'worldsim.news_permadeath'],
-  ['death', `${H} murdered ${H} in cold blood! They will not return.`, 'street_encounter.news.murdered'],
+  ['death', `${H} murdered ${H} in cold blood! The victim will be back, and will remember.`, 'street_encounter.news.murdered'],
   ['gossip', `${H} is telling anyone who'll listen: "${H} got into a brawl with ${H} at the Bank"`, 'worldsim.news_gossip'],
   ['gossip', 'Sister Mercy is telling anyone who\'ll listen: "Whisperwind was slain by Alice at Bank!"', 'gossip that quotes a death'],
   ['gossip', `Dark whispers about ${H} circulate through the taverns`, 'social.news_dark_whispers'],
