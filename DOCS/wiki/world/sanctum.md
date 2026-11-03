@@ -1,8 +1,9 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.10 | none
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none

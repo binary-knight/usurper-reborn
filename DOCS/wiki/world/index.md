@@ -1,8 +1,9 @@
 ---
 title: World and locations
 path: /wiki/en/world/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/MainStreetDistricts.cs
+history: 1.3.10 | Leaving a place you opened from a district brings you back to that district.
 history: 1.3.9 | none
 ---
 Main Street is the hub. Location keys depend on the current district and menu presentation, so read the menu in front of you.

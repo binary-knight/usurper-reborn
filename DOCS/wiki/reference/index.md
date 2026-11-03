@@ -1,8 +1,9 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/WikiDataExporter.cs
+history: 1.3.10 | The generated outpost table lists a potion's price as 1.25 times the town price in place of a floor price.
 history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none

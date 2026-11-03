@@ -1,8 +1,9 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.10 | While Blessed Rain falls, healing HP at the Healer (H and F) is free with no tax, and the menu rows no longer run into each other in any language.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none
