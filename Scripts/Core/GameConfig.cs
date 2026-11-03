@@ -802,6 +802,7 @@ public static partial class GameConfig
     // Court Politics (interactive)
     public const int DismissLoyaltyCost = 15;       // Faction loyalty lost when dismissing a member
     public const int ArrestTrialCost = 500;         // Gold cost to arrest a plotter
+    public const double DetectThreatsPlotChance = 0.5; // 1.3.10: Detect Threats uncovers an active plot on half its casts
     public const int ArrestFactionLoyaltyCost = 20; // Faction loyalty lost when arresting
     public const int PromoteLoyaltyGain = 10;       // Loyalty gained from promotion
     public const int PromoteCost = 1000;            // Gold cost to promote a member

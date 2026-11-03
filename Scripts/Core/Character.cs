@@ -1347,6 +1347,7 @@ public class Character
         return Random.Shared.Next(100) < 25;
     }
     public DateTime LastPartnerBondingUtc { get; set; } = DateTime.MinValue;  // v0.57.7: Wall-clock gate on Home "quality time with partner" rewards (XP/HP/Mana). Shared across dinner/walk/cuddle — one bonding event per 20 real hours. Rage reported "romantic dinner is infinite XP" — was looping Level*50 with no cooldown.
+    public List<DyingMessageSaveData> DyingMessages { get; set; } = new();   // 1.3.10: dying wish messages the player promised to deliver (NPCPetitionSystem)
     public DateTime LastRiteOfReturnUtc { get; set; } = DateTime.MinValue;   // v0.65.6: Wall-clock gate on the Temple's Rite of Return (gold-priced resurrection refill, online permadeath mode). One rite per GameConfig.RiteOfReturnCooldownHours real hours. Wall-clock beats day-counter in MUD mode (v0.57.6 lesson).
     public long LoanAmount { get; set; } = 0;                   // Active loan balance (principal + interest)
     public int LoanDaysRemaining { get; set; } = 0;             // Days until enforcer attack

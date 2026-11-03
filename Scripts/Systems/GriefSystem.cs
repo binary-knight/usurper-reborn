@@ -200,6 +200,23 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.3.10: the player's spouse died away from the player's fights (a permanent death or old age in the
+        /// world, or one found at login): the NPC grief begins for the player, with its Mental loss once per
+        /// death (a grief already begun, as a death in the player's own fight begins it, adds nothing), and a
+        /// line in the player's pending notices. Online it acts only inside the player's session (the world
+        /// simulator has none; the login sync grieves there). Returns true when a grief began.
+        /// </summary>
+        public static bool BeginSpouseGrief(Character? player, string npcId, string npcName, DeathType deathType)
+        {
+            if (player == null || player is NPC) return false;
+            if (UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Server.SessionContext.Current == null) return false;
+            if (!Instance.BeginNpcGrief(npcId, npcName, deathType)) return false;
+            MentalSystem.ApplyNpcGrief(player);
+            GameEngine.PendingNotifications.Enqueue(Loc.Get("grief.spouse_onset", npcName));
+            return true;
+        }
+
+        /// <summary>
         /// Update grief states based on time passed.
         /// v1.1.15: returns the stage each advancing grief entered (one entry per grief that moved),
         /// so the daily reset can apply the Mental change for Depression and Acceptance.

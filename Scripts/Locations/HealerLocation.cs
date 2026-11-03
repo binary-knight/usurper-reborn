@@ -30,6 +30,13 @@ public class HealerLocation : BaseLocation
     // Healing costs
     private const int FullHealCostPerHP = 2;       // Cost per HP restored
 
+    /// <summary>1.3.10: the gold an HP of healing costs here: nothing while Blessed Rain falls.</summary>
+    internal static long HealCostPerHP => WorldEventSystem.Instance.HealingIsFree ? 0 : FullHealCostPerHP;
+
+    /// <summary>1.3.10: a healing price with its taxes; free healing carries no tax (the tax has a 1 gold floor).</summary>
+    private static (long kingTax, long cityTax, long total) Taxed(long price) =>
+        price > 0 ? CityControlSystem.CalculateHealingTaxedPrice(price) : (0, 0, 0);
+
     /// <summary>
     /// Calculate healing potion cost scaled by player level.
     /// Uses GameConfig.HealingPotion* constants so Healer stays in sync with shops and dungeon merchants.
@@ -301,6 +308,13 @@ public class HealerLocation : BaseLocation
                 terminal.WriteLine($"  {Loc.Get("healer.alignment_markup", alignText, (int)((alignmentModifier - 1.0f) * 100))}");
         }
 
+        // 1.3.10: Blessed Rain makes healing free
+        if (WorldEventSystem.Instance.HealingIsFree)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine($"  {Loc.Get("healer.blessed_rain_free")}");
+        }
+
         // Show world event price modifier
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         if (Math.Abs(worldEventModifier - 1.0f) > 0.01f)
@@ -510,17 +524,19 @@ public class HealerLocation : BaseLocation
         }
 
         long hpNeeded = player.MaxHP - player.HP;
-        long maxCost = hpNeeded * FullHealCostPerHP;
-        var (_, _, maxCostWithTax) = CityControlSystem.CalculateHealingTaxedPrice(maxCost);
+        long perHp = HealCostPerHP;   // 1.3.10: 0 while Blessed Rain falls
+        long maxCost = hpNeeded * perHp;
+        var (_, _, maxCostWithTax) = Taxed(maxCost);
         // Calculate effective per-HP cost including taxes for affordability
-        long effectivePerHP = hpNeeded > 0 ? maxCostWithTax / hpNeeded : FullHealCostPerHP;
-        if (effectivePerHP < FullHealCostPerHP) effectivePerHP = FullHealCostPerHP;
+        long effectivePerHP = hpNeeded > 0 ? maxCostWithTax / hpNeeded : perHp;
+        if (effectivePerHP < perHp) effectivePerHP = perHp;
 
         terminal.WriteLine(Loc.Get("healer.how_much_hp"), "cyan");
         terminal.WriteLine(Loc.Get("healer.asks", Manager), "gray");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("shop.healing_cost", hpNeeded, $"{maxCostWithTax:N0}"), "gray");
-        terminal.WriteLine(Loc.Get("healer.base_cost_info", FullHealCostPerHP), "gray");
+        if (perHp == 0) terminal.WriteLine(Loc.Get("healer.blessed_rain_free"), "bright_green");
+        else terminal.WriteLine(Loc.Get("healer.base_cost_info", FullHealCostPerHP), "gray");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("healer.hp_prompt"));
@@ -536,8 +552,8 @@ public class HealerLocation : BaseLocation
         if (hpToHeal > hpNeeded)
             hpToHeal = hpNeeded;
 
-        long cost = hpToHeal * FullHealCostPerHP;
-        var (healKingTax, healCityTax, healTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
+        long cost = hpToHeal * perHp;
+        var (healKingTax, healCityTax, healTotalWithTax) = Taxed(cost);
 
         if (player.Gold < healTotalWithTax)
         {
@@ -548,13 +564,13 @@ public class HealerLocation : BaseLocation
             return;
         }
 
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_healing"), cost);
+        if (cost > 0) CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_healing"), cost);
 
         // Perform healing
         player.Gold -= healTotalWithTax;
         player.Statistics.RecordGoldSpent(healTotalWithTax);
         player.Statistics.RecordHealthRestored(hpToHeal);
-        CityControlSystem.Instance.ProcessSaleTax(cost);
+        if (cost > 0) CityControlSystem.Instance.ProcessSaleTax(cost);
         player.HP += (int)hpToHeal;
         if (player.HP > player.MaxHP) player.HP = player.MaxHP;
 
@@ -595,13 +611,14 @@ public class HealerLocation : BaseLocation
         }
 
         long hpNeeded = player.MaxHP - player.HP;
-        long cost = hpNeeded * FullHealCostPerHP;
-        var (fullHealKingTax, fullHealCityTax, fullHealTotalWithTax) = CityControlSystem.CalculateHealingTaxedPrice(cost);
+        long cost = hpNeeded * HealCostPerHP;   // 1.3.10: 0 while Blessed Rain falls
+        var (fullHealKingTax, fullHealCityTax, fullHealTotalWithTax) = Taxed(cost);
 
         terminal.WriteLine(Loc.Get("healer.full_restore_cost", $"{fullHealTotalWithTax:N0}", Manager), "cyan");
+        if (cost == 0) terminal.WriteLine(Loc.Get("healer.blessed_rain_free"), "bright_green");
         terminal.WriteLine("");
 
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_full_healing"), cost);
+        if (cost > 0) CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("healer.tax_full_healing"), cost);
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (!await terminal.AskYesNoAsync(Loc.Get("healer.proceed_full_heal")))
@@ -622,7 +639,7 @@ public class HealerLocation : BaseLocation
         player.Gold -= fullHealTotalWithTax;
         player.Statistics.RecordGoldSpent(fullHealTotalWithTax);
         player.Statistics.RecordHealthRestored(hpNeeded);
-        CityControlSystem.Instance.ProcessSaleTax(cost);
+        if (cost > 0) CityControlSystem.Instance.ProcessSaleTax(cost);
         player.HP = player.MaxHP;
 
         terminal.WriteLine("");

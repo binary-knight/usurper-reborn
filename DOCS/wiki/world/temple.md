@@ -35,11 +35,11 @@ The Faith room holds the Faith faction's oath and cloister: you join the Faith t
 
 ### What does the Inner Sanctum give
 
-The Inner Sanctum is for members of the Faith: once a day, for {{balance:InnerSanctumCost}} gold, it raises one of nine attributes by 1 for good, chosen at random among Strength, Defense, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution.
+The Inner Sanctum is for members of the Faith: once a day, for {{balance:InnerSanctumCost}} gold, it raises one of nine attributes by 1 for good, chosen at random among Strength, Defense, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution. On a Holy Day (a world event) the meditation is free.
 
 ### Settling a betrayal
 
-While a betrayal can be settled, the Faith room also lists B: forgive a betrayer, take revenge on the Stranger once if she escaped her fight, or, for a companion who left you, make one act of atonement a day for gold. An act of atonement costs 100 gold per character level, at least 100, and counts as a kindness toward that companion's forgiveness. A forgiven companion waits at the Inn with loyalty 50. How resentment builds is on [companions](/wiki/en/combat/companions/#resentment-and-leaving).
+While a betrayal can be settled, the Faith room also lists B: forgive a betrayer, take revenge on the Stranger once if she escaped her fight, or, for a companion who left you, make one act of atonement a day for gold. An act of atonement costs 100 gold per character level, at least 100 (nothing on a Holy Day), and counts as a kindness toward that companion's forgiveness. A forgiven companion waits at the Inn with loyalty 50. How resentment builds is on [companions](/wiki/en/combat/companions/#resentment-and-leaving).
 
 Old Stones holds prophecies and visions. These are story-facing spaces, not a second Favor currency.
 

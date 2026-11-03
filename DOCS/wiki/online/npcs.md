@@ -29,7 +29,7 @@ No. While 3 or fewer NPCs of a race are alive, old age passes them by: an NPC of
 
 ### When an NPC dies of old age
 
-Its spouse is widowed, a player spouse is told, a player's romance with it ends, an NPC on a player's team leaves its gear, items and gold to the team leader, and its children who are left without parents go to the royal orphanage.
+Its spouse is widowed, a player spouse is told and grieves (online at the next login), a player's romance with it ends, an NPC on a player's team leaves its gear, items and gold to the team leader, and its children who are left without parents go to the royal orphanage.
 
 ## Do NPCs come back after they die
 

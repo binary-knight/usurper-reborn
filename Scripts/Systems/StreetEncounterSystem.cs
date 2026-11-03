@@ -3346,7 +3346,7 @@ public class StreetEncounterSystem
 
         if (result.Victory)
         {
-            // === PERMANENT DEATH (deliberate murder = always permadeath) ===
+            // === DEATH (the victim respawns like any NPC; the murder memory and the family grudge stay) ===
             npc.HP = 0;
             if (realNpc != null)
             {
@@ -3434,11 +3434,9 @@ public class StreetEncounterSystem
                 result.GoldGained += bountyReward;
             }
 
-            // === NEWS (permadeath — this one isn't coming back) ===
+            // === NEWS (1.3.10: the line says the victim will be back) ===
             NewsSystem.Instance?.Newsy(
                 "\u2620 " + Loc.Get("street_encounter.news.murdered", player.Name2, npc.Name2 ?? npc.Name));
-
-            // No respawn queue — deliberate murder is always permanent (IsPermaDead blocks respawn)
 
             // === BLOOD PRICE (adjusted by bounty type) ===
             if (realNpc != null)

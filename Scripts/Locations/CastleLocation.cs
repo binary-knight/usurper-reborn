@@ -3208,6 +3208,25 @@ public class CastleLocation : BaseLocation
         await Pacing.Wait(2500);
     }
 
+    /// <summary>1.3.10: the roll of a Detect Threats cast (0 to 1); a test sets it.</summary>
+    internal static Func<double> DetectThreatsRoll = () => Random.Shared.NextDouble();
+
+    /// <summary>
+    /// 1.3.10: Detect Threats uncovers the most advanced plot still secret, as the spymaster's discovery does
+    /// (WorldSimulator.AdvancePlot): the plot is marked discovered (its 7 day lapse starts) and its conspirators
+    /// leave the court. Returns the plot, or null when none is secret.
+    /// </summary>
+    internal static CourtIntrigueSaveData? UncoverPlot(RoyalCourtSaveData court)
+    {
+        var plot = court.ActivePlots.Where(p => !p.IsDiscovered).OrderByDescending(p => p.Progress).FirstOrDefault();
+        if (plot == null) return null;
+        plot.IsDiscovered = true;
+        plot.DaysDiscovered = 0;
+        var conspirators = plot.Conspirators ?? new List<string>();
+        court.CourtMembers.RemoveAll(m => conspirators.Contains(m.Name));
+        return plot;
+    }
+
     private async Task CastDetectThreats()
     {
         if (currentKing.MagicBudget < 500)
@@ -3218,8 +3237,20 @@ public class CastleLocation : BaseLocation
             return;
         }
 
+        // 1.3.10: one roll a cast (outside the change, which a conflict retries) uncovers an active plot
+        bool uncover = DetectThreatsRoll() < GameConfig.DetectThreatsPlotChance;
+        CourtIntrigueSaveData? uncovered = null;
+        bool secretPlots = false;
+
         // v1.1.13: the spell's cost leaves the stored magic budget in one guarded court change
-        if (!await CourtChangeAsync(court => { if (court.MagicBudget < 500) return false; court.MagicBudget -= 500; return true; }))
+        if (!await CourtChangeAsync(court =>
+            {
+                if (court.MagicBudget < 500) return false;
+                court.MagicBudget -= 500;
+                uncovered = uncover ? UncoverPlot(court) : null;
+                secretPlots = court.ActivePlots.Any(p => !p.IsDiscovered);
+                return true;
+            }))
         {
             await ShowCourtChangeFailed();
             return;
@@ -3229,6 +3260,31 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("castle.wizard_gazes"));
         await Pacing.Wait(1500);
+
+        if (uncovered != null)
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("castle.detect_plot_found", PlotTypeLabel(uncovered.PlotType)));
+            terminal.WriteLine(Loc.Get("castle.detect_plotters", string.Join(", ", uncovered.Conspirators)));
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("castle.detect_plot_arrest"));
+            terminal.WriteLine("");
+            string plotKey = uncovered.PlotType switch
+            {
+                "Assassination" => "worldsim.court.plot_discovered.assassination",
+                "Coup" => "worldsim.court.plot_discovered.coup",
+                "Scandal" => "worldsim.court.plot_discovered.scandal",
+                "Sabotage" => "worldsim.court.plot_discovered.sabotage",
+                _ => "worldsim.court.plot_discovered"
+            };
+            NewsSystem.Instance?.Newsy(true, Loc.Get(plotKey, KingTitle(), currentKing.Name));
+        }
+        else if (secretPlots)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("castle.detect_plot_hidden"));
+            terminal.WriteLine("");
+        }
 
         // Get potential threats (high darkness NPCs)
         var threats = NPCSpawnSystem.Instance.ActiveNPCs

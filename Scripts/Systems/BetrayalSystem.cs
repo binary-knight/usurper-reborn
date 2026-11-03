@@ -905,7 +905,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>1.2.8: the gold an act of atonement costs: Math.Max(min cost, cost per level x level).</summary>
         internal static long AtonementCost(Character player) =>
-            Math.Max(GameConfig.BetrayalAtonementMinCost, (long)GameConfig.BetrayalAtonementCostPerLevel * player.Level);
+            WorldEventSystem.Instance.TempleServicesFree ? 0   // 1.3.10: a Holy Day makes the Temple's services free
+            : Math.Max(GameConfig.BetrayalAtonementMinCost, (long)GameConfig.BetrayalAtonementCostPerLevel * player.Level);
 
         /// <summary>1.2.8: an act of atonement was made this game day.</summary>
         internal bool AtonedToday()

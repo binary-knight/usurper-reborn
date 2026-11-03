@@ -1053,6 +1053,7 @@ public class WorldSimulator
             // HandleSpouseBereavement below only fires when married and only handles the spouse case.
             // Keyed on npc.ID, matching the combat path + the affair keys ("marriedNpcId:seducerId").
             // Idempotent for non-romance NPCs.
+            bool playersSpouse = RomanceTracker.Instance?.IsPlayerMarriedTo(npc.ID) == true;   // 1.3.10: read before the release below
             RomanceTracker.Instance?.OnNPCPermadied(npc.ID);
             NPCMarriageRegistry.Instance.OnNPCPermadied(npc.ID);
 
@@ -1066,6 +1067,11 @@ public class WorldSimulator
                 NotifyPlayerSpouseOfDeath(npc, killerName, location);
                 HandleSpouseBereavement(npc);
             }
+
+            // 1.3.10: the player grieves a spouse who died away from the player's fights (after the notice); a fall
+            // in the player's own fight is grieved by CombatEngine.HandleNpcTeammateDeath
+            if (playersSpouse && !atPlayersSide)
+                GriefSystem.BeginSpouseGrief(GameEngine.Instance?.CurrentPlayer, npc.ID, npc.Name2 ?? npc.Name, DeathType.Combat);
 
             // Check if this NPC's children are now orphaned (both parents dead)
             CheckForOrphanedChildren(npc);
@@ -1574,6 +1580,7 @@ public class WorldSimulator
                     // state here too (lover/FWB/affair, not just spouse). Same unconditional call
                     // as the MarkNPCDead permadeath branch -- aging does not route through
                     // MarkNPCDead, so it needs its own hook. Idempotent for non-romance NPCs.
+                    bool playersSpouse = RomanceTracker.Instance?.IsPlayerMarriedTo(npc.ID) == true;   // 1.3.10: read before the release below
                     RomanceTracker.Instance?.OnNPCPermadied(npc.ID);
                     NPCMarriageRegistry.Instance.OnNPCPermadied(npc.ID);
 
@@ -1587,6 +1594,10 @@ public class WorldSimulator
                         NotifyPlayerSpouseOfDeath(npc, null, npc.CurrentLocation, "worldsim.cause_old_age", "worldsim.place_home");
                         HandleSpouseBereavement(npc);
                     }
+
+                    // 1.3.10: the player grieves a spouse who died of old age (after the notice)
+                    if (playersSpouse)
+                        GriefSystem.BeginSpouseGrief(GameEngine.Instance?.CurrentPlayer, npc.ID, npc.Name2 ?? npc.Name, DeathType.Inevitable);
 
                     // v0.61.5: If the deceased was on a player's team, bequeath
                     // their equipment + inventory + gold to the team leader.

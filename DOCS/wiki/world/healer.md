@@ -17,7 +17,7 @@ The Healer treats more than missing HP. Decide whether you need wound treatment,
 
 ## Healer cost for HP
 
-The Healer restores HP for 2 gold per HP before tax. H heals the amount you choose; F heals you to full.
+The Healer restores HP for 2 gold per HP before tax. H heals the amount you choose; F heals you to full. While the Blessed Rain world event lasts, both are free, with no tax.
 
 ## Healer tax
 

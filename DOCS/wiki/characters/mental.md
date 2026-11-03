@@ -105,7 +105,7 @@ From Devout onward, your [god's ward](/wiki/en/gods/favor/) reduces a particular
 
 ## Grief
 
-Grief begins when a story companion, an NPC teammate, a spouse or a lover dies. It passes through stages, and each stage changes your fights until the next one begins:
+Grief begins when a story companion, an NPC teammate, a spouse or a lover dies. A spouse lost away from your fights is grieved too: in single-player at once, online at your next login. A grief passes through stages, and each stage changes your fights until the next one begins:
 
 - Denial, 3 days: 20 percent less damage with basic attacks.
 - Anger, 5 days: 30 percent more damage with basic attacks and 20 percent less Defense against monster hits.

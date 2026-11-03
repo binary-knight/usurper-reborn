@@ -703,6 +703,12 @@ namespace UsurperRemake.Systems
         /// <summary>v1.1.15: true while any active event is a disaster (IsDisaster).</summary>
         public bool HasActiveDisaster => _activeEvents.Any(e => IsDisaster(e.Type));
 
+        /// <summary>1.3.10: true while Blessed Rain falls: HP healing at the Healer is free.</summary>
+        public bool HealingIsFree => _activeEvents.Any(e => e.Type == EventType.BlessedRain);
+
+        /// <summary>1.3.10: true on a Holy Day: the Temple's Cloister meditation and atonement are free.</summary>
+        public bool TempleServicesFree => _activeEvents.Any(e => e.Type == EventType.HolyDay);
+
         /// <summary>
         /// Check if player should take plague damage
         /// </summary>

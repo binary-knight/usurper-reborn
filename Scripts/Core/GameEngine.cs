@@ -1365,13 +1365,20 @@ public partial class GameEngine
                 $"SyncDeadSpouseState: cleared {cleared} stale dead-spouse marriage record(s) for {currentPlayer.Name}");
         }
 
+        var retiredSpouses = new List<(string Id, string Name, bool Aged)>();
         int retired = UsurperRemake.Systems.RomanceTracker.Instance
-            .SyncDeadPartners(NPCSpawnSystem.Instance?.ActiveNPCs);
+            .SyncDeadPartners(NPCSpawnSystem.Instance?.ActiveNPCs, retiredSpouses);
         if (retired > 0)
         {
             UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("ROMANCE",
                 $"SyncDeadPartners: retired {retired} dead/missing partner(s) for {currentPlayer.Name}");
         }
+
+        // 1.3.10: a spouse who died while the player was away is grieved now (online the world simulator has no
+        // session to grieve in)
+        foreach (var (id, name, aged) in retiredSpouses)
+            UsurperRemake.Systems.GriefSystem.BeginSpouseGrief(currentPlayer, id, name,
+                aged ? UsurperRemake.Systems.DeathType.Inevitable : UsurperRemake.Systems.DeathType.Combat);
 
         // Make the correction durable now; neither pass writes to disk itself.
         if (retired > 0 || cleared > 0) _ = SaveCurrentGame();
@@ -6420,6 +6427,8 @@ public partial class GameEngine
         player.ActivePetId = playerData.ActivePetId ?? "";
         player.LastPartnerBondingUtc = playerData.LastPartnerBondingUtc;
         player.LastRiteOfReturnUtc = playerData.LastRiteOfReturnUtc;
+        player.DyingMessages = playerData.DyingMessages?.Select(m => new DyingMessageSaveData { Recipient = m.Recipient, Elder = m.Elder, Gold = m.Gold }).ToList()
+            ?? new List<DyingMessageSaveData>();   // 1.3.10: an old save has none
         player.LoanAmount = playerData.LoanAmount;
         player.LoanDaysRemaining = playerData.LoanDaysRemaining;
         player.LoanInterestAccrued = playerData.LoanInterestAccrued;
