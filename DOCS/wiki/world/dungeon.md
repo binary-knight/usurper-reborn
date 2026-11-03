@@ -70,7 +70,7 @@ With companions or teammates along, entering a new room has a 15% chance that on
 
 ## Dungeon outposts
 
-Four floors have a safe outpost room with no monsters or traps: floors 10, 20, 35 and 65. An outpost can heal, sell supplies and tell its lore; not every outpost does all three.
+Five floors have a safe outpost room with no monsters or traps: floors 10, 20, 35, 65 and 85. An outpost can heal, sell supplies and tell its lore; not every outpost does all three.
 
 {{table:outposts}}
 
@@ -80,7 +80,7 @@ Healing costs (10 + floor x 5) gold times the outpost's price factor, and restor
 
 ### Outpost supplies
 
-Supplies cost their base price times 1 + floor / 10 (the table shows the price on each outpost's floor). A torch heals 10 HP at once, a lockpick gives +2 Dexterity and a smoke bomb +2 Agility for your next fight. At your carrying limit the outpost refuses a potion, antidote or herb and takes no gold.
+A healing or mana potion costs 1.25 times the town price for your level. Other supplies cost their base price times 1 + floor / 10 (the table shows the price on each outpost's floor). A torch heals 10 HP at once, a lockpick gives +2 Dexterity and smoke powder +2 Agility for your next fight; smoke powder is not a smoke bomb and does not help you flee. At your carrying limit the outpost refuses a potion, antidote or herb and takes no gold.
 
 ### Outpost lore
 

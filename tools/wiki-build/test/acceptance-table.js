@@ -536,7 +536,7 @@ module.exports = [
   ["E95","where are the seven seals","/wiki/en/world/dungeon/","Spoiler: seal floors and how to find a seal","fold"],
   ["E96","how do i find the seal on floor 15","/wiki/en/world/dungeon/","Spoiler: seal floors and how to find a seal","fold"],
   ["E97","where are the secret bosses","/wiki/en/monsters/bosses/","Spoiler: secret bosses","fold"],
-  ["E98","which floors have an outpost","/wiki/en/world/dungeon/","Four floors have a safe outpost room with no monsters or traps: floors 10, 20, 35 and 65","first"],
+  ["E98","which floors have an outpost","/wiki/en/world/dungeon/","Five floors have a safe outpost room with no monsters or traps: floors 10, 20, 35, 65 and 85","first"],
   ["E99","how much does healing cost at an outpost","/wiki/en/world/dungeon/","Healing costs (10 + floor x 5) gold times the outpost's price factor","first"],
   ["E100","what level do i need for the swamp","/wiki/en/world/wilderness/","Blackmire Swamp South 20","first"],
   ["E101","how many times a day can i explore the wilderness","/wiki/en/world/wilderness/","You can make 4 exploration trips a day","miss: world/anchor-road/ ranks first"],

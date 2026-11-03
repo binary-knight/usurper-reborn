@@ -717,6 +717,7 @@ namespace UsurperRemake.Systems
         public int SettlementBuffType { get; set; }
         public int SettlementBuffCombats { get; set; }
         public float SettlementBuffValue { get; set; }
+        public int SmugglersCachePurchases { get; set; }   // 1.3.10 (P6)
         public bool SettlementGoldClaimedToday { get; set; }
         public bool SettlementHerbClaimedToday { get; set; }
         public bool SettlementShrineUsedToday { get; set; }

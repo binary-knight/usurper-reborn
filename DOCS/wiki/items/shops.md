@@ -32,7 +32,7 @@ The Weapon and Armor shops build their stock from the same templates as dungeon 
 
 A shop item's list price is its level to the power 1.5, times {{balance:ShopPriceMultiplier}}, times a slot factor, and at least 10 gold. Slot factors: main hand and body 1.0, off hand 0.8, head 0.7, legs 0.65, neck and rings 0.6, arms, hands and feet 0.5, cloak 0.45, waist and face 0.4. A level 20 main hand weapon lists at 26,832 gold, a level 20 helm at 18,782.
 
-The price you pay at the Weapon and Armor shops is the list price times your alignment modifier and any world event modifier, then less a city controller's discount, a Crown member's discount and a god's shop discount, then times the difficulty modifier (with the New Game+ shop discount, 10 percent off on cycle 2 or later after a Savior ending, in the same step), and then the sales tax is added.
+The price you pay at the Weapon and Armor shops is the list price times your alignment modifier and any world event modifier, then less a city controller's discount, a Smugglers' Cache discount, a Crown member's discount and a god's shop discount, then times the difficulty modifier (with the New Game+ shop discount, 10 percent off on cycle 2 or later after a Savior ending, in the same step), and then the sales tax is added.
 
 ### Alignment prices
 
@@ -44,6 +44,7 @@ You are Holy at 800 Chivalry or more with Darkness under 100, and Evil at 800 Da
 
 - Crown faction members pay 5 percent less at rank 0, rising to 15 percent less at rank 8.
 - The member of the team that controls the city pays 10 percent less.
+- With the Outskirts [Smugglers' Cache](/wiki/en/world/settlement/) service, your next 5 purchases in the Weapon, Armor and Magic shops cost 10 percent less, taken after the city controller's discount. Each purchase uses one, a quantity of potions bought at once is one, and auto-buy prices only as many items with it as you have purchases left.
 - Difficulty: Easy x0.85, Normal x1.0, Hard x1.15, Nightmare x1.25.
 - A Troll pays 10 percent less for a weapon at the Weapon Shop, after every other modifier and before the tax, and the Weapon Shop does not haggle with a Troll.
 

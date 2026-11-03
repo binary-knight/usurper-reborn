@@ -968,6 +968,7 @@ public class Character
     public int SettlementBuffType { get; set; }       // 0=None, 1=XPBonus, 2=DefenseBonus
     public int SettlementBuffCombats { get; set; }    // Remaining combats
     public float SettlementBuffValue { get; set; }    // Buff multiplier
+    public int SmugglersCachePurchases { get; set; }  // 1.3.10 (P6): Smugglers' Cache purchases left at the discount
     public bool HasSettlementBuff => SettlementBuffType > 0 && SettlementBuffCombats > 0;
     public bool SettlementGoldClaimedToday { get; set; }
     public bool SettlementHerbClaimedToday { get; set; }
@@ -2778,6 +2779,7 @@ public class Character
     public List<string> ChastisedToday { get; set; } = new();                    // 1.2.0 piece 5b, an immortal: followers chastised today (ImmortalDeedSystem.ChastiseKey); cleared with the deeds
     [System.Text.Json.Serialization.JsonIgnore] public bool MiracleCritPending { get; set; }   // 1.2.0: Valorian's Miracle, the next swing is a critical hit (transient)
     [System.Text.Json.Serialization.JsonIgnore] public bool IsMiracleAlly { get; set; }        // 1.2.0: Sylvana's beast, a teammate for one fight only (transient)
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsSettlementMilitia { get; set; }  // 1.3.10 (P6): the Barracks militia, a teammate for one fight only (transient)
     // 1.2.0 Temple gods piece 4, single-player: standing lost by each god to desecration this week
     // (GodStandingPenalty). Kept for the week GodStandingPenaltyWeek only; online it is in SQL.
     public Dictionary<string, int> GodStandingPenalties { get; set; } = new();

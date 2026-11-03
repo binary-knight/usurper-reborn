@@ -8,13 +8,14 @@ namespace UsurperRemake.Systems;
 /// </summary>
 public static class ShopPricing
 {
-    /// <summary>The price before tax (what haggling starts from and the sale tax is figured on).</summary>
-    public static long Price(Character player, long baseValue, bool weaponShop)
+    /// <summary>The price before tax (what haggling starts from and the sale tax is figured on). cachePurchasesAhead:
+    /// the purchases already planned ahead of this one, for the Smugglers' Cache (CityControlSystem.ApplyDiscount).</summary>
+    public static long Price(Character player, long baseValue, bool weaponShop, int cachePurchasesAhead = 0)
     {
         var alignmentModifier = AlignmentSystem.Instance.GetPriceModifier(player, isShadyShop: false);
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         long price = (long)(baseValue * alignmentModifier * worldEventModifier);
-        price = CityControlSystem.Instance.ApplyDiscount(price, player);
+        price = CityControlSystem.Instance.ApplyDiscount(price, player, cachePurchasesAhead);
         price = (long)(price * FactionSystem.Instance.GetShopPriceModifier());
         if (player.CachedBoonEffects?.ShopDiscountPercent > 0)
             price = (long)(price * (1.0 - player.CachedBoonEffects.ShopDiscountPercent));
@@ -25,6 +26,6 @@ public static class ShopPricing
     }
 
     /// <summary>The price with the king's and the city's tax: what the player pays without haggling.</summary>
-    public static long Total(Character player, long baseValue, bool weaponShop) =>
-        CityControlSystem.CalculateTaxedPrice(Price(player, baseValue, weaponShop)).Item3;
+    public static long Total(Character player, long baseValue, bool weaponShop, int cachePurchasesAhead = 0) =>
+        CityControlSystem.CalculateTaxedPrice(Price(player, baseValue, weaponShop, cachePurchasesAhead)).Item3;
 }

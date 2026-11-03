@@ -6297,6 +6297,7 @@ public partial class GameEngine
         player.SettlementBuffType = playerData.SettlementBuffType;
         player.SettlementBuffCombats = playerData.SettlementBuffCombats;
         player.SettlementBuffValue = playerData.SettlementBuffValue;
+        player.SmugglersCachePurchases = Math.Max(0, playerData.SmugglersCachePurchases);   // 1.3.10 (P6)
         player.SettlementGoldClaimedToday = playerData.SettlementGoldClaimedToday;
         player.SettlementHerbClaimedToday = playerData.SettlementHerbClaimedToday;
         player.SettlementShrineUsedToday = playerData.SettlementShrineUsedToday;

@@ -752,6 +752,7 @@ public class ArmorShopLocation : BaseLocation
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
+        SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
 
         if (canEquipPersonally && !currentPlayer.AutoEquipDisabled)
         {
@@ -1009,7 +1010,7 @@ public class ArmorShopLocation : BaseLocation
             int currentAC = currentPlayer.GetEquipment(slot)?.ArmorClass ?? 0;
             foreach (var armor in AutoBuyOffers(slot, currentAC))
             {
-                long price = AutoBuyPrice(armor);
+                long price = AutoBuyPrice(armor, picks.Count);   // 1.3.10 (P6): a Smugglers' Cache purchase only while one is left
                 var (_, _, total) = CityControlSystem.CalculateTaxedPrice(price);
                 if (total > gold) continue;
                 picks.Add(new AutoBuyPick(slot, armor, price, total, armor.ArmorClass - currentAC));
@@ -1031,8 +1032,10 @@ public class ArmorShopLocation : BaseLocation
             .ThenBy(i => i.Value)
             .ToList();
 
-    /// <summary>1.3.10: an armor's price before tax; (D2) the one shop price, as the direct buy charges it.</summary>
-    private long AutoBuyPrice(Equipment armor) => ShopPricing.Price(currentPlayer, armor.Value, weaponShop: false);
+    /// <summary>1.3.10: an armor's price before tax; (D2) the one shop price, as the direct buy charges it, and (P6) a
+    /// Smugglers' Cache purchase only while one is left for the pieces already picked ahead of it.</summary>
+    private long AutoBuyPrice(Equipment armor, int cachePurchasesAhead = 0) =>
+        ShopPricing.Price(currentPlayer, armor.Value, weaponShop: false, cachePurchasesAhead);
 
     /// <summary>
     /// 1.3.10 (play test N4): auto-buy shows every piece it would buy and the total first, then asks once: buy all,
@@ -1096,6 +1099,7 @@ public class ArmorShopLocation : BaseLocation
             {
                 currentPlayer.Statistics.RecordPurchase(pick.Total);
                 CityControlSystem.Instance.ProcessSaleTax(pick.Price);
+                SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
                 QuestSystem.OnEquipmentPurchased(currentPlayer, pick.Armor);
                 bought++;
                 spent += pick.Total;
@@ -1241,6 +1245,7 @@ public class ArmorShopLocation : BaseLocation
                         {
                             purchased++;
                             CityControlSystem.Instance.ProcessSaleTax(itemPrice); // v1.1.1: after the equip check; a failed equip refunded the price but kept the tax
+                            SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("armor_shop.autobuy_purchased", ItemNames.Display(armor)));
 

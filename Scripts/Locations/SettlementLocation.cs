@@ -792,13 +792,129 @@ public class SettlementLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
+    /// <summary>The item kinds the stall buys: what the Weapon, Armor and Magic shops buy back.</summary>
+    internal static readonly ObjType[] StallSellTypes =
+    {
+        ObjType.Weapon, ObjType.Shield,
+        ObjType.Body, ObjType.Head, ObjType.Arms, ObjType.Hands, ObjType.Legs, ObjType.Feet, ObjType.Waist, ObjType.Face, ObjType.Abody,
+        ObjType.Magic, ObjType.Fingers, ObjType.Neck,
+    };
+
+    /// <summary>
+    /// 1.3.10 (P6): the Market Stall trade (it said "coming in a future update"). Buy healing and mana potions at the
+    /// Healer's price for your level, tax included (the town price), up to what you can carry; sell an identified,
+    /// uncursed weapon, armor piece or accessory from your backpack at the town shops' price, half its value (the
+    /// Shadows fence bonus included). No new item kinds.
+    /// </summary>
     private async Task UseMarketService()
     {
+        while (true)
+        {
+            long heal = GameConfig.GetHealingPotionCost(currentPlayer.Level);
+            long mana = GameConfig.GetManaPotionCost(currentPlayer.Level);
+            var (_, _, healTaxed) = CityControlSystem.CalculateHealingTaxedPrice(heal);
+            var (_, _, manaTaxed) = CityControlSystem.CalculateHealingTaxedPrice(mana);
+
+            terminal.SetColor("bright_yellow");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("settlement.market_desc"));
+            terminal.SetColor("white");
+            StallOption("1", Loc.Get("settlement.market_buy_heal", $"{healTaxed:N0}", currentPlayer.Healing, currentPlayer.MaxPotions));
+            StallOption("2", Loc.Get("settlement.market_buy_mana", $"{manaTaxed:N0}", currentPlayer.ManaPotions, currentPlayer.MaxManaPotions));
+            StallOption("S", Loc.Get("settlement.market_sell"));
+            terminal.SetColor("gray");
+            StallOption("0", Loc.Get("ui.done_shopping"));
+            terminal.SetColor("cyan");
+            terminal.WriteLine(Loc.Get("settlement.your_gold", $"{currentPlayer.Gold:N0}"));
+            terminal.WriteLine("");
+
+            string input = (await GetChoice()).Trim().ToUpperInvariant();
+            if (input == "1") await BuyAtStall(false, heal, healTaxed);
+            else if (input == "2") await BuyAtStall(true, mana, manaTaxed);
+            else if (input == "S") await SellAtStall();
+            else return;
+        }
+    }
+
+    private void StallOption(string key, string label) =>
+        terminal.WriteLine(IsScreenReader ? $"  {key}. {label}" : $"  [{key}] {label}");
+
+    private async Task BuyAtStall(bool manaPotion, long basePrice, long taxedPrice)
+    {
+        string name = Loc.Get(manaPotion ? "world_boss.mana_potion" : "street_encounter.merchant.item.healing_potion");
+        bool full = manaPotion ? currentPlayer.ManaPotions >= currentPlayer.MaxManaPotions : currentPlayer.Healing >= currentPlayer.MaxPotions;
+        if (full)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("settlement.market_full", name));
+        }
+        else if (currentPlayer.Gold < taxedPrice)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("ui.not_enough_gold"));
+        }
+        else
+        {
+            currentPlayer.Gold -= taxedPrice;
+            currentPlayer.Statistics?.RecordPurchase(taxedPrice);
+            CityControlSystem.Instance.ProcessSaleTax(basePrice);
+            if (manaPotion) currentPlayer.ManaPotions++;
+            else currentPlayer.Healing++;
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("settlement.market_bought", name, $"{taxedPrice:N0}"));
+        }
+        await terminal.PressAnyKey();
+    }
+
+    private async Task SellAtStall()
+    {
+        float fence = FactionSystem.Instance.GetFencePriceModifier();
+        var items = currentPlayer.Inventory
+            .Where(i => i != null && i.IsIdentified && !i.IsCursed && StallSellTypes.Contains(i.Type))
+            .ToList();
+        if (items.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("settlement.market_nothing_to_sell"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        long Price(Item item) => (long)((item.Value / 2) * fence);
         terminal.SetColor("bright_yellow");
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("settlement.market_desc"));
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("settlement.market_coming_soon"));
+        terminal.WriteLine(Loc.Get("settlement.market_sell_header"));
+        terminal.SetColor("white");
+        for (int i = 0; i < items.Count; i++)
+        {
+            string prefix = IsScreenReader ? $"  {i + 1}. " : $"  [{i + 1}] ";
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, prefix + Loc.Get("settlement.market_sell_row", ItemNames.Display(items[i]), $"{Price(items[i]):N0}"));
+        }
+        terminal.WriteLine("");
+
+        string input = await terminal.GetInput(Loc.Get("settlement.market_sell_prompt"));
+        if (!int.TryParse(input?.Trim(), out int pick) || pick < 1 || pick > items.Count)
+        {
+            terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
+            return;
+        }
+
+        var item = items[pick - 1];
+        long price = Price(item);
+        string itemName = ItemNames.Display(item);
+        if (!await terminal.AskYesNoAsync(Loc.Get("settlement.market_sell_confirm", itemName, $"{price:N0}")))
+        {
+            terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
+            return;
+        }
+
+        currentPlayer.Inventory.Remove(item);
+        currentPlayer.Gold += price;
+        currentPlayer.Statistics?.RecordSale(price, 1);
+        DebugLogger.Instance.LogInfo("GOLD", $"SETTLEMENT STALL SELL: {currentPlayer.DisplayName} sold {item.Name} for {price:N0}g (gold now {currentPlayer.Gold:N0})");
+        currentPlayer.RecalculateStats();
+        terminal.SetColor("bright_green");
+        terminal.WriteLine(Loc.Get("settlement.market_sold", itemName, $"{price:N0}"));
         await terminal.PressAnyKey();
     }
 
@@ -961,6 +1077,12 @@ public class SettlementLocation : BaseLocation
                 break;
             case "oracles_sanctum":
                 await UseOracleService();
+                break;
+            case "barracks":
+                await UseBarracksService();
+                break;
+            case "smugglers_cache":
+                await UseSmugglersCacheService();
                 break;
             default:
                 terminal.SetColor("gray");
@@ -1236,6 +1358,54 @@ public class SettlementLocation : BaseLocation
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("settlement.gambling_remaining", $"{currentPlayer.Gold:N0}"));
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>1.3.10 (P6): the Barracks. A settler militia fighter joins each of the next fights (SettlementMilitia); it is
+    /// one of the timed settlement buffs, so it waits while another is held.</summary>
+    private async Task UseBarracksService()
+    {
+        if (currentPlayer.HasSettlementBuff)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("ui.settlement_buff_active"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.SettlementBuffType = (int)SettlementBuffType.Militia;
+        currentPlayer.SettlementBuffCombats = GameConfig.SettlementMilitiaFights;
+        currentPlayer.SettlementBuffValue = 0f;
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("settlement.barracks_desc"));
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("settlement.gained_militia", SettlementMilitia.LevelFor(currentPlayer), GameConfig.SettlementMilitiaFights));
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>1.3.10 (P6): the Smugglers' Cache. The next purchases in the town shops cost less (SmugglersCache); it is
+    /// not a timed settlement buff, and a new run starts only when the last one is spent.</summary>
+    private async Task UseSmugglersCacheService()
+    {
+        if (currentPlayer.SmugglersCachePurchases > 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("settlement.cache_still_active", currentPlayer.SmugglersCachePurchases));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.SmugglersCachePurchases = GameConfig.SmugglersCachePurchases;
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("settlement.cache_desc"));
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("settlement.gained_cache", $"{GameConfig.SmugglersCacheDiscount * 100:F0}", GameConfig.SmugglersCachePurchases));
+
         await terminal.PressAnyKey();
     }
 
