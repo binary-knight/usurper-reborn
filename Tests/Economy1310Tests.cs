@@ -685,4 +685,130 @@ public class Economy1310Tests : IDisposable
         string raw = Encoding.UTF8.GetString(output.ToArray());
         raw.Should().Contain("\u001b[37m" + ItemNames.Column(t, 26), "drawn as one the player can buy, not greyed out");
     }
+
+    // ------------------------------------------------------------------ D4: the offline Auction House
+
+    private static (MarketplaceLocation market, TerminalEmulator term, MemoryStream output) Market(Character hero, params string[] lines)
+    {
+        var (term, output) = Term(lines);
+        var market = new MarketplaceLocation();
+        Wire(market, term, hero);
+        return (market, term, output);
+    }
+
+    private static MarketplaceSystem.MarketListing ListByPlayer(Character hero, string itemName, int daysAgo)
+    {
+        var item = new Item { Name = itemName, Value = 50 };
+        MarketplaceSystem.Instance.ListItem(hero.DisplayName, item, 75);
+        var listing = MarketplaceSystem.Instance.Listings.Last();
+        listing.Posted = DateTime.Now.AddDays(-daysAgo);
+        return listing;
+    }
+
+    [Fact]
+    public async Task D4_APlayer_CanWithdrawTheirListing_AndTheItemComesBack()
+    {
+        MarketplaceSystem.Instance.ClearAllListings();
+        try
+        {
+            var hero = Hero("Seller");
+            ListByPlayer(hero, "Withdrawn Ring", 2);
+            var other = new NPC { Name1 = "Vendor", Name2 = "Vendor", Level = 5 };
+            MarketplaceSystem.Instance.NPCListItem(other, new Item { Name = "Vendor Ring", Value = 10 });
+            var (market, term, output) = Market(hero, "1", "", "");
+            (await Choose(market, "W")).Should().BeFalse();
+            hero.Inventory.Should().ContainSingle(i => i.Name == "Withdrawn Ring");
+            MarketplaceSystem.Instance.Listings.Should().ContainSingle(l => l.IsNPCSeller, "only the player's own listing is withdrawn");
+            Plain(term, output).Should().Contain(Loc.Get("marketplace.withdrawn", ItemNames.Display("Withdrawn Ring")));
+        }
+        finally { MarketplaceSystem.Instance.ClearAllListings(); }
+    }
+
+    [Fact]
+    public async Task D4_AnExpiredPlayerListing_ComesBackToTheSeller_NotDestroyed()
+    {
+        MarketplaceSystem.Instance.ClearAllListings();
+        try
+        {
+            var hero = Hero("Expired");
+            ListByPlayer(hero, "Unsold Ring", 31);
+            ListByPlayer(hero, "Fresh Ring", 3);
+            var (market, term, output) = Market(hero, "", "", "");
+            (await Choose(market, "C")).Should().BeFalse();
+            hero.Inventory.Should().ContainSingle(i => i.Name == "Unsold Ring");
+            MarketplaceSystem.Instance.Listings.Should().ContainSingle(l => l.Item.Name == "Fresh Ring");
+            Plain(term, output).Should().Contain(Loc.Get("marketplace.expired_returned", ItemNames.Display("Unsold Ring")));
+        }
+        finally { MarketplaceSystem.Instance.ClearAllListings(); }
+    }
+
+    [Fact]
+    public async Task D4_WithAFullPack_TheExpiredListingStays_UntilThereIsRoom()
+    {
+        MarketplaceSystem.Instance.ClearAllListings();
+        try
+        {
+            var hero = Hero("FullPack");
+            for (int i = 0; i < GameConfig.MaxInventoryItems; i++) hero.Inventory.Add(new Item { Name = "Stone", Value = 1 });
+            ListByPlayer(hero, "Held Ring", 40);
+            var (market, term, output) = Market(hero, "", "", "");
+            await Choose(market, "C");
+            MarketplaceSystem.Instance.Listings.Should().ContainSingle(l => l.Item.Name == "Held Ring", "kept, not destroyed");
+            Plain(term, output).Should().Contain(Loc.Get("marketplace.expired_pack_full"));
+
+            hero.Inventory.RemoveAt(0);
+            var (market2, _, _) = Market(hero, "", "", "");
+            await Choose(market2, "C");
+            hero.Inventory.Should().Contain(i => i.Name == "Held Ring");
+            MarketplaceSystem.Instance.Listings.Should().BeEmpty();
+        }
+        finally { MarketplaceSystem.Instance.ClearAllListings(); }
+    }
+
+    [Fact]
+    public void D4_AnExpiredNpcListing_GoesBackToTheNpcsStock()
+    {
+        MarketplaceSystem.Instance.ClearAllListings();
+        try
+        {
+            var npc = new NPC { Name1 = "Stocker", Name2 = "Stocker", Level = 5, HP = 10, MaxHP = 10 };
+            NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+            _addedNpcs.Add(npc);
+            var item = new Item { Name = "Stock Ring", Value = 10 };
+            MarketplaceSystem.Instance.NPCListItem(npc, item);
+            MarketplaceSystem.Instance.Listings.Single().Posted = DateTime.Now.AddDays(-31);
+            MarketplaceSystem.Instance.CleanupExpiredListings();
+            MarketplaceSystem.Instance.Listings.Should().BeEmpty();
+            npc.MarketInventory.Should().Contain(item);
+        }
+        finally { MarketplaceSystem.Instance.ClearAllListings(); }
+    }
+
+    [Theory]
+    [InlineData("visual")] [InlineData("bbs")] [InlineData("screenreader")]
+    public void D4_EveryAuctionMenu_ShowsTheWithdrawKey(string mode)
+    {
+        var hero = Hero("MenuW");
+        var (market, term, output) = Market(hero);
+        string method = mode switch { "bbs" => "DisplayLocationBBS", "screenreader" => "DisplayLocationSR", _ => "DisplayLocation" };
+        bool sr = GameConfig.ScreenReaderMode;
+        try
+        {
+            typeof(MarketplaceLocation).GetMethod(method, F)!.Invoke(market, null);
+        }
+        finally { GameConfig.ScreenReaderMode = sr; }
+        string shown = Plain(term, output);
+        if (mode == "screenreader") shown.Should().Contain(Loc.Get("marketplace.withdraw"));
+        else if (mode == "bbs") shown.Should().Contain("W").And.Contain(Loc.Get("marketplace.bbs_withdraw"));
+        else shown.Should().Contain("[W]" + Loc.Get("marketplace.menu_withdraw"));
+        foreach (var lang in new[] { "en", "hu" })
+        {
+            string row = " [S]" + Loc.GetIn(lang, "marketplace.menu_status") + "[W]" + Loc.GetIn(lang, "marketplace.menu_withdraw") + "[R]" + Loc.GetIn(lang, "marketplace.menu_return");
+            row.Length.Should().BeLessThanOrEqualTo(79, lang);
+            foreach (var k in new[] { "marketplace.expired_returned", "marketplace.withdrawn" })
+                Loc.GetIn(lang, k, new string('W', 30)).Length.Should().BeLessThanOrEqualTo(79, k);
+            foreach (var k in new[] { "marketplace.expired_pack_full", "marketplace.withdraw_pack_full", "marketplace.withdraw_prompt" })
+                Loc.GetIn(lang, k).Length.Should().BeLessThanOrEqualTo(79, k);
+        }
+    }
 }
