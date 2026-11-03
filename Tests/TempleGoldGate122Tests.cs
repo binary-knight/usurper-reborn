@@ -202,7 +202,8 @@ public class TempleGoldGate122Tests
         var hero = r.Hero;
 
         var output = new MemoryStream();
-        var term = new TerminalEmulator(new LineStream(new[] { "1", "", "", "" }.Concat(Enumerable.Repeat("", 20))), output);
+        // 1.3.10: deed 2 (deed 1, alms to the poor, now costs gold, which this test does not count)
+        var term = new TerminalEmulator(new LineStream(new[] { "2", "", "", "" }.Concat(Enumerable.Repeat("", 20))), output);
         var street = new MainStreetLocation();
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, term);
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(street, hero);

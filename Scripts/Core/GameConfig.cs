@@ -2757,6 +2757,7 @@ public static partial class GameConfig
     public const int DefaultPlayerFights = 3;     // plfights
     public const int DefaultStartingHealing = 20;  // starting potions (scales with level)
     public const int DefaultGoodDeeds = 3;        // chivnr
+    public const int GoodDeedAlmsGoldPerLevel = 20;   // 1.3.10 (P13, his pick): "give gold to the poor" costs level x 20 gold
     public const int DefaultDarkDeeds = 3;        // darknr
     public const int DefaultLoyalty = 50;
     public const int DefaultMentalHealth = 100;
@@ -3373,8 +3374,6 @@ public static partial class GameConfig
     // ═══════════════════════════════════════════════════════════════
     
     // Daily Player Processing (Pascal maintenance formulas)
-    public const int AliveBonus = 100;                    // level * 100 per day alive (nerfed from 350 in v0.30.9)
-    public const long MaxAliveBonus = 1500000000;         // Maximum alive bonus allowed
     public const int DailyDungeonFights = 10;           // Daily dungeon fights reset
     public const int DailyPlayerFights = 3;             // Daily player fights reset
     public const int DefaultTeamFights = 2;               // Daily team fights reset
@@ -3449,12 +3448,9 @@ public static partial class GameConfig
     public const int MaxInactivityDays = 999;             // Maximum inactivity setting
     
     // Bank and Economic Maintenance (Pascal bank system)
-    public const int DefaultBankInterest = 3;             // Default daily interest rate
+    public const int DefaultBankInterest = 3;             // Pascal's rate, kept only in the world save; 1.3.10 (P10): nothing pays it (the bank pays BankLocation.DailyInterestRate)
     public const int MinBankInterest = 1;                 // Minimum interest rate
     public const int MaxBankInterest = 15;                // Maximum interest rate
-    public const int DefaultTownPot = 5000;               // Default town pot value
-    public const int MinTownPot = 100;                    // Minimum town pot
-    public const int MaxTownPot = 500000000;              // Maximum town pot
     
     // Royal System Maintenance (Pascal king system daily resets)
     public const int DailyPrisonSentences = 4;            // King's daily prison sentences

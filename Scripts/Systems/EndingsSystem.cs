@@ -61,6 +61,11 @@ namespace UsurperRemake.Systems
             // Count saved vs destroyed gods (all 6 Old Gods)
             var (savedGods, destroyedGods) = CountGodsByFlags(story);
 
+            // 1.3.10: Manwe's last answer weighs the ending
+            var manweEnding = ManweChoiceEnding(story, alignment, destroyedGods);
+            if (manweEnding != null)
+                return manweEnding.Value;
+
             // Determine ending based on choices
             if (alignment < -300 || destroyedGods >= 5)
             {
@@ -74,6 +79,22 @@ namespace UsurperRemake.Systems
             {
                 return EndingType.Defiant; // Independent path - reject all gods
             }
+        }
+
+        /// <summary>
+        /// 1.3.10: the ending Manwe's answer picks, after Dissolution and the True Ending rules. "Walk away from
+        /// creation" (manwe_ally) is the Defiant ending in every alignment. "Let me take the burden"
+        /// (manwe_compassion, the test won) is the Savior ending, or the Usurper ending when the Usurper test
+        /// already holds (alignment below -300, or 5 or more gods destroyed). Any other answer: null, today's rule.
+        /// </summary>
+        internal static EndingType? ManweChoiceEnding(StoryProgressionSystem? story, long alignment, int destroyedGods)
+        {
+            if (story == null) return null;
+            if (story.HasStoryFlag("manwe_ally"))
+                return EndingType.Defiant;
+            if (story.HasStoryFlag("manwe_compassion"))
+                return alignment < -300 || destroyedGods >= 5 ? EndingType.Usurper : EndingType.Savior;
+            return null;
         }
 
         /// <summary>
@@ -979,6 +1000,23 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.3.10: the story flags of the four moral paradoxes' answers and of Mira's quest choice, in the order the
+        /// ending screen shows their lines. Each flag's line key is ending.echo_ plus the flag.
+        /// </summary>
+        internal static readonly string[] ChoiceEchoFlags =
+        {
+            "killed_possessed_child", "village_consumed", "carries_demon",
+            "lyris_sacrificed_for_veloura", "refused_lyris_sacrifice", "soul_rejected_by_loom",
+            "woke_terravok_early", "let_terravok_sleep", "spoke_to_terravok",
+            "created_paradise", "refused_paradise", "absorbed_world_darkness",
+            "mira_chose_life", "mira_chose_peace", "mira_chose_middle",
+        };
+
+        /// <summary>1.3.10: the line keys for the choices this character made (see ChoiceEchoFlags).</summary>
+        internal static List<string> ChoiceEchoKeys(StoryProgressionSystem story) =>
+            ChoiceEchoFlags.Where(story.HasStoryFlag).Select(f => "ending.echo_" + f).ToList();
+
+        /// <summary>
         /// Show the impact of the player's choices on the world
         /// </summary>
         private async Task ShowWorldImpact(Character player, EndingType ending, StoryProgressionSystem story, TerminalEmulator terminal)
@@ -1029,6 +1067,10 @@ namespace UsurperRemake.Systems
             {
                 Row(terminal, $"  {Loc.Get("ending.world_choices", story.MajorChoices.Count)}", "bright_magenta");
             }
+
+            // 1.3.10: one line for each moral paradox answered and for Mira's choice of mercy
+            foreach (var key in ChoiceEchoKeys(story))
+                Row(terminal, $"  {Loc.Get(key)}", "magenta");
 
             // Ending-specific impact
             switch (ending)

@@ -116,7 +116,35 @@ public class ClassicMainStreetLayout1114Tests
         if (mode == "visual") expected = Regex.Replace(expected, "^╚═+╝\n", "", RegexOptions.Multiline);
         if (tier == 2 && mode == "screenreader") expected = expected.Replace("  H - Home\n", "  H - Home\n  O - Church\n");
         if (tier == 2 && mode == "bbs") expected = expected.Replace("World Events\n", "World Events\n [O] Old Church \n");
+        expected = WithGoodDeeds(expected, tier, mode);
         RenderClassic(level, online, mode).Should().Be(expected);
+    }
+
+    /// <summary>
+    /// 1.3.10 (P13): the classic menu draws G (Good Deeds), which the tagged menu handled but never drew: last in the
+    /// Stats Record row of the visual menu (a row of its own below tier 3), a row of its own above Team Corner (or Quit)
+    /// in the BBS menu, and last in Information for the screen reader (which now has its header at tier 1, as it lists
+    /// more than Status).
+    /// </summary>
+    private static string WithGoodDeeds(string expected, int tier, string mode)
+    {
+        string label = Loc.Get("main_street.good_deeds_title");
+        switch (mode)
+        {
+            case "visual":
+                return tier == 3
+                    ? expected.Replace(" [=]Stats Record [P]Progress\n", $" [=]Stats Record [P]Progress     [G]{label}\n")
+                    : Regex.Replace(expected, @"^( \[S\][^\n]*\n)", $"$1 [G]{label}\n", RegexOptions.Multiline);
+            case "screenreader":
+                if (tier == 1) return expected.Replace("  S - Status\n", $"{Loc.Get("main_street.section_info")}\n  S - Status\n  G - {label}\n");
+                int info = expected.IndexOf(Loc.Get("main_street.section_info") + "\n", StringComparison.Ordinal);
+                int end = expected.IndexOf("\n\n", info, StringComparison.Ordinal) + 1;
+                return expected.Insert(end, $"  G - {label}\n");
+            default:
+                return tier == 3
+                    ? expected.Replace("\n [Z]", $"\n [G]{label}\n [Z]")
+                    : Regex.Replace(expected, @"^( ?\[Q\] Quit)", $" [G]{label}\n$1", RegexOptions.Multiline);
+        }
     }
 
     [Fact]
@@ -153,9 +181,9 @@ public class ClassicMainStreetLayout1114Tests
     public void ClassicMenu_SettlementShowsOnceFounded()
     {
         MainStreetLocation.ClassicShown(MainStreetLocation.ClassicVisualRows[5], new MainStreetLocation.StreetView(3, false, true))
-            .Select(i => i.Key).Should().Equal("=", "P", ">");
+            .Select(i => i.Key).Should().Equal("=", "P", ">", "G");
         MainStreetLocation.ClassicShown(MainStreetLocation.ClassicVisualRows[5], new MainStreetLocation.StreetView(3, false, false))
-            .Select(i => i.Key).Should().Equal("=", "P");
+            .Select(i => i.Key).Should().Equal("=", "P", "G");
     }
 
     // ---------- the classic keys ----------

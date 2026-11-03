@@ -45,9 +45,9 @@ A Bed level multiplies the chance of a child: 15 percent each time with a spouse
 - Trophy Room, 500,000 gold: shows your trophies (T).
 - Study, 750,000 gold: {{percent:StudyXPBonus}} percent more combat experience.
 - Servants' Quarters, 500,000 gold: {{balance:ServantsDailyGoldBase}} + level x {{balance:ServantsDailyGoldPerLevel}} gold each day.
-- Reinforced Door, 250,000 gold: online, lets you sleep at Home safely.
+- Reinforced Door, 250,000 gold, sold online only: lets you sleep at Home safely.
 - Legendary Armory, 2,500,000 gold: +5 permanent damage and +5 permanent defense.
-- Vitality Fountain, 5,000,000 gold: bonus maximum HP equal to 10 percent of your maximum HP when you buy it.
+- Vitality Fountain, 5,000,000 gold: 10 percent more maximum HP, at every level.
 
 ## Marriage
 

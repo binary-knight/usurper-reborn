@@ -36,7 +36,8 @@ public partial class MainStreetLocation
                 CI("F", StreetPlace.Fame, "menu.action.fame"), CI("E", StreetPlace.Explore, "main_street.classic_explore", "bright_green"),
                 CI("$", StreetPlace.WorldEvents, "menu.action.world_events") },
         new[] { CI("=", StreetPlace.StatsRecord, "menu.action.stats_record"), CI("P", StreetPlace.Progress, "menu.action.progress"),
-                CI(">", StreetPlace.Settlement, "menu.action.settlement", "bright_green") },
+                CI(">", StreetPlace.Settlement, "menu.action.settlement", "bright_green"),
+                CI("G", StreetPlace.GoodDeeds, "main_street.good_deeds_title") },   // 1.3.10 (P13): G was handled but never drawn
         new[] { CI("Y", StreetPlace.DarkAlley, "menu.action.dark_alley", "gray"), CI("+", StreetPlace.Sanctum, "menu.action.sanctum", "bright_yellow"),
                 CI("X", StreetPlace.LoveStreet, "menu.action.love_street", "magenta"), CI("Q", null, "menu.action.quit_game", "gray"),
                 CI("~", null, "menu.action.settings", "gray") },
@@ -55,7 +56,8 @@ public partial class MainStreetLocation
             CI("C", StreetPlace.Challenges, "menu.action.challenges"), CI("Z", StreetPlace.TeamCorner, "menu.action.team_corner") }),
         ("main_street.section_info", new[] { CI("S", StreetPlace.Status, "menu.action.status"), CI("N", StreetPlace.News, "menu.action.news"),
             CI("F", StreetPlace.Fame, "menu.action.fame"), CI("$", StreetPlace.WorldEvents, "menu.action.world_events"),
-            CI("=", StreetPlace.StatsRecord, "menu.action.stats_record"), CI("P", StreetPlace.Progress, "menu.action.progress") }),
+            CI("=", StreetPlace.StatsRecord, "menu.action.stats_record"), CI("P", StreetPlace.Progress, "menu.action.progress"),
+            CI("G", StreetPlace.GoodDeeds, "main_street.good_deeds_title") }),
         ("main_street.section_exploration_label", new[] { CI("E", StreetPlace.Explore, "menu.action.wilderness"), CI(">", StreetPlace.Settlement, "menu.action.settlement") }),
         ("main_street.section_other", new[] { CI("Y", StreetPlace.DarkAlley, "menu.action.dark_alley"), CI("+", StreetPlace.Sanctum, "menu.action.sanctum"),
             CI("X", StreetPlace.LoveStreet, "menu.action.love_street"), CI("Q", null, "menu.action.quit"), CI("?", null, "menu.action.help"),
@@ -79,6 +81,7 @@ public partial class MainStreetLocation
                 CI("J", StreetPlace.Auctions, "main_street.menu_auction") },
         new[] { CI("C", StreetPlace.Challenges, "main_street.menu_challenges_suffix"), CI("L", StreetPlace.Lodging, "main_street.menu_lodging_suffix"),
                 CI("=", StreetPlace.StatsRecord, "main_street.menu_stats"), CI("P", StreetPlace.Progress, "main_street.menu_progress_suffix") },
+        new[] { CI("G", StreetPlace.GoodDeeds, "main_street.good_deeds_title") },   // 1.3.10 (P13): a row of its own, so French fits 79
         new[] { CI("Z", StreetPlace.TeamCorner, "main_street.menu_team_corner"), CI(">", StreetPlace.Settlement, "main_street.menu_outskirts", "bright_green") },
     };
 

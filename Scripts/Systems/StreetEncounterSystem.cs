@@ -1038,7 +1038,13 @@ public class StreetEncounterSystem
         if (int.TryParse(choice, out int itemChoice) && itemChoice >= 1 && itemChoice <= items.Count)
         {
             var item = items[itemChoice - 1];
-            if (player.Gold >= item.Price)
+            string? carryFull = MerchantCarryFullLine(player, item.Name);   // 1.3.10 (D3): the carry limit before the charge
+            if (carryFull != null)
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(carryFull);
+            }
+            else if (player.Gold >= item.Price)
             {
                 player.Gold -= item.Price;
                 player.Statistics?.RecordPurchase(item.Price);
@@ -2139,6 +2145,15 @@ public class StreetEncounterSystem
 
         return items;
     }
+
+    /// <summary>
+    /// 1.3.10 (D3): the Healer's line when the potions the merchant sells are already at the carry limit, or null when
+    /// one more fits. Checked before the gold is taken (it was taken and nothing given). A pack that only partly fits
+    /// still sells and gives what fits.
+    /// </summary>
+    internal static string? MerchantCarryFullLine(Character player, string itemName) =>
+        itemName is "Healing Potion" or "Healing Potions (x3)" or "Healing Potions (x5)" && player.Healing >= player.MaxPotions
+            ? Loc.Get("healer.max_potions", player.MaxPotions) : null;
 
     private void ApplyMerchantItem(Character player, MerchantItem item)
     {

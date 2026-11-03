@@ -543,7 +543,7 @@ public class DataItems125Tests
     [InlineData("en")] [InlineData("hu")]
     public void ACursedBagItem_IsTaggedInTheReadersLanguage(string lang)
     {
-        var item = new Item { Name = "Cursed Ring", Cursed = true, Durability = 100 };
+        var item = new Item { Name = "Cursed Ring", Cursed = true };
         InLang(lang, () => item.GetDisplayName())
             .Should().Be($"{Loc.GetIn(lang, "item.cursed_ring")} ({Loc.GetIn(lang, "item.rarity.cursed")})");
         if (lang == "en") InLang(lang, () => item.GetDisplayName()).Should().Be("Cursed Ring (Cursed)", "English is as it was");

@@ -294,9 +294,7 @@ public class HirePrices128Tests
         await WithNpcs(new[] { veteran, senior, other }, async () =>
         {
             var hero = TeamCornerRig.Hero(name: "Old Leader", team: "Old Guard", gold: 10_000);
-            var maint = new MaintenanceSystem(new TerminalUI());
-            var charge = typeof(MaintenanceSystem).GetMethod("ProcessTeamWages", F)!;
-            await (Task)charge.Invoke(maint, new object[] { hero })!;
+            await MaintenanceSystem.ProcessTeamWages(hero);   // 1.3.10 (D1): static, shared by the maintenance pass and each player's reset
             hero.Gold.Should().Be(10_000 - 400 - 3000);
             veteran.Team.Should().Be("Old Guard");
             senior.Team.Should().Be("Old Guard");
@@ -311,8 +309,7 @@ public class HirePrices128Tests
         {
             var hero = TeamCornerRig.Hero(name: "Thin Leader", team: "Thin Purse", gold: 500);
             hero.UnpaidWageDays = new Dictionary<string, int>();
-            var maint = new MaintenanceSystem(new TerminalUI());
-            await (Task)typeof(MaintenanceSystem).GetMethod("ProcessTeamWages", F)!.Invoke(maint, new object[] { hero })!;
+            await MaintenanceSystem.ProcessTeamWages(hero);   // 1.3.10 (D1)
             hero.Gold.Should().Be(100, "400 is charged, where 1,000 would have taken all 500 and left the wage unpaid");
             hero.UnpaidWageDays.Should().BeEmpty();
         });

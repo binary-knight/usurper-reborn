@@ -147,16 +147,15 @@ public class RestWorld125Tests : IDisposable
 
     private static readonly string[] MaintScreenKeys =
     {
-        "maint.header_title", "maint.type_scheduled", "maint.bard_songs", "maint.potions_spoiled", "maint.bank_interest_row",
+        "maint.header_title", "maint.type_scheduled", "maint.bard_songs", "maint.potions_spoiled",
         "maint.royal_processing", "maint.royal_complete", "maint.economy_processing", "maint.economy_complete",
-        "maint.bank_safes_reset", "maint.town_pot", "maint.cleanup_running", "maint.cleanup_complete",
+        "maint.bank_safes_reset", "maint.cleanup_running", "maint.cleanup_complete",
         "maint.inactive_checked", "maint.bounty_updated", "maint.guard_validated", "maint.records_updating",
         "maint.stats_updated", "maint.records_updated", "maint.news_updated",
     };
 
     private static MaintenanceConfig MaintConfig() => new MaintenanceConfig
     {
-        BankInterest = GameConfig.DefaultBankInterest, TownPotValue = GameConfig.DefaultTownPot,
         DungeonFights = GameConfig.DefaultDungeonFights,
     };
 
@@ -179,8 +178,7 @@ public class RestWorld125Tests : IDisposable
             await CallAsync(maint, "ProcessClassSpecificMaintenance", player, config);
             maint.ProcessHealingSpoilage(player);
             await CallAsync(maint, "ProcessRoyalSystem", config);
-            await CallAsync(maint, "ProcessEconomicSystems", config);
-            maint.ApplyBankInterest(player, config);
+            await CallAsync(maint, "ProcessEconomicSystems", config);   // 1.3.10: no bank interest and no town pot rows (P10, P14)
             await CallAsync(maint, "CleanupSystems", config);
             await CallAsync(maint, "UpdateSystemRecords");
             return s.Text;
@@ -206,7 +204,7 @@ public class RestWorld125Tests : IDisposable
         Rows(en).Should().Contain("               U S U R P E R   M A I N T E N A N C E              ");
         en.Should().Contain("Maintenance Type: SCHEDULED").And.Contain($"  {LongName}: Bard songs restored")
             .And.Contain($"  {LongName}: 5 healing potions spoiled").And.Contain("Processing royal system...")
-            .And.Contain("Economic processing complete.").And.Contain($"  Town pot: {GameConfig.DefaultTownPot} gold")
+            .And.Contain("Economic processing complete.")
             .And.Contain("  Royal guard validated").And.Contain("  News files updated");
     }
 
@@ -217,7 +215,6 @@ public class RestWorld125Tests : IDisposable
         {
             var rows = new List<string>
             {
-                "  " + L(lang, "maint.alive_bonus", LongName, 35_000),
                 "  " + L(lang, "maint.team_wages_paid", $"{9_999_999L:N0}", 5),
                 "  " + L(lang, "maint.team_wages_short", $"{9_999_999L:N0}", $"{9_999_998L:N0}"),
                 "  " + L(lang, "maint.npc_left_unpaid", LongName),
@@ -229,12 +226,11 @@ public class RestWorld125Tests : IDisposable
             };
             EveryRowFits(rows, $"maintenance rows ({lang})");
         }
-        NoEnglishLeft(string.Join("\n", new[] { "maint.alive_bonus", "maint.team_wages_paid", "maint.team_wages_short",
+        NoEnglishLeft(string.Join("\n", new[] { "maint.team_wages_paid", "maint.team_wages_short",
             "maint.npc_left_unpaid", "maint.assassin_bonus", "maint.birthday_row", "maint.royal_limits_reset",
             "maint.days_in_power", "maint.type_forced" }.Select(k => L("hu", k, LongName, 5))),
-            new[] { "maint.alive_bonus", "maint.team_wages_paid", "maint.team_wages_short", "maint.npc_left_unpaid",
+            new[] { "maint.team_wages_paid", "maint.team_wages_short", "maint.npc_left_unpaid",
                 "maint.assassin_bonus", "maint.birthday_row", "maint.royal_limits_reset", "maint.days_in_power", "maint.type_forced" });
-        L("en", "maint.alive_bonus", LongName, 5).Should().Be($"{LongName}: Alive bonus +5");
         L("en", "maint.team_wages_short", "10", "3").Should().Be("Team wages: Can't afford 10g! (had 3g)");
     }
 
@@ -245,25 +241,19 @@ public class RestWorld125Tests : IDisposable
         InLang("fr", () =>
         {
             var hu = MaintPlayer("hu");
-            maint.ProcessHealingSpoilage(hu);
-            maint.ApplyBankInterest(hu, MaintConfig());
+            maint.ProcessHealingSpoilage(hu);   // 1.3.10 (P10): the bank interest mail is gone with the hidden interest
             return 0;
         });
         var mails = MailSystem.MailFor(LongName);
-        mails.Should().HaveCount(2);
+        mails.Should().HaveCount(1);
         var potions = mails.Single(m => m.Subject == L("hu", "maint.mail_potions_subject"));
         potions.Sender.Should().Be(L("hu", "mail.sender_system"));
         potions.Lines.Should().Equal(L("hu", "maint.mail_potions_line1"), L("hu", "maint.mail_potions_line2", 5));
-        var interest = mails.Single(m => m.Subject == L("hu", "maint.mail_interest_subject"));
-        interest.Lines.Should().Equal(L("hu", "maint.mail_interest_line1"),
-            L("hu", "maint.mail_interest_line2", 1_000_000L * GameConfig.DefaultBankInterest / 100));
         foreach (var m in mails) EveryRowFits(m.Lines, "maintenance mail (hu)");
         foreach (var lang in AllLanguages)
-            EveryRowFits(new[] { L(lang, "maint.mail_potions_line1"), L(lang, "maint.mail_potions_line2", 999_999),
-                L(lang, "maint.mail_interest_line1"), L(lang, "maint.mail_interest_line2", 999_999_999L) }, $"maintenance mail ({lang})");
+            EveryRowFits(new[] { L(lang, "maint.mail_potions_line1"), L(lang, "maint.mail_potions_line2", 999_999) }, $"maintenance mail ({lang})");
         NoEnglishLeft(string.Join("\n", mails.SelectMany(m => m.Lines.Append(m.Subject))),
-            new[] { "maint.mail_potions_subject", "maint.mail_potions_line1", "maint.mail_potions_line2",
-                "maint.mail_interest_subject", "maint.mail_interest_line1", "maint.mail_interest_line2" });
+            new[] { "maint.mail_potions_subject", "maint.mail_potions_line1", "maint.mail_potions_line2" });
 
         // An English recipient gets the mail as before, from a Hungarian writer
         MailSystem.ClearAllMail();

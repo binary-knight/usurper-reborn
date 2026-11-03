@@ -2676,6 +2676,22 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// 1.3.10: the login failsafe's ending: Manwe resolved (defeated, allied, saved or consumed), the ending
+    /// sequence not finished and the player not immortal give the ending to play now; otherwise null.
+    /// </summary>
+    internal static EndingType? EndingToResumeOnLogin(Character player)
+    {
+        if (player == null || player.IsImmortal) return null;
+        var storySystem = StoryProgressionSystem.Instance;
+        bool manweResolved = storySystem.OldGodStates.TryGetValue(OldGodType.Manwe, out var manweState) &&
+            (manweState.Status == GodStatus.Defeated || manweState.Status == GodStatus.Allied ||
+             manweState.Status == GodStatus.Saved || manweState.Status == GodStatus.Consumed);
+        bool sequenceCompleted = storySystem.HasStoryFlag("ending_sequence_completed");
+        if (!manweResolved || sequenceCompleted) return null;
+        return EndingsSystem.Instance.DetermineEnding(player);
+    }
+
+    /// <summary>
     /// Load game by filename
     /// </summary>
     private async Task LoadSaveByFileName(string fileName)
@@ -3188,13 +3204,8 @@ public partial class GameEngine
             // sequence-not-completed is enough to fire DetermineEnding on login.
             if (currentPlayer != null && !currentPlayer.IsImmortal)
             {
-                var storySystem = StoryProgressionSystem.Instance;
-                bool manweResolved = storySystem.OldGodStates.TryGetValue(OldGodType.Manwe, out var manweState) &&
-                    (manweState.Status == GodStatus.Defeated || manweState.Status == GodStatus.Allied ||
-                     manweState.Status == GodStatus.Saved || manweState.Status == GodStatus.Consumed);
-                bool sequenceCompleted = storySystem.HasStoryFlag("ending_sequence_completed");
-
-                if (manweResolved && !sequenceCompleted)
+                var resumeEnding = EndingToResumeOnLogin(currentPlayer);
+                if (resumeEnding != null)
                 {
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine("");
@@ -3203,7 +3214,7 @@ public partial class GameEngine
                     terminal.WriteLine("");
                     await Pacing.Wait(2000);
 
-                    var endingType = EndingsSystem.Instance.DetermineEnding(currentPlayer);
+                    var endingType = resumeEnding.Value;
                     await EndingsSystem.Instance.TriggerEnding(currentPlayer, endingType, terminal);
 
                     if (PendingNewGamePlus)
@@ -6237,7 +6248,7 @@ public partial class GameEngine
         player.HasReinforcedDoor = playerData.HasReinforcedDoor;
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
-        player.BonusMaxHP = playerData.BonusMaxHP;
+        player.BonusMaxHP = Character.MigratedBonusMaxHP(playerData.HasVitalityFountain, playerData.BonusMaxHP);   // 1.3.10 (P11)
         player.BonusWeapPow = playerData.BonusWeapPow;
         player.BonusArmPow = playerData.BonusArmPow;
         player.HomeRestsToday = playerData.HomeRestsToday;

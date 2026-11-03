@@ -379,7 +379,7 @@ public class ArmorShopLocation : BaseLocation
         int num = 1;
         foreach (var item in pageItems)
         {
-            bool canAfford = currentPlayer.Gold >= item.Value;
+            bool canAfford = currentPlayer.Gold >= ShopPricing.Total(currentPlayer, item.Value, weaponShop: false);   // 1.3.10 (D2)
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
             bool meetsClass = MeetsClass(currentPlayer.Class, item);
             bool canBuy = canAfford && meetsLevel && meetsClass;
@@ -622,24 +622,11 @@ public class ArmorShopLocation : BaseLocation
 
         var item = items[actualIndex];
 
-        // Apply alignment and world event price modifiers
+        // 1.3.10 (D2): the one shop price (alignment, world event, city, faction, boon, difficulty)
         var alignmentModifier = AlignmentSystem.Instance.GetPriceModifier(currentPlayer, isShadyShop: false);
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         var totalModifier = alignmentModifier * worldEventModifier;
-        long adjustedPrice = (long)(item.Value * totalModifier);
-
-        // Apply city control discount if player's team controls the city
-        adjustedPrice = CityControlSystem.Instance.ApplyDiscount(adjustedPrice, currentPlayer);
-
-        // Apply faction discount (The Crown gets 10% off at shops)
-        adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
-
-        // Apply divine boon shop discount
-        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
-            adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
-
-        // Apply difficulty-based price multiplier
-        adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+        long adjustedPrice = ShopPricing.Price(currentPlayer, item.Value, weaponShop: false);
 
         // Calculate total with tax
         var (armorKingTax, armorCityTax, armorTotalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
@@ -1045,15 +1032,10 @@ public class ArmorShopLocation : BaseLocation
             .ThenBy(i => i.Value)
             .ToList();
 
-    /// <summary>1.3.10: an armor's price after the city, faction and boon discounts, before tax (as the per-slot path).</summary>
-    private long AutoBuyPrice(Equipment armor, int cachePurchasesAhead = 0)
-    {
-        long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer, cachePurchasesAhead);
-        itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
-        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
-            itemPrice = (long)(itemPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
-        return itemPrice;
-    }
+    /// <summary>1.3.10: an armor's price before tax; (D2) the one shop price, as the direct buy charges it, and (P6) a
+    /// Smugglers' Cache purchase only while one is left for the pieces already picked ahead of it.</summary>
+    private long AutoBuyPrice(Equipment armor, int cachePurchasesAhead = 0) =>
+        ShopPricing.Price(currentPlayer, armor.Value, weaponShop: false, cachePurchasesAhead);
 
     /// <summary>
     /// 1.3.10 (play test N4): auto-buy shows every piece it would buy and the total first, then asks once: buy all,
@@ -1171,12 +1153,9 @@ public class ArmorShopLocation : BaseLocation
                 .ThenBy(i => i.Value)
                 .ToList();
 
-            // Filter to only affordable items based on current gold (include faction + boon discount)
-            var factionMod = FactionSystem.Instance.GetShopPriceModifier();
-            var boonDiscount = currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0
-                ? (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent) : 1.0;
+            // Filter to only affordable items based on current gold. 1.3.10 (D2): the price it charges, with tax
             var currentlyAffordable = affordableArmor
-                .Where(i => (long)(CityControlSystem.Instance.ApplyDiscount(i.Value, currentPlayer) * factionMod * boonDiscount) <= currentPlayer.Gold)
+                .Where(i => ShopPricing.Total(currentPlayer, i.Value, weaponShop: false) <= currentPlayer.Gold)
                 .ToList();
 
             if (currentlyAffordable.Count == 0)
@@ -1201,12 +1180,7 @@ public class ArmorShopLocation : BaseLocation
             {
                 // Re-check affordability since gold may have changed
                 var armor = currentlyAffordable[armorIndex];
-                long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer);
-                // Apply faction discount (The Crown gets 10% off at shops)
-                itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
-                // Apply divine boon shop discount
-                if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
-                    itemPrice = (long)(itemPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
+                long itemPrice = AutoBuyPrice(armor);   // 1.3.10 (D2): the one shop price
 
                 // Calculate total with tax
                 var (_, _, abItemTotal) = CityControlSystem.CalculateTaxedPrice(itemPrice);

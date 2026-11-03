@@ -168,7 +168,7 @@ public static class DivineBoonRegistry
         new BoonDefinition
         {
             Id = "merchants_favor", Name = "Merchant's Favor", Category = "Economy",
-            Description = "Reduces shop prices",
+            Description = "Reduces weapon and armor shop prices",   // 1.3.10 (D5): read by those two shops only
             Alignments = new[] { "Light", "Balance" }, CostPerTier = 8,
             ShopDiscountPercent = new[] { 0.03f, 0.06f, 0.10f }
         },

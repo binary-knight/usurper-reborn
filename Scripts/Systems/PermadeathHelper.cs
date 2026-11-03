@@ -345,7 +345,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.SetColor("bright_magenta");
                 string heirName = heir.DisplayName ?? heir.Name2 ?? heir.Name1 ?? UsurperRemake.Systems.Loc.Get("permadeath.your_child");
-                terminal.WriteLine(
+                // 1.3.10 (D5): the line says half the gold carried (the bank is not passed on); wrapped at 79
+                UsurperRemake.UI.UIHelper.WriteRow(terminal,
                     $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_estate", heirName, passed)}");
                 await Pacing.Wait(2500);
                 terminal.SetColor("gray");

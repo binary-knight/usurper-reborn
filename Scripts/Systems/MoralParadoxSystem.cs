@@ -55,7 +55,7 @@ namespace UsurperRemake.Systems
             {
                 Id = "possessed_child",
                 TriggerFloor = 25,
-                TriggerChapter = StoryChapter.RisingPower,
+                RequiredSeal = SealType.FirstWar, // 1.3.10: the seal of floor 15, not a chapter
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
@@ -98,8 +98,10 @@ namespace UsurperRemake.Systems
             {
                 Id = "velouras_cure",
                 TriggerFloor = 65,
-                TriggerChapter = StoryChapter.FirstGod,
                 RequiredArtifact = ArtifactType.SoulweaversLoom,
+                RequiredGod = OldGodType.Veloura, // 1.3.10: the Loom comes from her; the cure is for a goddess saved
+                RequiredGodStatus = GodStatus.Saved,
+                RequiresLyris = true, // 1.3.10: the scene is hers; she must travel with the player
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
@@ -139,7 +141,8 @@ namespace UsurperRemake.Systems
             {
                 Id = "free_terravok",
                 TriggerFloor = 80,
-                TriggerChapter = StoryChapter.GodWar,
+                RequiredGod = OldGodType.Terravok, // 1.3.10: offered while he still sleeps
+                RequiredGodStatus = GodStatus.Dormant,
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
@@ -150,7 +153,8 @@ namespace UsurperRemake.Systems
                         DarknessChange = 500,
                         WisdomChange = 3,
                         MassDeaths = 10000,
-                        GodAwakened = OldGodType.Terravok,
+                        // 1.3.10: no GodAwakened. An Awakened god with no save artifact could never be met yet counted
+                        // as resolved, with no saved or destroyed flag for the ending; he is met on floor 95 as usual.
                         StoryFlag = "woke_terravok_early"
                     },
                     new ParadoxOption
@@ -180,7 +184,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "destroy_darkness",
                 TriggerFloor = 95,
-                TriggerChapter = StoryChapter.Ascension,
                 RequiredArtifact = ArtifactType.SunforgedBlade,
                 Choices = new List<ParadoxOption>
                 {
@@ -606,17 +609,33 @@ namespace UsurperRemake.Systems
 
             var story = StoryProgressionSystem.Instance;
 
-            // Check floor requirement
-            // (Would need current floor from dungeon context)
+            // The floor is the caller's: each floor offers only its own paradox (DungeonLocation).
 
-            // Check chapter requirement
-            if (story.CurrentChapter < paradox.TriggerChapter)
+            // Chapter requirement: only the final choice still waits for one (no code offers it)
+            if (paradox.TriggerChapter != null && story.CurrentChapter < paradox.TriggerChapter.Value)
+                return false;
+
+            // 1.3.10: the prerequisites (a seal, an artifact, a god's fate) replace the chapters the
+            // descent never reached
+            if (paradox.RequiredSeal != null && !story.CollectedSeals.Contains(paradox.RequiredSeal.Value))
                 return false;
 
             // Check artifact requirement
             if (paradox.RequiredArtifact != null &&
                 !story.CollectedArtifacts.Contains(paradox.RequiredArtifact.Value))
                 return false;
+
+            if (paradox.RequiredGod != null &&
+                (!story.OldGodStates.TryGetValue(paradox.RequiredGod.Value, out var god) ||
+                 god.Status != paradox.RequiredGodStatus))
+                return false;
+
+            if (paradox.RequiresLyris)
+            {
+                var lyris = CompanionSystem.Instance.GetCompanion(CompanionId.Lyris);
+                if (lyris == null || !lyris.IsRecruited || lyris.IsDead)
+                    return false;
+            }
 
             return true;
         }
@@ -717,8 +736,16 @@ namespace UsurperRemake.Systems
         /// <summary>v1.2.5: shown in the reader's language, from the key built from Id.</summary>
         public string Name => Loc.Get(MoralParadoxSystem.ParadoxKey(Id, "name"));
         public int TriggerFloor { get; set; }
-        public StoryChapter TriggerChapter { get; set; }
+        /// <summary>1.3.10: null for the four floor paradoxes, which wait for their prerequisites instead.</summary>
+        public StoryChapter? TriggerChapter { get; set; }
         public ArtifactType? RequiredArtifact { get; set; }
+        /// <summary>1.3.10: a seal that must be held.</summary>
+        public SealType? RequiredSeal { get; set; }
+        /// <summary>1.3.10: an Old God whose state must be RequiredGodStatus.</summary>
+        public OldGodType? RequiredGod { get; set; }
+        public GodStatus RequiredGodStatus { get; set; }
+        /// <summary>1.3.10: Lyris must travel with the player (recruited and alive).</summary>
+        public bool RequiresLyris { get; set; }
         public string[] Setup => MoralParadoxSystem.Rows(MoralParadoxSystem.ParadoxKey(Id, "setup"));
         public List<ParadoxOption> Choices { get; set; } = new();
         public string[] OceanPhilosophyReflection => MoralParadoxSystem.Rows(MoralParadoxSystem.ParadoxKey(Id, "reflection"));

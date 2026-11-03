@@ -1405,7 +1405,7 @@ namespace UsurperRemake.Systems
         public long BankVaultReserve { get; set; } = GameConfig.BankVaultInitial; // v1.2: single-player robbery reserve; online lives in world_state
         public int BankRobberiesToday { get; set; }        // 1.2.4: single-player robbery attempts counter; online lives in world_state
         public string BankRobberiesDate { get; set; } = ""; // 1.2.4: the day BankRobberiesToday belongs to (yyyy-MM-dd)
-        public int TownPotValue { get; set; }
+        public int TownPotValue { get; set; }   // 1.3.10 (P14): the town pot is gone; kept so old saves and the editor read it, never written
 
         // Political state
         public string? CurrentRuler { get; set; }

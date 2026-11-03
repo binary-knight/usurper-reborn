@@ -15,7 +15,6 @@ namespace UsurperRemake.Locations;
 /// </summary>
 public class MarketplaceLocation : BaseLocation
 {
-    private const int MaxListingAgeDays = 30; // Auto-expire after 30 days
 
     public MarketplaceLocation() : base(GameLocation.AuctionHouse, "Auction House",
         "A grand hall echoes with the cries of auctioneers. Bidders crowd around display cases, inspecting goods with practiced eyes.")
@@ -168,6 +167,16 @@ public class MarketplaceLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write(Loc.Get("marketplace.menu_status"));
 
+        // 1.3.10 (D4): take back a listing
+        terminal.SetColor("darkgray");
+        terminal.Write("[");
+        terminal.SetColor("bright_yellow");
+        terminal.Write("W");
+        terminal.SetColor("darkgray");
+        terminal.Write("]");
+        terminal.SetColor("white");
+        terminal.Write(Loc.Get("marketplace.menu_withdraw"));
+
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor("bright_yellow");
@@ -216,7 +225,7 @@ public class MarketplaceLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("marketplace.bbs_browse")), ("B", "bright_yellow", Loc.Get("marketplace.bbs_buy")), ("A", "bright_yellow", Loc.Get("marketplace.bbs_add")), ("S", "bright_yellow", Loc.Get("marketplace.bbs_status")), ("R", "bright_yellow", Loc.Get("marketplace.bbs_return")));
+        ShowBBSMenuRow(("C", "bright_yellow", Loc.Get("marketplace.bbs_browse")), ("B", "bright_yellow", Loc.Get("marketplace.bbs_buy")), ("A", "bright_yellow", Loc.Get("marketplace.bbs_add")), ("S", "bright_yellow", Loc.Get("marketplace.bbs_status")), ("W", "bright_yellow", Loc.Get("marketplace.bbs_withdraw")), ("R", "bright_yellow", Loc.Get("marketplace.bbs_return")));
 
         ShowBBSFooter();
     }
@@ -240,6 +249,7 @@ public class MarketplaceLocation : BaseLocation
         WriteSRMenuOption("B", Loc.Get("marketplace.buy"));
         WriteSRMenuOption("A", Loc.Get("marketplace.sell"));
         WriteSRMenuOption("S", Loc.Get("marketplace.status"));
+        WriteSRMenuOption("W", Loc.Get("marketplace.withdraw"));
         WriteSRMenuOption("R", Loc.Get("marketplace.return"));
         terminal.WriteLine("");
 
@@ -266,6 +276,9 @@ public class MarketplaceLocation : BaseLocation
             case "S":
                 await ShowStatus();
                 return false;
+            case "W":
+                await WithdrawListing();
+                return false;
             case "R":
             case "Q":
                 await NavigateToLocation(GameLocation.MainStreet);
@@ -275,9 +288,74 @@ public class MarketplaceLocation : BaseLocation
         }
     }
 
-    private async Task ShowBoard()
+    /// <summary>
+    /// 1.3.10 (D4): an unsold listing past 30 days comes back to the seller's pack, one line each; with the pack full it
+    /// stays listed and Grimjaw says so. NPC listings return to the NPC (CleanupExpiredListings).
+    /// </summary>
+    private async Task ReturnExpiredListings()
     {
         MarketplaceSystem.Instance.CleanupExpiredListings();
+        int room = GameConfig.MaxInventoryItems - currentPlayer.Inventory.Count;
+        var back = MarketplaceSystem.Instance.TakeExpiredListings(currentPlayer.DisplayName, room);
+        foreach (var item in back)
+        {
+            currentPlayer.Inventory.Add(item);
+            terminal.WriteLine(Loc.Get("marketplace.expired_returned", item.GetDisplayName()), "yellow");
+        }
+        bool held = MarketplaceSystem.Instance.Listings.Any(l => l.IsExpired && !l.IsNPCSeller && l.Seller == currentPlayer.DisplayName);
+        if (held) terminal.WriteLine(Loc.Get("marketplace.expired_pack_full"), "red");
+        if (back.Count > 0 || held) await terminal.PressAnyKey();
+    }
+
+    /// <summary>1.3.10 (D4): take back one of your own listings; the item returns to the pack (CancelListing had no caller).</summary>
+    private async Task WithdrawListing()
+    {
+        await ReturnExpiredListings();
+        var mine = MarketplaceSystem.Instance.GetAllListings().Where(l => !l.IsNPCSeller && l.Seller == currentPlayer.DisplayName).ToList();
+        if (mine.Count == 0)
+        {
+            terminal.WriteLine(Loc.Get("marketplace.nothing_listed").Trim(), "yellow");
+            await Pacing.Wait(1500);
+            return;
+        }
+        if (currentPlayer.IsInventoryFull)
+        {
+            terminal.WriteLine(Loc.Get("marketplace.withdraw_pack_full"), "red");
+            await Pacing.Wait(1500);
+            return;
+        }
+
+        terminal.ClearScreen();
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("marketplace.your_listings").Trim());
+        terminal.SetColor("white");
+        for (int i = 0; i < mine.Count; i++)
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, $"{i + 1}. {mine[i].Item.GetDisplayName()} -- {Loc.Get("anchor_road.gold_amount", $"{mine[i].Price:N0}")}");
+        var input = await terminal.GetInput(Loc.Get("marketplace.withdraw_prompt"));
+        if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase)) return;
+        if (!int.TryParse(input, out int choice) || choice < 1 || choice > mine.Count)
+        {
+            terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
+            await Pacing.Wait(1500);
+            return;
+        }
+
+        var listing = mine[choice - 1];
+        var item = MarketplaceSystem.Instance.CancelListing(MarketplaceSystem.Instance.Listings.IndexOf(listing), currentPlayer.DisplayName);
+        if (item == null)
+        {
+            terminal.WriteLine(Loc.Get("marketplace.no_longer_available"), "red");
+            await Pacing.Wait(1500);
+            return;
+        }
+        currentPlayer.Inventory.Add(item);
+        terminal.WriteLine(Loc.Get("marketplace.withdrawn", item.GetDisplayName()), "bright_green");
+        await Pacing.Wait(1500);
+    }
+
+    private async Task ShowBoard()
+    {
+        await ReturnExpiredListings();
         terminal.ClearScreen();
 
         WriteBoxHeader(Loc.Get("marketplace.listings"), "bright_cyan", 77);
@@ -343,7 +421,7 @@ public class MarketplaceLocation : BaseLocation
 
     private async Task BuyItem()
     {
-        MarketplaceSystem.Instance.CleanupExpiredListings();
+        await ReturnExpiredListings();
         var listings = MarketplaceSystem.Instance.GetAllListings();
 
         if (listings.Count == 0)
@@ -471,6 +549,7 @@ public class MarketplaceLocation : BaseLocation
 
     private new async Task ShowStatus()
     {
+        await ReturnExpiredListings();
         terminal.ClearScreen();
 
         WriteBoxHeader(Loc.Get("marketplace.your_status"), "bright_cyan", 77);

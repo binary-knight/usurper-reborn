@@ -85,6 +85,6 @@ Enchant costs, limits, failure chances and the materials each enchant needs are 
 
 ## Auctions
 
-Offline, the Auction House lists items at your own price beside listings from NPCs. A listing expires 30 real days after it is posted. An NPC prices its item at 100 to 150 percent of the item's value by its greed, then plus or minus 5 percent.
+Offline, the Auction House lists items at your own price beside listings from NPCs. W takes one of your listings back. A listing unsold 30 real days after it is posted comes back to you when you next visit the Auction House (it waits there while your pack is full); an NPC's goes back to its stock. An NPC prices its item at 100 to 150 percent of the item's value by its greed, then plus or minus 5 percent.
 
 Online, a listing runs 12, 24, 48 or 72 hours for a fee of 5, 4, 3 or 2 percent of your asking price, plus the king's tax percent, at least 1 gold. You can have 5 listings active at once. Check the actual lot before bidding or selling; a template in this wiki is not a promise that it is listed.
