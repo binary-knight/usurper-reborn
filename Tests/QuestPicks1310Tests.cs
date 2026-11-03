@@ -244,6 +244,23 @@ public class QuestPicks1310Tests : IDisposable
         o.GetDisplayDescription().Should().EndWith($"on floor {o.TargetFloor}");
     }
 
+    [Theory]
+    [InlineData(30, 25, "level 30 + 6 is past the Hobgoblin's levels (11 to 25)")]
+    [InlineData(3, 11, "level 3 + 6 is short of them; floor 11 is within level 3's reach of 13")]
+    public void P9_AChampion_IsPlacedWithinItsTiersLevels(int level, int floor, string because)
+    {
+        GodsResolvedThrough(100);
+        var q = ChampionBounty(20, 2);
+        q.MinLevel = 1;
+        var o = Kill(q);
+        string bossName = Loc.GetIn("en", "quest.title.champion", "Hobgoblin");
+        o.TargetId = "hobgoblin";
+        o.TargetName = bossName;
+        o.DescriptionArgs = new List<string> { bossName };
+        QuestSystem.ClaimQuest(Hero("Fbtwo Hob " + level, level), q).Should().Be(QuestClaimResult.CanClaim);
+        o.TargetFloor.Should().Be(floor, because);
+    }
+
     [Fact]
     public void P9_TheFloor_NeverPassesAnOldGodThePlayerHasNotDealtWith()
     {
