@@ -470,7 +470,7 @@ public class Economy1310Tests : IDisposable
         var (term, output) = Term("1", "", "0");
         await Call(Dungeon(term, hero, 10), "SettlementTrade", hero, Settlement());
         hero.Healing.Should().Be(hero.MaxPotions);
-        hero.Gold.Should().Be(10_000 - 25 * 2, "the floor 10 price");
+        hero.Gold.Should().Be(10_000 - GameConfig.GetSettlementHealingPotionCost(hero.Level), "the outpost price (P12: the town price x1.25)");
     }
 
     private static async Task<(Character hero, string shown)> Merchant(long healing, string pick)
@@ -497,7 +497,7 @@ public class Economy1310Tests : IDisposable
 
         var (below, _) = await Merchant(probe.MaxPotions - 1, "1");
         below.Healing.Should().Be(below.MaxPotions, "below the limit the potion is sold");
-        below.Gold.Should().Be(10_000 - (40 + 3 * below.Level));
+        below.Gold.Should().Be(10_000 - GameConfig.GetSettlementHealingPotionCost(below.Level), "the merchant price (P12)");
     }
 
     // ------------------------------------------------------------------ P13: Good Deeds, the bank ban, the Reinforced Door
