@@ -54,7 +54,7 @@ A bounty on an NPC pays its level x 100 x its difficulty in gold, where the diff
 
 ### Crown monster bounties
 
-A monster bounty names a criminal: a Bandit Leader, an Escaped Prisoner, a Cult Leader, a Rogue Mage or an Orc Warlord. Its difficulty is 1 to 4, and you can take it from level 5 x its difficulty. When you take it, the criminal waits in one room of a floor at your level + 3 x difficulty (within the floors you can reach), and the quest names the floor. Killing the criminal completes it. It pays twice the gold or experience of its base tier (low for difficulty 1, medium for 2, high for 3 and 4); potions and Chivalry or Darkness are paid at the base tier.
+A monster bounty asks you to kill one named criminal: a Bandit Leader, an Escaped Prisoner, a Cult Leader, a Rogue Mage or an Orc Warlord. Its difficulty is 1 to 4, and you can take it from level 5 x its difficulty. When you take it, the criminal waits in one room of a floor at your level + 3 x difficulty (within the floors you can reach), and the quest names the floor. Killing the criminal completes it. It pays twice the gold or experience of its base tier (low for difficulty 1, medium for 2, high for 3 and 4); potions and Chivalry or Darkness are paid at the base tier.
 
 ## Royal quests
 
