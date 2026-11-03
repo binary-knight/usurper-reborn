@@ -6237,7 +6237,7 @@ public partial class GameEngine
         player.HasReinforcedDoor = playerData.HasReinforcedDoor;
         player.PermanentDamageBonus = playerData.PermanentDamageBonus;
         player.PermanentDefenseBonus = playerData.PermanentDefenseBonus;
-        player.BonusMaxHP = playerData.BonusMaxHP;
+        player.BonusMaxHP = Character.MigratedBonusMaxHP(playerData.HasVitalityFountain, playerData.BonusMaxHP);   // 1.3.10 (P11)
         player.BonusWeapPow = playerData.BonusWeapPow;
         player.BonusArmPow = playerData.BonusArmPow;
         player.HomeRestsToday = playerData.HomeRestsToday;

@@ -50,7 +50,9 @@ public static class PlayerCharacterLoader
             Specialization = (ClassSpecialization)playerData.Specialization,
             PermanentDamageBonus = playerData.PermanentDamageBonus,
             PermanentDefenseBonus = playerData.PermanentDefenseBonus,
-            BonusMaxHP = playerData.BonusMaxHP,
+            // 1.3.10 (P11): the Fountain of Vitality is a 10 percent multiplier; an old save's flat snapshot is dropped
+            HasVitalityFountain = playerData.HasVitalityFountain,
+            BonusMaxHP = Character.MigratedBonusMaxHP(playerData.HasVitalityFountain, playerData.BonusMaxHP),
             BonusWeapPow = playerData.BonusWeapPow,
             BonusArmPow = playerData.BonusArmPow,
             // 1.2.0: the owner's temporary stat buffs, applied by the recalculation below

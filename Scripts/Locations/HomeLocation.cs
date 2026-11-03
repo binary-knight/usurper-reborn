@@ -4342,10 +4342,12 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.armory_bonus"));
     }
 
+    /// <summary>1.3.10 (P11): the fountain is a 10 percent max HP multiplier in RecalculateStats (it added a flat snapshot).</summary>
     private void ApplyFountainBonus()
     {
-        long hpBonus = currentPlayer.MaxHP / 10;
-        currentPlayer.BonusMaxHP += hpBonus;
+        long before = currentPlayer.MaxHP;
+        currentPlayer.RecalculateStats();
+        long hpBonus = currentPlayer.MaxHP - before;
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("home.fountain_installed"));
         terminal.WriteLine(Loc.Get("home.fountain_hp_bonus", hpBonus));

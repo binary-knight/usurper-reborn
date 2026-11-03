@@ -190,9 +190,7 @@ public class MaintenanceSystem
             DungeonFights = GameConfig.DefaultDungeonFights,
             PlayerFights = GameConfig.DefaultPlayerFights,
             TeamFights = GameConfig.DefaultTeamFights,
-            BankInterest = GameConfig.DefaultBankInterest,
             InactivityDays = GameConfig.DefaultInactivityDays,
-            TownPotValue = GameConfig.DefaultTownPot,
             ResurrectionAllowed = true,
             MaxTime = 999
         };
@@ -228,17 +226,12 @@ public class MaintenanceSystem
     /// </summary>
     private async Task ProcessPlayerDailyMaintenance(Character player, MaintenanceConfig config, bool silent = true)
     {
-        // Player alive bonus (Pascal: level * 350 per day)
-        if (player.HP > 0 && player.AliveBonus < GameConfig.MaxAliveBonus)
-        {
-            var bonus = player.Level * GameConfig.AliveBonus;
-            player.AliveBonus += bonus;
+        // 1.3.10 (P14): the alive bonus counter is gone; nothing ever paid it out.
 
-            WriteIfNotSilent($"  {Loc.Get("maint.alive_bonus", player.Name2, bonus)}", "green");
-        }
-        
-        // NPC team daily wages (v0.30.9)
-        await ProcessTeamWages(player);
+        // NPC team daily wages (v0.30.9). 1.3.10 (D1): online, each player pays at their own daily reset
+        // (DailySystemManager), so this shared pass, which runs once per server day, charges no wages there.
+        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+            await ProcessTeamWages(player, WriteIfNotSilent);
 
         // Class-specific daily processing
         await ProcessClassSpecificMaintenance(player, config);
@@ -283,9 +276,13 @@ public class MaintenanceSystem
     /// <summary>
     /// Process daily NPC team wages - deduct gold for each NPC on the player's team.
     /// NPCs leave after MaxUnpaidWageDays consecutive days without pay, sending a mail.
+    /// 1.3.10 (D1): static, so the online daily reset charges each player at that player's own reset;
+    /// write prints the maintenance rows (the offline pass passes WriteIfNotSilent; online nothing is printed).
     /// </summary>
-    private async Task ProcessTeamWages(Character player)
+    internal static async Task ProcessTeamWages(Character player, Action<string, string>? write = null)
     {
+        void WriteIfNotSilent(string text, string color) => write?.Invoke(text, color);
+
         if (string.IsNullOrEmpty(player.Team)) return;
 
         var allNPCs = NPCSpawnSystem.Instance?.ActiveNPCs;
@@ -521,48 +518,16 @@ public class MaintenanceSystem
     {
         WriteIfNotSilent(Loc.Get("maint.economy_processing"), "white");
 
-        // Bank interest processing
-        await ProcessBankInterest(config);
+        // 1.3.10 (P10): no bank interest here; the bank pays its stated daily rate in BankLocation.ProcessDailyMaintenance.
 
         // Safe value reset (Pascal: Safe_Reset)
         ProcessSafeReset();
 
-        // Town pot management
-        ProcessTownPot(config);
+        // 1.3.10 (P14): the town pot is gone; it only printed a line.
 
         WriteIfNotSilent(Loc.Get("maint.economy_complete"), "green");
         if (!silentMode)
             await Pacing.Wait(500);
-    }
-
-    /// <summary>
-    /// Process bank interest for all accounts
-    /// Pascal: Bank interest calculation
-    /// </summary>
-    private Task ProcessBankInterest(MaintenanceConfig config)
-    {
-        var gameEngine = GameEngine.Instance;
-        if (gameEngine?.CurrentPlayer != null)
-            ApplyBankInterest(gameEngine.CurrentPlayer, config);
-        return Task.CompletedTask;
-    }
-
-    /// <summary>v1.2.5: one player's bank interest and statement mail (split out of ProcessBankInterest).</summary>
-    internal void ApplyBankInterest(Character player, MaintenanceConfig config)
-    {
-        if (player.BankGold <= 0) return;
-
-        var interest = (long)(player.BankGold * config.BankInterest / 100.0);
-        player.BankGold += interest;
-        player.Interest += interest;
-
-        WriteIfNotSilent($"  {Loc.Get("maint.bank_interest_row", interest)}", "green");
-
-        // Send bank statement mail, v1.2.5: in the recipient's language
-        using (Loc.RenderLanguage(RecipientLanguage(player)))
-            MailSystem.SendSystemMail(player.Name2, Loc.Get("maint.mail_interest_subject"),
-                Loc.Get("maint.mail_interest_line1"),
-                Loc.Get("maint.mail_interest_line2", interest));
     }
 
     /// <summary>
@@ -573,16 +538,6 @@ public class MaintenanceSystem
     {
         // Bank safe reset logic (Pascal implementation)
         WriteIfNotSilent($"  {Loc.Get("maint.bank_safes_reset")}", "cyan");
-    }
-    
-    /// <summary>
-    /// Process town pot maintenance
-    /// Pascal: Town pot processing
-    /// </summary>
-    private void ProcessTownPot(MaintenanceConfig config)
-    {
-        // Town pot value maintenance (Pascal implementation)
-        WriteIfNotSilent($"  {Loc.Get("maint.town_pot", config.TownPotValue)}", "white");
     }
     
     /// <summary>
@@ -777,9 +732,7 @@ public class MaintenanceConfig
     public int DungeonFights { get; set; }
     public int PlayerFights { get; set; }
     public int TeamFights { get; set; }
-    public int BankInterest { get; set; }
     public int InactivityDays { get; set; }
-    public int TownPotValue { get; set; }
     public bool ResurrectionAllowed { get; set; }
     public int MaxTime { get; set; }
 } 
