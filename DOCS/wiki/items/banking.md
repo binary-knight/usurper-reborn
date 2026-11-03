@@ -32,7 +32,7 @@ Each daily reset, after the loan grows, an unpaid loan is enforced by its size:
 - Over 10,000: debt collectors deal loan / 500 damage (never killing you), add Darkness and 1 wanted level.
 - Over 25,000: the bank takes gold on hand, up to half the loan.
 - Over 50,000: you lose the bank guard job, gain more Darkness and 3 wanted levels, and lose 50 Chivalry.
-- Over 100,000: the bank refuses you service.
+- Over 100,000: the bank only lets you repay the loan (L).
 
 ## Bank guard job
 

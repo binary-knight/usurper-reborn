@@ -13,7 +13,7 @@
 [0m[37m [90m[90m[[93m[93mK[90m[90m][37m[37mCastle       [90m[90m[[93m[93mH[90m[90m][37m[37mHome         [90m[90m[[93m[93mC[90m[90m][37m[37mChallenges   [90m[90m[[93m[93mL[90m[90m][37m[37mLodging      [90m[90m[[93m[93mZ[90m[90m][37m[37mTeam Corner
 [0m
 [37m [90m[90m[[93m[93mS[90m[90m][37m[37mStatus       [90m[90m[[93m[93mN[90m[90m][37m[37mNews         [90m[90m[[93m[93mF[90m[90m][37m[37mFame         [90m[90m[[93m[93mE[90m[90m][92m[92mWilderness   [90m[90m[[93m[93m$[90m[90m][37m[37mWorld Events
-[0m[37m [90m[90m[[93m[93m=[90m[90m][37m[37mStats Record [90m[90m[[93m[93mP[90m[90m][37m[37mProgress
+[0m[37m [90m[90m[[93m[93m=[90m[90m][37m[37mStats Record [90m[90m[[93m[93mP[90m[90m][37m[37mProgress     [90m[90m[[93m[93mG[90m[90m][37m[37mGood Deeds
 [0m[37m [90m[90m[[93m[93mY[90m[90m][90m[90mDark Alley   [90m[90m[[93m[93m+[90m[90m][93m[93mThe Sanctum  [90m[90m[[93m[93mX[90m[90m][35m[35mLove Street  [90m[90m[[93m[93mQ[90m[90m][90m[90mQuit Game    [90m[90m[[93m[93m~[90m[90m][90m[90mSettings
 [0m
 [37m
@@ -23,6 +23,7 @@
 [90m[90m [[93m[93mN[90m[90m][37m[37m News       [90m[90m[[93m[93mF[90m[90m][37m[37m Fame       [90m[90m[[93m[93mE[90m[90m][92m[92m Explore    [90m[90m[[93m[93m$[90m[90m][37m[37m World Events
 [90m[90m [[93m[93mY[90m[90m][90m[90mDark Alley [90m[90m[[93m[93m+[90m[90m][93m[93mSanctum [90m[90m[[93m[93mX[90m[90m][35m[35mLove St    [90m[90m[[93m[93mO[90m[90m][37m[37m Old Church [90m[90m[[93m[93mJ[90m[90m][37m[37mAuction
 [90m[90m [[93m[93mC[90m[90m][37m[37m Challenges [90m[90m[[93m[93mL[90m[90m][37m[37m Lodging    [90m[90m[[93m[93m=[90m[90m][37m[37mStats      [90m[90m[[93m[93mP[90m[90m][37m[37m Progress
+[90m[90m [[93m[93mG[90m[90m][37m[37mGood Deeds
 [90m[90m [[93m[93mZ[90m[90m][37m[37mTeam Corner
 [90m[90m[[93m[93mQ[90m[90m][90m[90m Quit       [90m[90m[[93m[93m~[90m[90m][90m[90mSettings
 [0m[2J[H���Room.Info {"num":"q1","name":"Room q1","area":"Dungeon Floor 6","exits":{"north":"c2","east":"u3","west":"e4","south":"h5"}}��[90m[90m╔═══════════════════════════════════════════════════════╗

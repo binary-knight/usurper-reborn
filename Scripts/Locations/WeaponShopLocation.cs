@@ -449,7 +449,7 @@ public class WeaponShopLocation : BaseLocation
         int num = 1;
         foreach (var item in pageItems)
         {
-            bool canAfford = currentPlayer.Gold >= item.Value;
+            bool canAfford = currentPlayer.Gold >= ShopPricing.Total(currentPlayer, item.Value, weaponShop: true);   // 1.3.10 (D2)
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
             bool meetsClass = MeetsClass(currentPlayer.Class, item);
             bool canBuy = canAfford && meetsLevel && meetsClass;
@@ -724,26 +724,10 @@ public class WeaponShopLocation : BaseLocation
 
         var item = items[actualIndex];
 
-        // Apply alignment and world event price modifiers
+        // 1.3.10 (D2): the one shop price (alignment, world event, city, faction, boon, difficulty, Troll)
         var alignmentModifier = AlignmentSystem.Instance.GetPriceModifier(currentPlayer, isShadyShop: false);
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
-        long adjustedPrice = (long)(item.Value * alignmentModifier * worldEventModifier);
-
-        // Apply city control discount if player's team controls the city
-        adjustedPrice = CityControlSystem.Instance.ApplyDiscount(adjustedPrice, currentPlayer);
-
-        // Apply faction discount (The Crown gets 10% off at shops)
-        adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
-
-        // Apply divine boon shop discount
-        if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
-            adjustedPrice = (long)(adjustedPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
-
-        // Apply difficulty-based price multiplier
-        adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
-
-        // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
-        adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
+        long adjustedPrice = ShopPricing.Price(currentPlayer, item.Value, weaponShop: true);
 
         // Calculate total with tax
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
@@ -1450,7 +1434,7 @@ public class WeaponShopLocation : BaseLocation
             .Concat(EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded))
             .Where(w => w.WeaponPower > currentPow)
             .Where(w => w.CanEquip(currentPlayer, out _))
-            .Where(w => w.Value <= currentPlayer.Gold)
+            .Where(w => ShopPricing.Total(currentPlayer, w.Value, weaponShop: true) <= currentPlayer.Gold)   // 1.3.10 (D2): the price it charges
             .Where(w => !w.RequiresGood || currentPlayer.Chivalry > currentPlayer.Darkness)
             .Where(w => !w.RequiresEvil || currentPlayer.Darkness > currentPlayer.Chivalry)
             .OrderByDescending(w => w.WeaponPower)
@@ -1489,13 +1473,7 @@ public class WeaponShopLocation : BaseLocation
         {
             // Re-check affordability (gold may have changed)
             var weapon = affordableWeapons[weaponIndex];
-            long adjustedPrice = CityControlSystem.Instance.ApplyDiscount(weapon.Value, currentPlayer);
-            // Apply faction discount (The Crown gets 10% off at shops)
-            adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
-            // Apply difficulty-based price multiplier
-            adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
-            // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
-            adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
+            long adjustedPrice = ShopPricing.Price(currentPlayer, weapon.Value, weaponShop: true);   // 1.3.10 (D2): as the direct buy
 
             // Calculate total with tax
             var (abKingTax, abCityTax, abTotal) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);

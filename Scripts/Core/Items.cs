@@ -67,8 +67,6 @@ public class Item
     public DateTime CreatedDate { get; set; }           // When item was created
     public string Creator { get; set; } = "";           // Who created the item (for player-made items)
     public bool IsArtifact { get; set; } = false;       // Special unique artifacts
-    public int Durability { get; set; } = 100;          // Item durability (0-100)
-    public int MaxDurability { get; set; } = 100;       // Maximum durability
     
     // Magic properties
     public MagicEnhancement MagicProperties { get; set; } = new MagicEnhancement();
@@ -274,19 +272,8 @@ public class Item
         if (Cursed)
             name += $" ({Loc.Get("item.rarity.cursed")})";
             
-        if (Durability < 100)
-        {
-            var conditionKey = Durability switch
-            {
-                >= 80 => "item.condition.good",
-                >= 60 => "item.condition.fair",
-                >= 40 => "item.condition.poor",
-                >= 20 => "item.condition.bad",
-                _ => "item.condition.broken"
-            };
-            name += $" [{Loc.Get(conditionKey)}]";
-        }
-        
+        // 1.3.10 (P14): no condition label; item durability is gone (nothing ever wore an item down)
+
         if (IsArtifact)
             name += " *";
             
@@ -345,27 +332,6 @@ public class Item
         
         return desc.Trim();
     }
-    
-    /// <summary>
-    /// Damage the item (reduce durability)
-    /// </summary>
-    public void TakeDamage(int damage)
-    {
-        Durability = Math.Max(0, Durability - damage);
-    }
-    
-    /// <summary>
-    /// Repair the item
-    /// </summary>
-    public void Repair(int amount)
-    {
-        Durability = Math.Min(MaxDurability, Durability + amount);
-    }
-    
-    /// <summary>
-    /// Check if item is broken
-    /// </summary>
-    public bool IsBroken => Durability <= 0;
 
     // Compatibility aliases expected by newer location/shop code
     /// <summary>

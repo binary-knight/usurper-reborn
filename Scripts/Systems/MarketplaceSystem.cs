@@ -373,15 +373,38 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Remove expired listings
+        /// Remove expired listings. 1.3.10 (D4): an expired listing goes back to its seller, it was destroyed: an NPC's
+        /// item returns to that NPC's stock here; a player's listing stays on the board until that player is at the
+        /// Auction House and takes it back (TakeExpiredListings).
         /// </summary>
         public void CleanupExpiredListings()
         {
-            int removed = Listings.RemoveAll(l => l.IsExpired);
-            if (removed > 0)
+            foreach (var listing in Listings.Where(l => l.IsExpired && l.IsNPCSeller).ToList())
             {
-                // GD.Print($"[Marketplace] Removed {removed} expired listings");
+                var seller = NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.Id == listing.SellerNPCId);
+                if (seller != null)
+                {
+                    seller.MarketInventory ??= new List<global::Item>();
+                    seller.MarketInventory.Add(listing.Item);
+                }
+                Listings.Remove(listing);
             }
+        }
+
+        /// <summary>
+        /// 1.3.10 (D4): a player's expired listings, oldest first, handed back to that seller; at most <paramref name="room"/>
+        /// of them (the pack's free places), the rest stay listed until there is room.
+        /// </summary>
+        public List<global::Item> TakeExpiredListings(string sellerName, int room)
+        {
+            var back = new List<global::Item>();
+            foreach (var listing in Listings.Where(l => l.IsExpired && !l.IsNPCSeller && l.Seller == sellerName)
+                         .OrderBy(l => l.Posted).Take(Math.Max(0, room)).ToList())
+            {
+                Listings.Remove(listing);
+                back.Add(listing.Item);
+            }
+            return back;
         }
 
         /// <summary>

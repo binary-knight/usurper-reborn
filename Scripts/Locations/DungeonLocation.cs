@@ -15779,7 +15779,13 @@ public class DungeonLocation : BaseLocation
             if (int.TryParse(choice, out int idx) && idx >= 1 && idx <= items.Count)
             {
                 var item = items[idx - 1];
-                if (player.Gold < item.cost)
+                string? carryFull = SettlementCarryFullLine(player, item.id);   // 1.3.10 (D3): the carry limit before the charge
+                if (carryFull != null)
+                {
+                    terminal.WriteLine(carryFull, "yellow");
+                    await terminal.PressAnyKey();
+                }
+                else if (player.Gold < item.cost)
                 {
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
                     await terminal.PressAnyKey();   // 1.3.10 (B7): the result stays on screen until Enter
@@ -15844,6 +15850,21 @@ public class DungeonLocation : BaseLocation
 
         return items;
     }
+
+    /// <summary>
+    /// 1.3.10 (D3): the line that refuses a carried item already at its carry limit (the Healer's and the herb pouch's
+    /// lines), or null when one more fits. The trade checks it before it takes the gold; it took the gold and gave nothing.
+    /// </summary>
+    internal static string? SettlementCarryFullLine(Character player, string itemId) => itemId switch
+    {
+        "heal_potion" when player.Healing >= player.MaxPotions => Loc.Get("healer.max_potions", player.MaxPotions),
+        "mana_potion" when player.ManaPotions >= player.MaxManaPotions => Loc.Get("healer.max_mana_potions"),
+        "antidote" when player.Antidotes >= player.MaxAntidotes => Loc.Get("healer.max_antidotes", player.MaxAntidotes),
+        "healing_herb" when player.HerbHealing >= GameConfig.HerbMaxCarry[(int)HerbType.HealingHerb] => Loc.Get("wilderness.herb_pouch_full"),
+        "starbloom" when player.HerbStarbloom >= GameConfig.HerbMaxCarry[(int)HerbType.StarbloomEssence] => Loc.Get("wilderness.herb_pouch_full"),
+        "firebloom" when player.HerbFirebloom >= GameConfig.HerbMaxCarry[(int)HerbType.FirebloomPetal] => Loc.Get("wilderness.herb_pouch_full"),
+        _ => null,
+    };
 
     private void ApplySettlementPurchase(Character player, string itemId)
     {

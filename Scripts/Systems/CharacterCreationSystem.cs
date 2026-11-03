@@ -2835,7 +2835,6 @@ public class CharacterCreationSystem
         character.PKills = 0;
         character.PDefeats = 0;
         character.Interest = 0;
-        character.AliveBonus = 0;
         character.Expert = false;
         character.MaxTime = 60; // Default max time per session
         character.Ear = 1; // global_ear_all

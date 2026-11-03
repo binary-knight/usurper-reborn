@@ -2146,11 +2146,12 @@ public class Character
         _boonOutMaxMana = MaxMana;
         _boonRecorded = true;
 
-        // Apply Fountain of Vitality bonus HP, then (1.3.6) Titan's Resolve. The inputs are recorded
-        // so RecalculateBoonShare carries a boon change through the same steps.
+        // Apply the flat bonus HP and (1.3.10, P11) the Fountain of Vitality's 10 percent, then (1.3.6) Titan's Resolve.
+        // The inputs are recorded so RecalculateBoonShare carries a boon change through the same steps.
         _boonTailBonusMaxHP = BonusMaxHP;
+        _boonTailFountain = HasVitalityFountain;
         _boonTailTitanItems = EquippedTitanResolveCount();
-        MaxHP = AfterBoonSegmentMaxHP(MaxHP, _boonTailBonusMaxHP, _boonTailTitanItems);
+        MaxHP = AfterBoonSegmentMaxHP(MaxHP, _boonTailBonusMaxHP, _boonTailFountain, _boonTailTitanItems);
 
         // Apply permanent weapon/armor power bonuses (Infernal Forge, artifacts, etc.)
         if (BonusWeapPow > 0)
@@ -2207,6 +2208,7 @@ public class Character
     private bool _boonRecorded;
     // 1.3.6: the inputs of the steps after the boon segment (Fountain bonus, Titan's Resolve items)
     private long _boonTailBonusMaxHP;
+    private bool _boonTailFountain;
     private int _boonTailTitanItems;
 
     /// <summary>1.3.6: Titan's Resolve gives 5 percent more max HP, once however many equipped items carry it.</summary>
@@ -2216,14 +2218,29 @@ public class Character
     internal int EquippedTitanResolveCount() =>
         EquippedItems.Values.Count(id => id > 0 && EquipmentDatabase.GetById(id)?.HasTitanResolve == true);
 
-    /// <summary>1.3.6: max HP after the boon segment, before the floor of 1: the Fountain bonus, then Titan's Resolve.</summary>
-    private static long AfterBoonSegmentMaxHP(long boonOut, long bonusMaxHP, int titanItems)
+    /// <summary>1.3.10 (P11): the Fountain of Vitality gives 10 percent more max HP, at every level.</summary>
+    public const double VitalityFountainMaxHPMultiplier = 1.10;
+
+    /// <summary>
+    /// 1.3.6: max HP after the boon segment, before the floor of 1: the flat bonus, the Fountain of Vitality (1.3.10: a
+    /// 10 percent multiplier; it was a flat snapshot in BonusMaxHP), then Titan's Resolve.
+    /// </summary>
+    private static long AfterBoonSegmentMaxHP(long boonOut, long bonusMaxHP, bool fountain, int titanItems)
     {
         long hp = boonOut;
         if (bonusMaxHP > 0) hp += bonusMaxHP;
+        if (fountain) hp = (long)(hp * VitalityFountainMaxHPMultiplier);
         if (titanItems > 0) hp = (long)(hp * TitanResolveMaxHPMultiplier);
         return hp;
     }
+
+    /// <summary>
+    /// 1.3.10 (P11): a save from before 1.3.10 holds the Fountain of Vitality as a flat snapshot in BonusMaxHP, and the
+    /// fountain was the only thing that wrote BonusMaxHP; with the fountain now a multiplier that snapshot is dropped on
+    /// load, so the old bonus is not counted twice. Both load paths (single player and online) call this.
+    /// </summary>
+    public static long MigratedBonusMaxHP(bool hasVitalityFountain, long savedBonusMaxHP) =>
+        hasVitalityFountain ? 0 : savedBonusMaxHP;
 
     /// <summary>1.2.0: max HP after the configured boon, the awakening and Terran, from the pre-boon max HP.</summary>
     private long BoonSegmentMaxHP(long pre, double awakeningHP)
@@ -2265,7 +2282,7 @@ public class Character
         long hp = BoonSegmentMaxHP(_boonPreMaxHP, _boonAwakeningHP);
         long mana = BoonSegmentMaxMana(_boonPreMaxMana, _boonAwakeningMana);
         // 1.3.6: the difference is taken after the Fountain bonus and Titan's Resolve, as a full recalculation applies them
-        MaxHP = Math.Max(1, MaxHP + AfterBoonSegmentMaxHP(hp, _boonTailBonusMaxHP, _boonTailTitanItems) - AfterBoonSegmentMaxHP(_boonOutMaxHP, _boonTailBonusMaxHP, _boonTailTitanItems));
+        MaxHP = Math.Max(1, MaxHP + AfterBoonSegmentMaxHP(hp, _boonTailBonusMaxHP, _boonTailFountain, _boonTailTitanItems) - AfterBoonSegmentMaxHP(_boonOutMaxHP, _boonTailBonusMaxHP, _boonTailFountain, _boonTailTitanItems));
         MaxMana = Math.Max(0, MaxMana + mana - _boonOutMaxMana);
         _boonOutMaxHP = hp;
         _boonOutMaxMana = mana;
@@ -2571,7 +2588,6 @@ public class Character
     
     // New for version 0.08+
     public long Interest { get; set; }              // accumulated bank interest
-    public long AliveBonus { get; set; }            // staying alive bonus
     public bool Expert { get; set; }                // expert menus ON/OFF
     public int MaxTime { get; set; }                // max minutes per session
     public byte Ear { get; set; }                   // internode message handling

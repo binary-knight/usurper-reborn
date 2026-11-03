@@ -232,6 +232,9 @@ public class DailySystemManager
         if (DoorMode.IsOnlineMode)
         {
             await RunBasicDailyReset();
+            // 1.3.10 (D1): team wages at this player's own reset; the shared maintenance pass below runs once
+            // per server day for whichever session gets there first, so it charges no wages online
+            await MaintenanceSystem.ProcessTeamWages(player);
             if (maintenanceSystem != null)
             {
                 await maintenanceSystem.CheckAndRunMaintenance(forced);

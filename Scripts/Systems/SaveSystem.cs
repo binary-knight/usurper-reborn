@@ -1578,7 +1578,6 @@ namespace UsurperRemake.Systems
             {
                 // Economic state
                 BankInterestRate = GameConfig.DefaultBankInterest,
-                TownPotValue = GameConfig.DefaultTownPot,
 
                 // Political state
                 CurrentRuler = GameEngine.Instance?.CurrentPlayer?.King == true ?

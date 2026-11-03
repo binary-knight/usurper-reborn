@@ -186,7 +186,9 @@ public class BankLocation : BaseLocation
         terminal.WriteLine(Loc.Get("bank.banned_knuckles"));
         terminal.WriteLine("");
 
+        // 1.3.10 (P13): the ban is enforced; repaying the loan (L) is the way back in, as the guards say
         terminal.SetColor("white");
+        terminal.WriteLine(IsScreenReader ? $"L. {Loc.Get("bank.repay")}" : $"[L] {Loc.Get("bank.repay")}");
         terminal.WriteLine(IsScreenReader ? $"Q. {Loc.Get("bank.banned_leave")}" : $"[Q] {Loc.Get("bank.banned_leave")}");
     }
 
@@ -413,6 +415,14 @@ public class BankLocation : BaseLocation
             return false;
 
         var upperChoice = choice.ToUpper().Trim();
+
+        // 1.3.10 (P13): a banned player gets only the repay key (L) and the way out; the ban screen was not enforced
+        if (IsPlayerBannedFromBank(currentPlayer) && upperChoice is not ("L" or "R" or "Q" or "M"))
+        {
+            terminal.WriteLine(Loc.Get("bank.banned_message"), "yellow");
+            await terminal.PressAnyKey();
+            return false;
+        }
 
         switch (upperChoice)
         {

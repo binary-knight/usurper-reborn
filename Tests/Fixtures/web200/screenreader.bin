@@ -48,6 +48,7 @@ Information:
   $ - World Events
   = - Stats Record
   P - Progress
+  G - Good Deeds
 
 Exploration:
   E - The Wilderness
@@ -66,6 +67,7 @@ Other:
  [N] News       [F] Fame       [E] Explore    [$] World Events
  [Y]Dark Alley [+]Sanctum [X]Love St    [O] Old Church [J]Auction
  [C] Challenges [L] Lodging    [=]Stats      [P] Progress
+ [G]Good Deeds
  [Z]Team Corner
 [Q] Quit       [~]Settings
 
