@@ -1,8 +1,9 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimService.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Systems/WeeklyGodSystem.cs
+history: 1.3.10 | While Blessed Rain falls, healing HP at the Healer is free; on a Holy Day the Cloister meditation and an act of atonement are free; no event changes anyone's stats; and the event descriptions state what each event does.
 history: 1.3.9 | The website's Observatory page shows public world data and an hourly history of the world.
 history: 1.3.8 | An NPC ally's fall at your side writes one line in the news, not two.
 history: 1.3.7 | none

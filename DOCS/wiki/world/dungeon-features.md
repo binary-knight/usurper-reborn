@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.10 | A fifth outpost, the Cinder Post, stands on floor 85, and room names that repeat on a floor are numbered II, III and so on.
 history: 1.3.9 | none
 history: 1.3.8 | An ally told to wait gets nothing from a camp, a safe haven or a room feature and takes no share of a feature's reward.
 history: 1.3.7 | The Warrior and Barbarian attack bonus from a room feature lasts into the next fight.

@@ -1,8 +1,9 @@
 ---
 title: Enchanting
 path: /wiki/en/items/enchanting/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.10 | The Smugglers' Cache takes 10 percent off the Magic Shop's enchants, potions and accessories for your next 5 purchases.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | Against Manwe the Creator's Ward stops 55 percent of what gear enchantments add after a hit, Godbane held or not, and the Magic Shop says when an item's name is too long to carry the enchant's tag.
