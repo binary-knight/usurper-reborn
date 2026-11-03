@@ -892,6 +892,7 @@ public class WeaponShopLocation : BaseLocation
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
+        SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
 
         if (canEquipPersonally && !currentPlayer.AutoEquipDisabled)
         {
@@ -1573,6 +1574,7 @@ public class WeaponShopLocation : BaseLocation
                         purchased = true;
                         currentPlayer.RecalculateStats();
                         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
+                        SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
 
                         // Check for equipment quest completion
                         QuestSystem.OnEquipmentPurchased(currentPlayer, weapon);

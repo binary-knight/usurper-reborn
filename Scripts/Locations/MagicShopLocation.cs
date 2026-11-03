@@ -664,6 +664,7 @@ public partial class MagicShopLocation : BaseLocation
                 CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.healing_potions"), totalCost);
                 player.Gold -= hpTotalWithTax;
                 player.Healing += quantity;
+                SmugglersCache.Spend(player);   // 1.3.10 (P6)
 
                 // Process city tax share from this sale
                 CityControlSystem.Instance.ProcessSaleTax(totalCost);
@@ -2155,6 +2156,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Execute enchantment
         player.Gold -= enchantCost;
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
 
         // Consume materials (even on failure for 4th/5th enchant)
         if (EnchantMaterialRequirements.TryGetValue(tierChoice - 1, out var consumeReqs))
@@ -2715,6 +2717,7 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         player.Gold -= removalCost;
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
 
         // v1.2.5: back to the base form: every stat, the fire and frost flags, the value and the name the
         // enchants changed. The record goes too, so a later first enchant records afresh.
@@ -3208,6 +3211,7 @@ public partial class MagicShopLocation : BaseLocation
         player.Statistics?.RecordAccessoryPurchase(totalWithTax);
         AchievementSystem.CheckAchievements(player); // v0.61.3: immediate achievement check
         CityControlSystem.Instance.ProcessSaleTax(price);
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
         // Check for equipment quest completion
         QuestSystem.OnEquipmentPurchased(player, item);
 
@@ -3860,6 +3864,7 @@ public partial class MagicShopLocation : BaseLocation
         // Deduct costs
         player.Gold -= loveTotalWithTax;
         CityControlSystem.Instance.ProcessSaleTax(spellCost);
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
         player.Mana -= selected.manaCost;
 
         // Check resistance (high Commitment NPCs)
@@ -4141,6 +4146,7 @@ public partial class MagicShopLocation : BaseLocation
         // Deduct costs
         player.Gold -= deathTotalWithTax;
         CityControlSystem.Instance.ProcessSaleTax(spellCost);
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
         player.Mana -= selected.manaCost;
 
         // Calculate success
@@ -4267,6 +4273,7 @@ public partial class MagicShopLocation : BaseLocation
             var (mpKingTax, mpCityTax, mpTotalWithTax) = CityControlSystem.CalculateTaxedPrice(totalCost);
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.mana_potions"), totalCost);
             player.Gold -= mpTotalWithTax;
+            SmugglersCache.Spend(player);   // 1.3.10 (P6)
             player.ManaPotions += qty;
 
             DisplayMessage(Loc.Get("magic_shop.mana_deal", _ownerName, $"{qty}"), "bright_green");
@@ -4323,6 +4330,7 @@ public partial class MagicShopLocation : BaseLocation
 
         player.Gold -= scryTotalWithTax;
         CityControlSystem.Instance.ProcessSaleTax(scryCost);
+        SmugglersCache.Spend(player);   // 1.3.10 (P6)
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.scry_reveal"), "magenta");

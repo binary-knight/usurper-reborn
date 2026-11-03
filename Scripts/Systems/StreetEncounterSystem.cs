@@ -2108,7 +2108,7 @@ public class StreetEncounterSystem
     private List<MerchantItem> GenerateMerchantItems(int playerLevel, bool shady)
     {
         var items = new List<MerchantItem>();
-        int potionPrice = 40 + playerLevel * 3;
+        long potionPrice = GameConfig.GetSettlementHealingPotionCost(playerLevel);   // 1.3.10 (P12): the town price x1.25, was 40 + 3 x level
 
         // v0.65.1: Name stays the English logic key (ApplyMerchantItem switch); DisplayKey/DescKey
         // are localized for display. Player report: town merchant item names rendered in English.

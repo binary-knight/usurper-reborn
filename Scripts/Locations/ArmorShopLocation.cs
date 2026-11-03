@@ -765,6 +765,7 @@ public class ArmorShopLocation : BaseLocation
 
         // Process city tax share from this sale
         CityControlSystem.Instance.ProcessSaleTax(adjustedPrice);
+        SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
 
         if (canEquipPersonally && !currentPlayer.AutoEquipDisabled)
         {
@@ -1022,7 +1023,7 @@ public class ArmorShopLocation : BaseLocation
             int currentAC = currentPlayer.GetEquipment(slot)?.ArmorClass ?? 0;
             foreach (var armor in AutoBuyOffers(slot, currentAC))
             {
-                long price = AutoBuyPrice(armor);
+                long price = AutoBuyPrice(armor, picks.Count);   // 1.3.10 (P6): a Smugglers' Cache purchase only while one is left
                 var (_, _, total) = CityControlSystem.CalculateTaxedPrice(price);
                 if (total > gold) continue;
                 picks.Add(new AutoBuyPick(slot, armor, price, total, armor.ArmorClass - currentAC));
@@ -1045,9 +1046,9 @@ public class ArmorShopLocation : BaseLocation
             .ToList();
 
     /// <summary>1.3.10: an armor's price after the city, faction and boon discounts, before tax (as the per-slot path).</summary>
-    private long AutoBuyPrice(Equipment armor)
+    private long AutoBuyPrice(Equipment armor, int cachePurchasesAhead = 0)
     {
-        long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer);
+        long itemPrice = CityControlSystem.Instance.ApplyDiscount(armor.Value, currentPlayer, cachePurchasesAhead);
         itemPrice = (long)(itemPrice * FactionSystem.Instance.GetShopPriceModifier());
         if (currentPlayer.CachedBoonEffects?.ShopDiscountPercent > 0)
             itemPrice = (long)(itemPrice * (1.0 - currentPlayer.CachedBoonEffects.ShopDiscountPercent));
@@ -1116,6 +1117,7 @@ public class ArmorShopLocation : BaseLocation
             {
                 currentPlayer.Statistics.RecordPurchase(pick.Total);
                 CityControlSystem.Instance.ProcessSaleTax(pick.Price);
+                SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
                 QuestSystem.OnEquipmentPurchased(currentPlayer, pick.Armor);
                 bought++;
                 spent += pick.Total;
@@ -1269,6 +1271,7 @@ public class ArmorShopLocation : BaseLocation
                         {
                             purchased++;
                             CityControlSystem.Instance.ProcessSaleTax(itemPrice); // v1.1.1: after the equip check; a failed equip refunded the price but kept the tax
+                            SmugglersCache.Spend(currentPlayer);   // 1.3.10 (P6)
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("armor_shop.autobuy_purchased", ItemNames.Display(armor)));
 

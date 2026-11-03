@@ -907,7 +907,10 @@ public static class WikiDataExporter
                 healShareOfMissing = s.HasHealing ? (float?)s.HealEffectiveness : null,
                 goods = s.HasTrading
                     ? InvokePrivate<List<(string id, string name, long cost)>>(dungeon, "GetSettlementTradeItems", s)
-                        .Select(g => new { id = g.id, name = g.name, price = g.cost }).ToArray()
+                        // 1.3.10 (P12): a potion's price follows the buyer's level (the town price x the factor), not the floor
+                        .Select(g => DungeonLocation.SettlementTownPricedGoods.Contains(g.id)
+                            ? new { id = g.id, name = g.name, price = (long?)null, townPriceFactor = (double?)GameConfig.SettlementPotionPriceMultiplier }
+                            : new { id = g.id, name = g.name, price = (long?)g.cost, townPriceFactor = (double?)null }).ToArray()
                     : []
             };
         }).ToArray(),

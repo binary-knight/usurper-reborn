@@ -75,6 +75,6 @@ Enchant removal (W) costs 5,000 + level x 200 gold before the price modifiers: 9
 
 ## Magic Shop prices and the loyalty discount
 
-Enchants, enchant removal, potions, accessories and the shop's spells and scrying are priced through the same modifiers: your alignment, any world event, a Crown member's discount, a city controller's 10 percent, the difficulty and the loyalty discount. The [shops guide](/wiki/en/items/shops/) lists the alignment, faction and difficulty numbers.
+Enchants, enchant removal, potions, accessories and the shop's spells and scrying are priced through the same modifiers: your alignment, any world event, a Crown member's discount, a city controller's 10 percent, the Smugglers' Cache's 10 percent while you have purchases left, the difficulty and the loyalty discount. The [shops guide](/wiki/en/items/shops/) lists the alignment, faction and difficulty numbers.
 
 The loyalty discount counts the gold you have spent at the Magic Shop: 5 percent off from 10,000 gold, 10 percent from 50,000 and 15 percent from 200,000. A failed enchant does not count toward it.

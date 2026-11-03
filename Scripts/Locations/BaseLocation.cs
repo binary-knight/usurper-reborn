@@ -7197,7 +7197,7 @@ public abstract class BaseLocation
             || currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion
             || currentPlayer.HasActiveShrineAttunement
             || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
-            || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff
+            || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff || currentPlayer.SmugglersCachePurchases > 0   // 1.3.10 (P6)
             || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
             || currentPlayer.LoversBlissCombats > 0 || currentPlayer.DivineBlessingCombats > 0
             || currentPlayer.Class == CharacterClass.Alchemist
@@ -7359,7 +7359,12 @@ public abstract class BaseLocation
                 terminal.SetColor("dark_red");
                 WriteBuff(Loc.Get("base.buff_dark_pact", (int)(currentPlayer.DarkPactDamageBonus * 100), currentPlayer.DarkPactCombats));
             }
-            if (currentPlayer.HasSettlementBuff)
+            if (currentPlayer.HasSettlementBuff && currentPlayer.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.Militia)
+            {
+                terminal.SetColor("bright_green");   // 1.3.10 (P6): the Barracks militia is an ally, not a percent
+                WriteBuff(Loc.Get("base.buff_settlement_militia", currentPlayer.SettlementBuffCombats));
+            }
+            else if (currentPlayer.HasSettlementBuff)
             {
                 string buffName = ((UsurperRemake.Systems.SettlementBuffType)currentPlayer.SettlementBuffType) switch
                 {
@@ -7373,6 +7378,11 @@ public abstract class BaseLocation
                 };
                 terminal.SetColor("bright_green");
                 WriteBuff(Loc.Get("base.buff_settlement", buffName, (int)(currentPlayer.SettlementBuffValue * 100), currentPlayer.SettlementBuffCombats));
+            }
+            if (currentPlayer.SmugglersCachePurchases > 0)
+            {
+                terminal.SetColor("bright_green");   // 1.3.10 (P6): the Smugglers' Cache, purchases not fights
+                WriteBuff(Loc.Get("base.buff_smugglers_cache", $"{GameConfig.SmugglersCacheDiscount * 100:F0}", currentPlayer.SmugglersCachePurchases));
             }
             if (currentPlayer.WellRestedCombats > 0)
             {

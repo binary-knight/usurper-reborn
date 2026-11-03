@@ -15798,20 +15798,25 @@ public class DungeonLocation : BaseLocation
         }
     }
 
+    /// <summary>1.3.10 (P12): the outpost goods priced from the town curve at the buyer's level, not from the floor.</summary>
+    internal static readonly string[] SettlementTownPricedGoods = { "heal_potion", "mana_potion" };
+
     private List<(string id, string name, long cost)> GetSettlementTradeItems(DungeonSettlement settlement)
     {
         var items = new List<(string id, string name, long cost)>();
         long priceScale = 1 + (currentDungeonLevel / 10);
+        // 1.3.10 (P12): potions cost the town price for the buyer's level times GameConfig.SettlementPotionPriceMultiplier
+        int buyerLevel = Math.Max(1, currentPlayer?.Level ?? 1);
 
         foreach (var itemName in settlement.TradeItems)
         {
             switch (itemName)
             {
                 case "Healing Potion":
-                    items.Add(("heal_potion", Loc.Get("street_encounter.merchant.item.healing_potion"), 25 * priceScale));
+                    items.Add(("heal_potion", Loc.Get("street_encounter.merchant.item.healing_potion"), GameConfig.GetSettlementHealingPotionCost(buyerLevel)));
                     break;
                 case "Mana Potion":
-                    items.Add(("mana_potion", Loc.Get("world_boss.mana_potion"), 30 * priceScale));
+                    items.Add(("mana_potion", Loc.Get("world_boss.mana_potion"), GameConfig.GetSettlementManaPotionCost(buyerLevel)));
                     break;
                 case "Antidote":
                     items.Add(("antidote", Loc.Get("street_encounter.merchant.item.antidote"), 20 * priceScale));

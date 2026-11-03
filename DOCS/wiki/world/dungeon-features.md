@@ -189,7 +189,7 @@ A floor always starts in a hall and ends in the boss room. The number of monster
 - **Meditation chamber:** from floor 10, one per floor: a resting place without monsters that uses the once per floor rest.
 - **Lore library:** from floor 15, one per floor, guarded 30 percent of the time. It tells you one lore fragment you have not read yet, among those your awakening allows.
 - **Memory room:** on floors 30, 45, 60, 75 and 90, without monsters; it can bring back a memory of your past.
-- **Outpost:** on floors 10, 20, 35 and 65; see [dungeon outposts](/wiki/en/world/dungeon/#dungeon-outposts).
+- **Outpost:** on floors 10, 20, 35, 65 and 85; see [dungeon outposts](/wiki/en/world/dungeon/#dungeon-outposts).
 - **Arena room:** guarded, with treasure; only on a few story floors (spoiler below).
 
 :::spoiler Spoiler: rooms on the seal floors
