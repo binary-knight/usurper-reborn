@@ -520,11 +520,19 @@ private static readonly string[] MutantPortrait = new string[]
 
         /// <summary>
         /// Returns cropped class portrait lines ready for display, or null if no portrait exists.
+        /// 1.3.10: the four hand drawn portraits above are used as they are; the other 13 classes use the
+        /// portraits converted from the class sprites (ClassPortraitArt), in 256 colours, or in 16 colours when
+        /// <paramref name="sixteenColours"/> is set (BBS sessions).
         /// </summary>
-        public static string[]? GetCroppedClassPortrait(CharacterClass characterClass, int displayWidth)
+        public static string[]? GetCroppedClassPortrait(CharacterClass characterClass, int displayWidth, bool sixteenColours = false)
         {
             if (!ClassPortraits.TryGetValue(characterClass, out var data))
-                return null;
+            {
+                var converted = sixteenColours ? ClassPortraitArt.Ansi16 : ClassPortraitArt.Xterm256;
+                if (!converted.TryGetValue(characterClass, out var lines))
+                    return null;
+                data = new PortraitData { Lines = lines, CropStartRow = 0, CropRows = 18, SourceWidth = 38 };
+            }
 
             var result = new string[data.CropRows];
             for (int i = 0; i < data.CropRows; i++)
