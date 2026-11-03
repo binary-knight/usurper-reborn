@@ -587,5 +587,12 @@
   "play.chron.revives": "Résurr.",
   "play.chron.map_explored": "Carte : {0}/{1} explorées",
   "play.chron.map_label": "Carte de l'étage, {0} salles explorées sur {1}",
-  "play.chron.sheet": "Fiche du personnage"
+  "play.chron.sheet": "Fiche du personnage",
+  "play.combat.champion": "Champion",
+  "play.chron.low_hp": "PV bas",
+  "play.chron.type_number": "Tapez le numéro, puis Entrée : {0}",
+  "play.chron.cap_number": "N°",
+  "play.chron.more_keys": "Autres touches",
+  "play.chron.keys_one": "Ici, une seule touche choisit une option ; pas besoin d’Entrée.",
+  "play.chron.keys_enter": "Tapez une touche, puis Entrée. Une touche ci-dessous envoie Entrée pour vous."
 }
