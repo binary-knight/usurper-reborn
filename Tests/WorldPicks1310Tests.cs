@@ -500,7 +500,15 @@ public class WorldPicks1310Tests : IDisposable
         D("winter_solstice").Should().NotContain("stronger").And.Contain("gold");
         D("merchant_caravan").Should().NotContain("rare items").And.Contain("20%");
         D("plague_ends").Should().NotContain("Healers");
-        D("holy_day").Should().Contain("Temple services are free");
+        // the Rite of Return keeps its price, so the Holy Day names what is free
+        D("holy_day").Should().NotContain("Temple services").And.Contain("Cloister meditation and atonement are free");
+        Loc.GetIn("en", "temple.holy_day_free").Should().NotContain("asks no gold").And.Contain("Cloister meditation and atonement");
+        foreach (var lang in Langs.Skip(1))
+        {
+            D("holy_day", lang).Should().NotBe(Loc.GetIn("en", "world_event.holy_day.desc"), lang);
+            Loc.GetIn(lang, "temple.holy_day_free").Should().NotBe(Loc.GetIn("en", "temple.holy_day_free"), lang);
+        }
+        FitsInEnAndHu("world_event.holy_day.desc", "    ");
         foreach (var lang in Langs.Skip(1))
             foreach (var id in new[] { "blessed_rain", "plague_outbreak", "cursed_land", "eclipse_darkness" })
                 D(id, lang).Should().NotContain("%", $"{lang} {id} announces no stat or magic change");
