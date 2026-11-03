@@ -10730,7 +10730,13 @@ public partial class CombatEngine
             terminal.WriteLine("");
 
             terminal.Write(Loc.Get("ui.your_choice"));
-            choice = (await terminal.GetKeyInput()).ToUpper();
+            choice = (await terminal.GetKeyInput()).Trim().ToUpper();
+            // 1.3.10 (play test B18): an empty Enter asks again quietly (the console's single key Enter is "\r")
+            while (choice.Length == 0)
+            {
+                terminal.Write(Loc.Get("ui.your_choice"));
+                choice = (await terminal.GetKeyInput()).Trim().ToUpper();
+            }
 
             if (choice == ">" && party.Count > 1)
             {
@@ -12944,7 +12950,11 @@ public partial class CombatEngine
             // Compare primary stat (Attack for weapons, Armor for armor, stat value for accessories)
             if (lootItem.Type == global::ObjType.Weapon)
             {
-                int currentPower = currentEquip.WeaponPower;
+                // 1.3.10 (play test B15): a two-hander is compared against the main hand plus the off-hand weapon, and
+                // the off-hand it takes off is named (InventorySystem.WeaponComparison); handedness as the Equip path finds it
+                var knownEquip = EquipmentDatabase.GetByName(lootItem.Name);
+                var lootHandedness = knownEquip?.Handedness ?? ShopItemGenerator.InferHandedness(knownEquip?.WeaponType ?? ShopItemGenerator.InferWeaponType(lootItem.Name));
+                var (currentPower, offHandRemoved) = InventorySystem.WeaponComparison(character, currentEquip, lootHandedness == WeaponHandedness.TwoHanded);
                 int newPower = lootItem.Attack;
                 int diff = newPower - currentPower;
 
@@ -12964,6 +12974,11 @@ public partial class CombatEngine
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("combat.same"));
+                }
+                if (offHandRemoved != null)
+                {
+                    terminal.SetColor("yellow");
+                    UIHelper.WriteRow(terminal, Loc.Get("inventory.offhand_comes_off", ItemNames.Display(offHandRemoved), offHandRemoved.WeaponPower));
                 }
             }
             else if (lootItem.Type == global::ObjType.Fingers || lootItem.Type == global::ObjType.Neck)

@@ -2693,7 +2693,9 @@ public class DungeonLocation : BaseLocation
         {
             new(Loc.Get("web.menu.exits"), room.Exits.Select(e => new UsurperRemake.Server.WebMenuItem(GetDirectionKey(e.Key),
                 compact ? Loc.Get($"dungeon.dir_{e.Key.ToString().ToLowerInvariant()}") : e.Value.Description)).ToList()),
-            new(Loc.Get("web.menu.actions"), RoomActions(room).Select(a => new UsurperRemake.Server.WebMenuItem(a.Key, a.Label, a.Enabled)).ToList()),
+            // 1.3.10 (play test B10): each action sends the key the room prints (DrawKey: * and % for I and =); the
+            // handler takes both
+            new(Loc.Get("web.menu.actions"), RoomActions(room).Select(a => new UsurperRemake.Server.WebMenuItem(a.DrawKey, a.Label, a.Enabled)).ToList()),
         });
     }
 
@@ -13989,10 +13991,11 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        // Print remaining legend entries if map was small
+        // Print remaining legend entries if map was small. 1.3.10 (play test R13): they start at the column the rows
+        // beside the map put theirs, the map's width (every room row and connector row is mapWidth wide), not at 50
         while (legendRow < legendRows)
         {
-            terminal.Write(new string(' ', 50));
+            terminal.Write(new string(' ', mapWidth));
             RenderLegendEntry(legendRow, 0);
             legendRow++;
             terminal.WriteLine("");

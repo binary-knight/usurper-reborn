@@ -280,7 +280,12 @@ public partial class MainStreetLocation
             DrawDistrict(district, places);
             var keys = places.Select(p => p.Key).Append(ReturnKey).ToList();
             string pick = await terminal.GetValidChoice(Loc.Get("ui.your_choice"), keys, ReturnKey);
-            if (pick == ReturnKey) return false;
+            if (pick == ReturnKey)
+            {
+                // 1.3.10 (play test A2): the district sent its own Room.Info, so the street is named again
+                LocationManager.Instance.EmitRoomInfo(GameLocation.MainStreet);
+                return false;
+            }
             var place = places.First(p => p.Key == pick).Place;
             var destination = DestinationOf(place, DoorMode.IsOnlineMode);
             if (destination != null) { _returnDistrict = district; _returnFrom = destination.Value; }
@@ -289,6 +294,32 @@ public partial class MainStreetLocation
             if (left) return true;
         }
     }
+
+    /// <summary>
+    /// 1.3.10 (play test A2): GMCP Room.Info for a district screen, so a client (the web page's plate and status line, a
+    /// MUD mapper) names the district the player stands in. Its num is a text id ("district:MerchantRow"), not a town
+    /// location number, as a dungeon room's is; its exits are the places it lists that are town locations, and Main
+    /// Street. Leaving to the street sends Main Street's Room.Info again (EnterDistrict). A no-op without GMCP.
+    /// </summary>
+    private void EmitDistrictRoomInfo(District district, string name, List<StreetEntry> places)
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsActive) return;
+        bool online = DoorMode.IsOnlineMode;
+        var exits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in places)
+            if (DestinationOf(p.Place, online) is GameLocation dest) exits[LocationManager.GmcpExitName(dest)] = (int)dest;
+        exits[LocationManager.GmcpExitName(GameLocation.MainStreet)] = (int)GameLocation.MainStreet;
+        UsurperRemake.Server.GmcpBridge.Emit("Room.Info", new
+        {
+            num = DistrictRoomId(district),
+            name,
+            area = "Usurper Reborn",
+            exits
+        });
+    }
+
+    /// <summary>1.3.10 (play test A2): a district's Room.Info num.</summary>
+    internal static string DistrictRoomId(District district) => "district:" + district.Group;
 
     /// <summary>1.3.10 (play test N3): the district a place was entered from, and the location that place is.</summary>
     private District? _returnDistrict;
@@ -336,6 +367,7 @@ public partial class MainStreetLocation
     {
         terminal.ClearScreen();
         string name = DistrictName(district, OnlinePlayerCount());
+        EmitDistrictRoomInfo(district, name, places);
         string back = Loc.Get("location.return_main_street");
         if (IsScreenReader)
         {

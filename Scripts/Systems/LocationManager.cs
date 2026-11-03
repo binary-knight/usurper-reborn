@@ -143,6 +143,28 @@ public class LocationManager
     /// cardinal exits if a current room is set; otherwise falls back to the static
     /// navigation table. Returns an empty dictionary if neither is available.
     /// </summary>
+    /// <summary>
+    /// GMCP Room.Info for a town location: its id, its name, the area and its exits. Sent on every location change, and
+    /// again by Main Street when the player leaves a district for the street (1.3.10, play test A2), since the district
+    /// screen sent its own Room.Info. A no-op when GMCP is not negotiated.
+    /// </summary>
+    internal void EmitRoomInfo(GameLocation locationId)
+    {
+        if (!UsurperRemake.Server.GmcpBridge.IsActive) return;
+        UsurperRemake.Server.GmcpBridge.Emit("Room.Info", new
+        {
+            num = (int)locationId,
+            name = (locations.TryGetValue(locationId, out var at) ? at : null)?.LocationName ?? locationId.ToString(),
+            area = "Usurper Reborn",
+            exits = BuildGmcpExitsForLocation(locationId)
+        });
+    }
+
+    /// <summary>The key of an exit to a town location in Room.Info: the destination's lowercase enum name.</summary>
+    internal static string GmcpExitName(GameLocation dest) =>
+        // LoveCorner and RoyalOrphanage share the value 77; the exit is Love Street's
+        dest == GameLocation.LoveCorner ? "lovecorner" : dest.ToString().ToLowerInvariant();
+
     private Dictionary<string, int> BuildGmcpExitsForLocation(GameLocation locationId)
     {
         var exits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -171,9 +193,7 @@ public class LocationManager
         bool settlement = SettlementSystem.Instance?.State.IsEstablished == true;
         foreach (var dest in TownExits(locationId, currentPlayer?.Level ?? 1, UsurperRemake.BBS.DoorMode.IsOnlineMode, settlement, locations.ContainsKey))
         {
-            // LoveCorner and RoyalOrphanage share the value 77; the exit is Love Street's
-            string destName = dest == GameLocation.LoveCorner ? "lovecorner" : dest.ToString().ToLowerInvariant();
-            exits[destName] = (int)dest;
+            exits[GmcpExitName(dest)] = (int)dest;
         }
 
         return exits;
@@ -375,13 +395,7 @@ public class LocationManager
         // Mudlet's mapper consumes this to draw the navigation graph automatically.
         if (UsurperRemake.Server.GmcpBridge.IsActive)
         {
-            UsurperRemake.Server.GmcpBridge.Emit("Room.Info", new
-            {
-                num = (int)locationId,
-                name = currentLocation?.LocationName ?? locationId.ToString(),
-                area = "Usurper Reborn",
-                exits = BuildGmcpExitsForLocation(locationId)
-            });
+            EmitRoomInfo(locationId);
 
             // v0.60.3: Char.StatusVars schema descriptor, emitted once per session
             // before the first Char.Status. Tells generic GMCP clients how to
