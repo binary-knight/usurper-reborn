@@ -64,6 +64,6 @@ Create, join or leave a team, recruit NPCs for a daily wage, equip and resurrect
 
 ## Auction House and News
 
-Offline, the Auction House lets you list an item at your own price and buy other listings; a listing expires after 30 real days. Online, a listing runs 12, 24, 48 or 72 hours for a fee of 5, 4, 3 or 2 percent of the price plus the king's tax. The [shops guide](/wiki/en/items/shops/) has the details. News is the town's newsboard, newest first.
+Offline, the Auction House lets you list an item at your own price, take a listing back (W) and buy other listings; a listing unsold after 30 real days comes back to you. Online, a listing runs 12, 24, 48 or 72 hours for a fee of 5, 4, 3 or 2 percent of the price plus the king's tax. The [shops guide](/wiki/en/items/shops/) has the details. News is the town's newsboard, newest first.
 
 The Gym from older versions was removed and cannot be reached.

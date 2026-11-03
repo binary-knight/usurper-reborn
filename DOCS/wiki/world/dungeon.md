@@ -80,7 +80,7 @@ Healing costs (10 + floor x 5) gold times the outpost's price factor, and restor
 
 ### Outpost supplies
 
-Supplies cost their base price times 1 + floor / 10 (the table shows the price on each outpost's floor). A torch heals 10 HP at once, a lockpick gives +2 Dexterity and a smoke bomb +2 Agility for your next fight. Potions, antidotes and herbs stop at your carrying limit.
+Supplies cost their base price times 1 + floor / 10 (the table shows the price on each outpost's floor). A torch heals 10 HP at once, a lockpick gives +2 Dexterity and a smoke bomb +2 Agility for your next fight. At your carrying limit the outpost refuses a potion, antidote or herb and takes no gold.
 
 ### Outpost lore
 
