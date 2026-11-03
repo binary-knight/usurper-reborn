@@ -31,7 +31,8 @@ namespace UsurperRemake.Systems
         DamageBonus = 3,   // Arena
         GoldBonus = 4,     // Thieves' Den
         TrapResist = 5,    // Prison
-        LibraryXP = 6      // Library
+        LibraryXP = 6,     // Library
+        Militia = 7        // 1.3.10 (P6): Barracks, a militia ally in each of the next fights
     }
 
     public class BuildingState
@@ -775,6 +776,9 @@ namespace UsurperRemake.Systems
                 services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.gambling_hall"), "gambling_hall"));
             if (HasProposedBuilding("oracles_sanctum", BuildingTier.Upgraded))
                 services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.oracles_sanctum"), "oracles_sanctum"));
+            // 1.3.10 (P6): the two buildings that were voted, funded and built with no service now serve once Built
+            if (HasProposedBuilding("barracks", BuildingTier.Built))
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.barracks"), "barracks"));
 
             return services;
         }
@@ -896,6 +900,47 @@ namespace UsurperRemake.Systems
                 ActiveProposalPlayerVotes = State.CurrentProposal?.PlayerVotes != null
                     ? new Dictionary<string, int>(State.CurrentProposal.PlayerVotes) : null
             };
+        }
+    }
+
+    /// <summary>
+    /// 1.3.10 (P6): the Barracks militia. While the player holds the Militia settlement buff (GameConfig.SettlementMilitiaFights
+    /// fights, counted down with the other settlement buffs at each fight's end), a settler militia fighter at the player's
+    /// level minus GameConfig.SettlementMilitiaLevelsBelow (at least 1) joins each monster fight and leaves at its end, as
+    /// Sylvana's beast does: no XP share, never in the dungeon party. Its stats are the royal Tank mercenary's
+    /// (CastleLocation.GenerateMercenary, "matches NPC Warrior") at that level.
+    /// </summary>
+    public static class SettlementMilitia
+    {
+        public static bool Active(Character? owner) =>
+            owner != null && owner.SettlementBuffType == (int)SettlementBuffType.Militia && owner.SettlementBuffCombats > 0;
+
+        public static int LevelFor(Character owner) => Math.Max(1, owner.Level - GameConfig.SettlementMilitiaLevelsBelow);
+
+        public static Character Build(Character owner)
+        {
+            int level = LevelFor(owner);
+            long hp = 100 + level * 50, str = 10 + level * 5, def = 10 + level * 3, wp = 5 + level * 2, ap = 5 + level * 3;
+            long agi = 10 + level * 2, dex = 10 + level * 2, con = 10 + level * 2, wis = 10 + level, intel = 10 + level;
+            string name = Loc.Get("settlement.militia_name");
+            return new Character
+            {
+                Name1 = name, Name2 = name, Class = CharacterClass.Warrior, Sex = CharacterSex.Male, Level = level,
+                HP = hp, MaxHP = hp, Strength = str, Defence = def, WeapPow = wp, ArmPow = ap,
+                Agility = agi, Dexterity = dex, Constitution = con, Wisdom = wis, Intelligence = intel, Healing = 3,
+                BaseMaxHP = hp, BaseStrength = str, BaseDefence = def, BaseAgility = agi, BaseDexterity = dex,
+                BaseConstitution = con, BaseWisdom = wis, BaseIntelligence = intel,
+                Stamina = 5 + level * 2, AI = CharacterAI.Computer, Allowed = true, IsSettlementMilitia = true,
+            };
+        }
+
+        /// <summary>Adds the militia fighter to this fight's list when the service is held and none is there yet.</summary>
+        public static Character? JoinFight(Character? owner, List<Character>? fightTeam)
+        {
+            if (!Active(owner) || fightTeam == null || fightTeam.Any(t => t != null && t.IsSettlementMilitia)) return null;
+            var militia = Build(owner!);
+            fightTeam.Add(militia);
+            return militia;
         }
     }
 

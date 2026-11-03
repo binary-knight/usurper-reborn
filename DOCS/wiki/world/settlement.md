@@ -33,7 +33,7 @@ Your gold goes to the core building under construction; with none, to the propos
 
 ## Settlement services
 
-A service opens when its building reaches the tier below. You can hold only one of the timed settlement buffs at a time (Tavern, Palisade, Arena, Thieves' Den, Prison or Library); it lasts {{balance:SettlementBuffDuration}} fights.
+A service opens when its building reaches the tier below. You can hold only one of the timed settlement buffs at a time (Tavern, Palisade, Arena, Thieves' Den, Prison, Library or Barracks); it lasts {{balance:SettlementBuffDuration}} fights, the Barracks 3.
 
 - **Tavern (Built):** +10 percent experience from fights.
 - **Market Stall (Built):** says trading will come later; it sells nothing.
@@ -61,7 +61,8 @@ Each is listed with what it needs to be proposed and the tier its service needs.
 - **Gambling Hall** (needs a Tavern Built; Built): bet up to {{balance:SettlementGambleMaxBet}} gold; you win double the bet back 50 percent of the time.
 - **Oracle's Sanctum** (needs a Mystic Circle Built; Upgraded): a hint about the dungeon.
 - **Memorial** (always possible): no service. When it passes, settler gifts are 25 percent larger for 10 steps.
-- **Barracks** (needs a Palisade Built) and **Smugglers' Cache** (needs no Council Hall Built yet): no service and no effect.
+- **Barracks** (needs a Palisade Built; Built): a settler militia fighter at your level minus 2 (at least level 1) fights at your side in each of your next 3 fights and leaves at the end of each; it takes no experience and never joins your dungeon party.
+- **Smugglers' Cache** (needs no Council Hall Built yet): no service and no effect.
 
 ## Changing world state
 

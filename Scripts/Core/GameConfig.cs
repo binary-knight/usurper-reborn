@@ -2122,6 +2122,9 @@ public static partial class GameConfig
     public const float SettlementTrapResist = 0.50f;             // Prison: -50% trap damage
     public const float SettlementLibraryXPBonus = 0.05f;         // Library: +5% XP (stacks w/ Tavern)
     public const long SettlementGambleMaxBet = 5000;             // Gambling Hall: max bet
+    // 1.3.10 (P6): the Barracks sends a settler militia fighter, the player's level minus this, into each of the next fights
+    public const int SettlementMilitiaFights = 3;
+    public const int SettlementMilitiaLevelsBelow = 2;
 
     // Reinforced Door (safe home sleep in online mode)
     public const long ReinforcedDoorCost = 250_000;

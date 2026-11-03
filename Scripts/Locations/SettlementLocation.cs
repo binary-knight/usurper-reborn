@@ -962,6 +962,9 @@ public class SettlementLocation : BaseLocation
             case "oracles_sanctum":
                 await UseOracleService();
                 break;
+            case "barracks":
+                await UseBarracksService();
+                break;
             default:
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("settlement.service_not_available"));
@@ -1236,6 +1239,31 @@ public class SettlementLocation : BaseLocation
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("settlement.gambling_remaining", $"{currentPlayer.Gold:N0}"));
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>1.3.10 (P6): the Barracks. A settler militia fighter joins each of the next fights (SettlementMilitia); it is
+    /// one of the timed settlement buffs, so it waits while another is held.</summary>
+    private async Task UseBarracksService()
+    {
+        if (currentPlayer.HasSettlementBuff)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("ui.settlement_buff_active"));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.SettlementBuffType = (int)SettlementBuffType.Militia;
+        currentPlayer.SettlementBuffCombats = GameConfig.SettlementMilitiaFights;
+        currentPlayer.SettlementBuffValue = 0f;
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("settlement.barracks_desc"));
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("settlement.gained_militia", SettlementMilitia.LevelFor(currentPlayer), GameConfig.SettlementMilitiaFights));
+
         await terminal.PressAnyKey();
     }
 

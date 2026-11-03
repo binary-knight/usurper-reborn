@@ -1210,6 +1210,9 @@ public partial class CombatEngine
         // [R]-retreat removes from this combat-local list only (they stay in the group).
         currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
         currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.3.8 H: an ally told to wait is in no fight
+        var settlementMilitia = SettlementMilitia.JoinFight(player, currentTeammates);   // 1.3.10 (P6): the Barracks militia, this fight only
+        if (settlementMilitia != null)
+            terminal.WriteLine(Loc.Get("settlement.militia_joins", settlementMilitia.DisplayName, settlementMilitia.Level), "bright_green");
 
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
@@ -2232,6 +2235,7 @@ public partial class CombatEngine
         // 1.2.0 Temple gods piece 5: Sylvana's beast was this fight's only; it leaves before the
         // outcome, so it takes no XP share and never reaches the pet or party code after the fight
         result.Teammates?.RemoveAll(t => t != null && t.IsMiracleAlly);
+        result.Teammates?.RemoveAll(t => t != null && t.IsSettlementMilitia);   // 1.3.10 (P6): the Barracks militia leaves the same way
 
         // Determine combat outcome
         if (globalEscape)

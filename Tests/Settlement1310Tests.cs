@@ -25,6 +25,8 @@ namespace UsurperReborn.Tests;
 ///      it does: Smoke Powder (+2 Agility), in every language.
 /// P12. A fifth outpost, the Cinder Post on floor 85 (the deep floors had none after 65): floor 65's services and heal
 ///      factors, with the outposts' own goods and the top herbs; its text is keyed in every language.
+/// P6.  The Barracks, voted, funded and built with no service, now serves once Built: a settler militia fighter at the
+///      player's level minus 2 joins each of the next 3 monster fights (a timed settlement buff) and leaves at each end.
 /// All in memory.
 /// </summary>
 [Collection("SharedGameSingletons")]
@@ -166,6 +168,200 @@ public class Settlement1310Tests : IDisposable
         typeof(DungeonLocation).GetMethod("ApplySettlementPurchase", F)!.Invoke(d, new object[] { hero, "smoke_bomb" });
         hero.SmokeBombs.Should().Be(0, "it is not the Black Market's guaranteed escape");
         hero.TimedStatBuffs.Should().ContainSingle(b => b.Source == "settlement_smoke_bomb" && b.Stat == StatKind.Agility && b.Amount == 2 && b.CombatsLeft == 1);
+    }
+
+    // ---------- P6: the Barracks militia ----------
+
+    /// <summary>Runs the body with a fresh settlement state that has the given proposed buildings, then puts the old one back.</summary>
+    private static async Task WithSettlement(Func<Task> body, params (string id, BuildingTier tier)[] built)
+    {
+        var saved = SettlementSystem.Instance.State;
+        try
+        {
+            var state = new SettlementState();
+            foreach (var (id, tier) in built) state.ProposedBuildings[id] = new ProposedBuildingState { Id = id, Tier = tier };
+            SettlementSystem.Instance.State = state;
+            await body();
+        }
+        finally { SettlementSystem.Instance.State = saved; }
+    }
+
+    [Fact]
+    public async Task The_barracks_is_a_service_once_built_and_not_before()
+    {
+        await WithSettlement(() =>
+        {
+            SettlementSystem.Instance.GetProposedServices().Should().NotContain(s => s.buildingId == "barracks");
+            return Task.CompletedTask;
+        }, ("barracks", BuildingTier.Foundation));
+        await WithSettlement(() =>
+        {
+            var svc = SettlementSystem.Instance.GetProposedServices();
+            svc.Should().ContainSingle(s => s.buildingId == "barracks");
+            svc.Single(s => s.buildingId == "barracks").label.Should().Be(Loc.Get("settlement.psvc.barracks"));
+            return Task.CompletedTask;
+        }, ("barracks", BuildingTier.Built));
+        // the services already there keep their keys
+        await WithSettlement(() =>
+        {
+            var svc = SettlementSystem.Instance.GetProposedServices();
+            svc.Single(s => s.buildingId == "arena").key.Should().Be("8");
+            svc.Single(s => s.buildingId == "barracks").key.Should().Be("9");
+            return Task.CompletedTask;
+        }, ("arena", BuildingTier.Upgraded), ("barracks", BuildingTier.Upgraded));
+    }
+
+    [Fact]
+    public async Task The_barracks_service_gives_the_militia_for_three_fights()
+    {
+        var hero = Hero("Militia Captain", 30);
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero);
+        await Run(loc, "UseBarracksService");
+        hero.SettlementBuffType.Should().Be((int)SettlementBuffType.Militia);
+        hero.SettlementBuffCombats.Should().Be(3);
+        hero.HasSettlementBuff.Should().BeTrue();
+        screen.Text.Should().Contain(Loc.Get("settlement.gained_militia", 28, 3));
+    }
+
+    [Fact]
+    public async Task The_barracks_waits_while_another_settlement_buff_is_held()
+    {
+        var hero = Hero("Busy Captain", 30);
+        hero.SettlementBuffType = (int)SettlementBuffType.XPBonus;
+        hero.SettlementBuffCombats = 4;
+        hero.SettlementBuffValue = GameConfig.SettlementXPBonus;
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero);
+        await Run(loc, "UseBarracksService");
+        hero.SettlementBuffType.Should().Be((int)SettlementBuffType.XPBonus);
+        hero.SettlementBuffCombats.Should().Be(4);
+        screen.Text.Should().Contain(Loc.Get("ui.settlement_buff_active"));
+    }
+
+    [Theory]
+    [InlineData(30, 28)]
+    [InlineData(2, 1)]
+    [InlineData(1, 1)]
+    public void The_militia_fighter_is_the_players_level_minus_two_with_the_tank_mercenarys_stats(int level, int expected)
+    {
+        var m = SettlementMilitia.Build(Hero("Lvl", level));
+        m.Level.Should().Be(expected);
+        m.IsSettlementMilitia.Should().BeTrue();
+        m.IsMercenary.Should().BeFalse("a dead militia fighter is not a lost royal bodyguard");
+        m.Class.Should().Be(CharacterClass.Warrior);
+        m.AI.Should().Be(CharacterAI.Computer);
+        m.DisplayName.Should().Be(Loc.Get("settlement.militia_name"));
+
+        // the royal Tank mercenary at the same level (CastleLocation.GenerateMercenary)
+        var castle = new CastleLocation();
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(castle, Hero("King", level));
+        var merc = (RoyalMercenary)typeof(CastleLocation).GetMethod("GenerateMercenary", F)!.Invoke(castle, new object[] { "Tank", expected })!;
+        (m.MaxHP, m.Strength, m.Defence, m.WeapPow, m.ArmPow).Should().Be((merc.MaxHP, merc.Strength, merc.Defence, merc.WeapPow, merc.ArmPow));
+        (m.Agility, m.Dexterity, m.Constitution, m.Wisdom, m.Intelligence).Should().Be((merc.Agility, merc.Dexterity, merc.Constitution, merc.Wisdom, merc.Intelligence));
+        (m.BaseMaxHP, m.BaseStrength, m.BaseDefence).Should().Be((merc.MaxHP, merc.Strength, merc.Defence));
+    }
+
+    private sealed class Scripted : Stream
+    {
+        private readonly byte[] _data; private int _pos;
+        public Scripted(string script) { _data = Encoding.UTF8.GetBytes(script); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int n = Math.Min(count, _data.Length - _pos);
+            if (n <= 0) return 0;
+            Array.Copy(_data, _pos, buffer, offset, n); _pos += n; return n;
+        }
+        public override bool CanRead => true; public override bool CanSeek => false; public override bool CanWrite => false;
+        public override long Length => _data.Length;
+        public override long Position { get => _pos; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long o, SeekOrigin so) => throw new NotSupportedException();
+        public override void SetLength(long v) => throw new NotSupportedException();
+        public override void Write(byte[] b, int o, int c) => throw new NotSupportedException();
+    }
+
+    private static Character Fighter(string name) => new Character
+    {
+        Name2 = name, Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 10,
+        HP = 500, MaxHP = 500, BaseMaxHP = 500, Strength = 80, BaseStrength = 80, Defence = 40, BaseDefence = 40,
+        Dexterity = 30, BaseDexterity = 30, Agility = 25, BaseAgility = 25, Constitution = 30, BaseConstitution = 30,
+        Gold = 100, Stamina = 100, CombatSpeed = CombatSpeed.Instant, Mental = 80,
+    };
+
+    private static async Task<(CombatResult result, string text, List<Character> seen)> MilitiaFight(Character hero, List<Character>? party = null)
+    {
+        var output = new MemoryStream();
+        var engine = new CombatEngine(new TerminalEmulator(new Scripted(string.Concat(Enumerable.Repeat("A\n", 10)) + string.Concat(Enumerable.Repeat("P\n", 6))), output));
+        engine.SeedRandomForTests(1310);
+        var rat = new Monster { Name = "Sewer Rat", Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 5, Gold = 3 };
+        var result = await engine.PlayerVsMonsters(hero, new List<Monster> { rat }, party, offerMonkEncounter: false);
+        string text = Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
+        return (result, text, party ?? new List<Character>());
+    }
+
+    [Fact]
+    public async Task The_militia_joins_each_fight_while_held_leaves_at_its_end_and_counts_three_fights()
+    {
+        var hero = Fighter("Militia Owner");
+        hero.SettlementBuffType = (int)SettlementBuffType.Militia;
+        hero.SettlementBuffCombats = GameConfig.SettlementMilitiaFights;
+        var party = new List<Character>();
+        for (int fight = 1; fight <= 3; fight++)
+        {
+            var (result, text, _) = await MilitiaFight(hero, party);
+            result.Outcome.Should().Be(CombatOutcome.Victory, text);
+            text.Should().Contain(Loc.Get("settlement.militia_joins", Loc.Get("settlement.militia_name"), 8), $"fight {fight}");
+            result.Teammates.Should().NotContain(t => t.IsSettlementMilitia, "it leaves at the fight's end");
+            party.Should().BeEmpty("it never joins the dungeon party");
+            hero.SettlementBuffCombats.Should().Be(3 - fight);
+        }
+        hero.SettlementBuffType.Should().Be(0, "spent after three fights");
+        var (_, after, _) = await MilitiaFight(hero, party);
+        after.Should().NotContain(Loc.Get("settlement.militia_name"), "no militia once the three fights are spent");
+    }
+
+    [Fact]
+    public async Task No_militia_joins_without_the_barracks_service()
+    {
+        var hero = Fighter("No Militia");
+        hero.SettlementBuffType = (int)SettlementBuffType.XPBonus;
+        hero.SettlementBuffCombats = 5;
+        hero.SettlementBuffValue = GameConfig.SettlementXPBonus;
+        var (result, text, _) = await MilitiaFight(hero);
+        result.Outcome.Should().Be(CombatOutcome.Victory, text);
+        text.Should().NotContain(Loc.Get("settlement.militia_name"));
+    }
+
+    [Fact]
+    public async Task The_status_sheet_shows_the_militia_as_an_ally_not_a_percent()
+    {
+        var hero = Hero("Status Captain", 30);
+        hero.SettlementBuffType = (int)SettlementBuffType.Militia;
+        hero.SettlementBuffCombats = 2;
+        var loc = new MainStreetLocation();
+        var screen = At(loc, hero);
+        await (Task)typeof(BaseLocation).GetMethod("ShowStatus", F)!.Invoke(loc, Array.Empty<object>())!;
+        screen.Text.Should().Contain(Loc.Get("base.buff_settlement_militia", 2).Trim());
+        screen.Text.Should().NotContain(Loc.Get("base.buff_settlement_default"));
+    }
+
+    [Fact]
+    public void The_militia_rows_exist_in_every_language_and_fit_79_columns()
+    {
+        string[] keys = { "settlement.psvc.barracks", "settlement.barracks_desc", "settlement.militia_name" };
+        foreach (var lang in Langs)
+        {
+            foreach (var k in keys.Concat(new[] { "settlement.gained_militia", "settlement.militia_joins", "base.buff_settlement_militia" }))
+                Loc.GetIn(lang, k).Should().NotBe(k, lang);
+            if (lang == "en" || lang == "hu")
+            {
+                foreach (var k in keys) Loc.GetIn(lang, k).Length.Should().BeLessThanOrEqualTo(79 - 6, $"{lang} {k}");
+                Loc.GetIn(lang, "settlement.gained_militia", 98, 3).Length.Should().BeLessThanOrEqualTo(79, lang);
+                Loc.GetIn(lang, "settlement.militia_joins", Loc.GetIn(lang, "settlement.militia_name"), 98).Length.Should().BeLessThanOrEqualTo(79, lang);
+                Loc.GetIn(lang, "base.buff_settlement_militia", 3).Length.Should().BeLessThanOrEqualTo(79, lang);
+            }
+        }
     }
 
     // ---------- P12: the floor 85 outpost ----------
