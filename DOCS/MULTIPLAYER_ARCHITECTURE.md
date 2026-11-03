@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.9; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.10; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
@@ -379,10 +379,13 @@ Option B: Single shared account with in-game auth (simpler)
 - Processes daily events (NPC aging, respawns, economy, etc.)
 - Sets `daily_state.last_reset_day` to prevent double-processing
 - Other players see "Daily maintenance in progress..." briefly
+- Claimed quests age once a day, by the world reset (`WorldSimService`), not by each player's own daily reset (1.3.10; `QuestSystem.WorldResetAgesQuests`, `DailySystemManager`)
+- Team wages are charged per player at that player's own daily reset (1.3.10; `MaintenanceSystem.ProcessTeamWages`, called from `DailySystemManager`); the shared maintenance pass charges none online
 
 ### Crash/Disconnect Recovery
 - `online_players` entries expire after 120 seconds without heartbeat
 - Background cleanup process removes stale entries
+- The orphan cleanup (`SqlSaveBackend.PruneOrphanedPlayerData`) compares names with `ulower`, which folds case as C# does (1.3.10), so a name stored in another case never removes a connected player's `online_players` row or restarts the connected time the online list shows
 - Player data auto-saved before any risky operation
 - SQLite WAL mode prevents corruption on process crash
 

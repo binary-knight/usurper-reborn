@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.9; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
+<!-- doc: checked 1.3.10; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
 # Usurper Reborn: Docker Deployment Guide
 
 Host your own Usurper Reborn MUD server using Docker.
@@ -135,7 +135,7 @@ In this compose stack nginx passes every page to the web service, which serves `
 ## Connecting
 
 ### Browser
-Open `http://your-server` in a browser. Click "Play Now" for the embedded terminal, or open `http://your-server/play/` for the full page client.
+Open `http://your-server` in a browser. Click "Play Now" for the embedded terminal, or open `http://your-server/play/` for the full page client. The landing page Docker ships also links to `/play/` as "Play in the Browser" (`docker/web/index.html`).
 
 ### SSH (requires additional sshd setup)
 The Docker setup doesn't include an SSH server. Players connect via the browser terminal or raw TCP. For SSH access, run sshd on the host (or in a container that has the game binary) with a `ForceCommand` of `UsurperReborn --mud-relay --mud-port 4000`; the relay puts the terminal in raw mode and forwards to the game server with the player's login. `DOCS/SERVER_DEPLOYMENT.md` has the full sshd setup used on the public server.
