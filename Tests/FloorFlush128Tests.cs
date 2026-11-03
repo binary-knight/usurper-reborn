@@ -649,7 +649,8 @@ public class FloorFlush128Tests : IDisposable
             state.IsPermanentlyClear.Should().BeFalse("the seal floor's permanent clear waits for leaving the floor");
             state.EverCleared.Should().BeFalse();
             ((bool)typeof(DungeonLocation).GetMethod("IsFloorCleared", F)!.Invoke(dungeon, null)!).Should().BeTrue();
-            ((int)typeof(DungeonLocation).GetMethod("GetMaxAccessibleFloor", F)!.Invoke(dungeon, new object[] { hero, SealFloor + 1 })!)
+            // 1.3.10: the gate is static (QuestSystem places quest targets by it)
+            ((int)typeof(DungeonLocation).GetMethod("GetMaxAccessibleFloor", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { hero, SealFloor + 1 })!)
                 .Should().Be(SealFloor + 1, "the next floor opens as before");
 
             SaveFloorStateOnLeaving(dungeon, hero);

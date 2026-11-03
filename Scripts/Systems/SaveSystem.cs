@@ -1743,7 +1743,8 @@ namespace UsurperRemake.Systems
                         RequiredProgress = objective.RequiredProgress,
                         CurrentProgress = objective.CurrentProgress,
                         IsOptional = objective.IsOptional,
-                        BonusReward = objective.BonusReward
+                        BonusReward = objective.BonusReward,
+                        TargetFloor = objective.TargetFloor   // 1.3.10
                     });
                 }
 

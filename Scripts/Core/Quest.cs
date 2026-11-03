@@ -563,6 +563,9 @@ public class QuestObjective
     public int CurrentProgress { get; set; } = 0;       // Current count
     public bool IsOptional { get; set; } = false;       // Optional bonus objectives
     public int BonusReward { get; set; } = 0;           // Extra reward for optional objectives
+    /// <summary>1.3.10: the dungeon floor where this kill objective's named target waits (QuestSystem.PlaceTargets),
+    /// set when the quest is taken; 0 for none.</summary>
+    public int TargetFloor { get; set; } = 0;
 
     // v0.61.3: localization-aware fields. When DescriptionKey is non-empty, the
     // display layer renders Loc.Get(DescriptionKey, DescriptionArgs) using the

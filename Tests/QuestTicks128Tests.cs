@@ -315,6 +315,7 @@ public class QuestTicks128Tests
         {
             "Id", "Description", "DescriptionKey", "DescriptionArgs", "ObjectiveType", "TargetId", "TargetName",
             "RequiredProgress", "CurrentProgress", "IsOptional", "BonusReward",
+            "TargetFloor",   // 1.3.10: a placed target's floor; 0 when a save made before it loads, which is "none"
         });
     }
 }

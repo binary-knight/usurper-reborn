@@ -16,7 +16,10 @@ public static class MonsterGenerator
     /// </summary>
     /// <param name="approachScale">v1.1.10: extra HP and damage for a dungeon floor that leads up to an Old
     /// God (OldGodApproachScale); 1.0 everywhere else. Defence is not scaled.</param>
-    public static Monster GenerateMonster(int dungeonLevel, bool isBoss = false, bool isMiniBoss = false, Random? random = null, double approachScale = 1.0)
+    /// <param name="forced">1.3.10: the family and tier to make (a quest's placed champion), in place of one drawn for the
+    /// level; null draws one as before.</param>
+    public static Monster GenerateMonster(int dungeonLevel, bool isBoss = false, bool isMiniBoss = false, Random? random = null, double approachScale = 1.0,
+        (MonsterFamilies.MonsterFamily Family, MonsterFamilies.MonsterTier Tier)? forced = null)
     {
         random ??= Random.Shared;
 
@@ -24,7 +27,7 @@ public static class MonsterGenerator
         dungeonLevel = Math.Max(1, Math.Min(100, dungeonLevel));
 
         // Get appropriate monster family and tier for this level
-        var (family, tier) = MonsterFamilies.GetMonsterForLevel(dungeonLevel, random);
+        var (family, tier) = forced ?? MonsterFamilies.GetMonsterForLevel(dungeonLevel, random);
 
         // Calculate base stats using smooth scaling formulas
         var stats = CalculateMonsterStats(dungeonLevel, isBoss ? (tier.BossPowerMultiplier ?? tier.PowerMultiplier) : tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);

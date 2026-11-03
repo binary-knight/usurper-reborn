@@ -596,7 +596,8 @@ public class Castle125Tests : IDisposable
         // Type 2 ("Clear a dungeon floor of all hostile creatures") is a floor to clear; it was read as a monster
         // quest until 1.2.5 because "creature" was checked before "floor".
         var expected = new[] { QuestTarget.Monster, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.ReachFloor, QuestTarget.DefeatNPC };
-        var objective = new[] { QuestObjectiveType.KillMonsters, QuestObjectiveType.ReachDungeonFloor, QuestObjectiveType.ClearDungeonFloor, QuestObjectiveType.ReachDungeonFloor, QuestObjectiveType.KillBoss };
+        // 1.3.10: type 1 (the stolen artifact) is a kill of the thief placed on a floor
+        var objective = new[] { QuestObjectiveType.KillMonsters, QuestObjectiveType.KillBoss, QuestObjectiveType.ClearDungeonFloor, QuestObjectiveType.ReachDungeonFloor, QuestObjectiveType.KillBoss };
         CastleLocation.RoyalQuestTypes.Should().HaveCount(5);
         InLang("hu", () =>
         {
