@@ -32,6 +32,9 @@ namespace UsurperReborn.Tests;
 /// second test says the same without the fixtures: none of the new packages in any stream.
 /// 1.3.10 (fix/combat-1310) re-captured them: the fight menus list P, E, T, W and L (G3), the status line shows Stamina
 /// 306/306, not 100/306 (G6), and each Char.Combat.Enemies enemy carries rank (B12); nothing else.
+/// 1.3.10 (fix/game-small-1310) re-captured them: the map legend rows below the map's last row start at the map's
+/// width (13 columns here), not at column 50, beside the rows above (R13); six rows, 222 bytes, the same in every
+/// session but the screen reader's, whose map has no legend column; nothing else.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WebFlagOff3aTests

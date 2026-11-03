@@ -467,6 +467,9 @@ public class CharacterCreationSystem
             WeapPow = 0,
             ArmPow = 0,
             AutoHeal = false,
+            // 1.3.10: a new character starts on Fast combat speed; a loaded save keeps its own (a save with no
+            // CombatSpeed field reads Normal, PlayerData's default)
+            CombatSpeed = CombatSpeed.Fast,
             Loyalty = GameConfig.DefaultLoyalty,
             Haunt = 0,
             Master = '1',
