@@ -878,6 +878,10 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task CheckQuestDependentFloorEvents(Character player, TerminalEmulator term)
     {
+        // 1.3.10: the moral paradoxes of floors 25, 65 and 80 are offered on any entry once their
+        // prerequisite is met (a seal, an artifact, a god's fate), not only on a first visit
+        await OfferFloorParadox(player, term);
+
         switch (currentDungeonLevel)
         {
             case 85:
@@ -943,6 +947,33 @@ public class DungeonLocation : BaseLocation
         }
     }
 
+    /// <summary>1.3.10: the paradox each floor offers on any entry (floor 95 keeps its own two checks below).</summary>
+    internal static string? FloorParadoxId(int floor) => floor switch
+    {
+        25 => "possessed_child",
+        65 => "velouras_cure",
+        80 => "free_terravok",
+        _ => null
+    };
+
+    /// <summary>1.3.10: offers this floor's paradox when it is available; floor 65 keeps its lead-in moment.</summary>
+    private async Task OfferFloorParadox(Character player, TerminalEmulator term)
+    {
+        var id = FloorParadoxId(currentDungeonLevel);
+        if (id == null || !MoralParadoxSystem.Instance.IsParadoxAvailable(id, player))
+            return;
+        if (id == "velouras_cure")
+        {
+            term.WriteLine("");
+            await ShowStoryMoment(term, Loc.Get("dungeon.story_soulweaver_price_title"),
+                new[] {
+                    Loc.Get("dungeon.story_soulweaver_price_1"),
+                    Loc.Get("dungeon.story_soulweaver_price_2"),
+                }, "bright_magenta");
+        }
+        await MoralParadoxSystem.Instance.PresentParadox(id, player, term);
+    }
+
     /// <summary>
     /// Trigger narrative events at key dungeon floors
     /// </summary>
@@ -993,11 +1024,7 @@ public class DungeonLocation : BaseLocation
                         Loc.Get("dungeon.story_whispers_6")
                     }, "bright_cyan");
                 StoryProgressionSystem.Instance.SetStoryFlag("heard_whispers", true);
-                // Moral Paradox: The Possessed Child
-                if (MoralParadoxSystem.Instance.IsParadoxAvailable("possessed_child", player))
-                {
-                    await MoralParadoxSystem.Instance.PresentParadox("possessed_child", player, term);
-                }
+                // 1.3.10: the Possessed Child is offered in CheckQuestDependentFloorEvents (every entry)
                 break;
 
             case 30:
@@ -1099,19 +1126,7 @@ public class DungeonLocation : BaseLocation
                 }
                 break;
 
-            case 65:
-                // Moral Paradox: Veloura's Cure (deeper choice about the Loom's cost)
-                if (MoralParadoxSystem.Instance.IsParadoxAvailable("velouras_cure", player))
-                {
-                    term.WriteLine("");
-                    await ShowStoryMoment(term, Loc.Get("dungeon.story_soulweaver_price_title"),
-                        new[] {
-                            Loc.Get("dungeon.story_soulweaver_price_1"),
-                            Loc.Get("dungeon.story_soulweaver_price_2"),
-                        }, "bright_magenta");
-                    await MoralParadoxSystem.Instance.PresentParadox("velouras_cure", player, term);
-                }
-                break;
+            // 1.3.10: floor 65 (Veloura's Cure) moved to CheckQuestDependentFloorEvents (every entry)
 
             case 75:
                 await ShowStoryMoment(term, Loc.Get("dungeon.story_echoes_title"),
@@ -1148,11 +1163,7 @@ public class DungeonLocation : BaseLocation
                         "",
                         Loc.Get("dungeon.story_mourning_8")
                     }, "bright_blue");
-                // Moral Paradox: Free Terravok (alternative to combat)
-                if (MoralParadoxSystem.Instance.IsParadoxAvailable("free_terravok", player))
-                {
-                    await MoralParadoxSystem.Instance.PresentParadox("free_terravok", player, term);
-                }
+                // 1.3.10: Free Terravok is offered in CheckQuestDependentFloorEvents (every entry)
                 break;
 
             // Cases 85 and 90 moved to CheckQuestDependentFloorEvents() — they depend on
