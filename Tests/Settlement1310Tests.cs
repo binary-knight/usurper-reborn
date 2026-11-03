@@ -12,6 +12,7 @@ using UsurperRemake;
 using UsurperRemake.Data;
 using UsurperRemake.Locations;
 using UsurperRemake.Systems;
+using UsurperReborn.Tests.Localization;
 using Xunit;
 
 namespace UsurperReborn.Tests;
@@ -27,6 +28,9 @@ namespace UsurperReborn.Tests;
 ///      factors, with the outposts' own goods and the top herbs; its text is keyed in every language.
 /// P6.  The Barracks, voted, funded and built with no service, now serves once Built: a settler militia fighter at the
 ///      player's level minus 2 joins each of the next 3 monster fights (a timed settlement buff) and leaves at each end.
+/// P6.  The Smugglers' Cache, likewise, now serves once Built: its "-10% shop prices (5 purchases)" comes off wherever the
+///      city controller's shop discount applies (Weapon, Armor and Magic shops), shown and charged, and each purchase
+///      there spends one. The count is saved; a save without it loads with none.
 /// All in memory.
 /// </summary>
 [Collection("SharedGameSingletons")]
@@ -360,6 +364,156 @@ public class Settlement1310Tests : IDisposable
                 Loc.GetIn(lang, "settlement.gained_militia", 98, 3).Length.Should().BeLessThanOrEqualTo(79, lang);
                 Loc.GetIn(lang, "settlement.militia_joins", Loc.GetIn(lang, "settlement.militia_name"), 98).Length.Should().BeLessThanOrEqualTo(79, lang);
                 Loc.GetIn(lang, "base.buff_settlement_militia", 3).Length.Should().BeLessThanOrEqualTo(79, lang);
+            }
+        }
+    }
+
+    // ---------- P6: the Smugglers' Cache ----------
+
+    [Fact]
+    public async Task The_cache_is_a_service_once_built_after_the_ones_already_there()
+    {
+        await WithSettlement(() =>
+        {
+            SettlementSystem.Instance.GetProposedServices().Should().NotContain(s => s.buildingId == "smugglers_cache");
+            return Task.CompletedTask;
+        }, ("smugglers_cache", BuildingTier.Foundation));
+        await WithSettlement(() =>
+        {
+            var svc = SettlementSystem.Instance.GetProposedServices();
+            svc.Select(s => (s.key, s.buildingId)).Should().Equal(("8", "gambling_hall"), ("9", "barracks"), ("10", "smugglers_cache"));
+            svc.Last().label.Should().Be(Loc.Get("settlement.psvc.smugglers_cache"));
+            return Task.CompletedTask;
+        }, ("gambling_hall", BuildingTier.Built), ("barracks", BuildingTier.Built), ("smugglers_cache", BuildingTier.Built));
+    }
+
+    [Fact]
+    public async Task The_cache_service_gives_five_purchases_and_waits_until_they_are_spent()
+    {
+        var hero = Hero("Smuggler Friend");
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero);
+        await Run(loc, "UseSmugglersCacheService");
+        hero.SmugglersCachePurchases.Should().Be(5);
+        hero.HasSettlementBuff.Should().BeFalse("not one of the timed settlement buffs");
+        screen.Text.Should().Contain(Loc.Get("settlement.gained_cache", "10", 5));
+
+        hero.SmugglersCachePurchases = 2;
+        var again = At(loc, hero);
+        await Run(loc, "UseSmugglersCacheService");
+        hero.SmugglersCachePurchases.Should().Be(2, "a new run starts only when the last is spent");
+        again.Text.Should().Contain(Loc.Get("settlement.cache_still_active", 2));
+    }
+
+    [Fact]
+    public void The_town_shop_price_is_ten_percent_lower_while_cache_purchases_are_left()
+    {
+        var hero = Hero("Price Check");
+        CityControlSystem.Instance.ApplyDiscount(1000, hero).Should().Be(1000);
+        hero.SmugglersCachePurchases = 5;
+        CityControlSystem.Instance.ApplyDiscount(1000, hero).Should().Be(900);
+        CityControlSystem.Instance.ApplyDiscount(1000, hero, 4).Should().Be(900, "the fifth purchase in line still has it");
+        CityControlSystem.Instance.ApplyDiscount(1000, hero, 5).Should().Be(1000, "the sixth does not");
+        CityControlSystem.Instance.ApplyDiscount(5, hero).Should().Be(5, "10 percent of 5 rounds to nothing");
+        SmugglersCache.Spend(hero);
+        hero.SmugglersCachePurchases.Should().Be(4);
+        hero.SmugglersCachePurchases = 0;
+        SmugglersCache.Spend(hero);
+        hero.SmugglersCachePurchases.Should().Be(0, "never below none");
+    }
+
+    [Fact]
+    public void A_magic_shop_potion_purchase_is_discounted_and_spends_one_purchase()
+    {
+        var hero = Hero("Potion Buyer", 20);
+        hero.Healing = 0;
+        hero.SmugglersCachePurchases = 1;
+        var shop = new MagicShopLocation();
+        At(shop, hero, "1", "1");
+        long full = (long)typeof(MagicShopLocation).GetMethod("ApplyAllPriceModifiers", F)!.Invoke(shop, new object[] { GameConfig.GetHealingPotionCost(20), hero })!;
+        long gold = hero.Gold;
+        typeof(MagicShopLocation).GetMethod("BuyHealingPotions", F)!.Invoke(shop, new object[] { hero });
+        hero.Healing.Should().Be(1);
+        hero.SmugglersCachePurchases.Should().Be(0);
+        long paidWithCache = gold - hero.Gold;
+        long fullNow = (long)typeof(MagicShopLocation).GetMethod("ApplyAllPriceModifiers", F)!.Invoke(shop, new object[] { GameConfig.GetHealingPotionCost(20), hero })!;
+        fullNow.Should().BeGreaterThan(full, "the discount is gone after the purchase");
+        gold = hero.Gold;
+        typeof(MagicShopLocation).GetMethod("BuyHealingPotions", F)!.Invoke(shop, new object[] { hero });
+        hero.Healing.Should().Be(2);
+        (gold - hero.Gold).Should().BeGreaterThan(paidWithCache, "the second potion costs the full price");
+    }
+
+    [Fact]
+    public void The_armor_auto_buy_plan_prices_only_the_picks_the_cache_still_covers()
+    {
+        var hero = Hero("Armor Planner", 30);
+        hero.SmugglersCachePurchases = 1;
+        var shop = new ArmorShopLocation();
+        At(shop, hero);
+        var plan = ((IEnumerable)typeof(ArmorShopLocation).GetMethod("PlanAutoBuy", F | BindingFlags.Public)!.Invoke(shop, null)!).Cast<object>().ToList();
+        plan.Count.Should().BeGreaterThan(1);
+        long Price(object pick) => (long)pick.GetType().GetProperty("Price")!.GetValue(pick)!;
+        Equipment Armor(object pick) => (Equipment)pick.GetType().GetProperty("Armor")!.GetValue(pick)!;
+        long plain(object pick) { int left = hero.SmugglersCachePurchases; hero.SmugglersCachePurchases = 0;
+            try { return (long)typeof(ArmorShopLocation).GetMethod("AutoBuyPrice", F)!.Invoke(shop, new object[] { Armor(pick), 0 })!; }
+            finally { hero.SmugglersCachePurchases = left; } }
+        Price(plan[0]).Should().BeLessThan(plain(plan[0]), "the first pick has the cache");
+        for (int i = 1; i < plan.Count; i++) Price(plan[i]).Should().Be(plain(plan[i]), $"pick {i} is past the one purchase left");
+    }
+
+    [Fact]
+    public void Every_shop_purchase_priced_through_the_city_discount_spends_a_cache_purchase()
+    {
+        string Src(string file) => File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Locations", file));
+        int Count(string text, string what) => Regex.Matches(text, Regex.Escape(what)).Count;
+        // one spend per purchase site: Weapon Shop buy and auto-buy; Armor Shop buy, auto-buy plan and per-slot path;
+        // Magic Shop healing potions, enchant, enchant removal, accessory, two spells, mana potions and scrying
+        Count(Src("WeaponShopLocation.cs"), "SmugglersCache.Spend(currentPlayer);").Should().Be(2);
+        Count(Src("ArmorShopLocation.cs"), "SmugglersCache.Spend(currentPlayer);").Should().Be(3);
+        string magic = Src("MagicShopLocation.cs");
+        Count(magic, "SmugglersCache.Spend(player);").Should().Be(8);
+        Count(magic, "ApplyAllPriceModifiers(").Should().Be(13, "a new priced purchase needs its own spend");
+    }
+
+    [Fact]
+    public void The_cache_count_is_saved_and_an_older_save_loads_with_none()
+    {
+        var c = Hero("Saved Smuggler");
+        c.SmugglersCachePurchases = 3;
+        var data = (PlayerData)typeof(SaveSystem).GetMethod("SerializePlayer", F)!.Invoke(SaveSystem.Instance, new object[] { c })!;
+        data.SmugglersCachePurchases.Should().Be(3);
+        var back = System.Text.Json.JsonSerializer.Deserialize<PlayerData>(System.Text.Json.JsonSerializer.Serialize(data))!;
+        MenuKeysNeedEnterPref1115Tests.Restore(back).SmugglersCachePurchases.Should().Be(3);
+        var old = System.Text.Json.JsonSerializer.Deserialize<PlayerData>("{}")!;
+        MenuKeysNeedEnterPref1115Tests.Restore(old).SmugglersCachePurchases.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task The_status_sheet_shows_the_cache_purchases_left()
+    {
+        var hero = Hero("Status Smuggler", 30);
+        hero.SmugglersCachePurchases = 4;
+        var loc = new MainStreetLocation();
+        var screen = At(loc, hero);
+        await (Task)typeof(BaseLocation).GetMethod("ShowStatus", F)!.Invoke(loc, Array.Empty<object>())!;
+        screen.Text.Should().Contain(Loc.Get("base.buff_smugglers_cache", "10", 4).Trim());
+    }
+
+    [Fact]
+    public void The_cache_rows_exist_in_every_language_and_fit_79_columns()
+    {
+        string[] keys = { "settlement.psvc.smugglers_cache", "settlement.cache_desc" };
+        foreach (var lang in Langs)
+        {
+            foreach (var k in keys.Concat(new[] { "settlement.gained_cache", "settlement.cache_still_active", "base.buff_smugglers_cache" }))
+                Loc.GetIn(lang, k).Should().NotBe(k, lang);
+            if (lang == "en" || lang == "hu")
+            {
+                foreach (var k in keys) Loc.GetIn(lang, k).Length.Should().BeLessThanOrEqualTo(79 - 6, $"{lang} {k}");
+                Loc.GetIn(lang, "settlement.gained_cache", "10", 5).Length.Should().BeLessThanOrEqualTo(79, lang);
+                Loc.GetIn(lang, "settlement.cache_still_active", 5).Length.Should().BeLessThanOrEqualTo(79, lang);
+                Loc.GetIn(lang, "base.buff_smugglers_cache", "10", 5).Length.Should().BeLessThanOrEqualTo(79, lang);
             }
         }
     }

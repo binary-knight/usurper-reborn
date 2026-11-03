@@ -7197,7 +7197,7 @@ public abstract class BaseLocation
             || currentPlayer.ArenaChampionTier >= (int)UsurperRemake.Data.GauntletChampionData.ArenaTier.GrandChampion
             || currentPlayer.HasActiveShrineAttunement
             || currentPlayer.WellRestedCombats > 0 || currentPlayer.HasGodSlayerBuff
-            || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff
+            || currentPlayer.HasDarkPactBuff || currentPlayer.HasSettlementBuff || currentPlayer.SmugglersCachePurchases > 0   // 1.3.10 (P6)
             || currentPlayer.HasActiveSongBuff || currentPlayer.HasActiveHerbBuff
             || currentPlayer.LoversBlissCombats > 0 || currentPlayer.DivineBlessingCombats > 0
             || currentPlayer.Class == CharacterClass.Alchemist
@@ -7378,6 +7378,11 @@ public abstract class BaseLocation
                 };
                 terminal.SetColor("bright_green");
                 WriteBuff(Loc.Get("base.buff_settlement", buffName, (int)(currentPlayer.SettlementBuffValue * 100), currentPlayer.SettlementBuffCombats));
+            }
+            if (currentPlayer.SmugglersCachePurchases > 0)
+            {
+                terminal.SetColor("bright_green");   // 1.3.10 (P6): the Smugglers' Cache, purchases not fights
+                WriteBuff(Loc.Get("base.buff_smugglers_cache", $"{GameConfig.SmugglersCacheDiscount * 100:F0}", currentPlayer.SmugglersCachePurchases));
             }
             if (currentPlayer.WellRestedCombats > 0)
             {

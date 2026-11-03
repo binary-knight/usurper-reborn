@@ -968,6 +968,7 @@ public class Character
     public int SettlementBuffType { get; set; }       // 0=None, 1=XPBonus, 2=DefenseBonus
     public int SettlementBuffCombats { get; set; }    // Remaining combats
     public float SettlementBuffValue { get; set; }    // Buff multiplier
+    public int SmugglersCachePurchases { get; set; }  // 1.3.10 (P6): Smugglers' Cache purchases left at the discount
     public bool HasSettlementBuff => SettlementBuffType > 0 && SettlementBuffCombats > 0;
     public bool SettlementGoldClaimedToday { get; set; }
     public bool SettlementHerbClaimedToday { get; set; }

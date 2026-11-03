@@ -1038,6 +1038,7 @@ namespace UsurperRemake.Systems
                 SettlementBuffType = player.SettlementBuffType,
                 SettlementBuffCombats = player.SettlementBuffCombats,
                 SettlementBuffValue = player.SettlementBuffValue,
+                SmugglersCachePurchases = player.SmugglersCachePurchases,   // 1.3.10 (P6)
                 SettlementGoldClaimedToday = player.SettlementGoldClaimedToday,
                 SettlementHerbClaimedToday = player.SettlementHerbClaimedToday,
                 SettlementShrineUsedToday = player.SettlementShrineUsedToday,

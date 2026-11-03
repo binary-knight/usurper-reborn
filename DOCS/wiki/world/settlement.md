@@ -62,7 +62,7 @@ Each is listed with what it needs to be proposed and the tier its service needs.
 - **Oracle's Sanctum** (needs a Mystic Circle Built; Upgraded): a hint about the dungeon.
 - **Memorial** (always possible): no service. When it passes, settler gifts are 25 percent larger for 10 steps.
 - **Barracks** (needs a Palisade Built; Built): a settler militia fighter at your level minus 2 (at least level 1) fights at your side in each of your next 3 fights and leaves at the end of each; it takes no experience and never joins your dungeon party.
-- **Smugglers' Cache** (needs no Council Hall Built yet): no service and no effect.
+- **Smugglers' Cache** (needs no Council Hall Built yet; Built): your next 5 purchases in the Weapon, Armor and Magic shops cost 10 percent less (see [shops](/wiki/en/items/shops/)). It is not a timed buff and does not count fights; you can take it again once the 5 are spent.
 
 ## Changing world state
 

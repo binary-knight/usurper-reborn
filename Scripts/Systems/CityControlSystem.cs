@@ -120,15 +120,16 @@ public class CityControlSystem
     /// <summary>
     /// Apply discount to a price for city controllers
     /// </summary>
-    public long ApplyDiscount(long originalPrice, Character buyer)
+    public long ApplyDiscount(long originalPrice, Character buyer, int cachePurchasesAhead = 0)
     {
+        // 1.3.10 (P6): the Smugglers' Cache discount comes off in the same shops (SmugglersCache)
         if (!IsCharacterCityController(buyer))
-            return originalPrice;
+            return SmugglersCache.Apply(originalPrice, buyer, cachePurchasesAhead);
 
         float discount = GetShopDiscount(buyer);
         long discountAmount = (long)(originalPrice * discount);
 
-        return Math.Max(1, originalPrice - discountAmount);
+        return SmugglersCache.Apply(Math.Max(1, originalPrice - discountAmount), buyer, cachePurchasesAhead);
     }
 
     /// <summary>

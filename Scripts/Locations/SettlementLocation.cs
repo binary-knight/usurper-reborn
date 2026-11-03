@@ -965,6 +965,9 @@ public class SettlementLocation : BaseLocation
             case "barracks":
                 await UseBarracksService();
                 break;
+            case "smugglers_cache":
+                await UseSmugglersCacheService();
+                break;
             default:
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("settlement.service_not_available"));
@@ -1263,6 +1266,29 @@ public class SettlementLocation : BaseLocation
         terminal.WriteLine(Loc.Get("settlement.barracks_desc"));
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("settlement.gained_militia", SettlementMilitia.LevelFor(currentPlayer), GameConfig.SettlementMilitiaFights));
+
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>1.3.10 (P6): the Smugglers' Cache. The next purchases in the town shops cost less (SmugglersCache); it is
+    /// not a timed settlement buff, and a new run starts only when the last one is spent.</summary>
+    private async Task UseSmugglersCacheService()
+    {
+        if (currentPlayer.SmugglersCachePurchases > 0)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("settlement.cache_still_active", currentPlayer.SmugglersCachePurchases));
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        currentPlayer.SmugglersCachePurchases = GameConfig.SmugglersCachePurchases;
+
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get("settlement.cache_desc"));
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("settlement.gained_cache", $"{GameConfig.SmugglersCacheDiscount * 100:F0}", GameConfig.SmugglersCachePurchases));
 
         await terminal.PressAnyKey();
     }

@@ -779,6 +779,8 @@ namespace UsurperRemake.Systems
             // 1.3.10 (P6): the two buildings that were voted, funded and built with no service now serve once Built
             if (HasProposedBuilding("barracks", BuildingTier.Built))
                 services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.barracks"), "barracks"));
+            if (HasProposedBuilding("smugglers_cache", BuildingTier.Built))
+                services.Add((keyNum++.ToString(), Loc.Get("settlement.psvc.smugglers_cache"), "smugglers_cache"));
 
             return services;
         }
@@ -941,6 +943,28 @@ namespace UsurperRemake.Systems
             var militia = Build(owner!);
             fightTeam.Add(militia);
             return militia;
+        }
+    }
+
+    /// <summary>
+    /// 1.3.10 (P6): the Smugglers' Cache. Its service gives GameConfig.SmugglersCachePurchases purchases at
+    /// GameConfig.SmugglersCacheDiscount off in the town shops, the Weapon Shop, the Armor Shop and the Magic Shop:
+    /// wherever the city controller's shop discount applies (CityControlSystem.ApplyDiscount), so the price shown is the
+    /// price charged. Each purchase there (a quantity of potions is one purchase) spends one.
+    /// </summary>
+    public static class SmugglersCache
+    {
+        /// <summary>Whether the purchase <paramref name="purchasesAhead"/> places after the next one still gets the discount.</summary>
+        public static bool Active(Character? buyer, int purchasesAhead = 0) =>
+            buyer != null && buyer.SmugglersCachePurchases > Math.Max(0, purchasesAhead);
+
+        public static long Apply(long price, Character? buyer, int purchasesAhead = 0) =>
+            Active(buyer, purchasesAhead) ? Math.Max(1, price - (long)(price * GameConfig.SmugglersCacheDiscount)) : price;
+
+        /// <summary>One purchase made at a price that went through Apply.</summary>
+        public static void Spend(Character? buyer)
+        {
+            if (buyer != null && buyer.SmugglersCachePurchases > 0) buyer.SmugglersCachePurchases--;
         }
     }
 
