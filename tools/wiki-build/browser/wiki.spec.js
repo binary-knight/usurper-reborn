@@ -55,6 +55,7 @@ for (const route of [
     page,
   }) => {
     await open(page);
+    await page.getByRole("button", { name: "Light theme" }).click();
     for (const summary of await page.locator("summary").all())
       await summary.click();
     await fits(page);
