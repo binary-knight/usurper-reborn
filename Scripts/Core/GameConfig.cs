@@ -2739,6 +2739,7 @@ public static partial class GameConfig
     public const int DefaultPlayerFights = 3;     // plfights
     public const int DefaultStartingHealing = 20;  // starting potions (scales with level)
     public const int DefaultGoodDeeds = 3;        // chivnr
+    public const int GoodDeedAlmsGoldPerLevel = 20;   // 1.3.10 (P13, his pick): "give gold to the poor" costs level x 20 gold
     public const int DefaultDarkDeeds = 3;        // darknr
     public const int DefaultLoyalty = 50;
     public const int DefaultMentalHealth = 100;

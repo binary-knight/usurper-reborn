@@ -398,4 +398,143 @@ public class Economy1310Tests : IDisposable
         below.Healing.Should().Be(below.MaxPotions, "below the limit the potion is sold");
         below.Gold.Should().Be(10_000 - (40 + 3 * below.Level));
     }
+
+    // ------------------------------------------------------------------ P13: Good Deeds, the bank ban, the Reinforced Door
+
+    [Theory]
+    [InlineData(1, "visual")] [InlineData(3, "visual")]
+    [InlineData(1, "screenreader")] [InlineData(3, "screenreader")]
+    [InlineData(1, "bbs")] [InlineData(3, "bbs")]
+    public void P13_TheClassicMainStreet_ShowsGoodDeeds(int tier, string mode)
+    {
+        string label = Loc.Get("main_street.good_deeds_title");
+        string menu = ClassicMainStreetLayout1114Tests.RenderClassic(tier == 3 ? 10 : 1, false, mode);
+        menu.Should().Contain(mode == "screenreader" ? $"  G - {label}" : $"[G]{label}");
+        foreach (string row in menu.Split('\n'))
+            if (row.Contains("[G]") || row.Contains("G - ")) row.Length.Should().BeLessThanOrEqualTo(79, row);
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public void P13_TheClassicGoodDeedsRows_Fit79_InEveryLanguage(string lang)
+    {
+        string prev = GameConfig.Language;
+        GameConfig.Language = lang;
+        try
+        {
+            foreach (var mode in new[] { "visual", "bbs" })
+                foreach (string row in ClassicMainStreetLayout1114Tests.RenderClassic(10, false, mode).Split('\n'))
+                    if (row.Contains("[G]")) row.Length.Should().BeLessThanOrEqualTo(79, $"{lang} {mode}: {row}");
+            ("  " + Loc.GetIn(lang, "main_street.deed_give_gold", 999_999.ToString("N0"))).Length.Should().BeLessThanOrEqualTo(79);
+        }
+        finally { GameConfig.Language = prev; }
+    }
+
+    private async Task<(Character hero, string shown)> Deeds(long gold, params string[] lines)
+    {
+        var hero = Hero("Deeds");
+        hero.Gold = gold;
+        hero.ChivNr = 3;
+        var (term, output) = Term(lines);
+        var street = new MainStreetLocation();
+        Wire(street, term, hero);
+        await Call(street, "ShowGoodDeeds");
+        return (hero, Plain(term, output));
+    }
+
+    [Fact]
+    public async Task P13_GivingGoldToThePoor_CostsLevelTimes20_AndShowsThePrice()
+    {
+        var (hero, shown) = await Deeds(1_000, "1", "");
+        hero.Gold.Should().Be(1_000 - 10 * 20);
+        hero.ChivNr.Should().Be(2);
+        hero.Chivalry.Should().BeGreaterThan(0);
+        shown.Should().Contain(Loc.Get("main_street.deed_give_gold", "200"));
+    }
+
+    [Fact]
+    public async Task P13_GivingGoldToThePoor_WithoutTheGold_IsRefused_AndTheDeedIsKept()
+    {
+        var (hero, shown) = await Deeds(199, "1", "");
+        hero.Gold.Should().Be(199);
+        hero.ChivNr.Should().Be(3, "the deed is not spent");
+        hero.Chivalry.Should().Be(0);
+        shown.Should().Contain(Loc.Get("ui.not_enough_gold"));
+
+        var (helper, _) = await Deeds(0, "2", "");
+        helper.ChivNr.Should().Be(2, "the other deeds stay free");
+        helper.Gold.Should().Be(0);
+    }
+
+    private static (BankLocation bank, TerminalEmulator term, MemoryStream output, Character hero) Bank(params string[] lines)
+    {
+        var hero = Hero("Banned");
+        hero.Loan = 150_000;
+        hero.Gold = 200_000;
+        hero.BankGold = 0;
+        var (term, output) = Term(lines);
+        var bank = new BankLocation();
+        Wire(bank, term, hero);
+        return (bank, term, output, hero);
+    }
+
+    private static async Task<bool> Choose(BaseLocation loc, string key)
+    {
+        try { return await (Task<bool>)loc.GetType().GetMethod("ProcessChoice", F)!.Invoke(loc, new object[] { key })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+    }
+
+    [Theory]
+    [InlineData("D")] [InlineData("W")] [InlineData("T")] [InlineData("G")] [InlineData("O")] [InlineData("I")]
+    public async Task P13_ABannedPlayer_GetsNoBankService(string key)
+    {
+        var (bank, term, output, hero) = Bank("100", "100", "Y", "", "", "");
+        (await Choose(bank, key)).Should().BeFalse();
+        hero.Gold.Should().Be(200_000, key);
+        hero.BankGold.Should().Be(0, key);
+        hero.BankGuard.Should().BeFalse(key);
+        Plain(term, output).Should().Contain(Loc.Get("bank.banned_message"));
+    }
+
+    [Fact]
+    public async Task P13_ABannedPlayer_CanRepay_WithL_AndIsThenServed()
+    {
+        var (bank, term, output, hero) = Bank("1", "", "", "");
+        typeof(BankLocation).GetMethod("DisplayLocation", F)!.Invoke(bank, null);
+        string screen = Plain(term, output);
+        screen.Should().Contain($"[L] {Loc.Get("bank.repay")}").And.Contain($"[Q] {Loc.Get("bank.banned_leave")}");
+        foreach (var lang in Langs) Loc.GetIn(lang, "bank.banned_leave").Should().NotContain("(", lang);
+
+        (await Choose(bank, "L")).Should().BeFalse();
+        hero.Loan.Should().Be(0);
+        hero.Gold.Should().Be(50_000);
+        BankLocation.IsPlayerBannedFromBank(hero).Should().BeFalse();
+    }
+
+    private static async Task<(Character hero, string shown)> Upgrades(bool online, params string[] lines)
+    {
+        OnlineField.SetValue(null, online);
+        var hero = Hero("Door");
+        hero.Gold = 3_000_000;
+        var (term, output) = Term(lines);
+        var home = new HomeLocation();
+        Wire(home, term, hero);
+        await Call(home, "ShowHomeUpgrades");
+        return (hero, Plain(term, output));
+    }
+
+    [Fact]
+    public async Task P13_TheReinforcedDoor_IsNotSoldOffline_AndTheNumbersAfterItStillBuyTheirUpgrade()
+    {
+        var (hero, shown) = await Upgrades(false, "10", "Y", "", "");
+        shown.Should().NotContain(Loc.Get("home.special_door"));
+        shown.Should().Contain($"[10] {Loc.Get("home.special_armory")}").And.Contain($"[11] {Loc.Get("home.special_fountain")}");
+        hero.HasReinforcedDoor.Should().BeFalse();
+        hero.HasLegendaryArmory.Should().BeTrue("10 offline is the Armory");
+
+        var (online, onlineShown) = await Upgrades(true, "10", "Y", "", "");
+        onlineShown.Should().Contain($"[10] {Loc.Get("home.special_door")}");
+        online.HasReinforcedDoor.Should().BeTrue("online the door is sold at 10, as before");
+        online.HasLegendaryArmory.Should().BeFalse();
+    }
 }

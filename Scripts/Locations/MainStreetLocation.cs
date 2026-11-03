@@ -832,7 +832,7 @@ public partial class MainStreetLocation : BaseLocation
         if (currentPlayer.ChivNr > 0)
         {
             terminal.WriteLine(Loc.Get("main_street.available_deeds"));
-            terminal.WriteLine(Loc.Get("main_street.deed_give_gold"));
+            terminal.WriteLine(Loc.Get("main_street.deed_give_gold", AlmsCost(currentPlayer).ToString("N0")));
             terminal.WriteLine(Loc.Get("main_street.deed_help_temple"));
             terminal.WriteLine(Loc.Get("main_street.deed_orphanage"));
             terminal.WriteLine("");
@@ -1796,10 +1796,25 @@ public partial class MainStreetLocation : BaseLocation
         return rank;
     }
     
+    /// <summary>1.3.10 (P13): giving gold to the poor costs the player's level times 20 gold (it cost nothing).</summary>
+    internal static long AlmsCost(Character player) => (long)Math.Max(1, player.Level) * GameConfig.GoodDeedAlmsGoldPerLevel;
+
     private async Task ProcessGoodDeed(string choice)
     {
         if (int.TryParse(choice, out int deed) && deed >= 1 && deed <= 3)
         {
+            if (deed == 1)
+            {
+                // 1.3.10 (P13): the alms are paid, or the deed is refused and not spent
+                long alms = AlmsCost(currentPlayer);
+                if (currentPlayer.Gold < alms)
+                {
+                    terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
+                    return;
+                }
+                currentPlayer.Gold -= alms;
+                currentPlayer.Statistics?.RecordGoldSpent(alms);
+            }
             currentPlayer.ChivNr--;
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: true, "main_street.good_deed"); // v0.57.12: paired movement
             

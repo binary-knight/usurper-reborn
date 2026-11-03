@@ -4024,9 +4024,12 @@ public class HomeLocation : BaseLocation
         // Servants' Quarters
         long servantsCost = 500_000;
         ShowOneTimePurchase(opt++, Loc.Get("home.special_servants"), currentPlayer.HasServants, servantsCost, Loc.Get("home.special_servants_desc", GameConfig.ServantsDailyGoldBase, GameConfig.ServantsDailyGoldPerLevel));
-        // Reinforced Door
+        // Reinforced Door. 1.3.10 (P13): it guards a sleeping player online only, so offline it is not sold; the
+        // numbers after its place close up and are mapped back below
         long reinforcedDoorCost = GameConfig.ReinforcedDoorCost;
-        ShowOneTimePurchase(opt++, Loc.Get("home.special_door"), currentPlayer.HasReinforcedDoor, reinforcedDoorCost, Loc.Get("home.special_door_desc"));
+        bool doorSold = UsurperRemake.BBS.DoorMode.IsOnlineMode;
+        if (doorSold)
+            ShowOneTimePurchase(opt++, Loc.Get("home.special_door"), currentPlayer.HasReinforcedDoor, reinforcedDoorCost, Loc.Get("home.special_door_desc"));
         // Legendary Armory
         long armoryCost = 2_500_000;
         ShowOneTimePurchase(opt++, Loc.Get("home.special_armory"), currentPlayer.HasLegendaryArmory, armoryCost, Loc.Get("home.special_armory_desc"));
@@ -4051,6 +4054,7 @@ public class HomeLocation : BaseLocation
         var input = await terminal.GetInput(Loc.Get("home.select_upgrade"));
         if (!int.TryParse(input, out int choice) || choice < 1)
             return;
+        if (!doorSold && choice >= 10) choice++;   // 1.3.10 (P13): offline, 10 is the Armory and 11 the Fountain
 
         switch (choice)
         {

@@ -444,13 +444,14 @@ public class WebMenu200Tests
 
         // Accepted but intentionally not listed. The classic layout gates only its display (v1.1.14: "every classic key
         // does what it did, at every level"), so ProcessClassicChoice still takes a place's key below the tier that
-        // draws it, and two keys no classic row has ever drawn: G (Good Deeds) and 9 (does nothing). The menu follows
-        // the screen, not the switch, so these stay out of it.
-        foreach (var hidden in new[] { "G", "9" })
+        // draws it, and one key no classic row has ever drawn: 9 (does nothing). The menu follows the screen, not the
+        // switch, so it stays out. 1.3.10 (P13): G (Good Deeds) is drawn now, so it is listed.
+        foreach (var hidden in new[] { "9" })
         {
             handled.Should().Contain(hidden);
             keys.Should().NotContain(hidden, "{0} is taken by the handler but never drawn", hidden);
         }
+        keys.Should().Contain("G", "the classic menu draws Good Deeds at every tier");
         if (level == 1)
             foreach (var belowTier in new[] { "T", "B", "O", "K", "H", "N", "F" })
             {
