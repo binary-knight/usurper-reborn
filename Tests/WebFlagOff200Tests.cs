@@ -34,6 +34,8 @@ namespace UsurperReborn.Tests;
 /// for Auto-Combat and Speed ([AUTO] and [SPD] became [O] and [X]); every GMCP frame is the same.
 /// 1.3.10 (fix/combat-1310) re-captured them: the standard and screen reader fight menus list P, E, T, W and L (G3),
 /// and Char.Vitals combatSp is 306 of 306, not 100 (G6, the fight stamina starts at its maximum); nothing else.
+/// 1.3.10 (fix/economy-1310) re-captured them: the classic Main Street menu draws G, Good Deeds (P13), on the Stats row
+/// and the compact rows and in the screen reader list; every GMCP frame is the same.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WebFlagOff200Tests
