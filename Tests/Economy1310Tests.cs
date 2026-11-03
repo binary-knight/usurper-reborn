@@ -312,4 +312,90 @@ public class Economy1310Tests : IDisposable
         }
         finally { typeof(DailySystemManager).GetField("autoSaveEnabled", F)!.SetValue(dsm, true); }
     }
+
+    // ------------------------------------------------------------------ D3: the carry limit before the charge
+
+    private static DungeonLocation Dungeon(TerminalEmulator term, Character hero, int floor)
+    {
+        var d = new DungeonLocation();
+        Wire(d, term, hero);
+        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(d, floor);
+        typeof(DungeonLocation).GetField("dungeonRandom", F)!.SetValue(d, new Random(1310));
+        return d;
+    }
+
+    private static DungeonSettlement Settlement() => new DungeonSettlement
+    {
+        Id = "ec", Floor = 10, Name = "Ec Camp", NPCName = "Ec Trader", HasTrading = true,
+        TradeItems = new[] { "Healing Potion", "Mana Potion", "Antidote", "Healing Herb", "Starbloom Essence", "Firebloom Petal" },
+    };
+
+    [Theory]
+    [InlineData("1", "heal")]
+    [InlineData("2", "mana")]
+    [InlineData("3", "antidote")]
+    [InlineData("4", "herb")]
+    [InlineData("5", "starbloom")]
+    [InlineData("6", "firebloom")]
+    public async Task D3_ASettlementItemAtTheCarryLimit_IsRefused_AndNoGoldIsTaken(string pick, string what)
+    {
+        var hero = Hero("CapSet");
+        hero.Healing = hero.MaxPotions;
+        hero.ManaPotions = hero.MaxManaPotions;
+        hero.Antidotes = hero.MaxAntidotes;
+        hero.HerbHealing = GameConfig.HerbMaxCarry[(int)HerbType.HealingHerb];
+        hero.HerbStarbloom = GameConfig.HerbMaxCarry[(int)HerbType.StarbloomEssence];
+        hero.HerbFirebloom = GameConfig.HerbMaxCarry[(int)HerbType.FirebloomPetal];
+        var (term, output) = Term(pick, "", "0");
+        await Call(Dungeon(term, hero, 10), "SettlementTrade", hero, Settlement());
+        hero.Gold.Should().Be(10_000, what + ": nothing was given, so nothing is taken");
+        string shown = Plain(term, output);
+        string line = what switch
+        {
+            "heal" => Loc.Get("healer.max_potions", hero.MaxPotions),
+            "mana" => Loc.Get("healer.max_mana_potions"),
+            "antidote" => Loc.Get("healer.max_antidotes", hero.MaxAntidotes),
+            _ => Loc.Get("wilderness.herb_pouch_full"),
+        };
+        shown.Should().Contain(line);
+        shown.Should().NotContain(Loc.Get("dungeon.settlement_purchased", "").Trim().TrimEnd('!'), "no purchase line");
+    }
+
+    [Fact]
+    public async Task D3_ASettlementItemBelowTheLimit_IsStillSold()
+    {
+        var hero = Hero("CapSet2");
+        hero.Healing = hero.MaxPotions - 1;
+        var (term, output) = Term("1", "", "0");
+        await Call(Dungeon(term, hero, 10), "SettlementTrade", hero, Settlement());
+        hero.Healing.Should().Be(hero.MaxPotions);
+        hero.Gold.Should().Be(10_000 - 25 * 2, "the floor 10 price");
+    }
+
+    private static async Task<(Character hero, string shown)> Merchant(long healing, string pick)
+    {
+        var hero = Hero("CapStreet");
+        hero.Healing = healing;
+        var (term, output) = Term(pick, "", "");
+        var m = typeof(StreetEncounterSystem).GetMethod("ProcessMerchantEncounter", F)!;
+        try { await (Task)m.Invoke(StreetEncounterSystem.Instance, new object[] { hero, GameLocation.MainStreet, new EncounterResult(), term })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+        return (hero, Plain(term, output));
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    public async Task D3_TheStreetMerchant_RefusesPotionsAtTheCarryLimit_AndTakesNoGold(string pick)
+    {
+        var probe = Hero("CapStreet");
+        var (hero, shown) = await Merchant(probe.MaxPotions, pick);
+        hero.Gold.Should().Be(10_000);
+        hero.Healing.Should().Be(hero.MaxPotions);
+        shown.Should().Contain(Loc.Get("healer.max_potions", hero.MaxPotions));
+
+        var (below, _) = await Merchant(probe.MaxPotions - 1, "1");
+        below.Healing.Should().Be(below.MaxPotions, "below the limit the potion is sold");
+        below.Gold.Should().Be(10_000 - (40 + 3 * below.Level));
+    }
 }
