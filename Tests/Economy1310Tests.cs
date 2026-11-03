@@ -36,9 +36,76 @@ public class Economy1310Tests : IDisposable
     private readonly Character? _prevPlayer;
     private readonly TerminalEmulator? _prevTerminal;
     private readonly List<NPC> _addedNpcs = new();
+    private readonly SharedState _shared;
+
+    /// <summary>
+    /// The shared singletons the daily reset and maintenance tests (P10, P14, D1) write. The swapped ones get a fresh
+    /// instance for the test and the original back after it; the others have their values put back. So no world event,
+    /// companion, grief, quest, day counter or maintenance date from these tests reaches a later test.
+    /// </summary>
+    private sealed class SharedState
+    {
+        private static readonly (Type Type, string Field)[] Swapped =
+        {
+            (typeof(WorldEventSystem), "_instance"),
+            (typeof(CompanionSystem), "_fallbackInstance"),
+            (typeof(GriefSystem), "_fallbackInstance"),
+            (typeof(StoryProgressionSystem), "_fallbackInstance"),
+            (typeof(QuestSystem), "questDatabase"),
+        };
+        private static readonly string[] BankVault = { "_reserve", "_robberies", "_robberyDate" };
+        private static readonly string[] DayFields = { "currentDay", "lastResetTime", "lastAutoSave", "autoSaveEnabled" };
+        private static readonly string[] MaintFields = { "lastMaintenanceDate", "maintenanceRunning", "silentMode" };
+
+        private readonly object?[] _swapped = new object?[Swapped.Length];
+        private readonly object?[] _vault = new object?[BankVault.Length];
+        private readonly object?[] _day = new object?[DayFields.Length];
+        private readonly object?[] _maint = new object?[MaintFields.Length];
+        private readonly object? _maintenance;
+        private readonly bool _pendingDisplay;
+        private readonly int _sessionDay;
+        private readonly DateTime _sessionReset;
+
+        private static FieldInfo Static(Type t, string f) => t.GetField(f, SF)!;
+        private static FieldInfo Field(Type t, string f) => t.GetField(f, F)!;
+
+        public SharedState()
+        {
+            for (int i = 0; i < Swapped.Length; i++)
+            {
+                var (t, f) = Swapped[i];
+                _swapped[i] = Static(t, f).GetValue(null);
+                Static(t, f).SetValue(null, t == typeof(QuestSystem) ? new List<Quest>() : Activator.CreateInstance(t));
+            }
+            for (int i = 0; i < BankVault.Length; i++) _vault[i] = Static(typeof(BankVaultSystem), BankVault[i]).GetValue(null);
+            var dsm = DailySystemManager.Instance;
+            for (int i = 0; i < DayFields.Length; i++) _day[i] = Field(typeof(DailySystemManager), DayFields[i]).GetValue(dsm);
+            _pendingDisplay = dsm.PendingDailyResetDisplay;
+            _maintenance = Field(typeof(DailySystemManager), "maintenanceSystem").GetValue(dsm);
+            if (_maintenance != null)
+                for (int i = 0; i < MaintFields.Length; i++) _maint[i] = Field(typeof(MaintenanceSystem), MaintFields[i]).GetValue(_maintenance);
+            _sessionDay = GameEngine.Instance.SessionCurrentDay;
+            _sessionReset = GameEngine.Instance.SessionLastResetTime;
+        }
+
+        public void Restore()
+        {
+            for (int i = 0; i < Swapped.Length; i++) Static(Swapped[i].Type, Swapped[i].Field).SetValue(null, _swapped[i]);
+            for (int i = 0; i < BankVault.Length; i++) Static(typeof(BankVaultSystem), BankVault[i]).SetValue(null, _vault[i]);
+            var dsm = DailySystemManager.Instance;
+            for (int i = 0; i < DayFields.Length; i++) Field(typeof(DailySystemManager), DayFields[i]).SetValue(dsm, _day[i]);
+            dsm.PendingDailyResetDisplay = _pendingDisplay;
+            Field(typeof(DailySystemManager), "maintenanceSystem").SetValue(dsm, _maintenance);
+            if (_maintenance != null)
+                for (int i = 0; i < MaintFields.Length; i++) Field(typeof(MaintenanceSystem), MaintFields[i]).SetValue(_maintenance, _maint[i]);
+            GameEngine.Instance.SessionCurrentDay = _sessionDay;
+            GameEngine.Instance.SessionLastResetTime = _sessionReset;
+        }
+    }
 
     public Economy1310Tests()
     {
+        _shared = new SharedState();
         Pacing.Disabled = true;
         _prevOnline = (bool)OnlineField.GetValue(null)!;
         _prevPlayer = GameEngine.Instance.CurrentPlayer;
@@ -53,6 +120,7 @@ public class Economy1310Tests : IDisposable
         typeof(TerminalEmulator).GetField("_fallbackInstance", SF)!.SetValue(null, _prevTerminal);
         foreach (var n in _addedNpcs) NPCSpawnSystem.Instance.ActiveNPCs.Remove(n);
         MailSystem.ClearAllMail();
+        _shared.Restore();
     }
 
     // ------------------------------------------------------------------ helpers
@@ -311,6 +379,39 @@ public class Economy1310Tests : IDisposable
             second.Gold.Should().Be(10_000 - wageB, "the second player of the same server day pays too");
         }
         finally { typeof(DailySystemManager).GetField("autoSaveEnabled", F)!.SetValue(dsm, true); }
+    }
+
+    [Fact]
+    public async Task D1_TheDailyResetTests_LeaveNoSharedStateBehind()
+    {
+        var events = WorldEventSystem.Instance;
+        var companions = CompanionSystem.Instance;
+        var grief = GriefSystem.Instance;
+        var story = StoryProgressionSystem.Instance;
+        var quests = typeof(QuestSystem).GetField("questDatabase", SF)!.GetValue(null);
+        var dsm = DailySystemManager.Instance;
+        int day = (int)typeof(DailySystemManager).GetField("currentDay", F)!.GetValue(dsm)!;
+        int sessionDay = GameEngine.Instance.SessionCurrentDay;
+        long vault = BankVaultSystem.Current;
+
+        var inner = new SharedState();
+        OnlineField.SetValue(null, true);
+        typeof(DailySystemManager).GetField("autoSaveEnabled", F)!.SetValue(dsm, false);
+        GameEngine.Instance.CurrentPlayer = Hero("Restore");
+        await Call(dsm, "PerformDailyReset", false);
+        await Call(dsm, "PerformDailyReset", false);
+        ((int)typeof(DailySystemManager).GetField("currentDay", F)!.GetValue(dsm)!).Should().Be(day + 2, "the resets ran");
+        inner.Restore();
+
+        WorldEventSystem.Instance.Should().BeSameAs(events);
+        CompanionSystem.Instance.Should().BeSameAs(companions);
+        GriefSystem.Instance.Should().BeSameAs(grief);
+        StoryProgressionSystem.Instance.Should().BeSameAs(story);
+        typeof(QuestSystem).GetField("questDatabase", SF)!.GetValue(null).Should().BeSameAs(quests);
+        ((int)typeof(DailySystemManager).GetField("currentDay", F)!.GetValue(dsm)!).Should().Be(day);
+        GameEngine.Instance.SessionCurrentDay.Should().Be(sessionDay);
+        BankVaultSystem.Current.Should().Be(vault);
+        ((bool)typeof(DailySystemManager).GetField("autoSaveEnabled", F)!.GetValue(dsm)!).Should().BeTrue();
     }
 
     // ------------------------------------------------------------------ D3: the carry limit before the charge
