@@ -462,11 +462,23 @@ public partial class CombatEngine
 
     /// <summary>
     /// 1.3.9: the keys a combat tip may name under each standard menu, with the potion key of that menu: the
-    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed);
+    /// dungeon menu (ShowDungeonCombatMenuStandard) always lists A, D, I (Use Item), R, O (Auto-Combat) and X (Speed),
+    /// and from 1.3.10 P, E, T, W and L (the tactics);
     /// the PvP menu (ShowCombatMenuStandard) lists A, D, H (Heal), I (Disarm), T, L, R, S and X and has no Auto-Combat.
     /// </summary>
-    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X" });
+    internal static readonly (string PotionKey, string[] Keys) DungeonMenuTipKeys = ("I", new[] { "A", "D", "I", "R", "O", "X", "P", "E", "T", "W", "L" });   // 1.3.10: the tactics too
     internal static readonly (string PotionKey, string[] Keys) PvpMenuTipKeys = ("H", new[] { "A", "D", "H", "I", "T", "L", "R", "S", "X" });
+
+    /// <summary>
+    /// 1.3.10 (G2): a combat tip for a screen reader, its keys kept in words as the screen reader menu names them
+    /// ("D - Defend"): a key joined to its word ("[D]efend") reads "D - Defend", a key on its own ("Press [X]") reads
+    /// "Press X". The brackets went before and "[D]efend" read "Defend", with no key.
+    /// </summary>
+    internal static string ScreenReaderTip(string tip)
+    {
+        tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\](\w+)", "$1 - $1$2");
+        return System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w+)\]", "$1");
+    }
 
     /// <summary>
     /// A tip every 5th round (10th at Fast or Instant), under the standard menu. 1.3.9: the potion tip names the
@@ -492,10 +504,7 @@ public partial class CombatEngine
             if (System.Text.RegularExpressions.Regex.Matches(tip, @"\[([^\]\s]+)\]").Any(m => Array.IndexOf(menu.Keys, m.Groups[1].Value) < 0))
                 return;
             if (GameConfig.ScreenReaderMode)
-            {
-                // Strip bracket-key formatting like [P]ower Attack → Power Attack
-                tip = System.Text.RegularExpressions.Regex.Replace(tip, @"\[(\w)\]", "$1");
-            }
+                tip = ScreenReaderTip(tip);
             terminal.SetColor(ColorRole.Notice);
             foreach (var line in HintSystem.WordWrap(tip, 77))   // 1.3.9: within 79 columns in every language
                 terminal.WriteLine($"  {line}");
@@ -2800,6 +2809,25 @@ public partial class CombatEngine
                 }
             }
 
+            // 1.3.10 (B14): a healing potion at full health is refused before the turn is spent, and a quick heal for
+            // less than 10 percent of max HP asks first (H with a mana potion to use goes to the potion choice as before)
+            if (action.Type == CombatActionType.Heal || action.Type == CombatActionType.QuickHeal)
+            {
+                bool manaChoice = action.Type == CombatActionType.Heal && player.ManaPotions > 0 && player.Mana < player.MaxMana;
+                if (!manaChoice && player.Healing > 0)
+                {
+                    if (player.HP >= player.MaxHP)
+                    {
+                        terminal.WriteLine(Loc.Get("combat.full_health"), "yellow");
+                        await Pacing.Wait(GetCombatDelay(800));
+                        continue;
+                    }
+                    if (action.Type == CombatActionType.QuickHeal && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
+                }
+            }
+
             return action;
         }
     }
@@ -2925,12 +2953,13 @@ public partial class CombatEngine
 
     /// <summary>
     /// v1.2.2: one row of a compact BBS menu. Items are written in order; when the next item would pass
-    /// column 80 the row wraps before it and continues indented one space, so a longer translation never
-    /// runs past the edge of an 80 column terminal.
+    /// column 79 the row wraps before it and continues indented one space, so a longer translation never
+    /// runs past the edge of an 80 column terminal. 1.3.10 (G5): 79, not 80, as every other row; the Hungarian
+    /// full first row reached 80.
     /// </summary>
     internal sealed class BbsMenuRow
     {
-        internal const int Width = 80;
+        internal const int Width = 79;   // 1.3.10 (G5): 79, so a full row never reaches column 80
         private readonly TerminalEmulator t;
         private int col;
         internal BbsMenuRow(TerminalEmulator terminal) { t = terminal; }
@@ -3072,6 +3101,8 @@ public partial class CombatEngine
             row.Item("[K]", "bright_yellow", Loc.Get("combat.backstab_label") + " ", "darkgray");
         if (!isFollower && CanSmite(player))
             row.Item("[Z]", "bright_yellow", Loc.Get("combat.smite_label", player.SmiteChargesRemaining) + " ", "bright_white");
+        if (!isFollower && CanRage(player))   // 1.3.10 (G3)
+            row.Item("[G]", "bright_yellow", Loc.Get("combat.rage_label") + " ", "bright_red");
 
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
@@ -3297,6 +3328,15 @@ public partial class CombatEngine
         if (!isFollower && RescueOffered(player))
             terminal.WriteLine(Loc.Get("combat.rescue_menu_sr"));
 
+        // 1.3.10 (G3): the tactics, as the standard menu lists them
+        terminal.WriteLine($"  P - {Loc.Get("combat.power_attack")}");
+        terminal.WriteLine($"  E - {Loc.Get("combat.precise_strike")}");
+        terminal.WriteLine($"  T - {Loc.Get("combat.taunt")}");
+        terminal.WriteLine($"  W - {Loc.Get("combat.disarm")}");
+        terminal.WriteLine($"  L - {Loc.Get("combat.hide")}");
+        if (!isFollower && CanRage(player))
+            terminal.WriteLine($"  G - {Loc.Get("combat.rage_short")}");
+
         // Quickbar slots
         if (classInfo.Count > 0)
         {
@@ -3398,6 +3438,16 @@ public partial class CombatEngine
             }
         }
 
+        // 1.3.10 (G3): the tactics the fight takes from this prompt (Power Attack, Precise Strike, Taunt, Disarm, Hide),
+        // and Rage while the class can rage and is not raging; the compact menu showed them, this one did not
+        WriteBoxRow("[P] ", "white", Loc.Get("combat.power_attack"));
+        WriteBoxRow("[E] ", "white", Loc.Get("combat.precise_strike"));
+        WriteBoxRow("[T] ", "white", Loc.Get("combat.taunt"));
+        WriteBoxRow("[W] ", "white", Loc.Get("combat.disarm"));
+        WriteBoxRow("[L] ", "white", Loc.Get("combat.hide"));
+        if (!isFollower && CanRage(player))
+            WriteBoxRow("[G] ", "bright_red", Loc.Get("combat.rage_short"));
+
         // Quickbar slots [1]-[9]
         if (classInfo.Count > 0)
         {
@@ -3493,6 +3543,10 @@ public partial class CombatEngine
 
     /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>
     internal static bool CanBackstab(Character player) => player.GetClassCombatModifiers().BackstabMultiplier > 1f;
+
+    /// <summary>1.3.10 (G3): [G] Rage is for a class whose modifier allows it (the Barbarian), while not raging; the
+    /// fight prompt's own condition.</summary>
+    internal static bool CanRage(Character player) => player.GetClassCombatModifiers().RageAvailable && !player.IsRaging;
 
     /// <summary>1.3.2: [Z] Smite is for a class with daily smite charges (the Paladin), while one is left.</summary>
     internal static bool CanSmite(Character player) => player.GetClassCombatModifiers().SmiteCharges > 0 && player.SmiteChargesRemaining > 0;
@@ -5648,7 +5702,8 @@ public partial class CombatEngine
         }
 
         // Use colored combat message
-        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
+        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random,
+            critical: monsterRoll.IsCriticalSuccess);   // v1.1.14: the engine RNG; 1.3.10: no graze line after a critical
         foreach (var row in CombatMessages.Rows(attackMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
         // Check for shield block (20% chance to block, halves incoming damage)
@@ -15204,7 +15259,7 @@ public partial class CombatEngine
 
             // 2.0: the combat owner's Client.Menu, web client only (a grouped follower's prompt sends none)
             if (!GameConfig.ElectronMode)
-                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
+                WebClientMenu.Emit(WebClientMenu.Combat, () => MultiMonsterMenuGroups(player, miracleOffered, hasTeammatesNeedingAid, canHealAlly), QuickbarHintIfDrawn, result.CurrentRound);   // 1.3.9: with the round
 
             if (!GameConfig.ElectronMode)
             {
@@ -15251,6 +15306,10 @@ public partial class CombatEngine
                         await Pacing.Wait(GetCombatDelay(800));
                         continue;
                     }
+                    // 1.3.10 (B14): a healing potion for less than 10 percent of max HP asks first; No spends nothing
+                    if (hasHealPots && !hasManaPots && SmallHeal(player)
+                        && !await ConfirmHealAnyway(Loc.Get("combat.potion_small_heal", player.MaxHP - player.HP, player.MaxHP)))
+                        continue;
                     action.Type = CombatActionType.UseItem;
                     return (action, false);
 
@@ -15456,7 +15515,7 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "G":
-                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides
+                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides; CanRage is the same test
                     {
                         action.Type = CombatActionType.Rage;
                         return (action, false);
@@ -23934,6 +23993,38 @@ public partial class CombatEngine
     /// Display a paste-able death narrative after the player dies.
     /// Creates a roguelike-style "tombstone" summary of the character's journey.
     /// </summary>
+    /// <summary>
+    /// The death page's opening: the screen cleared, then "YOU DIED" and the art. 1.3.10 (C5): the words are a plain line
+    /// in the reader's language above the art (the art spelled them "Y O U   D I E D" between block glyphs, which the web
+    /// page read as "YOUDIED"), and the HP the page shows is sent first: the last Char.Vitals went out at the round's
+    /// prompt, so the page kept that HP (1 of 155 after Death's Door) under "YOU DIED".
+    /// </summary>
+    internal async Task ShowDeathBanner(Character player, List<Character>? teammates)
+    {
+        if (player.HP < 0) player.HP = 0;
+        UsurperRemake.Server.GmcpBridge.EmitVitalsIfChanged(player);
+        UsurperRemake.Server.GmcpBridge.EmitVitalsToGroup(teammates);   // as beside every leader vitals send in combat
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            terminal.WriteLine("");
+        }
+        else
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
+            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
+            terminal.WriteLine("");
+        }
+    }
+
+    /// <summary>1.3.10 (C5): the death story's share line as rows of at most 79 columns, each indented two spaces.</summary>
+    internal static List<string> ShareRows(string shareLine) =>
+        UIHelper.WordWrap(Loc.Get("combat.share_label", shareLine), UIHelper.WrapWidth - 2).Select(r => "  " + r).ToList();
+
     private async Task ShowDeathSummary(CombatResult result)
     {
         var player = result.Player;
@@ -23995,7 +24086,8 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         string shareLine = Loc.Get("combat.share_death", playerName, className, player.Level, killerName, totalKills.ToString("N0"), deepestFloor);
-        terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
+        foreach (var row in ShareRows(shareLine))   // 1.3.10 (C5): wrapped at word bounds, not split at column 80
+            terminal.WriteLine(row);
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
@@ -24700,21 +24792,7 @@ public partial class CombatEngine
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
 
-        terminal.ClearScreen();
-
-        // Display dramatic death art
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("death.you_died")}");
-            terminal.WriteLine("");
-        }
-        else
-        {
-            await UsurperRemake.UI.ANSIArt.DisplayArtAnimated(terminal, UsurperRemake.UI.ANSIArt.Death, 60);
-            terminal.WriteLine("");
-        }
+        await ShowDeathBanner(result.Player, result.Teammates);
         await Pacing.Wait(GetCombatDelay(1000));
 
         // Show NPC teammate reactions to player death
@@ -24859,6 +24937,8 @@ public partial class CombatEngine
             int restoredHP = (int)(result.Player.MaxHP * 0.5);
 
             ShowDivineRestore(restoredHP, result.Player.MaxHP, rezLeft, max);
+            // 1.3.10 (C5): the Temple's screen clears this page a few seconds later, so its hall says it once more
+            result.Player.PendingLifeNotice = rezLeft == 0 ? Loc.Get("death.final_warning") : Loc.Get("death.rez_remaining", rezLeft, max);
             // v0.65.6: lives are renewable now -- say so at the moment the
             // player is most afraid, or the countdown reads as a death spiral.
             terminal.SetColor("gray");
@@ -32053,7 +32133,59 @@ public partial class CombatEngine
                 return (CombatActionType.ClassAbility, targetIdx, matched.slotId, 0, null, false);
             }
         }
+        // 1.3.10 (B14): a plain heal (Lay on Hands) with no one to heal is refused before it costs anything, and one
+        // that would restore little asks first
+        if (abilityDef != null && !await HealAbilityGate(player, abilityDef)) return null;
         return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, false);
+    }
+
+    /// <summary>
+    /// 1.3.10 (B14): true when the one healed is missing less than 10 percent of their max HP, so a heal restores less
+    /// than that. Full health is not a small heal; it is no heal (the callers refuse it).
+    /// </summary>
+    internal static bool SmallHeal(Character c) => c.HP < c.MaxHP && (c.MaxHP - c.HP) * 10 < c.MaxHP;
+
+    /// <summary>1.3.10 (B14): asks whether to heal anyway; Enter or No is No. Nothing is spent on No.</summary>
+    private async Task<bool> ConfirmHealAnyway(string message)
+    {
+        terminal.SetColor("yellow");
+        foreach (var row in UIHelper.WordWrap($"{message} {Loc.Get("ui.yn_default_no").TrimEnd()}", UIHelper.WrapWidth))
+            terminal.WriteLine(row);
+        return await terminal.AskYesNoAsync("> ", false);
+    }
+
+    /// <summary>1.3.10 (B14): the refusal of a plain heal no one needs, as rows of at most 79 columns.</summary>
+    internal static List<string> NoOneHurtRows(ClassAbilitySystem.ClassAbility a) =>
+        UIHelper.WordWrap(Loc.Get("combat.heal_no_one_hurt", a.DisplayName), UIHelper.WrapWidth);
+
+    /// <summary>1.3.10 (B14): a class ability that only heals (no effect, no buff), as Lay on Hands.</summary>
+    internal static bool IsPlainHealAbility(ClassAbilitySystem.ClassAbility a) =>
+        a.Type == ClassAbilitySystem.AbilityType.Heal && a.BaseHealing > 0 && string.IsNullOrEmpty(a.SpecialEffect)
+        && a.AttackBonus == 0 && a.DefenseBonus == 0;
+
+    /// <summary>
+    /// 1.3.10 (B14): before a plain heal ability is used from the player's own prompt: refused (nothing spent) when no
+    /// one it can heal (the player, and the living allies when it can target one) is hurt; asked first when everyone
+    /// hurt is missing less than 10 percent of their max HP. True to go on.
+    /// </summary>
+    private async Task<bool> HealAbilityGate(Character player, ClassAbilitySystem.ClassAbility ability)
+    {
+        if (!IsPlainHealAbility(ability)) return true;
+        var reach = new List<Character> { player };
+        if (ability.CanTargetAlly && currentTeammates != null)
+            reach.AddRange(currentTeammates.Where(t => t != null && t.IsAlive && t != player));
+        var hurt = reach.Where(c => c.HP < c.MaxHP).ToList();
+        if (hurt.Count == 0)
+        {
+            terminal.SetColor("yellow");
+            foreach (var row in NoOneHurtRows(ability))   // within 79 columns: a Hungarian name makes the line longer
+                terminal.WriteLine(row);
+            await Pacing.Wait(GetCombatDelay(1000));
+            return false;
+        }
+        if (hurt.All(SmallHeal))
+            return await ConfirmHealAnyway(Loc.Get("combat.heal_small_confirm", ability.DisplayName, hurt.Max(c => c.MaxHP - c.HP)));
+        return true;
     }
 
     /// <summary>
@@ -32130,7 +32262,9 @@ public partial class CombatEngine
             };
         }
 
-        // Handle ability quickbar slot
+        // Handle ability quickbar slot; 1.3.10 (B14): a plain heal with no one hurt is refused, a small one asks first
+        var healDef = ClassAbilitySystem.GetAbility(matched.slotId);
+        if (healDef != null && !await HealAbilityGate(player, healDef)) return null;
         return new CombatAction
         {
             Type = CombatActionType.ClassAbility,

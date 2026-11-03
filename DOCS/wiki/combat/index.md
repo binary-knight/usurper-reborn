@@ -133,7 +133,7 @@ When you dual wield, every swing past the first (and past a Warrior's extra swin
 
 ## Tactical actions
 
-These actions work for any class unless stated, and each one ends your turn, even when it fails; only Backstab, Smite or Rage from a class that cannot use it, and Smite with no charge left, ask again. Type the key at the combat prompt. The compact combat menu lists P, E, T, W and L; the standard menu does not list them, but the keys work there too. Every combat menu lists Backstab for an Assassin and Smite for a Paladin with a charge left; none lists Rage.
+These actions work for any class unless stated, and each one ends your turn, even when it fails; only Backstab, Smite or Rage from a class that cannot use it, and Smite with no charge left, ask again. Type the key at the combat prompt. Every combat menu lists P, E, T, W and L, Backstab for an Assassin, Smite for a Paladin with a charge left and Rage for a Barbarian who is not raging. A menu lists only what you can take that round; a key it leaves out still does what it does when you type it.
 
 ### Power Attack (P)
 

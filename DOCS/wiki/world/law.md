@@ -83,7 +83,7 @@ You can do 3 activities a day. Each one but Shadow Boxing raises an attribute by
 - **Meditation:** Wisdom, and a tenth of your maximum HP back.
 - **Stretching:** Stamina, and a twentieth of your maximum HP back.
 - **Planning:** Charisma.
-- **Shadow Boxing:** 10 combat stamina back, up to 100.
+- **Shadow Boxing:** 10 combat stamina back, up to your maximum.
 - **Praying:** 10 to 20 Chivalry when your Chivalry is higher than your Darkness, otherwise 10 to 20 Darkness.
 
 ## Getting out of prison

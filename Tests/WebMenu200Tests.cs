@@ -512,19 +512,23 @@ public class WebMenu200Tests
     // ------------------------------------------------------------------ parity: combat
 
     [Fact]
-    public async Task DungeonFight_ClientMenu_ListsExactlyTheKeysTheHandlerTakes()
+    public async Task DungeonFight_ClientMenu_ListsTheKeysTheTextMenuDrew_EachAHandlerCase()
     {
         var hero = Hero();
         hero.Quickbar[0] = ClassAbilitySystem.GetAvailableAbilities(hero).First().Id;
-        var (_, bytes, _) = await MultiPrompt("web", hero, "D\n");
+        var (_, bytes, text) = await MultiPrompt("web", hero, "D\n");
         var items = Items(Of(bytes, "Client.Menu").Single());
         var labels = CaseLabels("Scripts/Systems/CombatEngine.cs", "GetPlayerActionMultiMonster");
         var digits = Enumerable.Range(1, 9).Select(i => i.ToString()).ToList();
         labels.Should().Contain(digits);
         // 1.3.9: AUTO and SPD typed out are the long forms of O and X, which the menu lists
         labels.Should().Contain(new[] { "O", "AUTO", "X", "SPD" });
-        var expected = labels.Where(l => l != "" && !digits.Contains(l) && l != "AUTO" && l != "SPD").Append("1").ToList();
-        items.Select(i => i.Key).Should().BeEquivalentTo(expected, "every case of the handler, the filled quickbar slot for the digits");
+        items.Select(i => i.Key).Should().OnlyContain(k => labels.Contains(k), "every listed key is a case of the handler");
+        // 1.3.10 (C3): exactly the keys the text menu drew this round, no key it did not draw
+        var drawn = Regex.Matches(text, @"\u2551 \[([A-Z0-9])\]").Select(m => m.Groups[1].Value).ToList();
+        items.Select(i => i.Key).Should().BeEquivalentTo(drawn, "Client.Menu lists what the text menu shows");
+        items.Select(i => i.Key).Should().Contain(new[] { "P", "E", "T", "W", "L", "1" }).And.NotContain(new[] { "H", "U", "M", "V", "G", "B", "J", "K", "Z" },
+            "a lone Warrior with no ally, no Miracle and nothing to coat or brew");
     }
 
     /// <summary>Sends a key then D; the key was refused when the prompt went on to take the D.</summary>
@@ -560,12 +564,14 @@ public class WebMenu200Tests
         foreach (var key in new[] { "A", "P", "E", "T", "W", "L", "R", "I", "K", "Z", "G", "B", "J", "M", "V", "U", "H" })
         {
             var (taken, type) = await MultiKey(Make(), key);
-            taken.Should().Be(enabled[key], "{0} {1}: the menu says enabled={2}, the handler gave {3}", cls, key, enabled[key], type);
+            // 1.3.10 (C3): a key that cannot be taken this round is not listed; typed, the handler still refuses it
+            bool listedAndEnabled = enabled.TryGetValue(key, out var on) && on;
+            taken.Should().Be(listedAndEnabled, "{0} {1}: listed={2} enabled={3}, the handler gave {4}", cls, key, enabled.ContainsKey(key), on, type);
         }
     }
 
     [Fact]
-    public async Task PvpFight_ClientMenu_ListsTheHandlersKeys_PowerPreciseDeathMercyRefused()
+    public async Task PvpFight_ClientMenu_ListsTheHandlersKeys_PowerPreciseDeathMercyNotListed()
     {
         var hero = Hero(cls: CharacterClass.Barbarian);
         hero.PoisonVials = 1; hero.HerbHealing = 1;
@@ -577,7 +583,7 @@ public class WebMenu200Tests
         var arms = parse.DescendantNodes().OfType<SwitchExpressionArmSyntax>()
             .Select(a => a.Pattern).OfType<ConstantPatternSyntax>().Select(p => ((LiteralExpressionSyntax)p.Expression).Token.ValueText).ToList();
         // B and J parse as Coat Blade and herbs, but the PvP round has no case for either: they make a plain attack
-        items.Keys.Where(k => !char.IsDigit(k[0])).Should().BeEquivalentTo(arms.Except(new[] { "B", "J" }).Append("X"),
+        items.Keys.Where(k => !char.IsDigit(k[0])).Should().BeEquivalentTo(arms.Except(new[] { "B", "J", "P", "E", "F", "M" }).Append("X"),
             "the menu holds every ParseCombatAction key (S is one) that does what it says in PvP, and X (1.3.9: Speed)");
         var pvpRound = CSharpSyntaxTree.ParseText(Source("Scripts/Systems/CombatEngine.cs")).GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(m => m.Identifier.Text == "ProcessPlayerVsPlayerAction").ToString();
@@ -585,7 +591,7 @@ public class WebMenu200Tests
         pvpRound.Should().Contain("CombatActionType.Rage").And.Contain("CombatActionType.RangedAttack").And.Contain("CombatActionType.QuickHeal");
         foreach (var k in new[] { "P", "E", "F", "M" })
         {
-            items[k].Enabled.Should().BeFalse("{0} is refused in PvP", k);
+            items.Should().NotContainKey(k, "{0} is refused in PvP every round, so 1.3.10 does not list it", k);
             var (action, _, text) = await PvpPrompt("door", Hero(cls: CharacterClass.Barbarian), k + "\nD\n");
             action.Type.Should().Be(CombatActionType.Defend, "{0} was refused and the D after it taken", k);
             text.Should().Contain(Loc.Get("combat.pvp_action_unavailable"));
@@ -595,9 +601,174 @@ public class WebMenu200Tests
             items[k].Enabled.Should().BeTrue();
             var h = Hero(cls: CharacterClass.Barbarian);
             h.PoisonVials = 1; h.HerbHealing = 1;
+            h.HP = h.MaxHP / 2;   // 1.3.10 (B14): a potion at full health is refused before the turn
             var (action, _, _) = await PvpPrompt("door", h, k + "\nD\n");
             action.Type.Should().NotBe(CombatActionType.Defend, "{0} is taken", k);
         }
+    }
+
+    // ------------------------------------------------------------------ 1.3.10: G3 the tactics shown, C3 only what can be taken
+
+    private static string DrawDungeonMenu(Character hero, string kind, string lang)
+    {
+        using var s = new Scope("door", hero, lang);
+        var t = new TerminalEmulator(new MemoryStream(), s.Stream);
+        var engine = new CombatEngine(t);
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+        var classInfo = (List<(string key, string name, bool available)>)Invoke(engine, typeof(CombatEngine), "GetClassSpecificActions", hero)!;
+        Invoke(engine, typeof(CombatEngine), "ShowDungeonCombatMenu" + kind, hero, false, false, classInfo, false, GodDomain.None);
+        return Plain(s.Bytes(t));
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void DungeonMenus_ListTheTactics_AndRageOnlyForAClassThatCanRage(string lang)
+    {
+        foreach (var cls in new[] { CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin, CharacterClass.Assassin })
+        foreach (bool raging in new[] { false, true })
+        {
+            var hero = Hero(cls: cls);
+            hero.IsRaging = raging;
+            bool rage = cls == CharacterClass.Barbarian && !raging;
+            string std = DrawDungeonMenu(hero, "Standard", lang);
+            string sr = DrawDungeonMenu(hero, "ScreenReader", lang);
+            string bbs = DrawDungeonMenu(hero, "BBS", lang);
+            foreach (var k in new[] { "P", "E", "T", "W", "L" })
+            {
+                std.Should().Contain($"[{k}] ", "{0} {1}: the standard menu lists {2}", lang, cls, k);
+                sr.Should().Contain($"  {k} - ", "{0} {1}: the screen reader menu lists {2}", lang, cls, k);
+                bbs.Should().Contain($"[{k}]", "{0} {1}: the compact menu lists {2}", lang, cls, k);
+            }
+            std.Contains("[G] ").Should().Be(rage, "{0} {1} raging={2}: Rage only while it can be taken", lang, cls, raging);
+            sr.Contains("  G - ").Should().Be(rage);
+            bbs.Contains("[G]").Should().Be(rage);
+            foreach (var text in new[] { std, sr, bbs })
+                text.Split('\n').Should().OnlyContain(r => r.Length <= 79, "{0} {1}: every row fits 79 columns", lang, cls);
+        }
+    }
+
+    [Fact]
+    public async Task ASoloPaladin_SeesNoActionItCannotTake_InTextOrClientMenu()
+    {
+        var hero = Hero(cls: CharacterClass.Paladin);
+        hero.SmiteChargesRemaining = 0; hero.PoisonVials = 0; hero.HerbHealing = 0;
+        var (_, bytes, text) = await MultiPrompt("web", hero, "D\n");
+        var keys = Items(Of(bytes, "Client.Menu").Single()).Select(i => i.Key).ToList();
+        foreach (var k in new[] { "H", "U", "M", "V", "G", "B", "J", "K", "Z" })
+        {
+            keys.Should().NotContain(k, "{0} cannot be taken by a solo Paladin this round", k);
+            text.Should().NotContain($"[{k}] ", "and the text menu does not draw {0}", k);
+        }
+        keys.Should().Contain(new[] { "A", "D", "I", "R", "P", "E", "T", "W", "L", "O", "X" });
+    }
+
+    [Fact]
+    public async Task AKeyTheMenuNoLongerShows_StillDoesWhatItDidWhenTyped()
+    {
+        Character Pal() { var h = Hero(cls: CharacterClass.Paladin); h.SmiteChargesRemaining = 0; h.PoisonVials = 0; h.HerbHealing = 0; return h; }
+        var expect = new (string Key, string Line)[]
+        {
+            ("G", Loc.Get("combat.invalid_action")),
+            ("V", Loc.Get("combat.invalid_action")),
+            ("K", Loc.Get("combat.invalid_action")),
+            ("M", Loc.Get("miracle.not_ready")),
+            ("B", Loc.Get("ui.no_poison_vials")),
+            ("J", Loc.Get("combat.herb_empty")),
+            ("Z", Loc.Get("combat.out_of_smites")),
+        };
+        foreach (var (key, line) in expect)
+        {
+            var (action, _, text) = await MultiPrompt("web", Pal(), key + "\nD\n");
+            action.Type.Should().Be(CombatActionType.Defend, "{0} was refused and the D after it taken", key);
+            text.Should().Contain(line, "{0} says what it said before", key);
+        }
+        foreach (var key in new[] { "H", "U" })
+        {
+            var (action, _, _) = await MultiPrompt("web", Pal(), key + "\nD\n");
+            action.Type.Should().Be(CombatActionType.Defend, "{0} with no ally is refused, as before", key);
+        }
+    }
+
+    // ------------------------------------------------------------------ 1.3.10 B14: a heal that would restore little asks first
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task APotionForLittleHp_AsksFirst_NoSpendsNothing(string lang)
+    {
+        Character Hurt(long hp) { var h = Hero(); h.HP = hp; h.MaxHP = 400; h.Healing = 5; h.ManaPotions = 0; return h; }
+        var hero = Hurt(361);   // 39 missing, under 40 (10 percent)
+        var (no, _, text) = await MultiPrompt("door", hero, "I\nN\nD\n", lang: lang);
+        no.Type.Should().Be(CombatActionType.Defend, "No went back to the menu");
+        hero.Healing.Should().Be(5, "nothing was spent");
+        text.Should().Contain(Loc.GetIn(lang, "combat.potion_small_heal", 39, 400).Substring(0, 20));
+        // the question's rows (the scripted keys are not echoed, so the first row follows the action prompt here)
+        text.Split('\n').Select(r => r.Replace(Loc.GetIn(lang, "combat.choose_action"), "")).Should().OnlyContain(r => r.Length <= 79);
+        var (yes, _, _) = await MultiPrompt("door", Hurt(361), "I\nY\n", lang: lang);
+        yes.Type.Should().Be(CombatActionType.UseItem, "Yes drinks it");
+        var (plain, _, plainText) = await MultiPrompt("door", Hurt(360), "I\n", lang: lang);
+        plain.Type.Should().Be(CombatActionType.UseItem, "40 missing is 10 percent: no question");
+        plainText.Should().NotContain(Loc.GetIn(lang, "combat.potion_small_heal", 40, 400).Substring(0, 20));
+        var (full, _, fullText) = await MultiPrompt("door", Hurt(400), "I\nD\n", lang: lang);
+        full.Type.Should().Be(CombatActionType.Defend, "at full health the potion is refused, as before");
+        fullText.Should().Contain(Loc.GetIn(lang, "ui.no_usable_potions"));
+    }
+
+    private static Character Paladin(long hp)
+    {
+        var h = Hero(cls: CharacterClass.Paladin);
+        h.MaxHP = 400; h.HP = hp;
+        h.Quickbar[0] = "lay_on_hands";
+        h.CurrentCombatStamina = 200;
+        return h;
+    }
+
+    [Fact]
+    public async Task LayOnHands_AtFullHealth_IsRefusedBeforeItCostsAnything_AndAskesFirstForLittle()
+    {
+        var full = Paladin(400);
+        long st = full.CurrentCombatStamina;
+        var (a, _, text) = await MultiPrompt("door", full, "1\nD\n");
+        a.Type.Should().Be(CombatActionType.Defend, "refused, the menu came back");
+        full.CurrentCombatStamina.Should().Be(st, "no stamina spent");
+        text.Should().Contain(Loc.Get("combat.heal_no_one_hurt", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName));
+
+        var (no, _, noText) = await MultiPrompt("door", Paladin(395), "1\nN\nD\n");
+        no.Type.Should().Be(CombatActionType.Defend);
+        noText.Should().Contain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 5));
+        var (yes, _, _) = await MultiPrompt("door", Paladin(395), "1\nY\n");
+        yes.Type.Should().Be(CombatActionType.ClassAbility);
+        var (hurt, _, hurtText) = await MultiPrompt("door", Paladin(200), "1\n");
+        hurt.Type.Should().Be(CombatActionType.ClassAbility, "a real wound: no question");
+        hurtText.Should().NotContain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 200));
+    }
+
+    [Fact]
+    public async Task LayOnHands_ReadsTheAllies_ItCanHeal()
+    {
+        static Action<CombatEngine> With(Character ally) => e => typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(e, new List<Character> { ally });
+        var ally = new Character { Name2 = "Ally", HP = 380, MaxHP = 400 };
+        var (asked, _, text) = await MultiPrompt("door", Paladin(400), "1\nN\nD\n", setup: With(ally));
+        asked.Type.Should().Be(CombatActionType.Defend, "the ally misses 20 of 400: asked, and No");
+        text.Should().Contain(Loc.Get("combat.heal_small_confirm", ClassAbilitySystem.GetAbility("lay_on_hands")!.DisplayName, 20));
+        var wounded = new Character { Name2 = "Ally", HP = 100, MaxHP = 400 };
+        var (go, _, _) = await MultiPrompt("door", Paladin(400), "1\n", setup: With(wounded));
+        go.Type.Should().Be(CombatActionType.ClassAbility, "an ally with a real wound: no question");
+    }
+
+    [Fact]
+    public async Task Pvp_QuickHealForLittle_AsksFirst_AndAPotionAtFullHealthSpendsNoTurn()
+    {
+        var h = Hero(); h.MaxHP = 400; h.HP = 395; h.Healing = 3; h.ManaPotions = 0;
+        var (no, _, text) = await PvpPrompt("door", h, "Q\nN\nD\n");
+        no.Type.Should().Be(CombatActionType.Defend);
+        text.Should().Contain(Loc.Get("combat.potion_small_heal", 5, 400));
+        var f = Hero(); f.MaxHP = 400; f.HP = 400; f.Healing = 3; f.ManaPotions = 0;
+        var (full, _, fullText) = await PvpPrompt("door", f, "H\nD\n");
+        full.Type.Should().Be(CombatActionType.Defend, "refused before the turn");
+        fullText.Should().Contain(Loc.Get("combat.full_health"));
+        f.Healing.Should().Be(3);
     }
 
     // ------------------------------------------------------------------ the quickbar hint

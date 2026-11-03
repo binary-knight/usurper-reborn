@@ -128,10 +128,13 @@ public static class CombatMessages
     /// Generate monster attack message. The raw damage is not shown here: the damage after armor is shown
     /// separately (showing both confused players into thinking they were hit twice).
     /// </summary>
-    public static string GetMonsterAttackMessage(string monsterName, string monsterColor, long damage, long playerMaxHP, Random? random = null)
+    public static string GetMonsterAttackMessage(string monsterName, string monsterColor, long damage, long playerMaxHP, Random? random = null, bool critical = false)
     {
         random ??= Random.Shared;
         var tier = GetDamageTier(damage, playerMaxHP);
+        // 1.3.10 (B16): after "lands a CRITICAL HIT!" the line is never a graze ("barely touches you"); a weak
+        // critical reads as a plain hit. One draw either way, so a seeded fight keeps its numbers.
+        if (critical && tier < DamageTier.Light) tier = DamageTier.Light;
         int form = random.Next(MonsterAttackForms[tier]);
         return Loc.Get(FormKey("monster", tier, form), monsterColor, monsterName);
     }

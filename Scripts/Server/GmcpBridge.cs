@@ -403,11 +403,18 @@ public static class GmcpBridge
             hp     = m.HP,
             maxHp  = m.MaxHP,
             isBoss = m.IsBoss || m.IsMiniBoss,
+            rank   = EnemyRank(m),   // 1.3.10: "boss", "champion" or "normal"; isBoss stays as it was for old pages and MUD clients
             alive  = m.IsAlive
         }).ToList();
 
         Emit("Char.Combat.Enemies", new { enemies, round = currentRound });
     }
+
+    /// <summary>
+    /// 1.3.10: the enemy's rank on Char.Combat.Enemies: "boss" for a boss, "champion" for a champion or elite
+    /// (IsMiniBoss and not a boss), otherwise "normal". The web enemy chip reads it, so a champion no longer reads Boss.
+    /// </summary>
+    internal static string EnemyRank(global::Monster m) => m.IsBoss ? "boss" : m.IsMiniBoss ? "champion" : "normal";
 
     /// <summary>
     /// Emit Char.Combat.Enemies if any tracked enemy stat (hp / maxHp / alive)
@@ -418,8 +425,9 @@ public static class GmcpBridge
     ///
     /// Round number is passed through to the payload but is not part of the
     /// change-detection snapshot -- including it would force an emit every
-    /// round and defeat the whole point. Name / level / isBoss are also
-    /// stable across a fight so they don't need to be in the snapshot.
+    /// round and defeat the whole point. Level and isBoss are stable across a
+    /// fight so they are not in the snapshot; 1.3.10: the rank is, so a change
+    /// of rank is sent.
     /// </summary>
     public static void EmitCombatEnemiesIfChanged(System.Collections.Generic.List<global::Monster>? monsters, int currentRound)
     {
@@ -429,7 +437,7 @@ public static class GmcpBridge
 
         var sb = new System.Text.StringBuilder();
         foreach (var m in monsters)
-            sb.Append($"{m.Name}|{m.HP}|{m.MaxHP}|{m.IsAlive};");
+            sb.Append($"{m.Name}|{m.HP}|{m.MaxHP}|{m.IsAlive}|{EnemyRank(m)};");
         var snapshot = sb.ToString();
 
         if (snapshot == ctx.LastGmcpEnemiesSnapshot) return;
