@@ -2,7 +2,7 @@
 title: Ways to play
 path: /wiki/en/getting-started/connections/
 checked: 1.3.9
-sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md
+sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md, web/index.html
 history: 1.3.9 | The website's Play buttons open the play page at /play/, a full page terminal with a tap pad on phones, a View choice of the Classic page or the Chronicle book view, also before login, and single key menus, on by default and changed with E in Settings.
 history: 1.3.8 | none
 history: 1.3.7 | none

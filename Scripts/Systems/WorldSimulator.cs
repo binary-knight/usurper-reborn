@@ -5551,8 +5551,9 @@ public class WorldSimulator
     // floors); NPCs never did. This is the minimal "narrative theater"
     // version: the NPC reads the available board, picks a level-appropriate
     // bounty, rolls success based on level matching, and applies the
-    // reward + news on success. Does NOT claim or remove the quest from
-    // questDatabase -- players still see the same bounty on the board.
+    // reward + news on success. 1.3.10: a bounty the NPC finishes leaves the
+    // board (it is marked done); before, the news said the hunt was won and
+    // the same bounty stayed open for players.
     //
     // Future slice could promote this to real competition (NPC sets Occupier,
     // quest disappears from player board, takes N ticks to complete) but
@@ -5618,6 +5619,15 @@ public class WorldSimulator
 
         if (succeeded)
         {
+            // 1.3.10: the finished bounty leaves the board. A player who claimed it since the NPC read the board keeps
+            // it, and the NPC comes back with nothing.
+            if (pick.Deleted || !string.IsNullOrEmpty(pick.Occupier))
+            {
+                npc.CurrentActivity = "returning empty-handed from the hunt";
+                return;
+            }
+            pick.Deleted = true;
+
             // Reward scales on the QUEST's intended level (so NPCs hunting
             // big bounties get paid like big bounties).
             long goldReward = 0;

@@ -126,6 +126,9 @@ public partial class QuestSystem
         if (!string.Equals(quest.Occupier, player.Name2, StringComparison.OrdinalIgnoreCase))
             return QuestCompletionResult.NotYourQuest;
         if (quest.Deleted) return QuestCompletionResult.QuestDeleted;
+        // 1.3.10: a Sellsword contract is paid by CompleteMercContract at the Sellsword Hall (its rate, rank and
+        // standing), never at Quest Hall rates
+        if (quest.IsMercContract) return QuestCompletionResult.QuestNotFound;
         
         // Check if player completed all quest requirements
         if (!ValidateQuestCompletion(player, quest))
@@ -211,6 +214,7 @@ public partial class QuestSystem
 
         return questDatabase.Where(q =>
             !q.Deleted &&
+            !q.IsMercContract &&   // 1.3.10: Sellsword contracts are taken and paid at the Sellsword Hall only
             string.IsNullOrEmpty(q.Occupier) &&
             !player.King &&
             q.Initiator != player.Name2 &&
@@ -264,6 +268,14 @@ public partial class QuestSystem
         // GD.Print($"[QuestSystem] Quest offered to {playerName}: {quest.Id}");
     }
     
+    /// <summary>
+    /// 1.3.10: true in the MUD, where the world reset and every session share one quest list. The world reset ages
+    /// each claimed quest once a day there, and a player's own daily reset does not. Elsewhere (single player, a door
+    /// session in its own process) the player's reset ages the quests as before.
+    /// </summary>
+    internal static bool WorldResetAgesQuests =>
+        UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Server.MudServer.Instance != null;
+
     /// <summary>
     /// Process daily quest maintenance (Pascal: Quest aging and failure)
     /// </summary>
@@ -524,8 +536,10 @@ public partial class QuestSystem
         // Remove old unclaimed bounty board quests
         questDatabase.RemoveAll(q => q.Initiator == BountyBoardInitiator && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
 
-        // Count existing bounty board quests
-        var existingCount = questDatabase.Count(q => q.Initiator == BountyBoardInitiator && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
+        // Count existing bounty board quests. 1.3.10: only those this level can take; online the board is shared,
+        // and quests filled for a much higher level left a low level player's board empty
+        var existingCount = questDatabase.Count(q => q.Initiator == BountyBoardInitiator && !q.Deleted && string.IsNullOrEmpty(q.Occupier)
+            && playerLevel >= q.MinLevel && playerLevel <= q.MaxLevel);
 
         // Add quests until we have 5 available
         var targetCount = 5;
@@ -625,11 +639,14 @@ public partial class QuestSystem
                                         UsurperRemake.Systems.Faction.TheShadows,
                                         UsurperRemake.Systems.Faction.TheFaith })
         {
+            // 1.3.10: only contracts this player can take count; online the board is shared, and contracts filled
+            // for a much higher level left a low level player's board bare
             int existing = questDatabase.Count(q => q.IsMercContract
                 && !q.Deleted
                 && string.IsNullOrEmpty(q.Occupier)
                 && q.IssuingFaction.HasValue
-                && q.IssuingFaction.Value == faction);
+                && q.IssuingFaction.Value == faction
+                && playerLevel >= q.MinLevel && playerLevel <= q.MaxLevel);
             int needed = slotsPerFaction - existing;
             if (needed <= 0) continue;
 
@@ -731,6 +748,29 @@ public partial class QuestSystem
             && player.Level >= q.MinLevel
             && player.Level <= q.MaxLevel
         ).ToList();
+    }
+
+    private static readonly object _mercClaimLock = new();
+
+    /// <summary>
+    /// 1.3.10: claim a Sellsword contract for this player if it is still free and in the player's level band. The
+    /// check and the claim happen under one lock, so two MUD sessions cannot both claim one contract (the card set
+    /// the Occupier with no check, and a later claim overwrote an earlier one). False: someone else has it.
+    /// </summary>
+    public static bool TryClaimMercContract(Character player, Quest quest)
+    {
+        if (player == null || quest == null) return false;
+        lock (_mercClaimLock)
+        {
+            if (!quest.IsMercContract || quest.Deleted || !string.IsNullOrEmpty(quest.Occupier)) return false;
+            if (player.Level < quest.MinLevel || player.Level > quest.MaxLevel) return false;
+            quest.Occupier = player.Name2;
+            quest.OccupierRace = player.Race;
+            quest.OccupierSex = (byte)player.Sex;
+            quest.OccupiedDays = 0;
+        }
+        player.MercContractsClaimedToday++;
+        return true;
     }
 
     /// <summary>
@@ -1380,6 +1420,14 @@ public partial class QuestSystem
 
     public static void MergePlayerQuests(string playerName, List<QuestData> savedQuests)
     {
+        // 1.3.10: in the MUD the world reset aged this player's quests in the shared list while they were away, and
+        // failed the ones whose time ran out (with mail). The save holds the days from the last save, so the shared
+        // copy's days are kept, and a quest the world failed is not handed back.
+        var shared = new Dictionary<string, Quest>();
+        if (WorldResetAgesQuests && savedQuests != null)
+            foreach (var q in questDatabase)
+                if (!string.IsNullOrEmpty(q.Id) && savedQuests.Any(s => s.Id == q.Id)) shared[q.Id] = q;
+
         // Remove only THIS player's quests from the shared database
         questDatabase.RemoveAll(q =>
             string.Equals(q.Occupier, playerName, StringComparison.OrdinalIgnoreCase) ||
@@ -1430,6 +1478,12 @@ public partial class QuestSystem
                     : null,
                 MercContractTier = questData.MercContractTier > 0 ? questData.MercContractTier : 1
             };
+
+            if (shared.TryGetValue(quest.Id, out var sharedCopy) && !quest.Deleted)
+            {
+                if (sharedCopy.Deleted) continue;   // 1.3.10: failed (or ended) by the world while away
+                quest.OccupiedDays = Math.Max(quest.OccupiedDays, sharedCopy.OccupiedDays);
+            }
 
             foreach (var objData in questData.Objectives)
             {
@@ -1532,6 +1586,7 @@ public partial class QuestSystem
         string nameId = monsterName.ToLower().Replace(" ", "_");
         // TierName is the base monster type (e.g. "Zombie") even for champion variants ("Zombie Champion")
         string tierId = !string.IsNullOrEmpty(tierName) ? tierName.ToLower().Replace(" ", "_") : "";
+        if (tierId == "mire_zombie") tierId = "zombie";   // 1.3.10: the swamp's Mire Zombie counts as a zombie
 
         foreach (var quest in playerQuests)
         {
@@ -1573,6 +1628,11 @@ public partial class QuestSystem
             foreach (var objective in quest.Objectives.Where(o =>
                 o.ObjectiveType == QuestObjectiveType.ReachDungeonFloor && !o.IsComplete))
             {
+                if (quest.QuestTarget == QuestTarget.SurviveDungeon)
+                {
+                    CountFloorsDescended(objective, floorNumber);
+                    continue;
+                }
                 if (floorNumber >= objective.RequiredProgress)
                 {
                     objective.CurrentProgress = objective.RequiredProgress;
@@ -1584,6 +1644,19 @@ public partial class QuestSystem
             }
 
         }
+    }
+
+    /// <summary>
+    /// 1.3.10: a board "Survive N floors" quest counts the floors the player goes down after taking it. It was met
+    /// the first time the player stood on floor N or deeper, so a deep player met it on entering the dungeon. The
+    /// objective's TargetId holds the last floor the player stood on (empty until the first floor after the claim,
+    /// which only sets it); each step deeper than that floor counts.
+    /// </summary>
+    internal static void CountFloorsDescended(QuestObjective objective, int floorNumber)
+    {
+        if (int.TryParse(objective.TargetId, out int lastFloor) && floorNumber > lastFloor)
+            objective.CurrentProgress = Math.Min(objective.RequiredProgress, objective.CurrentProgress + (floorNumber - lastFloor));
+        objective.TargetId = floorNumber.ToString();
     }
 
     /// <summary>
@@ -1639,8 +1712,7 @@ public partial class QuestSystem
 
         foreach (var bounty in claimed)
         {
-            long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
-            if (reward <= 0) reward = 500;
+            long reward = DefeatPayout(bounty);
             reward = GodBoonSystem.BountyReward(winner, reward);   // 1.2.0 Temple gods piece 2: Judicar's boon
             winner.Gold += reward;
             long xpReward = TeamHQBonus.ApplyXP(winner, Math.Max(winner.Level * 50, reward / 5));
@@ -1654,6 +1726,17 @@ public partial class QuestSystem
     }
 
     public static long BountyReward(Quest q) => q.BountyGold > 0 ? q.BountyGold : Math.Max(500, q.Reward * 100L);
+
+    /// <summary>
+    /// 1.3.10: the gold a quest with a named target pays when the target is beaten (AutoCompleteBountyForNPC and
+    /// CollectBountiesOnPlayer), before a god's boon: the posted gold, else the stored reward times 100, else 500.
+    /// The bounty board shows it (Quest.GetRewardDescription).
+    /// </summary>
+    public static long DefeatPayout(Quest q)
+    {
+        long reward = q.BountyGold > 0 ? q.BountyGold : q.Reward * 100L;
+        return reward > 0 ? reward : 500;
+    }
 
     /// <summary>
     /// v1.1.11: a player beat an NPC, by any route: a street fight, a duel, the pit, the Inn challenge,
@@ -1750,6 +1833,16 @@ public partial class QuestSystem
         return "legacy:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 
+    /// <summary>
+    /// 1.3.10: a quest claimed by, or offered only to, a player other than this one. Beating its target does not
+    /// pay this player or take the quest from its holder.
+    /// </summary>
+    internal static bool HeldByAnother(Quest q, string? playerName)
+    {
+        bool Other(string? who) => !string.IsNullOrEmpty(who) && !string.Equals(who, playerName, StringComparison.OrdinalIgnoreCase);
+        return Other(q.Occupier) || (Other(q.OfferedTo) && !q.Forced);
+    }
+
     public static long AutoCompleteBountyForNPC(Character player, string npcName, bool includeKillContracts = true)
     {
         if (string.IsNullOrEmpty(npcName)) return 0;
@@ -1765,7 +1858,8 @@ public partial class QuestSystem
             !string.IsNullOrEmpty(q.TargetNPCName) &&
             q.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase) &&
             !q.IsPlayerBounty &&   // v1.1.11: beating an NPC never pays a bounty on a player of that name (review)
-            (includeKillContracts || q.QuestTarget != QuestTarget.Assassin)
+            (includeKillContracts || q.QuestTarget != QuestTarget.Assassin) &&
+            !HeldByAnother(q, player?.Name2)   // 1.3.10: another player's claimed (or offered) quest stays theirs
         ).ToList();
         // v1.1.11: another process may hold the same bounty; only the one whose DB claim lands pays it.
         // A bounty claimed elsewhere is marked Deleted here too, unpaid.
@@ -1778,8 +1872,7 @@ public partial class QuestSystem
         foreach (var bounty in matchingBounties)
         {
             // Calculate reward — use BountyGold if set (king bounties), else legacy byte Reward
-            long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
-            if (reward <= 0) reward = 500; // Minimum reward
+            long reward = DefeatPayout(bounty);
             if (player != null) reward = GodBoonSystem.BountyReward(player, reward);   // 1.2.0 Temple gods piece 2: Judicar's boon
 
             // Give player the reward immediately

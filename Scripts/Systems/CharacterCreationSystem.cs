@@ -1691,13 +1691,24 @@ public class CharacterCreationSystem
 
         // Try side-by-side portrait layout if a portrait exists for this class
         // (skip portrait when player disabled character/monster art — use card layout instead)
-        var portrait = GameConfig.DisableCharacterMonsterArt ? null : RacePortraits.GetCroppedClassPortrait(characterClass, 38);
+        // 1.3.10: every class has a portrait; a BBS session (a door, a door player on the online server, or a BBS
+        // terminal on the game port) gets the 16 colour set of the converted ones
+        var portrait = GameConfig.DisableCharacterMonsterArt ? null : RacePortraits.GetCroppedClassPortrait(characterClass, 38,
+            ClassPortraitSixteenColours(UsurperRemake.BBS.DoorMode.IsInDoorMode, UsurperRemake.Server.SessionContext.Current?.ConnectionType, terminal.UseCp437));
         if (portrait != null)
             return await ShowClassPreviewSideBySide(characterClass, portrait);
 
         // Fallback: original card layout (no portrait)
         return await ShowClassPreviewCard(characterClass);
     }
+
+    /// <summary>
+    /// 1.3.10: true when the class preview uses the 16 colour portraits: a BBS door session, a session on the
+    /// online server that a BBS door opened (connection type "BBS"), or a BBS terminal (SyncTERM, NetRunner and the
+    /// like, sent CP437) connected straight to the game port. Every other session gets 256 colours.
+    /// </summary>
+    internal static bool ClassPortraitSixteenColours(bool inDoorMode, string? connectionType, bool cp437Terminal) =>
+        inDoorMode || connectionType == "BBS" || cp437Terminal;
 
     /// <summary>
     /// Side-by-side class preview: ANSI art portrait (left) + stats panel (right).
