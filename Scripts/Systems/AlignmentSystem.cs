@@ -620,7 +620,7 @@ namespace UsurperRemake.Systems
                     // v0.57.0 — walking both paths opens up dialogue, merchants, and quests on both sides.
                     abilities.Add(Loc.Get("alignment.ability_walks_both_paths"));
                     abilities.Add(Loc.Get("alignment.ability_diplomatic_immunity"));
-                    abilities.Add(Loc.Get("alignment.ability_merchant_trust"));
+                    abilities.Add(Loc.Get("alignment.ability_merchant_trust_balanced"));   // 1.3.10 (D5): Balanced pays 0.95, not Good's 0.9
                     abilities.Add(Loc.Get("alignment.ability_criminal_respect"));
                     break;
 

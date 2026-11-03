@@ -811,4 +811,104 @@ public class Economy1310Tests : IDisposable
                 Loc.GetIn(lang, k).Length.Should().BeLessThanOrEqualTo(79, k);
         }
     }
+
+    // ------------------------------------------------------------------ D5: discount, ability and inheritance texts
+
+    private static Character WithAlignment(long chivalry, long darkness)
+    {
+        var h = Hero("Texts");
+        h.Chivalry = chivalry;
+        h.Darkness = darkness;
+        return h;
+    }
+
+    [Fact]
+    public void D5_TheCrownDiscountText_StatesTheRankRate_AndTheThreeShops()
+    {
+        var faction = typeof(FactionSystem).GetProperty("PlayerFaction")!;
+        var rank = typeof(FactionSystem).GetProperty("FactionRank")!;
+        object? oldFaction = faction.GetValue(FactionSystem.Instance), oldRank = rank.GetValue(FactionSystem.Instance);
+        try
+        {
+            faction.SetValue(FactionSystem.Instance, (Faction?)Faction.TheCrown);
+            rank.SetValue(FactionSystem.Instance, 0);
+            FactionSystem.Instance.GetShopPriceModifier().Should().BeApproximately(0.95f, 0.0001f);
+            rank.SetValue(FactionSystem.Instance, 8);
+            FactionSystem.Instance.GetShopPriceModifier().Should().BeApproximately(0.85f, 0.0001f);
+        }
+        finally { faction.SetValue(FactionSystem.Instance, oldFaction); rank.SetValue(FactionSystem.Instance, oldRank); }
+        foreach (var k in new[] { "castle.crown_benefit_discount", "castle.oath_benefit_1", "base.faction_crown_bonus" })
+        {
+            Loc.GetIn("en", k).Should().Contain("5% to 15%").And.Contain("weapon, armor and magic shops").And.NotContain("all");
+            foreach (var lang in Langs) Loc.GetIn(lang, k).Should().Contain("15%", lang).And.NotContain("10%", lang);
+        }
+        Loc.GetIn("en", "boon.merchants_favor.desc").Should().Be("Reduces weapon and armor shop prices");
+    }
+
+    [Fact]
+    public void D5_MerchantsTrust_StatesTheRate_ThatAlignmentPays()
+    {
+        var good = WithAlignment(500, 0);
+        AlignmentSystem.Instance.GetAlignment(good).Should().Be(AlignmentSystem.AlignmentType.Good);
+        AlignmentSystem.Instance.GetPriceModifier(good, false).Should().BeLessThanOrEqualTo(0.9f);
+        AlignmentSystem.Instance.GetAlignmentAbilities(good).Should().Contain(Loc.Get("alignment.ability_merchant_trust"));
+        Loc.GetIn("en", "alignment.ability_merchant_trust").Should().Contain("10% or more");
+
+        var balanced = WithAlignment(300, 300);
+        AlignmentSystem.Instance.GetAlignment(balanced).Should().Be(AlignmentSystem.AlignmentType.Balanced);
+        AlignmentSystem.Instance.GetPriceModifier(balanced, false).Should().Be(0.95f);
+        var abilities = AlignmentSystem.Instance.GetAlignmentAbilities(balanced);
+        abilities.Should().Contain(Loc.Get("alignment.ability_merchant_trust_balanced")).And.NotContain(Loc.Get("alignment.ability_merchant_trust"));
+        foreach (var lang in Langs)
+        {
+            Loc.GetIn(lang, "alignment.ability_merchant_trust_balanced").Should().Contain("5%", lang);
+            Loc.GetIn(lang, "alignment.ability_merchant_trust").Should().Contain("10%", lang);
+        }
+    }
+
+    [Fact]
+    public void D5_TheAbilityTexts_StateWhatTheCombatCodeDoes()
+    {
+        var a = AlignmentSystem.Instance;
+        var holy = WithAlignment(900, 0);
+        a.GetCombatModifiers(holy).defenseMod.Should().Be(1.1f);
+        Loc.GetIn("en", "alignment.ability_divine_protection").Should().Be("Divine Protection - 10% more defense");
+        a.GetBlessedRegenPercent(holy).Should().Be(0.04f);
+        Loc.GetIn("en", "alignment.ability_blessed_aura").Should().Contain("4% of max HP each combat round");
+
+        var dark = WithAlignment(0, 500);
+        a.GetAlignment(dark).Should().Be(AlignmentSystem.AlignmentType.Dark);
+        a.GetAlignmentCritBonus(dark).Should().Be(3);
+        Loc.GetIn("en", "alignment.ability_shadow_strike").Should().Contain("+3% critical hit chance");
+        a.GetFearOnHitChance(dark).Should().Be(5);
+        Loc.GetIn("en", "alignment.ability_fear_aura").Should().Contain("5% chance per hit");
+
+        var evil = WithAlignment(0, 900);
+        a.GetCombatModifiers(evil).attackMod.Should().Be(1.2f);
+        a.GetFearOnHitChance(evil).Should().Be(10);
+        Loc.GetIn("en", "alignment.ability_terror_incarnate").Should().Be("Terror Incarnate - +20% attack, 10% chance per hit to frighten a foe");
+
+        foreach (var lang in Langs)
+        {
+            Loc.GetIn(lang, "alignment.ability_divine_protection").Should().Contain("10%", lang).And.NotContain("+2", lang);
+            Loc.GetIn(lang, "alignment.ability_blessed_aura").Should().Contain("4%", lang).And.NotContain("+2", lang);
+            Loc.GetIn(lang, "alignment.ability_shadow_strike").Should().Contain("+3%", lang);
+            Loc.GetIn(lang, "alignment.ability_fear_aura").Should().Contain("5%", lang);
+            Loc.GetIn(lang, "alignment.ability_terror_incarnate").Should().Contain("10%", lang);
+        }
+        foreach (var lang in new[] { "en", "hu" })
+            foreach (var k in new[] { "divine_protection", "blessed_aura", "shadow_strike", "fear_aura", "terror_incarnate", "merchant_trust", "merchant_trust_balanced" })
+                ("    - " + Loc.GetIn(lang, "alignment.ability_" + k)).Length.Should().BeLessThanOrEqualTo(79, $"{lang} {k}");
+    }
+
+    [Fact]
+    public void D5_TheInheritanceLine_SaysHalfTheGoldCarried_AndWrapsAt79()
+    {
+        Loc.GetIn("en", "permadeath.inheritance_estate", "Kid", "500").Should().Be("Half the gold you carried passes to Kid. (500 gold delivered.)");
+        foreach (var lang in new[] { "en", "hu" })
+            UsurperRemake.UI.UIHelper.MessageRows("  " + Loc.GetIn(lang, "permadeath.inheritance_estate", new string('W', 30), 99_999_999_999L.ToString("N0")))
+                .Should().OnlyContain(r => r.Length <= 79, lang);
+        string src = File.ReadAllText(Path.Combine(MainStreetDistricts1113Tests.RepoRoot(), "Scripts/Systems/PermadeathHelper.cs"));
+        src.Should().Contain("UIHelper.WriteRow(terminal,\n                    $\"  {UsurperRemake.Systems.Loc.Get(\"permadeath.inheritance_estate\"");
+    }
 }
