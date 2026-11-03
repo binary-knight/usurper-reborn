@@ -28,7 +28,7 @@ An event can change shop prices, the experience and the gold of a monster fight 
 
 {{table:world-events}}
 
-A plague has effects of its own: while it is active a healthy character in a fight takes 1 percent of maximum HP 10 percent of the rounds, with a small chance to catch the plague, and a sick one takes 25 percent more disease damage. The stat changes some events announce are not applied to anyone.
+A plague has effects of its own: while it is active a healthy character in a fight takes 1 percent of maximum HP 10 percent of the rounds, with a small chance to catch the plague, and a sick one takes 25 percent more disease damage. No event changes anyone's stats. While Blessed Rain falls, healing HP at the Healer (H and F) is free, with no tax. On a Holy Day the Temple's Cloister meditation and an act of atonement are free; the Rite of Return keeps its price.
 
 ## Events can affect your Mental
 

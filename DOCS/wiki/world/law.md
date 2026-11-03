@@ -32,7 +32,7 @@ A badly failed pickpocket attempt or an undercover guard in the Dark Alley can a
 
 ## What happens if I murder someone in town
 
-After a murder in town that is not a bounty kill, 5 royal guards of your level + 5 come for you. You can surrender or fight. Win the fight and you go free with 100 more Darkness. Lose it, or surrender, and a coin is flipped: on one side you are executed, on the other you go to prison. Execution kills the character; in single-player the normal death and resurrection choices follow. Prison for murder takes half your gold on hand and lasts 2 days with no escape attempt, no bail and no demand for release.
+A murdered townsperson comes back after a while like any NPC who dies, and remembers who killed them. After a murder in town that is not a bounty kill, 5 royal guards of your level + 5 come for you. You can surrender or fight. Win the fight and you go free with 100 more Darkness. Lose it, or surrender, and a coin is flipped: on one side you are executed, on the other you go to prison. Execution kills the character; in single-player the normal death and resurrection choices follow. Prison for murder takes half your gold on hand and lasts 2 days with no escape attempt, no bail and no demand for release.
 
 Self-defense against a street attacker is not murder. Neither is an honor duel: the NPC you beat keeps the HP it had before the fight and stays where it is. Honor duels in town and duels at the Inn share one daily cap of 3 wins.
 

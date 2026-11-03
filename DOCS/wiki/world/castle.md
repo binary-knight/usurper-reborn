@@ -105,7 +105,7 @@ When the treasury holds less than a day's costs, every guard loses 3 more loyalt
 
 ### Royal magic, the orphanage and court politics
 
-- **Royal magic,** paid from the magic budget: Bless Kingdom 1,000 (25 toward Chivalry), Detect Threats 500, Protection 2,000 (10 loyalty to every guard) and Scry 1,500 (one NPC's level, place and gold).
+- **Royal magic,** paid from the magic budget: Bless Kingdom 1,000 (25 toward Chivalry), Detect Threats 500 (half of its casts uncover the most advanced secret plot, whose plotters leave the court and can then be arrested; every cast also names up to three townsfolk with Darkness above 300), Protection 2,000 (10 loyalty to every guard) and Scry 1,500 (one NPC's level, place and gold).
 - **The orphanage** holds up to {{balance:MaxRoyalOrphans}} orphans. Adopting an orphan aged 3 to 12 costs 500 + 100 x the orphans already held, from the treasury, and moves you 15 toward Chivalry. A true orphan aged {{balance:OrphanCommissionAge}} or more can be commissioned for {{balance:OrphanCommissionCost}} gold as a guard (salary 300, loyalty 90, 10 toward Chivalry), as a mercenary, or as a townsperson. An adopted orphan is not a true orphan and cannot be commissioned.
 - **Court politics** costs from the treasury: arresting a plotter {{balance:ArrestTrialCost}}, promoting a court member {{balance:PromoteCost}} (+10 loyalty), and a bribe {{balance:BribeBaseCost}} + 50 x (100 minus the member's loyalty). A member at 40 loyalty costs 3,500 to bribe.
 
