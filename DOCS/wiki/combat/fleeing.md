@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.10 | Smoke Powder from a dungeon outpost gives +2 Agility for your next fight; it is not a Smoke Bomb and does not help you flee.
 history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none

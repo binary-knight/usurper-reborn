@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.10 | A fifth outpost, the Cinder Post, stands on floor 85, healing and mana potions at an outpost cost 1.25 times the town price for your level, and the outpost's smoke bomb is now Smoke Powder (+2 Agility).
 history: 1.3.9 | none
 history: 1.3.8 | An ally told to wait in a room catches up with you when you change floor or leave the dungeon.
 history: 1.3.7 | none

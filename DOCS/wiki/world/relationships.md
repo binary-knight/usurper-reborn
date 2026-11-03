@@ -1,8 +1,9 @@
 ---
 title: Relationships and Love Street
 path: /wiki/en/world/relationships/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/LoveStreetLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs
+history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.3 | none
 history: 1.3.2 | none

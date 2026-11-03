@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.10 | Online, each player pays the daily wage of the NPCs on the team at their own daily reset.
 history: 1.3.9 | none
 history: 1.3.8 | In a cleared dungeon room an ally can be told to wait, out of every fight, until you walk back, call it back, change floor or leave the dungeon; NPC allies who see a teammate finished remember it, a fall you could have stopped lowers their opinion of you without them bringing it up in talk, and the stance rows wrap at 79 columns.
 history: 1.3.7 | none

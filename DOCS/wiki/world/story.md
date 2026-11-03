@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/AmnesiaSystem.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MoralParadoxSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodEchoSystem.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.10 | The moral paradoxes of floors 25, 65 and 80 are offered on any visit once their condition is met, Manwe's last answer decides the ending (walking away from creation gives Defiant, taking the burden gives Savior or Usurper), an alliance with Manwe counts as saving him, and the ending screen has a line for each paradox answer and for Mira's choice.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | A new character that is not NG+ now starts with no recovered memories, and loading a single-player save starts the story clean, with no seals, artifacts or Old God states left from the character played before it.
 history: 1.3.7 | none

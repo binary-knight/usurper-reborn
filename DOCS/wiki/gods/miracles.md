@@ -1,8 +1,9 @@
 ---
 title: Daily Miracles
 path: /wiki/en/gods/miracles/
-checked: 1.3.9
+checked: 1.3.10
 sources: Scripts/Systems/MiracleSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Data/BeastData.cs, Scripts/Core/GameConfig.cs
+history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | none
 history: 1.3.7 | none
