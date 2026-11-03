@@ -613,5 +613,12 @@
   "play.chron.revives": "Revives",
   "play.chron.map_explored": "Map: {0}/{1} explored",
   "play.chron.map_label": "Map of the floor, {0} of {1} rooms explored",
-  "play.chron.sheet": "Character sheet"
+  "play.chron.sheet": "Character sheet",
+  "play.combat.champion": "Champion",
+  "play.chron.low_hp": "Low HP",
+  "play.chron.type_number": "Type the number, then Enter: {0}",
+  "play.chron.cap_number": "No.",
+  "play.chron.more_keys": "More keys",
+  "play.chron.keys_one": "One key press picks an option here; no Enter needed.",
+  "play.chron.keys_enter": "Type a key, then press Enter. A key below sends its Enter for you."
 }

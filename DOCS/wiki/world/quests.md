@@ -26,12 +26,12 @@ You can claim {{balance:MaxQuestsPerDay}} quests a day at the Quest Hall, and th
 
 ## The Quest Hall bounty board
 
-The board keeps 5 open dungeon quests and refreshes each day; an unclaimed one leaves after 3 days. A quest's difficulty is your level / 5, plus or minus 1, kept between 1 and 4. It is offered from your level - 5 to your level + 15 and gives you {{balance:DefaultQuestDays}} days plus its difficulty to finish. Its target is one of four kinds, aimed at floors between your level - 10 and your level + 10:
+The board keeps 5 open dungeon quests for your level and refreshes each day; an unclaimed one leaves after 3 days. A quest's difficulty is your level / 5, plus or minus 1, kept between 1 and 4. It is offered from your level - 5 to your level + 15 and gives you {{balance:DefaultQuestDays}} days plus its difficulty to finish. Its target is one of four kinds, aimed at floors between your level - 10 and your level + 10:
 
 - **Defeat a boss:** kill a monster type's champion of about your level + 3 x difficulty.
 - **Expedition:** reach a floor about your level + 2 x difficulty + 1 to 3 and defeat 3 + 2 x difficulty monsters.
 - **Clear a floor:** reach and clear a floor about your level + difficulty, plus or minus a little.
-- **Survive the depths:** descend 3 x difficulty + 2 to 4 floors (at most 15) and defeat 10 monsters.
+- **Survive the depths:** after you take it, descend 3 x difficulty + 2 to 4 floors (at most 15; each floor down counts) and defeat 10 monsters.
 
 ## Quest reward by tier
 
@@ -50,7 +50,7 @@ The Crown keeps 3 to 5 bounties on the board; an unclaimed one leaves after 7 da
 
 ### Bounty on an NPC
 
-A bounty on an NPC pays its level x 100 x its difficulty in gold, where the difficulty is its level / 15 + 1, at most 4, and the pay at most 25,500. Beating that NPC in a fight pays it whether or not you claimed the bounty. It also pays experience: the higher of your level x 50 and a fifth of the gold. A level 45 NPC (difficulty 4) pays 18,000 gold and, to a level 40 character, 3,600 experience. Judicar's boon can raise the gold. The [law guide](/wiki/en/world/law/#bounties) covers bounties on players and kill contracts.
+A bounty on an NPC pays its level x 100 x its difficulty in gold, where the difficulty is its level / 15 + 1, at most 4, and the pay at most 25,500. Beating that NPC in a fight pays it whether or not you claimed the bounty, unless another player claimed it. It also pays experience: the higher of your level x 50 and a fifth of the gold. A level 45 NPC (difficulty 4) pays 18,000 gold and, to a level 40 character, 3,600 experience. Judicar's boon can raise the gold. The [law guide](/wiki/en/world/law/#bounties) covers bounties on players and kill contracts.
 
 ### Crown monster bounties
 
@@ -60,7 +60,7 @@ A monster bounty asks for a number of kills by its kind (3 to 7) plus 2 x its di
 
 A royal quest comes from an audience at the [Castle](/wiki/en/world/castle/#royal-quests); you can hold one at a time. Its difficulty is 1 + your level / 15, at most 4, and it gives you 7 + 2 x difficulty days. The offer shows what it pays: when you accept, a quarter of (500 to 999) x your level x (difficulty + 1) gold and a quarter of (100 to 199) x your level x (difficulty + 1) experience; when you complete it, your level x 1,000 gold.
 
-Its goal is one of: kill 5 + 3 x difficulty monsters; reach a floor at your level + 3 x difficulty; clear a floor at your level - 5 + 5 x difficulty; or hunt a criminal. Floors are kept between 1 and your level + 10.
+Its goal is one of: kill 5 + 3 x difficulty monsters; reach a floor at your level + 3 x difficulty; clear a floor at your level - 5 + 5 x difficulty; or slay any dungeon floor boss. Floors are kept between 1 and your level + 10.
 
 ## Keep story discoveries in context
 
