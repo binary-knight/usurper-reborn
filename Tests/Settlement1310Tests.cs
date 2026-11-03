@@ -23,6 +23,8 @@ namespace UsurperReborn.Tests;
 /// L4-11. The Rat King's Market sold "Smoke Bomb (flee aid)", which gives +2 Agility for one fight and no flee help
 ///      (flight rolls on Dexterity; the real smoke bomb is the Black Market's guaranteed escape). It is renamed to what
 ///      it does: Smoke Powder (+2 Agility), in every language.
+/// P12. A fifth outpost, the Cinder Post on floor 85 (the deep floors had none after 65): floor 65's services and heal
+///      factors, with the outposts' own goods and the top herbs; its text is keyed in every language.
 /// All in memory.
 /// </summary>
 [Collection("SharedGameSingletons")]
@@ -164,6 +166,69 @@ public class Settlement1310Tests : IDisposable
         typeof(DungeonLocation).GetMethod("ApplySettlementPurchase", F)!.Invoke(d, new object[] { hero, "smoke_bomb" });
         hero.SmokeBombs.Should().Be(0, "it is not the Black Market's guaranteed escape");
         hero.TimedStatBuffs.Should().ContainSingle(b => b.Source == "settlement_smoke_bomb" && b.Stat == StatKind.Agility && b.Amount == 2 && b.CombatsLeft == 1);
+    }
+
+    // ---------- P12: the floor 85 outpost ----------
+
+    [Fact]
+    public void Floor_85_has_the_cinder_post_room_and_keeps_its_boss_room()
+    {
+        DungeonSettlementData.IsSettlementFloor(85).Should().BeTrue();
+        var floor = DungeonGenerator.GenerateFloor(85);
+        var outposts = floor.Rooms.Where(r => r.Type == RoomType.Settlement).ToList();
+        outposts.Should().ContainSingle();
+        outposts[0].Name.Should().Be("The Cinder Post");
+        outposts[0].EventType.Should().Be(DungeonEventType.Settlement);
+        outposts[0].HasMonsters.Should().BeFalse();
+        outposts[0].HasTrap.Should().BeFalse();
+        floor.Rooms.Should().Contain(r => r.Type == RoomType.BossAntechamber, "the Old God floor keeps its boss approach");
+        floor.Rooms.Should().Contain(r => r.IsBossRoom);
+        foreach (int other in new[] { 84, 86 })
+            DungeonGenerator.GenerateFloor(other).Rooms.Should().NotContain(r => r.Type == RoomType.Settlement, $"floor {other}");
+    }
+
+    [Fact]
+    public void The_cinder_post_has_floor_65s_services_and_deeper_stock()
+    {
+        var hearth = DungeonSettlementData.GetSettlement(65)!;
+        var post = DungeonSettlementData.GetSettlement(85)!;
+        post.Id.Should().Be("cinder_post");
+        post.Floor.Should().Be(85);
+        (post.HasHealing, post.HasTrading, post.HasLore).Should().Be((hearth.HasHealing, hearth.HasTrading, hearth.HasLore));
+        post.HealCostMultiplier.Should().Be(hearth.HealCostMultiplier);
+        post.HealEffectiveness.Should().Be(hearth.HealEffectiveness);
+        post.TradeItems.Should().Contain(hearth.TradeItems, "everything the Last Hearth sells");
+        post.TradeItems.Should().Contain(new[] { "Healing Herb", "Starbloom Essence" });
+
+        var hero = Hero("Deep Buyer", 90);
+        var goods = Goods(hero, 85);
+        goods.Select(g => g.id).Should().Equal("heal_potion", "mana_potion", "antidote", "healing_herb", "firebloom", "starbloom");
+        Cost(goods, "heal_potion").Should().Be((long)(GameConfig.GetHealingPotionCost(90) * 1.25));
+        Cost(goods, "mana_potion").Should().Be((long)(GameConfig.GetManaPotionCost(90) * 1.25));
+        Cost(goods, "antidote").Should().Be(20 * 9);
+        Cost(goods, "healing_herb").Should().Be(40 * 9);
+        Cost(goods, "firebloom").Should().Be(60 * 9);
+        Cost(goods, "starbloom").Should().Be(80 * 9);
+        var (d, _) = Dungeon(hero, 85);
+        Call<long>(d, "CalculateSettlementHealCost", hero, post).Should().Be((long)((10 + 85 * 5) * 0.6f));
+    }
+
+    [Fact]
+    public void The_cinder_post_text_is_keyed_in_every_language()
+    {
+        var post = DungeonSettlementData.GetSettlement(85)!;
+        var fields = new[] { "npc_title", "description", "greeting_first", "greeting_return" }
+            .Concat(Enumerable.Range(0, post.LoreFragments.Length).Select(i => $"lore.{i}")).ToList();
+        fields.Should().HaveCount(8);
+        foreach (var lang in Langs)
+            foreach (var f in fields)
+            {
+                string key = $"dungeon.settlement.cinder_post.{f}";
+                string v = Loc.GetIn(lang, key);
+                v.Should().NotBe(key, $"{lang} {f}");
+                v.Should().NotContain("\u2014").And.NotContain("\u2013");
+                if (lang != "en") v.Should().NotBe(Loc.GetIn("en", key), $"{lang} {f} is translated");
+            }
     }
 
     // ---------- P12: potion prices away from town ----------

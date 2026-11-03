@@ -70,7 +70,7 @@ With companions or teammates along, entering a new room has a 15% chance that on
 
 ## Dungeon outposts
 
-Four floors have a safe outpost room with no monsters or traps: floors 10, 20, 35 and 65. An outpost can heal, sell supplies and tell its lore; not every outpost does all three.
+Five floors have a safe outpost room with no monsters or traps: floors 10, 20, 35, 65 and 85. An outpost can heal, sell supplies and tell its lore; not every outpost does all three.
 
 {{table:outposts}}
 

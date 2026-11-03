@@ -89,6 +89,8 @@ test("outposts: the heal price and share, and supplies at the floor's price", ()
   assert.equal(row(html, "20")[1], "None");
   assert.match(row(html, "65")[2], /Healing Potion \(1\.25 x the town price\)/);
   assert.match(row(html, "65")[2], /Antidote 140/);
+  assert.match(row(html, "85")[1], /^261 gold, restores 35 percent/);
+  assert.match(row(html, "85")[2], /Starbloom Essence 720/);
   assert.match(row(html, "35")[1], /^74 gold, restores 40 percent/);
 });
 

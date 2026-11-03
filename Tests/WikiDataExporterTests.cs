@@ -719,12 +719,13 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     public void WorldOutpostsPriceAsTheDungeonDoes()
     {
         var outposts = World("outposts");
-        Assert.Equal(new[] { 10, 20, 35, 65 }, outposts.Select(o => o.GetProperty("floor").GetInt32()));
+        Assert.Equal(new[] { 10, 20, 35, 65, 85 }, outposts.Select(o => o.GetProperty("floor").GetInt32()));
         // (10 + floor x 5) x the outpost's factor
         Assert.Equal(30, One(outposts, "10", "floor").GetProperty("healCost").GetInt64());
         Assert.Equal(JsonValueKind.Null, One(outposts, "20", "floor").GetProperty("healCost").ValueKind);
         Assert.Equal(74, One(outposts, "35", "floor").GetProperty("healCost").GetInt64());
         Assert.Equal(201, One(outposts, "65", "floor").GetProperty("healCost").GetInt64());
+        Assert.Equal(261, One(outposts, "85", "floor").GetProperty("healCost").GetInt64());
         Assert.Equal(0.4, One(outposts, "35", "floor").GetProperty("healShareOfMissing").GetDouble(), 3);
         // base price x (1 + floor / 10); 1.3.10: a potion is the town price for the buyer's level x 1.25, no floor price
         var goods = One(outposts, "65", "floor").GetProperty("goods").EnumerateArray().ToArray();
