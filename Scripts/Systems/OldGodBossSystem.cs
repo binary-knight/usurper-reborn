@@ -362,6 +362,10 @@ namespace UsurperRemake.Systems
                     await Pacing.Wait(2000);
                 }
 
+                // 1.3.10: the stance of an earlier attempt (a flee or a loss) is cleared, so the modifiers read
+                // the one the player picks in this dialogue
+                ClearApproachFlags(StoryProgressionSystem.Instance, type);
+
                 // Run dialogue
                 var dialogueResult = await DialogueSystem.Instance.StartDialogue(
                     player, $"{type.ToString().ToLower()}_encounter", terminal);
@@ -496,6 +500,28 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply combat modifiers based on dialogue choices
         /// </summary>
+        /// <summary>
+        /// 1.3.10: the stance flags each Old God's dialogue sets and its combat modifiers read (the Apply*Modifiers
+        /// below). Outcomes (an alliance, a save, a spare) and the Stranger's stance are not in the list.
+        /// </summary>
+        internal static readonly IReadOnlyDictionary<OldGodType, string[]> ApproachFlags = new Dictionary<OldGodType, string[]>
+        {
+            [OldGodType.Maelketh] = new[] { "maelketh_combat_start", "maelketh_teaching" },
+            [OldGodType.Veloura] = new[] { "veloura_combat_start", "veloura_empathy", "veloura_mercy_kill" },
+            [OldGodType.Thorgrim] = new[] { "thorgrim_combat_start", "thorgrim_honorable_combat", "thorgrim_broken_logic" },
+            [OldGodType.Noctura] = new[] { "noctura_combat_start", "noctura_teaching_fight", "noctura_enraged" },
+            [OldGodType.Aurelion] = new[] { "aurelion_combat_start", "aurelion_defiant", "aurelion_humble" },
+            [OldGodType.Terravok] = new[] { "terravok_combat_start", "terravok_destructive", "terravok_respectful" },
+            [OldGodType.Manwe] = new[] { "manwe_combat_start", "manwe_compassion", "manwe_righteous" },
+        };
+
+        /// <summary>1.3.10: clears one god's stance flags before its dialogue runs again.</summary>
+        internal static void ClearApproachFlags(StoryProgressionSystem story, OldGodType type)
+        {
+            if (!ApproachFlags.TryGetValue(type, out var flags)) return;
+            foreach (var flag in flags) story.SetStoryFlag(flag, false);
+        }
+
         private void ApplyDialogueModifiers(OldGodType godType, TerminalEmulator terminal)
         {
             activeCombatModifiers.Reset();

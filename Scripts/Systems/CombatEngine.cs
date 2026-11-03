@@ -223,6 +223,10 @@ public partial class CombatEngine
     // Current player reference for combat speed setting
     private Character currentPlayer;
 
+    /// <summary>1.3.10: true when the damage is this fight's own player's, so the New Game+ damage unlock applies;
+    /// a teammate's, a companion's or a grouped player's damage does not take it.</summary>
+    private bool OwnDamage(Character attacker) => ReferenceEquals(attacker, currentPlayer);
+
     /// <summary>
     /// 1.3.2: divine wrath's cut for this fight, in percent: the fight's player deals this much less with a
     /// basic swing and has this much less defence against a monster's hit. The dungeon sets it on the engine
@@ -3905,7 +3909,7 @@ public partial class CombatEngine
         attackPower = (long)(attackPower * rollMultiplier);
 
         // Apply difficulty modifier to player damage
-        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(attacker));
 
         // Sunforged Blade artifact: +100% damage vs undead and demons (+200% during Manwe fight)
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -14926,7 +14930,7 @@ public partial class CombatEngine
 
                         // Difficulty modifier
                         long preDiffAttack = attackPower;
-                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+                        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(player));
 
                         // Grief effects
                         var griefFx = GriefSystem.Instance.GetCurrentEffects();
@@ -15826,7 +15830,7 @@ public partial class CombatEngine
             // 1.3.2: the class's BackstabMultiplier (the Assassin's 3)
             long backstabDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * (double)player.GetClassCombatModifiers().BackstabMultiplier);
             backstabDamage += random.Next(1, 20);
-            backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
+            backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage, OwnDamage(player));
 
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
@@ -15938,7 +15942,7 @@ public partial class CombatEngine
         powerDamage = (long)(powerDamage * rollMultiplier);
 
         // Difficulty
-        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage);
+        powerDamage = DifficultySystem.ApplyPlayerDamageMultiplier(powerDamage, OwnDamage(player));
 
         // Sunforged Blade vs undead/demons
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -16056,7 +16060,7 @@ public partial class CombatEngine
         defense = ApplyArmorPiercing(defense, player);
 
         long damage = Math.Max(1, attackPower - defense);
-        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(player));
 
         terminal.SetColor("bright_cyan");
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_hit", MonsterNames.Display(target), damage));
@@ -16113,7 +16117,7 @@ public partial class CombatEngine
 
         // Soul Strike: Chivalry-based holy damage
         long holyDamage = (player.Chivalry / 10) + (player.Level * 5) + random.Next(10, 30);
-        holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage);
+        holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage, OwnDamage(player));
 
         terminal.SetColor("bright_yellow");
         UIHelper.WriteRow(terminal, Loc.Get("combat.soul_strike_damage", holyDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
@@ -16148,7 +16152,7 @@ public partial class CombatEngine
         // Smite: 150% damage + level bonus (with weapon soft cap)
         long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
-        smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
+        smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage, OwnDamage(player));
 
         terminal.SetColor("bright_white");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_damage", smiteDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
@@ -16194,7 +16198,7 @@ public partial class CombatEngine
         defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut, the Defence half here
         defense = ApplyArmorPiercing(defense, player);
         rangedDamage = Math.Max(1, rangedDamage - defense);
-        rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
+        rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage, OwnDamage(player));
 
         terminal.SetColor("green");
         UIHelper.WriteRow(terminal, Loc.Get("combat.ranged_hit", MonsterNames.Display(target), rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
@@ -16726,7 +16730,7 @@ public partial class CombatEngine
                     ohDamage = player.Strength + GetEffectiveWeapPow(player.SwingWeapPow(offHand: true)) + random.Next(1, 15);
                     double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
                     ohDamage = (long)(ohDamage * ohMod);
-                    ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+                    ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage, OwnDamage(player));
                 }
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
@@ -19435,7 +19439,7 @@ public partial class CombatEngine
                     // Fallback if spell didn't set damage
                     totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
                 }
-                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
+                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage, OwnDamage(player));
                 await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true, spellCaster: player);
             }
 
@@ -19502,7 +19506,7 @@ public partial class CombatEngine
                 long dealt = 0;   // 1.3.6 G9 (Q7): the HP this cast's hit took from the target
                 if (damage > 0)
                 {
-                    damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                    damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(player));
                     damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
                     if (spellResult.SpecialEffect == "ignore_half_defense")
                         await ApplySpellDamageIgnoringArmor(target, damage, result, spellInfo.Name, player, 50);   // 1.3.4: Echo of Tomorrow
@@ -26132,7 +26136,7 @@ public partial class CombatEngine
             long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
             double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
             ohDamage = (long)(ohDamage * ohMod);
-            ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
+            ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage, OwnDamage(player));
 
             monster.HP -= Math.Max(1, ohDamage);
             result.TotalDamageDealt += Math.Max(1, ohDamage);
@@ -30553,7 +30557,7 @@ public partial class CombatEngine
         attackPower = (long)(attackPower * rollMultiplier);
 
         // Difficulty modifier
-        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower);
+        attackPower = DifficultySystem.ApplyPlayerDamageMultiplier(attackPower, OwnDamage(attacker));
 
         // Sunforged Blade artifact bonus vs undead/demons
         if (ArtifactSystem.Instance.HasSunforgedBlade() &&
@@ -30633,7 +30637,7 @@ public partial class CombatEngine
         }
 
         long damage = Math.Max(1, attackPower - defense);
-        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+        damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage, OwnDamage(attacker));
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("combat.precise_strike_lands", damage));
@@ -30678,7 +30682,7 @@ public partial class CombatEngine
 
             long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
             long actual = Math.Max(1, damage - defense);
-            actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual);
+            actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual, OwnDamage(attacker));
             terminal.WriteLine(Loc.Get("combat.shoot_arrow", actual), "bright_green");
             target.HP = Math.Max(0, target.HP - actual);
             result.CombatLog.Add($"Player ranged hits {target.Name} for {actual}");
@@ -30730,7 +30734,7 @@ public partial class CombatEngine
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         long actual = Math.Max(1, damage - defense);
-        actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual);
+        actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual, OwnDamage(player));
 
         terminal.SetColor("yellow");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_evil", MonsterNames.Display(target), actual));

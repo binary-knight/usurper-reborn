@@ -633,7 +633,9 @@ namespace UsurperRemake.Locations
             var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
             // Shadows members get 10% discount on all shady shop purchases
             float shadowsDiscount = FactionSystem.Instance?.PlayerFaction == Faction.TheShadows ? 0.90f : 1.0f;
-            return Math.Max(1, (long)(basePrice * alignmentModifier * worldEventModifier * shadowsDiscount));
+            // 1.3.10: the New Game+ shop discount (Blessed Commerce) reaches the shady shops too
+            float ngPlusDiscount = 1f - MetaProgressionSystem.Instance.GetShopDiscount();
+            return Math.Max(1, (long)(basePrice * alignmentModifier * worldEventModifier * shadowsDiscount * ngPlusDiscount));
         }
 
         private async Task VisitDrugPalace()
@@ -1654,6 +1656,7 @@ namespace UsurperRemake.Locations
             price *= AlignmentSystem.Instance.GetPriceModifier(currentPlayer, isShadyShop: true);
             price *= (1.0f - rankDiscount);
             if (isFreelance) price *= GameConfig.BlackMarketFreelanceSurcharge;
+            price *= 1f - MetaProgressionSystem.Instance.GetShopDiscount();   // 1.3.10: the New Game+ shop discount
             return Math.Max(1, (long)price);
         }
 

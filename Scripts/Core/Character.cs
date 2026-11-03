@@ -2095,6 +2095,10 @@ public class Character
         // 1.3.1: the Wisdom of completed companion griefs, added the same way; never stored
         Wisdom += GriefWisdomNow();
 
+        // 1.3.10: the New Game+ stat unlock (Ocean's Blessing, +15 percent to all stats), the player's only,
+        // before the stats feed HP, mana and defence; never stored
+        if (IsPlayer) ApplyMetaStatMultiplier(UsurperRemake.Systems.MetaProgressionSystem.Instance.GetStatMultiplier());
+
         // Apply stat-based bonuses AFTER equipment (stats may have been modified)
         // Constitution bonus to HP
         MaxHP += StatEffectsSystem.GetConstitutionHPBonus(Constitution, Level);
@@ -2183,6 +2187,16 @@ public class Character
         }
         Mana = Math.Min(Mana, MaxMana);
         ClampCombatStamina();   // 1.3.10 (G6): a maximum that dropped (level, Stamina, armor) lowers the fight stamina too
+    }
+
+    /// <summary>1.3.10: the New Game+ stat unlock on the nine attributes, inside RecalculateStats.</summary>
+    private void ApplyMetaStatMultiplier(float multiplier)
+    {
+        if (multiplier <= 1.0f) return;
+        long Up(long v) => (long)Math.Round(v * (double)multiplier);   // rounded: 1.15f is a hair under 1.15
+        Strength = Up(Strength); Dexterity = Up(Dexterity); Constitution = Up(Constitution);
+        Intelligence = Up(Intelligence); Wisdom = Up(Wisdom); Charisma = Up(Charisma);
+        Defence = Up(Defence); Stamina = Up(Stamina); Agility = Up(Agility);
     }
 
     // 1.2.0: what the last RecalculateStats put in and got out of the god boon segment. Runtime

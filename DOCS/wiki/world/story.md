@@ -52,7 +52,7 @@ A god killed or saved leaves 2 of its crafting material, and each of the first s
 
 **Saving in the fight.** With V in the fight you can save a god that can be saved: you need the Soulweaver's Loom, the god at half its HP or less, and Chivalry at least 200 above your Darkness. Veloura and Aurelion can be saved this way only once you hold their own artifact, Noctura and Terravok on a first meeting.
 
-**How the answers change the fight.** An answer can change your damage, the god's damage and the god's defense. Your damage changes the god's HP instead: 25 percent more damage means the god has 1 / 1.25 of its HP, so Maelketh's 49,500, alone or with five or more fighters, becomes 39,600. The god's damage is its own factor divided by your defense factor, never more than {{balance:OldGodDialogueBossDamageCap}} times, and it also scales the god's area attacks, channels and corruption.
+**How the answers change the fight.** An answer can change your damage, the god's damage and the god's defense. After a flight or a loss, the next attempt uses the answer given in that attempt. Your damage changes the god's HP instead: 25 percent more damage means the god has 1 / 1.25 of its HP, so Maelketh's 49,500, alone or with five or more fighters, becomes 39,600. The god's damage is its own factor divided by your defense factor, never more than {{balance:OldGodDialogueBossDamageCap}} times, and it also scales the god's area attacks, channels and corruption.
 
 - **Maelketh:** challenging him gives you 25 percent more damage, 15 percent less defense, 10 points more critical hit chance and bloodlust. Asking him to teach you gives 20 percent more defense, his damage x0.85 and a dodge of his first attack. The answer of peace changes nothing.
 - **Veloura:** hostility gives you 15 percent more damage and her damage x1.10. Empathy weakens her (Strength x0.85) and sets her damage x0.80; a mercy kill weakens her and sets her defense x0.70. Mira in your party multiplies her damage by 0.9 more.
@@ -78,14 +78,14 @@ Alignment here is Chivalry minus Darkness.
 - **Savior:** alignment above 300, or 3 or more gods saved. The gods that count as saved are Veloura, Aurelion and Terravok when saved, and Noctura while she is still your ally. She stops counting when you beat Manwe in a fight, because she then turns on you; she still counts when Manwe is allied in the conversation or spared through his offer.
 - **Defiant:** anything else.
 - **True Ending:** all seven seals, Awakening stage 7, a companion's death witnessed or a grief fully lived through, at least 2 of the four gods above counted as saved, alignment from -500 to 500, and a Blood Price below {{balance:MurderWeightEndingBlock}}.
-- **The older True Ending rule:** from the third cycle, Noctura still allied, 2 of Veloura, Aurelion and Terravok saved, all seven seals and alignment from -200 to 200. It asks no Awakening, grief or Blood Price.
+- **The older True Ending rule:** from the third cycle, Noctura still allied, 2 of Veloura, Aurelion and Terravok saved, all seven seals, alignment from -200 to 200 and a Blood Price below {{balance:MurderWeightEndingBlock}}. It asks no Awakening or grief.
 - **Dissolution (secret):** from the third cycle, 2 or more different endings completed before, Awakening stage 7, the full truth of who you are, all 7 Wave Fragments and a Blood Price below {{balance:MurderWeightEndingBlock}}. You learn the full truth from the memory of the full truth, or when a major memory brings your recovered memories to 8.
 
 A Blood Price of {{balance:MurderWeightEndingBlock}} or more closes the True Ending and Dissolution, and above {{balance:MurderWeightAwakeningBlock}} you gain no Awakening insights from dreams, visions, discoveries, songs or choices. After every ending but Dissolution the game offers ascension and then the Eternal Cycle; Dissolution offers neither.
 :::
 
 :::spoiler Spoiler: story chapters and the moral choices
-Four events move the story's chapter forward: meeting the Stranger, a first visit to floor 45, holding all six god artifacts (when the final artifact appears), and a first visit to floor 100. No other event or conversation sets a chapter, so the chapters between them never come.
+Four events move the story's chapter forward: meeting the Stranger, a first visit to floor 45, holding all six god artifacts (when the final artifact appears), and a first visit to floor 100. No other event or conversation sets a chapter, so the chapters between them never come. The chapter is kept in the save.
 
 Five moral choices are written, each offered once and each waiting for a chapter: the possessed child on floor 25, Veloura's cure on floor 65, freeing Terravok on floor 80, destroying the darkness on floor 95 (with the Sunforged Blade), and a final choice on floor 100. With the chapters above, a floor by floor descent never offers the possessed child, whose floor checks it only on the first visit; Veloura's cure and freeing Terravok come only on a first visit to their floor after the final artifact; destroying the darkness is checked on every visit to floor 95 once the final artifact is held. No code offers the final choice.
 :::

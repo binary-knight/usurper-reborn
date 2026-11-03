@@ -2753,9 +2753,10 @@ namespace UsurperRemake.Systems
                         pool.Add(Loc.Get("companion.idle.mira.vel_f40_2"));
                     }
                     var story = StoryProgressionSystem.Instance;
-                    if (dungeonLevel > 40 && story.HasStoryFlag("veloura_encountered"))
+                    // 1.3.10: the Old God state the encounter writes (veloura_encountered was never set)
+                    if (dungeonLevel > 40)
                     {
-                        if (story.OldGodStates.TryGetValue(OldGodType.Veloura, out var vState))
+                        if (story.OldGodStates.TryGetValue(OldGodType.Veloura, out var vState) && vState.HasBeenEncountered)
                         {
                             if (vState.Status == GodStatus.Saved)
                                 pool.Add(Loc.Get("companion.idle.mira.vel_saved"));

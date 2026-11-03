@@ -902,7 +902,9 @@ namespace UsurperRemake.Systems
             if (trigger.Contains("defeats Maelketh"))
             {
                 hasAnyCondition = true;
-                if (!(StoryProgressionSystem.Instance?.HasFlag(StoryFlag.DefeatedMaelketh) ?? false))
+                // 1.3.10: the Old God state, which the fight writes (the DefeatedMaelketh bit was never set).
+                // Marcus asks "you killed him? Or... saved him?", so any resolution counts.
+                if (!(StoryProgressionSystem.Instance?.IsGodResolved(OldGodType.Maelketh) ?? false))
                     allConditionsMet = false;
             }
 
@@ -925,9 +927,9 @@ namespace UsurperRemake.Systems
             if (trigger.Contains("allies with or defeats Noctura"))
             {
                 hasAnyCondition = true;
-                var allied = StoryProgressionSystem.Instance?.HasFlag(StoryFlag.AlliedNoctura) ?? false;
-                var defeated = StoryProgressionSystem.Instance?.HasFlag(StoryFlag.DefeatedNoctura) ?? false;
-                if (!allied && !defeated)
+                // 1.3.10: the Old God state (the AlliedNoctura and DefeatedNoctura bits were never set);
+                // Greta's "It's over then. One way or another." follows any resolution
+                if (!(StoryProgressionSystem.Instance?.IsGodResolved(OldGodType.Noctura) ?? false))
                     allConditionsMet = false;
             }
 

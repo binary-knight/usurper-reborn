@@ -2096,6 +2096,10 @@ namespace UsurperRemake.Systems
                     .Where(kvp => kvp.Value.HasBeenEncountered)
                     .Select(kvp => (int)kvp.Key)
                     .ToList();
+                // 1.3.10: the chapter, the StoryFlag bits and the major choices
+                data.CurrentChapter = (int)story.CurrentChapter;
+                data.StoryFlagBits = story.StoryFlags;
+                data.MajorChoices = story.ExportMajorChoices();
                 if (data.OldGodStates.Count > 0)
                 {
                 }
@@ -2598,6 +2602,9 @@ namespace UsurperRemake.Systems
 
                 // Restore cycle count
                 story.CurrentCycle = data.CurrentCycle;
+
+                // 1.3.10: restore the chapter, the StoryFlag bits and the major choices (an old save has none)
+                story.RestoreProgress(data.CurrentChapter, data.StoryFlagBits, data.MajorChoices);
 
                 // Restore completed endings
                 if (data.CompletedEndings != null)
