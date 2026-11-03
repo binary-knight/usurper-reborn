@@ -212,6 +212,8 @@ public class PlacesFlow1310Tests : IDisposable
         var hero = Hero("Night Sleeper");
         hero.GameTimeMinutes = 22 * 60;
         int dayBefore = DailySystemManager.Instance.CurrentDay;
+        // the engine's periodic update runs at most every 30 seconds; the test engine has no daily manager for it
+        typeof(GameEngine).GetField("lastPeriodicCheck", F)!.SetValue(GameEngine.Instance, DateTime.Now);
         var s = NewScreen("Y", "", "");
         var dorm = At(new DormitoryLocation(), hero, s.Term);
 

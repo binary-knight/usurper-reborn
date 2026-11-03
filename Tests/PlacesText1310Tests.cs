@@ -230,15 +230,30 @@ public class PlacesText1310Tests : IDisposable
     [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
     public void AwakeningPointers_SayProgressOpensAtTheFullMenuTier(string lang)
     {
+        var t = Table(lang);
         foreach (var key in new[] { "base.stat_awakening_hint", "hint.awakening.msg" })
         {
-            string text = Loc.GetIn(lang, key, GameConfig.MenuTier3Level);
-            text.Should().Contain(GameConfig.MenuTier3Level.ToString(), $"{lang} {key} names the level Progress opens");
+            t[key + ".early"].Should().Contain(GameConfig.MenuTier3Level.ToString(), $"{lang} {key}.early names the level Progress opens");
+            t[key].Should().NotContain(GameConfig.MenuTier3Level.ToString(), $"{lang} {key} is for a player who has it");
+            ClassicKeyHints200Tests.BracketKeys(t[key + ".early"]).Should().Equal(ClassicKeyHints200Tests.BracketKeys(t[key]), "the same keys");
         }
-        ("  " + Loc.GetIn(lang, "base.stat_awakening_hint", GameConfig.MenuTier3Level)).Length.Should().BeLessOrEqualTo(MaxWidth);
-        Src("Scripts/Locations/BaseLocation.cs").Should().Contain("\"base.stat_awakening_hint\", currentPlayer), GameConfig.MenuTier3Level)")
-            .And.Contain("HINT_AWAKENING, terminal, currentPlayer, GameConfig.MenuTier3Level)");
-        Src("Scripts/Systems/AwakeningScreens.cs").Should().Contain("HINT_AWAKENING, term, player, GameConfig.MenuTier3Level)");
+        ("  " + t["base.stat_awakening_hint.early"]).Length.Should().BeLessOrEqualTo(MaxWidth, lang);
+    }
+
+    [Fact]
+    public void AwakeningPointers_EarlyOnlyForADistrictsPlayerBelowTheFullTier()
+    {
+        var low = new Character { Level = GameConfig.MenuTier3Level - 1, DistrictsMainStreet = true };
+        var full = new Character { Level = GameConfig.MenuTier3Level, DistrictsMainStreet = true };
+        var classic = new Character { Level = 1 };
+        MainStreetLocation.AwakeningTextKey("hint.awakening.msg", low).Should().Be("hint.awakening.msg.early");
+        MainStreetLocation.AwakeningTextKey("base.stat_awakening_hint", low).Should().Be("base.stat_awakening_hint.early");
+        MainStreetLocation.AwakeningTextKey("hint.awakening.msg", full).Should().Be("hint.awakening.msg");
+        MainStreetLocation.AwakeningTextKey("hint.awakening.msg", classic).Should().Be("hint.awakening.msg.classic", "classic takes P at any level");
+        string bl = Src("Scripts/Locations/BaseLocation.cs"), aw = Src("Scripts/Systems/AwakeningScreens.cs");
+        bl.Should().Contain("Loc.Get(MainStreetLocation.AwakeningTextKey(\"base.stat_awakening_hint\", currentPlayer))")
+            .And.Contain("MainStreetLocation.AwakeningTextKey(\"hint.awakening.msg\", currentPlayer)");
+        aw.Should().Contain("MainStreetLocation.AwakeningTextKey(\"hint.awakening.msg\", player)");
     }
 
     [Fact]

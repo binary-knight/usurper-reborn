@@ -168,7 +168,8 @@ public class LocationManager
         bool settlement = SettlementSystem.Instance?.State.IsEstablished == true;
         foreach (var dest in TownExits(locationId, currentPlayer?.Level ?? 1, UsurperRemake.BBS.DoorMode.IsOnlineMode, settlement, locations.ContainsKey))
         {
-            string destName = dest.ToString().ToLowerInvariant();
+            // LoveCorner and RoyalOrphanage share the value 77; the exit is Love Street's
+            string destName = dest == GameLocation.LoveCorner ? "lovecorner" : dest.ToString().ToLowerInvariant();
             exits[destName] = (int)dest;
         }
 

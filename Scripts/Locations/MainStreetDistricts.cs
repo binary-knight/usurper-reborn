@@ -489,6 +489,17 @@ public partial class MainStreetLocation
     public static string StreetTextKey(string key, Character? player) =>
         player?.DistrictsMainStreet != true && ClassicTextKeys.Contains(key) ? key + ".classic" : key;
 
+    /// <summary>
+    /// 1.3.10: the awakening pointers (base.stat_awakening_hint, hint.awakening.msg) for this player. The districts
+    /// open Progress [P] at the full menu tier, so a districts player below it gets the ".early" text, which says from
+    /// which level; classic takes P at any level.
+    /// </summary>
+    internal static string AwakeningTextKey(string key, Character? player)
+    {
+        string k = StreetTextKey(key, player);
+        return k == key && player != null && TierForLevel(player.Level) < 3 ? key + ".early" : k;
+    }
+
     /// <summary>v1.1.13: the help screen: every unlocked place under the key path that reaches it.</summary>
     internal static List<string> HelpMapLines(StreetView v, int onlineCount)
     {
