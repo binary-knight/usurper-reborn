@@ -354,6 +354,114 @@ public class LivingWorld1310Tests : IDisposable
         after.Prisoners.Keys.Should().NotContain("Lord Invented", "a court title with no NPC behind it is not jailed");
     }
 
+    // ---------- C2 round 2 (pick P18): a discovered plot not arrested lapses after 7 game days ----------
+
+    private static CourtIntrigue DiscoveredPlot(King king, params string[] conspirators)
+    {
+        var plot = new CourtIntrigue { PlotType = "Coup", Conspirators = conspirators.ToList(), Target = king.Name, Progress = 20, IsDiscovered = true };
+        king.ActivePlots.Add(plot);
+        return plot;
+    }
+
+    /// <summary>Runs the court's day (King.ProcessDailyActivitiesAsync) the given number of times; returns the news posted.</summary>
+    private static async Task<List<string>> CourtDays(int days)
+    {
+        var posted = new List<string>();
+        NewsSystem.Instance.SetCatchUpBuffer(posted);
+        try { for (int i = 0; i < days; i++) (await King.ProcessDailyActivitiesAsync(null)).Should().BeTrue(); }
+        finally { NewsSystem.Instance.ClearCatchUpBuffer(); }
+        return posted;
+    }
+
+    private static string LapseNews() => Loc.Get("worldsim.court.plot_lapsed", HeroName);
+
+    [Fact]
+    public async Task C2_ADiscoveredPlot_OnDay6_IsStillListed()
+    {
+        var king = HeroKing();
+        DiscoveredPlot(king, "Lord Waiting", "Lady Waiting");
+        var news = await CourtDays(6);
+        var plot = CastleLocation.GetCurrentKing().ActivePlots.Should().ContainSingle(p => p.IsDiscovered).Subject;
+        plot.DaysDiscovered.Should().Be(6);
+        news.Should().NotContain(n => n.Contains(LapseNews()));
+    }
+
+    [Fact]
+    public async Task C2_ADiscoveredPlot_OnDay7_LapsesWithANewsLine()
+    {
+        var king = HeroKing();
+        DiscoveredPlot(king, "Lord Gone", "Lady Gone");
+        king.ActivePlots.Add(new CourtIntrigue { PlotType = "Scandal", Conspirators = new() { "Sir Busy" }, Target = king.Name, Progress = 20 });
+        var news = await CourtDays(7);
+        var after = CastleLocation.GetCurrentKing().ActivePlots;
+        after.Should().NotContain(p => p.IsDiscovered, "the king did not arrest it within 7 days");
+        after.Should().ContainSingle(p => !p.IsDiscovered, "a plot still in motion does not lapse");
+        news.Count(n => n.Contains(LapseNews())).Should().Be(1, "one news line says the plot fell apart");
+    }
+
+    [Fact]
+    public async Task C2_AnArrestOnDay6_EndsThePlot()
+    {
+        var hero = Hero();
+        var king = HeroKing();
+        var real = Npc("fc_late_plotter", "Fcten Late Plotter");
+        Roster(real);
+        DiscoveredPlot(king, real.Name2, "Lord Invented");
+        await CourtDays(6);
+        long treasury = CastleLocation.GetCurrentKing().Treasury;
+
+        var castle = new CastleLocation();
+        var s = At(castle, hero, "1");
+        await Run(castle, "CourtAction_Arrest");
+
+        s.Text.Should().NotContain(Loc.Get("castle.no_discovered_plots"));
+        var after = CastleLocation.GetCurrentKing();
+        after.ActivePlots.Should().BeEmpty();
+        after.Treasury.Should().Be(treasury - GameConfig.ArrestTrialCost);
+        after.Prisoners.Keys.Should().Contain(real.Name2);
+        (await CourtDays(1)).Should().NotContain(n => n.Contains(LapseNews()), "an arrested plot does not lapse later");
+    }
+
+    [Fact]
+    public async Task C2_AnOldSaveWithADiscoveredPlot_Loads_AndLapsesSevenDaysAfterTheLoad()
+    {
+        // a court saved before 1.3.10 has no DaysDiscovered field
+        const string oldPlot = "{\"PlotType\":\"Coup\",\"Conspirators\":[\"Lord Old\"],\"Target\":\"x\",\"Progress\":30,\"IsDiscovered\":true}";
+        var saved = System.Text.Json.JsonSerializer.Deserialize<CourtIntrigueSaveData>(oldPlot)!;
+        saved.IsDiscovered.Should().BeTrue();
+        saved.DaysDiscovered.Should().Be(0);
+
+        var king = HeroKing();
+        var court = OnlineStateManager.CourtData(king, null);
+        court.ActivePlots = new List<CourtIntrigueSaveData> { saved };
+        var loaded = King.CreateNewKing(HeroName, CharacterAI.Human, CharacterSex.Male);
+        typeof(OnlineStateManager).GetMethod("ApplyCourtTo", S)!.Invoke(null, new object[] { loaded, court, true, false });
+        loaded.ActivePlots.Should().ContainSingle(p => p.IsDiscovered && p.DaysDiscovered == 0 && p.Conspirators.Contains("Lord Old"));
+        CastleLocation.SetKing(loaded);
+
+        (await CourtDays(6)).Should().NotContain(n => n.Contains(LapseNews()));
+        CastleLocation.GetCurrentKing().ActivePlots.Should().ContainSingle(p => p.IsDiscovered);
+        (await CourtDays(1)).Count(n => n.Contains(LapseNews())).Should().Be(1);
+        CastleLocation.GetCurrentKing().ActivePlots.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void C2_TheDaysSinceDiscovery_SurviveTheSaveSites()
+    {
+        var king = HeroKing();
+        DiscoveredPlot(king, "Lord Counted").DaysDiscovered = 4;
+        var court = OnlineStateManager.CourtData(king, null);
+        court.ActivePlots.Single().DaysDiscovered.Should().Be(4);
+        var json = System.Text.Json.JsonSerializer.Serialize(court);
+        var back = System.Text.Json.JsonSerializer.Deserialize<RoyalCourtSaveData>(json)!;
+        var loaded = King.CreateNewKing(HeroName, CharacterAI.Human, CharacterSex.Male);
+        typeof(OnlineStateManager).GetMethod("ApplyCourtTo", S)!.Invoke(null, new object[] { loaded, back, true, false });
+        loaded.ActivePlots.Single().DaysDiscovered.Should().Be(4);
+        // the single-player save writes and reads the field at its two sites too
+        var save = Src("Systems", "SaveSystem.cs");
+        Regex.Matches(save, @"IsDiscovered = p\.IsDiscovered,\s*DaysDiscovered = p\.DaysDiscovered").Count.Should().Be(2);
+    }
+
     // ---------- C3: a jailed NPC stays in the cell ----------
 
     [Fact]

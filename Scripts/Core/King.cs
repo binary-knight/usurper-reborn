@@ -37,6 +37,8 @@ public class King
     // Max 5 NPC guards + 5 monster guards
     public const int MaxNPCGuards = 5;
     public const int MaxMonsterGuards = 5;
+    /// <summary>1.3.10: a discovered plot the king does not arrest lapses after this many game days.</summary>
+    public const int PlotLapseDays = 7;
     public List<RoyalGuard> Guards { get; set; } = new();
     public List<MonsterGuard> MonsterGuards { get; set; } = new();
     
@@ -183,12 +185,20 @@ public class King
         var king = CastleLocation.GetCurrentKing();
         if (king == null) return false;
         var released = new List<string>();
+        var lapsed = new List<UsurperRemake.Systems.CourtIntrigueSaveData>();
+        string reigning = king.Name;
         bool done = await UsurperRemake.Systems.OnlineStateManager.ApplyCourtChangeAsync(sql, court =>
         {
-            released = ApplyDailyActivities(court);
+            lapsed = new List<UsurperRemake.Systems.CourtIntrigueSaveData>();   // afresh on a retried write
+            released = ApplyDailyActivities(court, lapsed);
+            reigning = string.IsNullOrEmpty(court.KingName) ? reigning : court.KingName;
             return alsoToday == null || alsoToday(court);
         }, beforeWrite);
         if (!done) return false;
+
+        // 1.3.10: a lapsed plot's news, once the day is written
+        foreach (var _ in lapsed)
+            NewsSystem.Instance?.Newsy(true, Loc.Get("worldsim.court.plot_lapsed", reigning));
 
         // Reset daily tax revenue accumulators for the next day
         var now = CastleLocation.GetCurrentKing();
@@ -266,8 +276,20 @@ public class King
     }
 
     /// <summary>v1.1.13: the day's court activities applied to a court record; returns the prisoners released.</summary>
-    internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court)
+    internal static List<string> ApplyDailyActivities(UsurperRemake.Systems.RoyalCourtSaveData court,
+        List<UsurperRemake.Systems.CourtIntrigueSaveData>? lapsed = null)
     {
+        // 1.3.10: a discovered plot waits PlotLapseDays game days for the king's arrest, then falls apart
+        foreach (var plot in court.ActivePlots.Where(p => p.IsDiscovered).ToList())
+        {
+            plot.DaysDiscovered++;
+            if (plot.DaysDiscovered >= PlotLapseDays)
+            {
+                court.ActivePlots.Remove(plot);
+                lapsed?.Add(plot);
+            }
+        }
+
         // v1.1.13: citizen tax only; the day's sales tax went into the treasury sale by sale
         var income = DailyIncomeOf(court, 0);
         var expenses = DailyExpensesOf(court);
@@ -589,6 +611,7 @@ public class CourtIntrigue
     public DateTime StartDate { get; set; } = DateTime.Now;
     public bool IsDiscovered { get; set; } = false;
     public string DiscoveredBy { get; set; } = "";
+    public int DaysDiscovered { get; set; } = 0;     // 1.3.10: game days since discovery; lapses at PlotLapseDays
 }
 
 /// <summary>

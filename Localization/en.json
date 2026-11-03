@@ -4378,6 +4378,7 @@
   "worldsim.court.plot_discovered.scandal": "A scandal plot against {0} {1} was discovered!",
   "worldsim.court.plot_discovered.sabotage": "A sabotage plot against {0} {1} was discovered!",
   "worldsim.court.plot_discovered": "A plot against {0} {1} was discovered!",
+  "worldsim.court.plot_lapsed": "The plot against {0} fell apart before anyone was arrested.",
   "worldsim.court.assassination_attempt": "ASSASSINATION ATTEMPT! {0} {1} narrowly survived an assassination plot!",
   "worldsim.court.coup_attempt": "COUP ATTEMPT! {0} guards joined the conspiracy against {1} {2}!",
   "worldsim.court.scandal": "SCANDAL! Shocking revelations about {0} {1} rock the kingdom!",

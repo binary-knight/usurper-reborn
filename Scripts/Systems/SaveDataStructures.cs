@@ -2133,6 +2133,7 @@ namespace UsurperRemake.Systems
         public string Target { get; set; } = "";
         public int Progress { get; set; }
         public bool IsDiscovered { get; set; }
+        public int DaysDiscovered { get; set; }   // 1.3.10: an old save reads 0, so its discovered plot lapses 7 days after the load
     }
 
     /// <summary>

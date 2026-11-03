@@ -4177,6 +4177,7 @@
   "worldsim.court.plot_discovered.scandal": "¡Se ha descubierto una conspiración para desatar un escándalo contra {0} {1}!",
   "worldsim.court.plot_discovered.sabotage": "¡Se ha descubierto un complot de sabotaje contra {0} {1}!",
   "worldsim.court.plot_discovered": "¡Se ha descubierto un complot contra {0} {1}!",
+  "worldsim.court.plot_lapsed": "El complot contra {0} se deshizo antes de que arrestaran a nadie.",
   "worldsim.court.assassination_attempt": "¡INTENTO DE ASESINATO! ¡{0} {1} sobrevivió por poco a un complot de asesinato!",
   "worldsim.court.coup_attempt": "¡INTENTO DE GOLPE! ¡{0} guardias se unieron a la conspiración contra {1} {2}!",
   "worldsim.court.scandal": "¡ESCÁNDALO! ¡Revelaciones impactantes sobre {0} {1} sacuden el reino!",
