@@ -1690,7 +1690,7 @@ public class WeaponShopLocation : BaseLocation
         for (int i = 0; i < pageItems.Count; i++)
         {
             var item = pageItems[i];
-            bool canAfford = player.Gold >= ShopPricing.Total(player, item.Value, weaponShop: true);   // 1.3.10 (D2)
+            bool canAfford = player.Gold >= item.Value;
             bool meetsLevel = player.Level >= item.MinLevel;
             bool meetsClass = MeetsClass(player.Class, item);
 
