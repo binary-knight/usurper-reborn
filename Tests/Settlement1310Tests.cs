@@ -31,6 +31,9 @@ namespace UsurperReborn.Tests;
 /// P6.  The Smugglers' Cache, likewise, now serves once Built: its "-10% shop prices (5 purchases)" comes off wherever the
 ///      city controller's shop discount applies (Weapon, Armor and Magic shops), shown and charged, and each purchase
 ///      there spends one. The count is saved; a save without it loads with none.
+/// P6.  The Market Stall said "trading coming in a future update". It now trades: healing and mana potions at the
+///      Healer's price for the player's level (tax included), and an identified, uncursed weapon, armor piece or
+///      accessory from the backpack sold at the town shops' price, half its value.
 /// All in memory.
 /// </summary>
 [Collection("SharedGameSingletons")]
@@ -515,6 +518,104 @@ public class Settlement1310Tests : IDisposable
                 Loc.GetIn(lang, "settlement.cache_still_active", 5).Length.Should().BeLessThanOrEqualTo(79, lang);
                 Loc.GetIn(lang, "base.buff_smugglers_cache", "10", 5).Length.Should().BeLessThanOrEqualTo(79, lang);
             }
+        }
+    }
+
+    // ---------- P6: the Market Stall trade ----------
+
+    private static long HealerPrice(long basePrice) => CityControlSystem.CalculateHealingTaxedPrice(basePrice).total;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task The_stall_sells_a_potion_at_the_healers_price_for_the_level(bool mana)
+    {
+        var hero = Hero("Stall Buyer", 40);
+        hero.Healing = 0; hero.ManaPotions = 0;
+        long gold = hero.Gold;
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero, mana ? "2" : "1", "", "0");
+        await Run(loc, "UseMarketService");
+        long price = HealerPrice(mana ? GameConfig.GetManaPotionCost(40) : GameConfig.GetHealingPotionCost(40));
+        (gold - hero.Gold).Should().Be(price);
+        (mana ? hero.ManaPotions : hero.Healing).Should().Be(1);
+        (mana ? hero.Healing : hero.ManaPotions).Should().Be(0);
+        screen.Text.Should().NotContain(Loc.Get("settlement.market_coming_soon"));
+        screen.Text.Should().Contain(Loc.Get(mana ? "settlement.market_buy_mana" : "settlement.market_buy_heal", $"{price:N0}", 0, mana ? hero.MaxManaPotions : hero.MaxPotions));
+    }
+
+    [Fact]
+    public async Task The_stall_sells_no_potion_past_the_carry_limit_and_none_without_the_gold()
+    {
+        var hero = Hero("Full Buyer", 40);
+        hero.Healing = hero.MaxPotions;
+        long gold = hero.Gold;
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero, "1", "", "0");
+        await Run(loc, "UseMarketService");
+        hero.Gold.Should().Be(gold);
+        hero.Healing.Should().Be(hero.MaxPotions);
+        screen.Text.Should().Contain(Loc.Get("settlement.market_full", Loc.Get("street_encounter.merchant.item.healing_potion")));
+
+        var poor = Hero("Poor Buyer", 40);
+        poor.Healing = 0; poor.Gold = 10;
+        var poorScreen = At(loc, poor, "1", "", "0");
+        await Run(loc, "UseMarketService");
+        poor.Gold.Should().Be(10);
+        poor.Healing.Should().Be(0);
+        poorScreen.Text.Should().Contain(Loc.Get("ui.not_enough_gold"));
+    }
+
+    [Fact]
+    public async Task The_stall_buys_a_backpack_item_at_half_its_value_and_never_a_cursed_or_unknown_one()
+    {
+        var hero = Hero("Stall Seller", 40);
+        var blade = new Item { Name = "Stall Test Blade", Type = ObjType.Weapon, Value = 1000, IsIdentified = true };
+        var cursed = new Item { Name = "Stall Cursed Ring", Type = ObjType.Fingers, Value = 5000, IsIdentified = true, IsCursed = true };
+        var unknown = new Item { Name = "Stall Unknown Helm", Type = ObjType.Head, Value = 7000, IsIdentified = false };
+        hero.Inventory.AddRange(new[] { cursed, unknown, blade });
+        long gold = hero.Gold;
+        var loc = new SettlementLocation();
+        var screen = At(loc, hero, "S", "1", "Y", "", "0");
+        await Run(loc, "UseMarketService");
+        long expected = (long)((1000 / 2) * FactionSystem.Instance.GetFencePriceModifier());
+        (hero.Gold - gold).Should().Be(expected);
+        hero.Inventory.Should().NotContain(blade);
+        hero.Inventory.Should().Contain(cursed).And.Contain(unknown);
+        screen.Text.Should().NotContain("Stall Cursed Ring").And.NotContain("Stall Unknown Helm");
+        screen.Text.Should().Contain(Loc.Get("settlement.market_sold", ItemNames.Display(blade), $"{expected:N0}"));
+    }
+
+    [Fact]
+    public async Task The_stall_keeps_the_item_when_the_sale_is_declined()
+    {
+        var hero = Hero("Stall Keeper", 40);
+        var blade = new Item { Name = "Stall Kept Blade", Type = ObjType.Weapon, Value = 1000, IsIdentified = true };
+        hero.Inventory.Add(blade);
+        long gold = hero.Gold;
+        var loc = new SettlementLocation();
+        At(loc, hero, "S", "1", "N", "0");
+        await Run(loc, "UseMarketService");
+        hero.Gold.Should().Be(gold);
+        hero.Inventory.Should().Contain(blade);
+    }
+
+    [Fact]
+    public void The_stall_rows_exist_in_every_language_and_fit_79_columns()
+    {
+        string[] keys = { "settlement.market_buy_heal", "settlement.market_buy_mana", "settlement.market_sell", "settlement.market_full",
+            "settlement.market_bought", "settlement.market_nothing_to_sell", "settlement.market_sell_header", "settlement.market_sell_row",
+            "settlement.market_sell_prompt", "settlement.market_sell_confirm", "settlement.market_sold" };
+        foreach (var lang in Langs)
+            foreach (var k in keys) Loc.GetIn(lang, k).Should().NotBe(k, lang);
+        foreach (var lang in new[] { "en", "hu" })
+        {
+            string big = $"{9_999_999:N0}";
+            ("  [1] " + Loc.GetIn(lang, "settlement.market_buy_heal", big, 119, 119)).Length.Should().BeLessThanOrEqualTo(79, lang);
+            ("  [2] " + Loc.GetIn(lang, "settlement.market_buy_mana", big, 119, 119)).Length.Should().BeLessThanOrEqualTo(79, lang);
+            ("  [S] " + Loc.GetIn(lang, "settlement.market_sell")).Length.Should().BeLessThanOrEqualTo(79, lang);
+            Loc.GetIn(lang, "settlement.market_bought", Loc.GetIn(lang, "street_encounter.merchant.item.healing_potion"), big).Length.Should().BeLessThanOrEqualTo(79, lang);
+            Loc.GetIn(lang, "settlement.market_nothing_to_sell").Length.Should().BeLessThanOrEqualTo(79, lang);
         }
     }
 
