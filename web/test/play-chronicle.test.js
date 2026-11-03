@@ -421,7 +421,11 @@ test('without the room menu the headings and the header line stay; the text page
   const q = await chronicle();
   screen(q, ROOM_SCREEN);
   assert.strictEqual(layout(q), 'text');
-  assert.deepStrictEqual(q.el('c-screen').children.map((l) => l.textContent), ROOM_SCREEN.map((r) => r || ' '));
+  // one line per row; a box's rule rows are its edges (R5), so their line characters are not text
+  const shown = q.el('c-screen').children.map((l) => l.textContent);
+  assert.strictEqual(shown.length, ROOM_SCREEN.length);
+  ROOM_SCREEN.forEach((r, i) => { if (!/^[╔║╚]/.test(r)) assert.strictEqual(shown[i], r || ' ', r); });
+  assert.deepStrictEqual(shown.slice(0, 3).map((x) => x.trim()), ['', 'Hall of the Ancestors', '']);
   // a heading whose lines stay on the page keeps its heading even with the menu
   const r = await chronicle();
   frame(r, 'Room.Info', { num: 'room_4', name: 'Hall', area: 'Dungeon Floor 6' });
@@ -579,13 +583,17 @@ test('art comes only from language neutral data: location id, dungeon floor, cla
   const p = await chronicle();
   const bg = () => { const s = p.el('c-frame').querySelector('.scene'); return s ? s.style.backgroundImage || '' : null; };
   const img = () => { const i = p.el('c-frame').querySelector('img'); return i ? i.getAttribute('src') : null; };
+  assert.strictEqual(bg(), 'url("/play/art/scenes/main-street.png")', 'A2: before login, the town under the game\'s name');
+  assert.strictEqual(p.el('c-cap').textContent, 'Plate: Usurper Reborn');
   frame(p, 'Char.Status', { name: 'Rowan', class: 'MysticShaman', level: 1, gold: 1, xp: 1 });
-  assert.strictEqual(img(), '/play/art/classes/mystic-shaman.png', 'no place yet: the class portrait');
+  assert.strictEqual(img(), null, 'A2: no place yet is never the class portrait');
+  assert.strictEqual(bg(), 'url("/play/art/scenes/main-street.png")');
   frame(p, 'Room.Info', { num: 1, name: 'Calle Mayor', area: 'Usurper Reborn' });
   assert.strictEqual(bg(), 'url("/play/art/scenes/main-street.png")');
   frame(p, 'Room.Info', { num: 999, name: 'Main Street', area: 'Usurper Reborn' });
-  assert.strictEqual(bg(), null, 'a name is never read for art');
-  assert.strictEqual(img(), '/play/art/classes/mystic-shaman.png', 'an unknown place: the portrait again');
+  assert.strictEqual(bg(), '', 'a name is never read for art');
+  assert.strictEqual(img(), null, 'A2: an unknown place is a plain plate with its name, not the portrait');
+  assert.strictEqual(p.el('c-frame').querySelector('.place-name').textContent, 'Main Street');
   frame(p, 'Room.Info', { num: 'room_3', name: 'Crypt', area: 'Dungeon Floor 12' });
   frame(p, 'Room.Detail', Object.assign({}, ROOM_DETAIL, { theme: 'Frozen Depths' }));
   assert.strictEqual(bg(), 'url("/play/art/scenes/dungeon.png")', 'one dungeon scene: the theme is a translated name');
@@ -725,7 +733,8 @@ test('the floor scene comes from themeId, the same in every language; the transl
   assert.strictEqual(themes.length, 8);
   for (const s of themes) assert.ok(fs.existsSync(path.join(WEB, 'play', 'art', 'scenes', s + '.png')), s);
   const sprites = /var SPRITES = \{([^}]*)\}/.exec(code)[1].match(/'([a-z-]+)'/g).map((x) => x.slice(1, -1));
-  assert.strictEqual(sprites.length, 15);
+  assert.strictEqual(sprites.length, 12, 'A3: Beast, Insectoid and Aberration show the name');
+  sprites.push(...(/var SPRITE_NAMES = \[([\s\S]*?)\n {4}\];/.exec(code)[1].match(/\['([a-z-]+)'/g) || []).map((x) => x.slice(2, -1)));
   for (const s of sprites) assert.ok(fs.existsSync(path.join(WEB, 'play', 'art', 'monsters', s + '.png')), s);
   const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
   const scales = [...css.matchAll(/\.sprite[^{]*\{[^}]*?width: (\d+)px; height: (\d+)px/g)];

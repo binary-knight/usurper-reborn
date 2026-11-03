@@ -587,5 +587,12 @@
   "play.chron.revives": "Resurr.",
   "play.chron.map_explored": "Mapa: {0}/{1} explorado",
   "play.chron.map_label": "Mapa del piso, {0} de {1} salas exploradas",
-  "play.chron.sheet": "Hoja del personaje"
+  "play.chron.sheet": "Hoja del personaje",
+  "play.combat.champion": "Campeón",
+  "play.chron.low_hp": "PV bajos",
+  "play.chron.type_number": "Escribe el número y pulsa Intro: {0}",
+  "play.chron.cap_number": "N.º",
+  "play.chron.more_keys": "Más teclas",
+  "play.chron.keys_one": "Aquí basta con pulsar una tecla; no hace falta Intro.",
+  "play.chron.keys_enter": "Escribe una tecla y pulsa Intro. Una tecla de abajo envía el Intro por ti."
 }

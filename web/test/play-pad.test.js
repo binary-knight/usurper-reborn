@@ -221,7 +221,9 @@ test('screen text with HTML stays text on the buttons', async () => {
   pad(p, [' [X] ' + HOSTILE, ' [Y]' + '<img src=x onerror=alert(9)>']);
   const box = p.el('pad-scroll');
   assert.strictEqual(box.querySelectorAll('.chip').length, 2);
-  assert.ok(box.textContent.includes(HOSTILE.slice(0, 40)));
+  // R8: a long label ends at a word with an ellipsis on the button; its spoken name keeps all of it
+  assert.ok(box.textContent.includes(HOSTILE.slice(0, 30)));
+  assert.ok(box.querySelectorAll('.chip')[0].getAttribute('aria-label').includes(HOSTILE.trim()));
   const tags = descendants(box).map((e) => e.tagName);
   assert.ok(tags.every((t) => ['DIV', 'BUTTON', 'B', 'SPAN'].includes(t)), tags.join(','));
   assert.deepStrictEqual(p.errors, []);

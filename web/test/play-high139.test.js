@@ -90,10 +90,11 @@ test('B1: the fight page shows each round\'s text in order, newest at the foot, 
   await fight(p);
   screen(p, ROUND1);
   assert.strictEqual(p.run('UsurperPlay.layout()'), 'fight');
-  assert.deepStrictEqual(logText(p), ['COMBAT', 'A Zombie shambles out of the dark!', 'Round 1']);
+  // R7: the heading set between rules ("═══ COMBAT ═══") is frame, not text
+  assert.deepStrictEqual(logText(p), ['A Zombie shambles out of the dark!', 'Round 1']);
   // the game echoes the key as it is typed, before the Enter: the prompt row still goes
   screen(p, ROUND1.slice(0, -1).concat(['Choose action: A']), 0, ROUND1.length - 1);
-  assert.deepStrictEqual(logText(p), ['COMBAT', 'A Zombie shambles out of the dark!', 'Round 1']);
+  assert.deepStrictEqual(logText(p), ['A Zombie shambles out of the dark!', 'Round 1']);
   enter(p);
   frame(p, 'Client.Menu', FIGHT_MENU);
   screen(p, ROUND2);
@@ -135,7 +136,8 @@ test('B1: a sentence that names a key stays; a menu line whose keys are on the d
   await fight(p);
   screen(p, ['┌─── TIP ───┐', '│ Use [1] Power Strike for 1.75x damage, or [A] for a regular Attack.', '└───┘',
     '[A] Attack  [D] Defend  [R] Flee', 'Choose action: ']);
-  assert.deepStrictEqual(logText(p), ['TIP', 'Use [1] Power Strike for 1.75x damage, or [A] for a regular Attack.']);
+  // R7: the tip's edges and its title are frame; the tip's own line stays
+  assert.deepStrictEqual(logText(p), ['Use [1] Power Strike for 1.75x damage, or [A] for a regular Attack.']);
 });
 
 // ---------------------------------------------------------------- B2: the drawer log
@@ -145,13 +147,13 @@ test('B2: the drawer\'s combat log fills with each round in Classic, and keeps t
   await fight(p);
   assert.strictEqual(p.el('drawer').hidden, false, 'Classic opens the drawer for the fight');
   screen(p, ROUND1);
-  assert.deepStrictEqual(drawerLog(p), ['COMBAT', 'A Zombie shambles out of the dark!', 'Round 1']);
+  assert.deepStrictEqual(drawerLog(p), ['A Zombie shambles out of the dark!', 'Round 1']);
   enter(p);
   screen(p, ROUND2);
   enter(p);
   screen(p, ROUND3);
   const log = drawerLog(p);
-  assert.deepStrictEqual(log.slice(3, 5), ['You attack Zombie!', '[You roll 15; you need 2 or more]']);
+  assert.deepStrictEqual(log.slice(2, 4), ['You attack Zombie!', '[You roll 15; you need 2 or more]']);
   assert.strictEqual(log[log.length - 1], 'Round 3');
   frame(p, 'Char.Combat.Killed', { name: 'Zombie' });
   assert.match(drawerLog(p).slice(-1)[0], /Zombie/);
@@ -224,13 +226,14 @@ test('R2: a new screen opens at its own first line; the same draw keeps the read
 
 test('R3: a key label wraps between words, and a narrow right page sets its keys three across', () => {
   for (const m of CSS.matchAll(/\.lb[^{]*\{([^}]*)\}/g)) assert.doesNotMatch(m[1], /overflow-wrap:\s*anywhere|word-break:\s*break-all/, 'a label never breaks letter by letter: ' + m[0].slice(0, 70));
-  assert.match(CSS, /^\.chron \.kc \.lb \{[^}]*overflow-wrap: break-word; word-break: normal; \}$/m);
+  // R8: never inside a word; a label too long for two lines ends in an ellipsis
+  assert.match(CSS, /^\.chron \.kc \.lb \{[^}]*overflow-wrap: normal; word-break: normal; hyphens: manual; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;/m);
   assert.match(CSS, /^\.chron \.dock \{[^}]*container: dock \/ inline-size; \}$/m);
   const narrow = block('@container dock (max-width: 589px) {');
   assert.match(narrow, /^ {2}\.chron \.grid, \.chron\[data-layout\] \.grid \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/m);
   assert.match(narrow, /^ {2}\.chron\[data-layout="fight"\] \.kgroups \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/m);
   assert.match(block('@container dock (max-width: 479px) {'), /\.chron\[data-layout="fight"\] \.kgroups \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/);
-  assert.match(narrow, /^ {2}\.chron \.kc \.lb \{ font-size: 12\.5px; letter-spacing: 0; \}$/m);
+  assert.match(narrow, /^ {2}\.chron \.kc \.lb \{ font-size: 14px; \}$/m);
 });
 
 // ---------------------------------------------------------------- R4: the terminal's wraps
@@ -301,7 +304,8 @@ test('A1: block art rows are set solid; frames, bars and text are not art', asyn
     'HP: [████████████████████] 41/41  Potions: 20/20  Gold: 2,000  Lv 1  XP 10/200',
     '                     v1.3.8 "Reckoning"', '                      Press any key...']));
   const cls = p.el('c-screen').children.map((l) => l.getAttribute('class'));
-  assert.deepStrictEqual(cls, ['ln', 'ln art', 'ln art', 'ln art', 'ln', 'ln', 'ln', 'ln', 'ln']);
+  // the box rule row is a box edge (R5), not art
+  assert.deepStrictEqual(cls, ['ln', 'ln art', 'ln art', 'ln art', 'ln', 'ln bx bt bare', 'ln', 'ln', 'ln']);
   assert.match(CSS, /^\.chron \.screen \.ln\.art \{ line-height: 1; min-height: 0; white-space: pre; overflow-wrap: normal; letter-spacing: -\.04em; font-size: min\(1em, calc\(100cqi \/ 46\)\); \}$/m);
 });
 
