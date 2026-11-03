@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.9; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.10; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.9. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.10. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -176,9 +176,10 @@ Stats follow Pascal `UserRec` layout for source-game compatibility. Modern field
 - **Knighthood / Fame**: `IsKnighted`, `Fame`, `WeeklyRank`, `PreviousWeeklyRank`, `RivalName`, `RivalLevel`
 - **Login streaks**: `LoginStreak`, `LongestLoginStreak`, `LastLoginDate`
 - **Blood Moon**: `BloodMoonDay`, `IsBloodMoon`
-- **Settlement buffs**: `SettlementGoldClaimedToday`, `HQArmoryLevel`, `HQBarracksLevel`, `HQTrainingLevel`, `HQInfirmaryLevel` (transient; cached from DB on login)
+- **Settlement buffs**: `SettlementGoldClaimedToday`, `HQArmoryLevel`, `HQBarracksLevel`, `HQTrainingLevel`, `HQInfirmaryLevel` (transient; cached from DB on login). `SmugglersCachePurchases` (1.3.10) is saved: the discounted purchases left from the Smugglers' Cache service (`GameConfig.SmugglersCachePurchases`)
+- **Dying messages** (1.3.10): `DyingMessages`, a list of `DyingMessageSaveData` (recipient, elder, gold) for the messages the player promised to deliver; talking to the recipient delivers one and pays the elder's savings (`NPCPetitionSystem.DeliverDyingMessages`). An old save has none
 - **NG+**: `CycleExpMultiplier`, NG+ cycle level
-- **Preferences**: `CombatSpeed`, `AutoHeal`, `SkipIntimateScenes`, `ScreenReaderMode`, `CompactMode`, `Language`, `DisableCharacterMonsterArt`, `MutedChannels`
+- **Preferences**: `CombatSpeed`, `AutoHeal`, `SkipIntimateScenes`, `ScreenReaderMode`, `CompactMode`, `Language`, `DisableCharacterMonsterArt`, `MutedChannels`. A new character starts on `CombatSpeed.Fast` (1.3.10, `CharacterCreationSystem`); a loaded save keeps its own, and a save with no `CombatSpeed` field reads Normal
 
 `RecalculateStats()` is the canonical re-derivation entry point: resets derived fields to `Base*`, layers race / class growth, applies equipment, applies child bonuses, applies specialization bonuses, and clamps. Called on every character mutation.
 
@@ -676,8 +677,10 @@ SaveGameData {
 
 Since 1.3.8 a single player load (both load paths) first calls `GameEngine.ResetStoryForSinglePlayerLoad()`: the story, narrative systems, companions, dungeon party, faction, archetype, amnesia memories and the previous character's god entry start clean before any restore step. An online session keeps its own systems and is left alone. A new character also starts with no recovered amnesia memories.
 
+Since 1.3.10 the Fountain of Vitality is a 10 percent multiplier on max HP, so both load paths call `Character.MigratedBonusMaxHP`, which drops an old save's flat `BonusMaxHP` snapshot when the character has the fountain. The alive bonus, the town pot and the item durability counters are removed: they are no longer written, and a save that holds them loads with the values ignored (`SaveDataStructures.WorldStateData.TownPotValue` stays only so old saves and the editor read it).
+
 ### PlayerData (selection of major fields)
-Identity, stats, attributes, equipment (legacy + modern), inventory, status, daily counters, home upgrades, dungeon progression, preferences, statistics, achievements, login streak, weekly rank/rival, online death state (Resurrections, ResurrectionsUsed, MaxResurrections, TempleResurrectionsUsed, IsArrestCombat), Knighthood/Fame, Blood Moon state, NG+ cycle, child support data, herb pouch, settlement buffs, language/compact mode, mute channels, romantic orientation.
+Identity, stats, attributes, equipment (legacy + modern), inventory, status, daily counters, home upgrades, dungeon progression, preferences, statistics, achievements, login streak, weekly rank/rival, online death state (Resurrections, ResurrectionsUsed, MaxResurrections, TempleResurrectionsUsed, IsArrestCombat), Knighthood/Fame, Blood Moon state, NG+ cycle, child support data, herb pouch, settlement buffs, dying messages, language/compact mode, mute channels, romantic orientation.
 
 ### NPCData
 Identity, stats, class/race, lifecycle (Age, BirthDate, IsAgedDeath, PregnancyDueDate, PregnancyFatherName), marriage, faction, gang, full AI state (13 core personality + 10 romance traits, memories, goals, emotions), inventory, equipment, specialization.
@@ -1258,6 +1261,12 @@ Adjusts target monster level: `playerLevel + (difficulty - 2) * 3`, capped to `p
 ### Daily Quest Limit (`MaxQuestsPerDay = 3`)
 Tracked at claim time via `RoyQuestsToday`. Reset at daily reset.
 
+### Placed targets (1.3.10)
+The royal artifact quest (a Relic Thief), Crown criminal bounties and bounty board champion quests name a target. When the quest is taken (`QuestSystem.PlaceTargets`) the target is placed on a dungeon floor of `player.Level + difficulty * 3`, at most the deepest floor the player can reach (`ReachableFloor`; a champion also stays within its tier's levels), and the objective names that floor. The target waits in one room of the floor and killing it completes the objective. The floor is saved as `QuestObjective.TargetFloor` (0, and for every save before 1.3.10, for none).
+
+### Quest Aging
+Online, the world reset ages every claimed quest once a day (`WorldSimService`); a player's own daily reset does not (`QuestSystem.WorldResetAgesQuests`, 1.3.10). Single player and a BBS door session in its own process age quests at the player's daily reset.
+
 ### Quest Completion
 Gold rewards reduced 7-10x in v0.52.5 (was overtuned). Failure penalties enabled. Abandoned quests serialize with `QuestStatus.Abandoned`.
 
@@ -1746,7 +1755,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.9"
+Version = "1.3.10"
 VersionName = "Reckoning"
 ```
 

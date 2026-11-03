@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.9; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
+<!-- doc: checked 1.3.10; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
 # Wiki build and review
 
 The launch wiki has English prose in `DOCS/wiki/`, generated references and a
@@ -52,6 +52,9 @@ two. Use absolute, slash-terminated wiki links. Keep URLs stable when titles
 change. `checked` is the version against which a person checked the prose,
 not a value to advance automatically when the game version changes.
 A guide may also carry `history` lines, described below.
+A source is `README.md`, a `.cs`, `.md` or `.js` file under `Scripts/`, `DOCS/` or
+`web/`, or (since 1.3.10) a `.html` file under `web/`; the file must exist or the
+build fails (`tools/wiki-build/build.js`).
 Entity URLs use stable IDs rather than translated names. Spell keys such as
 `Cleric:1` use `Cleric-1` in the URL to keep directory names portable.
 
@@ -157,6 +160,9 @@ are listed. A floor's rooms are the game's own generated floor, and its boss
 name, the outposts' prices and the Sellsword contracts are read from private
 game members by reflection, so renaming one fails the export. The world
 constants print like the party constants and may not reuse a name either.
+An outpost good that sells at a multiple of the town price has no `price` and
+carries `townPriceFactor` instead (1.3.10); the outposts table prints it as
+"(N x the town price)".
 A secret boss carries its reward and only the stats its fight reads.
 `god-ranks`, `divine-boons`, `alignment-types`, `faction-ranks`,
 `faction-bonuses`, `world-events`, `old-god-mechanics`, `monster-guards` and
@@ -557,7 +563,9 @@ values, links, directives, spoiler exclusions, search, role checks, rate limits,
 mention stripping, queue persistence and off-server path confinement. The Claude
 API Ask tests use a fake SDK client and never call the API. Browser
 checks cover a phone width, both themes, focus/keyboard behavior, disclosure
-controls and WCAG accessibility scans. These are automated checks, not a claim
+controls and WCAG accessibility scans; each route runs its three scans (first
+theme, light theme, disclosures open) as three separate tests, one axe pass per
+test (`tools/wiki-build/browser/wiki.spec.js`). These are automated checks, not a claim
 of a full human screen-reader audit.
 
 Generated item prices are base values, not guaranteed quotes or drops. Monster
