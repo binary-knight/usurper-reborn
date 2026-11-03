@@ -1191,6 +1191,9 @@ public class InnLocation : BaseLocation
     {
         bool continueInteraction = true;
 
+        // 1.3.10: a dying wish message for this patron is delivered as the player sits down with them
+        if (NPCPetitionSystem.DeliverDyingMessages(currentPlayer, npc, terminal)) await terminal.PressAnyKey();
+
         while (continueInteraction)
         {
             terminal.ClearScreen();

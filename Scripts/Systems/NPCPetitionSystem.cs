@@ -1250,12 +1250,12 @@ namespace UsurperRemake.Systems
 
         #region Petition 6: Dying Wish
 
-        /// <summary>1.3.10: a living NPC in town (not the elder, not jailed) to carry a dying wish message to.</summary>
+        /// <summary>1.3.10: a living NPC in town (not the elder, not a story NPC, not jailed) to carry a dying wish message to.</summary>
         private NPC? PickMessageRecipient(NPC elder, Character player)
         {
             var pool = NPCSpawnSystem.Instance?.ActiveNPCs?
                 .Where(n => n != null && n != elder && n.IsAlive && !n.IsDead && !n.IsPermaDead && !n.IsAgedDeath
-                    && n.DaysInPrison <= 0 && !string.IsNullOrEmpty(n.Name2) && n.Name2 != player.Name2)
+                    && !n.IsStoryNPC && n.DaysInPrison <= 0 && !string.IsNullOrEmpty(n.Name2) && n.Name2 != player.Name2)
                 .ToList();
             return pool == null || pool.Count == 0 ? null : pool[_random.Next(pool.Count)];
         }

@@ -48,6 +48,7 @@ public class WorldPicks1310Tests : IDisposable
     private readonly object? _simBefore = typeof(WorldSimulator).GetField("_instance", S)!.GetValue(null);
     private readonly object? _petitionRandomBefore = typeof(NPCPetitionSystem).GetField("_random", F)!.GetValue(NPCPetitionSystem.Instance);
     private readonly object? _rollBefore = typeof(CastleLocation).GetField("DetectThreatsRoll", S)?.GetValue(null);
+    private readonly object? _rosterMarkBefore = typeof(NPCSpawnSystem).GetField("_rosterHighWaterMark", F)!.GetValue(NPCSpawnSystem.Instance);
 
     public WorldPicks1310Tests()
     {
@@ -84,6 +85,7 @@ public class WorldPicks1310Tests : IDisposable
         typeof(WorldSimulator).GetField("_instance", S)!.SetValue(null, _simBefore);
         typeof(NPCPetitionSystem).GetField("_random", F)!.SetValue(NPCPetitionSystem.Instance, _petitionRandomBefore);
         typeof(CastleLocation).GetField("DetectThreatsRoll", S)?.SetValue(null, _rollBefore);
+        typeof(NPCSpawnSystem).GetField("_rosterHighWaterMark", F)!.SetValue(NPCSpawnSystem.Instance, _rosterMarkBefore);
     }
 
     // ---------- helpers ----------
@@ -400,7 +402,8 @@ public class WorldPicks1310Tests : IDisposable
     public void P3_ASpouseFoundDeadAtLogin_IsGrieved()
     {
         var (hero, spouse) = MarriedHero();
-        Crowd(300, "town");   // the login sync acts only on a roster that looks complete
+        // the login sync acts only on a roster that looks complete (the high-water mark is restored in Dispose)
+        typeof(NPCSpawnSystem).GetField("_rosterHighWaterMark", F)!.SetValue(NPCSpawnSystem.Instance, 0);
         spouse.IsDead = spouse.IsPermaDead = true;
         var sync = typeof(RomanceTracker).GetMethods().FirstOrDefault(m => m.Name == "SyncDeadPartners" && m.GetParameters().Length == 2);
         sync.Should().NotBeNull("the login sync names the spouses it retires");
@@ -591,8 +594,10 @@ public class WorldPicks1310Tests : IDisposable
         Deliver(hero, other, NewScreen()).Should().BeFalse();
         hero.Gold.Should().Be(100_000);
         Messages(hero).Count.Should().Be(1);
-        // the town's talk screen delivers it, beside the talk quests
+        // the town's talk screen delivers it, beside the talk quests, and so does sitting down with an Inn patron
         Between(Src("Locations", "BaseLocation.cs"), "QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);", "npc.GetGreeting(currentPlayer)")
+            .Should().Contain("NPCPetitionSystem.DeliverDyingMessages(currentPlayer, npc, terminal)");
+        Between(Src("Locations", "InnLocation.cs"), "protected override async Task InteractWithNPC(NPC npc)", "while (continueInteraction)")
             .Should().Contain("NPCPetitionSystem.DeliverDyingMessages(currentPlayer, npc, terminal)");
     }
 
