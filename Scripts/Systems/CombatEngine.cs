@@ -32154,6 +32154,10 @@ public partial class CombatEngine
         return await terminal.AskYesNoAsync("> ", false);
     }
 
+    /// <summary>1.3.10 (B14): the refusal of a plain heal no one needs, as rows of at most 79 columns.</summary>
+    internal static List<string> NoOneHurtRows(ClassAbilitySystem.ClassAbility a) =>
+        UIHelper.WordWrap(Loc.Get("combat.heal_no_one_hurt", a.DisplayName), UIHelper.WrapWidth);
+
     /// <summary>1.3.10 (B14): a class ability that only heals (no effect, no buff), as Lay on Hands.</summary>
     internal static bool IsPlainHealAbility(ClassAbilitySystem.ClassAbility a) =>
         a.Type == ClassAbilitySystem.AbilityType.Heal && a.BaseHealing > 0 && string.IsNullOrEmpty(a.SpecialEffect)
@@ -32173,7 +32177,9 @@ public partial class CombatEngine
         var hurt = reach.Where(c => c.HP < c.MaxHP).ToList();
         if (hurt.Count == 0)
         {
-            terminal.WriteLine(Loc.Get("combat.heal_no_one_hurt", ability.DisplayName), "yellow");
+            terminal.SetColor("yellow");
+            foreach (var row in NoOneHurtRows(ability))   // within 79 columns: a Hungarian name makes the line longer
+                terminal.WriteLine(row);
             await Pacing.Wait(GetCombatDelay(1000));
             return false;
         }

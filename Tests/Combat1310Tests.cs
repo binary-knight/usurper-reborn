@@ -11,6 +11,7 @@ using FluentAssertions;
 using UsurperRemake;
 using UsurperRemake.Locations;
 using UsurperRemake.Server;
+using UsurperRemake.UI;
 using UsurperRemake.Systems;
 using Xunit;
 
@@ -284,5 +285,24 @@ public class Combat1310Tests
         ((Task)draw.Invoke(temple, new object[] { true })!).GetAwaiter().GetResult();
         term.StreamWriterInternal?.Flush();
         Plain(output.ToArray()).Should().NotContain(Loc.Get("death.rez_remaining", 2, 3), "not again on the next draw");
+    }
+    // ------------------------------------------------------------------ B14: the heal questions fit 79 columns
+
+    [Theory]
+    [MemberData(nameof(Langs))]
+    public void HealQuestionsAndRefusal_Fit79Columns_ForEveryPlainHeal(string lang)
+    {
+        var heals = ClassAbilitySystem.GetAllAbilities().Where(CombatEngine.IsPlainHealAbility).ToList();
+        heals.Select(a => a.Id).Should().Contain("lay_on_hands");
+        InLang(lang, () =>
+        {
+            foreach (var a in heals)
+            {
+                CombatEngine.NoOneHurtRows(a).Should().OnlyContain(r => r.Length <= 79, "{0} {1}", lang, a.Id);
+                string ask = $"{Loc.Get("combat.heal_small_confirm", a.DisplayName, 99999)} {Loc.Get("ui.yn_default_no").TrimEnd()}";
+                UIHelper.WordWrap(ask, UIHelper.WrapWidth).Should().OnlyContain(r => r.Length <= 79);
+            }
+        });
+        Source("Scripts/Systems/CombatEngine.cs").Should().Contain("foreach (var row in NoOneHurtRows(ability))");
     }
 }
