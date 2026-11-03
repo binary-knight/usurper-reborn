@@ -1578,6 +1578,20 @@ public partial class QuestSystem
     internal static readonly string[] BanditMonsters = { "Bandit Scout", "Mountain Bandit" };
     internal const string BanditTargetId = "bandit";
 
+    /// <summary>
+    /// 1.3.10: whether bandits are about for this player: the player holds a quest with a bandit kill objective (the
+    /// Sellsword contract "Bandits on the Trade Road", until it is turned in or ends) or a Bandit Raid runs. The
+    /// wilderness then weighs its bandits 3 times (WildernessData.PickMonsterName).
+    /// </summary>
+    internal static bool BanditsAbout(Character? player)
+    {
+        if (WorldEventSystem.Instance.GetActiveEvents().Any(e => e.Type == WorldEventSystem.EventType.BanditRaid))
+            return true;
+        if (player == null) return false;
+        return GetPlayerQuests(player.Name2).Any(q => q.Objectives.Any(o => o.ObjectiveType == QuestObjectiveType.KillSpecificMonster
+            && string.Equals(o.TargetId, BanditTargetId, StringComparison.OrdinalIgnoreCase)));
+    }
+
     public static void OnMonsterKilled(Character player, string monsterName, bool isBoss = false, string tierName = "", bool isMiniBoss = false)
     {
         bool isBandit = BanditMonsters.Any(b => string.Equals(b, monsterName, StringComparison.OrdinalIgnoreCase)

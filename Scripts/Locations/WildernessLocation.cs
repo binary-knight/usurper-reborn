@@ -384,7 +384,8 @@ public class WildernessLocation : BaseLocation
 
     private async Task CombatEncounter(WildernessRegion region)
     {
-        string monsterName = region.MonsterNames[Random.Shared.Next(region.MonsterNames.Length)];
+        // 1.3.10: bandits show up 3 times as often while the player holds a bandit contract or a Bandit Raid runs
+        string monsterName = WildernessData.PickMonsterName(region, QuestSystem.BanditsAbout(currentPlayer), Random.Shared);
 
         terminal.SetColor("red");
         // v0.62.1 article fix: "An Owl-Bear" / "An Elemental" instead of "A".

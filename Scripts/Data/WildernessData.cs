@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// Static data for the Wilderness exploration system — 4 themed regions
@@ -249,6 +250,28 @@ public static class WildernessData
         { "Kraken Spawn",     new() { Family = "Aquatic",    MonsterClass = MonsterClass.Beast,    AttackType = "physical", Color = "bright_blue",  CanSpeak = false, Abilities = new() { "TentacleGrab", "InkCloud" } } },
         { "Storm Elemental",  new() { Family = "Elemental",  MonsterClass = MonsterClass.Elemental,AttackType = "lightning",Color = "bright_cyan",  CanSpeak = false, Abilities = new() { "Lightning" } } },
     };
+
+    /// <summary>1.3.10: a bandit's weight in a region's encounter table while bandits are about (a held bandit
+    /// contract or a Bandit Raid); every other name weighs 1, so bandits show up 3 times as often.</summary>
+    public const int BanditEncounterWeight = 3;
+
+    /// <summary>
+    /// 1.3.10: the name of the creature an expedition fight meets. Each name in the region's table is as likely as
+    /// the next; while bandits are about, the region's bandits weigh BanditEncounterWeight and the rest 1.
+    /// </summary>
+    public static string PickMonsterName(WildernessRegion region, bool banditsAbout, Random rng)
+    {
+        var names = region.MonsterNames;
+        if (!banditsAbout) return names[rng.Next(names.Length)];
+        int Weight(string name) => Array.IndexOf(QuestSystem.BanditMonsters, name) >= 0 ? BanditEncounterWeight : 1;
+        int roll = rng.Next(names.Sum(Weight));
+        foreach (var name in names)
+        {
+            roll -= Weight(name);
+            if (roll < 0) return name;
+        }
+        return names[names.Length - 1];
+    }
 
     /// <summary>
     /// Returns the wilderness profile for a monster name, or a plain Beast
