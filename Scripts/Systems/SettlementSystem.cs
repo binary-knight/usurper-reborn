@@ -936,10 +936,12 @@ namespace UsurperRemake.Systems
             };
         }
 
-        /// <summary>Adds the militia fighter to this fight's list when the service is held and none is there yet.</summary>
+        /// <summary>Adds the militia fighter to this fight's list when the service is held and none is there yet; not in an
+        /// exhibition fight (the Pit, the Gauntlet, the bank guards) or an arrest.</summary>
         public static Character? JoinFight(Character? owner, List<Character>? fightTeam)
         {
             if (!Active(owner) || fightTeam == null || fightTeam.Any(t => t != null && t.IsSettlementMilitia)) return null;
+            if (owner!.IsExhibitionCombat || owner.IsArrestCombat) return null;   // a staged fight or an arrest is fought alone
             var militia = Build(owner!);
             fightTeam.Add(militia);
             return militia;

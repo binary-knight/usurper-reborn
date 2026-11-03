@@ -1211,8 +1211,6 @@ public partial class CombatEngine
         currentTeammates = teammates != null ? new List<Character>(teammates) : new List<Character>();
         currentTeammates.RemoveAll(t => t != null && t.IsWaiting);   // 1.3.8 H: an ally told to wait is in no fight
         var settlementMilitia = SettlementMilitia.JoinFight(player, currentTeammates);   // 1.3.10 (P6): the Barracks militia, this fight only
-        if (settlementMilitia != null)
-            terminal.WriteLine(Loc.Get("settlement.militia_joins", settlementMilitia.DisplayName, settlementMilitia.Level), "bright_green");
 
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
@@ -1394,6 +1392,9 @@ public partial class CombatEngine
             }
             terminal.WriteLine("");
         }
+
+        if (settlementMilitia != null)   // 1.3.10 (P6): after the intro's screen clear, so it stays on screen
+            terminal.WriteLine(Loc.Get("settlement.militia_joins", settlementMilitia.DisplayName, settlementMilitia.Level), "bright_green");
 
         if (result.Teammates.Count > 0)
         {

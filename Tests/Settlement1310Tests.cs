@@ -328,6 +328,58 @@ public class Settlement1310Tests : IDisposable
         after.Should().NotContain(Loc.Get("settlement.militia_name"), "no militia once the three fights are spent");
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void No_militia_joins_an_exhibition_fight_or_an_arrest(bool exhibition, bool arrest)
+    {
+        var hero = Fighter("Staged Fighter");
+        hero.SettlementBuffType = (int)SettlementBuffType.Militia;
+        hero.SettlementBuffCombats = GameConfig.SettlementMilitiaFights;
+        hero.IsExhibitionCombat = exhibition;
+        hero.IsArrestCombat = arrest;
+        SettlementMilitia.JoinFight(hero, new List<Character>()).Should().BeNull();
+        hero.IsExhibitionCombat = false;
+        hero.IsArrestCombat = false;
+        var team = new List<Character>();
+        SettlementMilitia.JoinFight(hero, team).Should().NotBeNull();
+        SettlementMilitia.JoinFight(hero, team).Should().BeNull("one militia fighter a fight");
+        team.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task The_militia_join_line_is_shown_after_the_fight_intro_clears_the_screen()
+    {
+        var hero = Fighter("Seen Militia");
+        hero.SettlementBuffType = (int)SettlementBuffType.Militia;
+        hero.SettlementBuffCombats = GameConfig.SettlementMilitiaFights;
+        var (_, text, _) = await MilitiaFight(hero);
+        int join = text.IndexOf(Loc.Get("settlement.militia_joins", Loc.Get("settlement.militia_name"), 8).Trim(), StringComparison.Ordinal);
+        int intro = text.IndexOf(Loc.Get("combat.header_visual").Trim(), StringComparison.Ordinal);
+        intro.Should().BeGreaterThanOrEqualTo(0);
+        join.Should().BeGreaterThan(intro, "the intro clears the screen; the line comes after it");
+    }
+
+    [Fact]
+    public async Task A_fallen_militia_fighter_leaves_the_fight_with_no_grief_and_no_bodyguard_line()
+    {
+        var hero = Fighter("Mourner");
+        int mental = hero.Mental;
+        var militia = SettlementMilitia.Build(hero);
+        militia.HP = 0;
+        var output = new MemoryStream();
+        var engine = new CombatEngine(new TerminalEmulator(new Scripted(""), output));
+        var result = new CombatResult { Player = hero, Teammates = new List<Character> { militia }, CombatLog = new List<string>() };
+        var m = typeof(CombatEngine).GetMethod("HandleTeammateDeathDispatch", F)!;
+        await (Task)m.Invoke(engine, new object[] { militia, "Sewer Rat", result })!;
+        result.Teammates.Should().NotContain(militia);
+        hero.Mental.Should().Be(mental);
+        string text = Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
+        text.Should().Contain(Loc.Get("combat.npc_fallen", militia.DisplayName).Trim());
+        text.Should().NotContain(Loc.Get("combat.mercenary_gone").Trim());
+        text.Should().NotContain(Loc.Get("combat.grief_onset").Trim());
+    }
+
     [Fact]
     public async Task No_militia_joins_without_the_barracks_service()
     {
