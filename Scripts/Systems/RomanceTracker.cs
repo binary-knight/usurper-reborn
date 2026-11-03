@@ -375,7 +375,13 @@ namespace UsurperRemake.Systems
         /// lists, so repeated calls are no-ops.
         /// </summary>
         /// <returns>Number of partners retired.</returns>
-        public int SyncDeadPartners(IEnumerable<NPC>? roster)
+        public int SyncDeadPartners(IEnumerable<NPC>? roster) => SyncDeadPartners(roster, null);
+
+        /// <summary>
+        /// 1.3.10: SyncDeadPartners, and each spouse it retires is added to retiredSpouses (id, name, and whether
+        /// the spouse died of old age), so the login can begin the player's grief.
+        /// </summary>
+        public int SyncDeadPartners(IEnumerable<NPC>? roster, List<(string Id, string Name, bool Aged)>? retiredSpouses)
         {
             if (roster == null) return 0;
             var pool = roster as IList<NPC> ?? roster.ToList();
@@ -419,6 +425,7 @@ namespace UsurperRemake.Systems
                     if (!goneOrDead) continue;
 
                     OnNPCPermadied(id);
+                    if (kind == "spouse") retiredSpouses?.Add((id, string.IsNullOrEmpty(name) ? npc?.Name2 ?? id : name, npc?.IsAgedDeath == true));
                     healed++;
                     DebugLogger.Instance?.LogInfo("ROMANCE",
                         $"SyncDeadPartners: retired {kind} '{(string.IsNullOrEmpty(name) ? id : name)}' " +

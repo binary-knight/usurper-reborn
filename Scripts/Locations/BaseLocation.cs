@@ -5758,6 +5758,7 @@ public abstract class BaseLocation
                     // Update talk-to-NPC quest objectives
                     QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name);
                     QuestSystem.OnNPCTalkedTo(currentPlayer, npc.Name2);
+                    NPCPetitionSystem.DeliverDyingMessages(currentPlayer, npc, terminal);   // 1.3.10: a dying wish message
 
                     string greeting = npc.GetGreeting(currentPlayer);
                     terminal.SetColor("yellow");

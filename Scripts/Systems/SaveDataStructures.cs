@@ -807,6 +807,7 @@ namespace UsurperRemake.Systems
         public string ActivePetId { get; set; } = "";
         public DateTime LastPartnerBondingUtc { get; set; }
         public DateTime LastRiteOfReturnUtc { get; set; } // v0.65.6 Temple Rite of Return wall-clock cooldown
+        public List<DyingMessageSaveData> DyingMessages { get; set; } = new();   // 1.3.10: dying wish messages to deliver
         public long LoanAmount { get; set; }
         public int LoanDaysRemaining { get; set; }
         public long LoanInterestAccrued { get; set; }
@@ -916,6 +917,17 @@ namespace UsurperRemake.Systems
                     EndsOn = (StatBuffEnd)r.EndsOn,
                     CombatsLeft = r.CombatsLeft
                 }).ToList();
+    }
+
+    /// <summary>
+    /// 1.3.10: a dying wish message the player promised to deliver (NPCPetitionSystem): talking to the recipient
+    /// delivers it and pays the elder's savings. An old save has none.
+    /// </summary>
+    public class DyingMessageSaveData
+    {
+        public string Recipient { get; set; } = "";   // the recipient NPC's Name2
+        public string Elder { get; set; } = "";       // the elder who asked
+        public long Gold { get; set; }                // the elder's savings, paid on delivery
     }
 
     /// <summary>

@@ -252,7 +252,7 @@ public class LivingWorld1310Tests : IDisposable
     [Fact]
     public void C1_TheStreetMurderAndTheDeathSpell_RecordTheKillInTheFamily()
     {
-        var street = Between(Src("Systems", "StreetEncounterSystem.cs"), "// === PERMANENT DEATH (deliberate murder", "// === GOLD THEFT ===");
+        var street = Between(Src("Systems", "StreetEncounterSystem.cs"), "// === DEATH (the victim respawns", "// === GOLD THEFT ===");
         street.Should().Contain("WorldSimulator.RecordFamilyDeath(realNpc, player.Name2)", "a street murder reaches the victim's kin");
         var spell = Between(Src("Locations", "MagicShopLocation.cs"), "// Kill the NPC", "// Blood price for dark magic kill");
         spell.Should().Contain("WorldSimulator.RecordFamilyDeath(targetNPC, player.Name2)", "a death spell reaches the victim's kin");

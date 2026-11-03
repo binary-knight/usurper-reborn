@@ -1250,6 +1250,53 @@ namespace UsurperRemake.Systems
 
         #region Petition 6: Dying Wish
 
+        /// <summary>1.3.10: a living NPC in town (not the elder, not jailed) to carry a dying wish message to.</summary>
+        private NPC? PickMessageRecipient(NPC elder, Character player)
+        {
+            var pool = NPCSpawnSystem.Instance?.ActiveNPCs?
+                .Where(n => n != null && n != elder && n.IsAlive && !n.IsDead && !n.IsPermaDead && !n.IsAgedDeath
+                    && n.DaysInPrison <= 0 && !string.IsNullOrEmpty(n.Name2) && n.Name2 != player.Name2)
+                .ToList();
+            return pool == null || pool.Count == 0 ? null : pool[_random.Next(pool.Count)];
+        }
+
+        /// <summary>
+        /// 1.3.10: talking to an NPC delivers every dying wish message the player carries for it: the recipient
+        /// remembers the kindness, and the elder's savings, the alignment and the news line follow (the reward
+        /// the promise used to pay at once). Returns true when a message was delivered.
+        /// </summary>
+        public static bool DeliverDyingMessages(Character player, NPC npc, TerminalEmulator terminal)
+        {
+            if (player?.DyingMessages == null || npc == null || string.IsNullOrEmpty(npc.Name2)) return false;
+            var messages = player.DyingMessages
+                .Where(m => string.Equals(m.Recipient, npc.Name2, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (messages.Count == 0) return false;
+
+            foreach (var message in messages)
+            {
+                player.DyingMessages.Remove(message);
+                terminal.SetColor("bright_cyan");
+                terminal.WriteLine($"  {Loc.Get("petition.dying.deliver", npc.Name2, message.Elder)}");
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  {Loc.Get("petition.dying.deliver_moved", npc.Name2)}");
+                terminal.SetColor("yellow");
+                terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_gold", message.Elder, message.Gold)}");
+                terminal.WriteLine("");
+                player.Gold += message.Gold;
+
+                npc.Memory?.RecordEvent(new MemoryEvent
+                {
+                    Type = MemoryType.Helped,
+                    Description = $"{player.Name2} delivered a message of forgiveness from {message.Elder}",
+                    InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = 0.4f
+                });
+
+                AlignmentSystem.Instance.ChangeAlignment(player, 10, isGood: true, "petition.dying_forgive"); // v0.57.12: paired movement
+                NewsSystem.Instance?.Newsy(Loc.Get("petition.news_dying_wish", player.Name2, message.Elder));
+            }
+            return true;
+        }
+
         private async Task ExecuteDyingWish(NPC elder, Character player, TerminalEmulator terminal)
         {
             var race = elder.Race;
@@ -1258,6 +1305,11 @@ namespace UsurperRemake.Systems
 
             // Pick a dying wish type
             int wishRoll = _random.Next(4);
+
+            // 1.3.10: the message goes to a living NPC in town, picked at random (it was the roster's first NPC);
+            // with no one to carry it to, the elder makes a confession instead
+            var recipient = wishRoll == 0 ? PickMessageRecipient(elder, player) : null;
+            if (wishRoll == 0 && recipient == null) wishRoll = 1;
 
             terminal.ClearScreen();
             UIHelper.DrawBoxTop(terminal, Loc.Get("petition.dying.header"), "magenta");
@@ -1268,10 +1320,8 @@ namespace UsurperRemake.Systems
 
             switch (wishRoll)
             {
-                case 0: // Legacy — deliver message
-                    var recipient = NPCSpawnSystem.Instance?.ActiveNPCs?
-                        .FirstOrDefault(n => !n.IsDead && n != elder && n.Name2 != player.Name2);
-                    string recipientName = recipient?.Name2 ?? Loc.Get("petition.dying.someone_special");
+                case 0: // Legacy: deliver a message (1.3.10: a talk task, paid on delivery)
+                    string recipientName = recipient!.Name2;
 
                     UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.legacy_not_long", player.Name2)}", "magenta", "bright_cyan");
                     UIHelper.DrawBoxLine(terminal, $"  {Loc.Get("petition.dying.legacy_tell", recipientName)}", "magenta", "cyan");
@@ -1285,14 +1335,18 @@ namespace UsurperRemake.Systems
                     var legacyChoice = await terminal.GetInput($"\n  {Loc.Get("petition.dying.legacy_prompt")}");
                     if (legacyChoice.ToUpper() == "P")
                     {
+                        // 1.3.10: the savings are paid when the message reaches the recipient (DeliverDyingMessages)
                         long inheritance = 500 + elder.Level * 50;
-                        player.Gold += inheritance;
+                        (player.DyingMessages ??= new List<DyingMessageSaveData>()).Add(new DyingMessageSaveData
+                        {
+                            Recipient = recipientName, Elder = elder.Name2, Gold = inheritance
+                        });
                         terminal.SetColor("bright_green");
                         terminal.WriteLine($"\n  {Loc.Get("petition.dying.legacy_thanks", player.Name2, race)}");
-                        terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_gold", elder.Name2, inheritance)}");
                         terminal.SetColor("gray");
                         terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_savings")}");
+                        terminal.SetColor("yellow");
+                        terminal.WriteLine($"  {Loc.Get("petition.dying.legacy_task", recipientName)}");
 
                         elder.Memory?.RecordEvent(new MemoryEvent
                         {
@@ -1300,19 +1354,6 @@ namespace UsurperRemake.Systems
                             Description = $"{player.Name2} promised to carry my final message",
                             InvolvedCharacter = player.Name2, Importance = 1.0f, EmotionalImpact = 0.8f
                         });
-
-                        if (recipient != null)
-                        {
-                            recipient.Memory?.RecordEvent(new MemoryEvent
-                            {
-                                Type = MemoryType.Helped,
-                                Description = $"{player.Name2} delivered a message of forgiveness from {elder.Name2}",
-                                InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = 0.4f
-                            });
-                        }
-
-                        AlignmentSystem.Instance.ChangeAlignment(player, 10, isGood: true, "petition.dying_forgive"); // v0.57.12: paired movement
-                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_dying_wish", player.Name2, elder.Name2));
                     }
                     else
                     {

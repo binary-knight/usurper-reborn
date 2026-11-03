@@ -1125,6 +1125,8 @@ namespace UsurperRemake.Systems
                 ActivePetId = player.ActivePetId ?? "",
                 LastPartnerBondingUtc = player.LastPartnerBondingUtc,
                 LastRiteOfReturnUtc = player.LastRiteOfReturnUtc,
+                DyingMessages = player.DyingMessages?.Select(m => new DyingMessageSaveData { Recipient = m.Recipient, Elder = m.Elder, Gold = m.Gold }).ToList()
+                    ?? new List<DyingMessageSaveData>(),   // 1.3.10
                 LoanAmount = player.LoanAmount,
                 LoanDaysRemaining = player.LoanDaysRemaining,
                 LoanInterestAccrued = player.LoanInterestAccrued,
