@@ -53,7 +53,7 @@ A new NPC starts in one of 15 places, weighted: Main Street, the Inn and the Cas
 
 ## How do NPCs get married
 
-An unmarried NPC of level 5 or more has a 1 in 500 chance each tick to try. The partner must be level 5 or more, within 10 levels, attracted to it and not close kin, and the pair must score above 0.3 for compatibility; the try then succeeds at the compatibility x 50 percent. An NPC in a polyamorous or open relationship can try while married.
+An unmarried NPC of level 5 or more has a 1 in 500 chance each tick to try. The partner must be level 5 or more, within 10 levels, attracted to it and not close kin, and the pair must score above 0.3 for compatibility; the try then succeeds at the compatibility x 50 percent. An NPC in a polyamorous or open relationship can try while married, but an NPC married to a player is never the partner. A jailed NPC neither tries nor is chosen, and runs none of its daily activities until it is released.
 
 ## How often do NPCs have children
 

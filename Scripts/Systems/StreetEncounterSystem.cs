@@ -3339,6 +3339,7 @@ public class StreetEncounterSystem
                 WorldSnapshotCounters.CountNpcDeath(realNpc);   // O2: a murder for the hourly world snapshot
                 realNpc.IsDead = true;
                 // realNpc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
+                WorldSimulator.RecordFamilyDeath(realNpc, player.Name2);   // 1.3.10: the victim's kin remember
             }
 
             // === GOLD THEFT ===

@@ -1006,7 +1006,8 @@ namespace UsurperRemake.Systems
                     Conspirators = p.Conspirators,
                     Target = p.Target,
                     Progress = p.Progress,
-                    IsDiscovered = p.IsDiscovered
+                    IsDiscovered = p.IsDiscovered,
+                    DaysDiscovered = p.DaysDiscovered
                 }).ToList() ?? new List<CourtIntrigueSaveData>(),
                 Guards = king.Guards?.Select(g => new RoyalGuardSaveData
                 {
@@ -1597,7 +1598,8 @@ namespace UsurperRemake.Systems
                     Conspirators = p.Conspirators ?? new List<string>(),
                     Target = p.Target,
                     Progress = p.Progress,
-                    IsDiscovered = p.IsDiscovered
+                    IsDiscovered = p.IsDiscovered,
+                    DaysDiscovered = p.DaysDiscovered
                 }).ToList();
             }
 

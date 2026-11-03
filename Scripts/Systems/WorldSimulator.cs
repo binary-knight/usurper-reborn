@@ -120,9 +120,10 @@ public class WorldSimulator
     /// 1.3.2, the activity guard: the NPC runs none of its own world sim activities (shopping, moves, dungeon runs
     /// and the rest): a player team member, a member of the player's dungeon party, an NPC in conversation. The
     /// spouse and lovers are not held here: they keep their activities and go home to the player (NPCGoHome).
+    /// 1.3.10: nor does a jailed NPC (DaysInPrison above 0): it stays in its cell until released.
     /// </summary>
     internal static bool IsOutOfActivityPass(NPC npc) =>
-        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc);
+        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc) || npc.DaysInPrison > 0;
 
     /// <summary>
     /// 1.3.2, the gear guard: the world sim never changes this NPC's equipment or gear power, and never sends it
@@ -2431,12 +2432,16 @@ public class WorldSimulator
     /// added to each relative's Enemies list. Surfaces downstream as the
     /// relative refusing to talk to / join the killer's team, attacking on
     /// sight when alignment is dark. Sparse + idempotent.
+    /// 1.3.10: static, and also called on a player kill (street murder, death spell, execution) with the
+    /// player's Name2 as killer, whether or not the death is permanent: only the grudge, never the permadeath
+    /// cascade (spouse notice, bereavement, orphans), which stays inside MarkNPCDead's permadeath branch.
     /// </summary>
-    private void RecordFamilyDeath(NPC deceased, string killerName)
+    internal static void RecordFamilyDeath(NPC deceased, string killerName)
     {
         try
         {
             if (deceased == null) return;
+            var npcs = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs ?? new List<NPC>();
 
             // Walk all NPCs once and classify by relation to the deceased.
             string deceasedName = deceased.Name2 ?? deceased.Name1 ?? deceased.Name;
@@ -6699,7 +6704,8 @@ public class WorldSimulator
     
     private void ExecuteJoinGang(NPC npc, string targetId, WorldState world)
     {
-        if (string.IsNullOrEmpty(targetId) || npc.GangId != null) return;
+        // 1.3.10: no gang is an empty id (every loader sets ""), not only null
+        if (string.IsNullOrEmpty(targetId) || !string.IsNullOrEmpty(npc.GangId)) return;
         
         var gangLeader = world.GetNPCById(targetId);
         if (gangLeader == null || gangLeader.CurrentLocation != npc.CurrentLocation) return;
@@ -7055,7 +7061,8 @@ public class WorldSimulator
             .Where(c => c.LoyaltyToKing < 40 && !c.IsPlotting)
             .ToList();
 
-        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count < 3)
+        // 1.3.10: a discovered plot waits in ActivePlots for the king's arrest; only the plots in motion count
+        if (unhappyMembers.Count >= 2 && working.ActivePlots.Count(p => !p.IsDiscovered) < 3)
         {
             // Start a new plot
             var conspirators = unhappyMembers.Take(Random.Shared.Next(2, (Math.Min(4, unhappyMembers.Count)) + 1)).ToList();
@@ -7142,7 +7149,7 @@ public class WorldSimulator
             plot.IsDiscovered = true;
             plot.DiscoveredBy = "Royal Spymaster";
 
-            // Conspirators go to prison
+            // The conspirators leave the court (the king's Arrest Plotter jails any who is a real NPC)
             foreach (var conspirator in plot.Conspirators)
             {
                 var member = working.CourtMembers.FirstOrDefault(m => m.Name == conspirator);
@@ -7165,7 +7172,7 @@ public class WorldSimulator
             };
             news.Add((true, Loc.Get(plotKey, CourtTitle(working), working.Name)));
 
-            working.ActivePlots.Remove(plot);
+            // 1.3.10: the discovered plot stays listed (it no longer advances) until the king arrests it
             return;
         }
 

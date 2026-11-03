@@ -371,7 +371,9 @@ public class RestWorld125Tests : IDisposable
             Rows(en).Should().Contain("           WORLD EVENTS").And.Contain("  * Martial Law")
                 .And.Contain("    The King declares martial law. Dark Alley is closed!").And.Contain("Current Modifiers:")
                 .And.Contain("Royal Decree:").And.Contain("  \"By Royal Decree: Martial law is in effect. Lawbreakers will be punished!\"")
-                .And.Contain("  Gold: +30%").And.Contain("  Stats: -2");
+                .And.Contain("  Gold: +30%");
+            // 1.3.10 (audit C6): no Stats row; nothing applies the events' stat modifier
+            Rows(en).Should().NotContain("  Stats: -2");
             en.Should().MatchRegex(@"\n    \(\d+ days remaining\)");
         }
         finally { events.ClearAllEvents(); }

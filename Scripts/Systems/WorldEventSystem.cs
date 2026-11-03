@@ -797,12 +797,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("world_event.mod_gold", $"{(GlobalGoldModifier > 1.0f ? "+" : "")}{((GlobalGoldModifier - 1.0f) * 100):F0}")}");
             }
 
-            if (GlobalStatModifier != 0)
-            {
-                string statColor = GlobalStatModifier > 0 ? "green" : "red";
-                terminal.SetColor(statColor);
-                terminal.WriteLine($"  {Loc.Get("world_event.mod_stats", $"{(GlobalStatModifier > 0 ? "+" : "")}{GlobalStatModifier}")}");
-            }
+            // 1.3.10: no "Stats" row: GlobalStatModifier is summed and saved but nothing applies it to a character
 
             // Show king's decree if any
             if (!string.IsNullOrEmpty(CurrentKingDecree))

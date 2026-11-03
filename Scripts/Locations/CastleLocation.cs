@@ -1741,6 +1741,18 @@ public class CastleLocation : BaseLocation
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(""))
         {
+            // 1.3.10: an NPC already freed (rescued, or released by a path that left the record) is not executed;
+            // its stale record is cleared
+            var listed = NPCSpawnSystem.Instance?.GetNPCByName(name);
+            if (listed != null && listed.DaysInPrison <= 0)
+            {
+                await CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0);
+                terminal.SetColor("red");
+                terminal.WriteLine(Loc.Get("castle.not_in_dungeon"));
+                await Pacing.Wait(1500);
+                return;
+            }
+
             // v1.1.13: one guarded court change; the execution follows only once it is written
             if (!await CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0))
             {
@@ -1758,6 +1770,7 @@ public class CastleLocation : BaseLocation
                 // npc.IsPermaDead = true;  // Disabled — NPCs now respawn after death
                 npc.DaysInPrison = 0;
                 npc.HP = 0;
+                WorldSimulator.RecordFamilyDeath(npc, currentPlayer.Name2);   // 1.3.10: the executed NPC's kin remember
             }
 
             // Release player from prison (execution just frees them with a penalty)

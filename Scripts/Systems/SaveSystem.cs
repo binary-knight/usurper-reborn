@@ -2295,7 +2295,8 @@ namespace UsurperRemake.Systems
                             Conspirators = p.Conspirators,
                             Target = p.Target,
                             Progress = p.Progress,
-                            IsDiscovered = p.IsDiscovered
+                            IsDiscovered = p.IsDiscovered,
+                            DaysDiscovered = p.DaysDiscovered
                         }).ToList(),
 
                         DesignatedHeir = king.DesignatedHeir ?? "",
@@ -2865,7 +2866,8 @@ namespace UsurperRemake.Systems
                             Conspirators = p.Conspirators ?? new List<string>(),
                             Target = p.Target,
                             Progress = p.Progress,
-                            IsDiscovered = p.IsDiscovered
+                            IsDiscovered = p.IsDiscovered,
+                            DaysDiscovered = p.DaysDiscovered
                         }).ToList() ?? new List<CourtIntrigue>();
 
                         king.DesignatedHeir = data.RoyalCourt.DesignatedHeir;

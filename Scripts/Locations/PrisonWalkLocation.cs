@@ -608,6 +608,7 @@ public partial class PrisonWalkLocation : BaseLocation
         if (prisoner is NPC npcPrisoner)
         {
             UsurperRemake.Systems.NPCSpawnSystem.Instance.ReleaseNPC(npcPrisoner, player.DisplayName);
+            RememberRescue(npcPrisoner, player);
         }
         else
         {
@@ -629,10 +630,28 @@ public partial class PrisonWalkLocation : BaseLocation
         await terminal.WriteLineAsync(Loc.Get("prison_walk.thanks"));
         await terminal.WriteLineAsync(Loc.Get("prison_walk.friend"));
 
-        // Add to player's known allies (if applicable)
-        // This could trigger future events where the freed prisoner helps the player
-
         await Pacing.Wait(2000);
+    }
+
+    /// <summary>
+    /// 1.3.10: a rescued NPC remembers the rescuer (a Saved memory, which raises its impression of them) and leaves
+    /// the king's prisoner list, so the king cannot execute someone already free.
+    /// </summary>
+    internal static void RememberRescue(NPC rescued, Character rescuer)
+    {
+        rescued.Memory?.RecordEvent(new MemoryEvent
+        {
+            Type = MemoryType.Saved,
+            Description = $"{rescuer.Name2} broke me out of prison",
+            InvolvedCharacter = rescuer.Name2,
+            Importance = 0.9f,
+            EmotionalImpact = 0.8f,
+            Location = "Prison"
+        });
+        string name = rescued.Name2 ?? rescued.Name1;
+        if (CastleLocation.GetCurrentKing()?.Prisoners.ContainsKey(name) == true)
+            CastleLocation.CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0)
+                .GetAwaiter().GetResult();
     }
     
     private async Task HandlePrisonBreakFailure(Character player, Character prisoner)
