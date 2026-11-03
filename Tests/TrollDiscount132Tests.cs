@@ -248,11 +248,13 @@ public class TrollDiscount132Tests : IDisposable
     }
 
     /// <summary>The Human's auto-buy pre-tax price at 9c7b0b0e: the 300 gold level 1 weapon through city,
-    /// faction and difficulty only (auto-buy has no alignment, event or boon step).</summary>
+    /// faction and difficulty only (auto-buy has no alignment, event or boon step). 1.3.10 (D2): auto-buy charges
+    /// the direct buy's price, so the alignment, event and boon case is the buy path's 276.</summary>
     private static long AutoBuyHumanPre(Scenario s) => s switch
     {
         Scenario.EasyCrown => 229,
         Scenario.HardCrown => 310,
+        Scenario.GoodEventBoon => 276,
         _ => 300,
     };
 
@@ -299,7 +301,7 @@ public class TrollDiscount132Tests : IDisposable
     [InlineData(Scenario.Plain, 330L)]
     [InlineData(Scenario.EasyCrown, 251L)]
     [InlineData(Scenario.HardCrown, 341L)]
-    [InlineData(Scenario.GoodEventBoon, 330L)]
+    [InlineData(Scenario.GoodEventBoon, 303L)]   // 1.3.10 (D2): 330 before, when auto-buy skipped alignment, event and boon
     public async Task AutoBuyPath_NonTrollPrices_AreThePinnedOnes(Scenario s, long charged)
     {
         foreach (var race in new[] { CharacterRace.Human, CharacterRace.Orc })

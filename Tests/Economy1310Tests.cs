@@ -537,4 +537,152 @@ public class Economy1310Tests : IDisposable
         online.HasReinforcedDoor.Should().BeTrue("online the door is sold at 10, as before");
         online.HasLegendaryArmory.Should().BeFalse();
     }
+
+    // ------------------------------------------------------------------ D2: one shop price
+
+    private static Character Aligned(string name, bool evil, long gold)
+    {
+        var h = Hero(name);
+        if (evil) { h.Darkness = 1000; h.Chivalry = 0; } else { h.Chivalry = 1000; h.Darkness = 0; }
+        h.Gold = gold;
+        return h;
+    }
+
+    private static float Mod(Character h) => AlignmentSystem.Instance.GetPriceModifier(h, isShadyShop: false);
+    private static long Taxed(long pre) => CityControlSystem.CalculateTaxedPrice(pre).Item3;
+
+    /// <summary>The direct buy's price, figured here from the shop's own modifiers (only alignment is not 1 in these tests).</summary>
+    private static long DirectPrice(Character h, Equipment e) => (long)(e.Value * Mod(h));
+
+    private static void NeutralWorld(Character h)
+    {
+        WorldEventSystem.Instance.GlobalPriceModifier.Should().Be(1.0f, "the test sets only alignment");
+        FactionSystem.Instance.GetShopPriceModifier().Should().Be(1.0f);
+        DifficultySystem.GetShopPriceMultiplier().Should().Be(1.0f);
+        CityControlSystem.Instance.ApplyDiscount(1000, h).Should().Be(1000);
+    }
+
+    private static Equipment BestWeapon(Character h) =>
+        EquipmentDatabase.GetShopWeapons(WeaponHandedness.OneHanded).Concat(EquipmentDatabase.GetShopWeapons(WeaponHandedness.TwoHanded))
+            .Where(w => w.WeaponPower > 0).Where(w => w.CanEquip(h, out _))
+            .Where(w => !w.RequiresGood || h.Chivalry > h.Darkness).Where(w => !w.RequiresEvil || h.Darkness > h.Chivalry)
+            .OrderByDescending(w => w.WeaponPower).ThenBy(w => w.Value).First();
+
+    private static async Task<Character> AutoBuyWeapon(Character h)
+    {
+        var (term, _) = Term("Y", "M", "", "");
+        var shop = new WeaponShopLocation();
+        Wire(shop, term, h);
+        await Call(shop, "AutoBuyBestWeapon");
+        return h;
+    }
+
+    [Fact]
+    public async Task D2_WeaponAutoBuy_ChargesTheDirectBuyPrice_WithTheAlignmentMarkup()
+    {
+        var h = Aligned("AbEvil", evil: true, 0);
+        Mod(h).Should().Be(1.4f);
+        NeutralWorld(h);
+        var t = BestWeapon(h);
+        h.Gold = Taxed(DirectPrice(h, t));
+        await AutoBuyWeapon(h);
+        h.GetEquipment(EquipmentSlot.MainHand)?.Name.Should().Be(t.Name);
+        h.Gold.Should().Be(0, "auto-buy charges what buying it directly charges, the 40 percent Evil markup included");
+    }
+
+    [Fact]
+    public async Task D2_WeaponAutoBuy_OffersWhatTheDiscountedPriceAffords()
+    {
+        var h = Aligned("AbHoly", evil: false, 0);
+        Mod(h).Should().BeLessThan(1.0f);
+        NeutralWorld(h);
+        var t = BestWeapon(h);
+        h.Gold = Taxed(DirectPrice(h, t));
+        t.Value.Should().BeGreaterThan(h.Gold, "the raw value is out of reach, the Holy price is not");
+        await AutoBuyWeapon(h);
+        h.GetEquipment(EquipmentSlot.MainHand)?.Name.Should().Be(t.Name);
+        h.Gold.Should().Be(0);
+    }
+
+    [Fact]
+    public void D2_ArmorAutoBuyPlan_PricesEveryPieceAsTheDirectBuy()
+    {
+        var h = Aligned("AbArmor", evil: true, 2_000_000);
+        NeutralWorld(h);
+        var shop = new ArmorShopLocation();
+        var (term, _) = Term();
+        Wire(shop, term, h);
+        var plan = shop.PlanAutoBuy();
+        plan.Should().NotBeEmpty();
+        foreach (var p in plan)
+        {
+            p.Price.Should().Be(DirectPrice(h, p.Armor), p.Armor.Name);
+            p.Total.Should().Be(Taxed(p.Price));
+        }
+    }
+
+    private static EquipmentSlot FirstArmorSlot() =>
+        ((EquipmentSlot[])typeof(ArmorShopLocation).GetField("ArmorSlots", SF)!.GetValue(null)!)[0];
+
+    private static Equipment BestArmor(Character h, EquipmentSlot slot) =>
+        EquipmentDatabase.GetShopArmor(slot).Where(i => i.ArmorClass > 0).Where(i => i.CanEquip(h, out _))
+            .Where(i => !i.RequiresGood || h.Chivalry > h.Darkness).Where(i => !i.RequiresEvil || h.Darkness > h.Chivalry)
+            .OrderByDescending(i => i.ArmorClass).ThenBy(i => i.Value).First();
+
+    [Fact]
+    public async Task D2_ArmorAutoBuy_SlotBySlot_OffersAndChargesTheDiscountedPrice()
+    {
+        var h = Aligned("AbSlot", evil: false, 0);
+        NeutralWorld(h);
+        var slot = FirstArmorSlot();
+        var t = BestArmor(h, slot);
+        h.Gold = Taxed(DirectPrice(h, t));
+        t.Value.Should().BeGreaterThan(h.Gold);
+        var (term, _) = Term("P", "Y", "C", "", "");
+        var shop = new ArmorShopLocation();
+        Wire(shop, term, h);
+        await Call(shop, "AutoBuyBestArmor");
+        h.GetEquipment(slot)?.Name.Should().Be(t.Name, "the slot by slot path offers what the Holy price affords");
+        h.Gold.Should().Be(0);
+    }
+
+    [Fact]
+    public void D2_TheArmorList_DrawsAnItemAffordable_AtItsDiscountedPrice()
+    {
+        var h = Aligned("AbList", evil: false, 0);
+        NeutralWorld(h);
+        var slot = FirstArmorSlot();
+        var shop = new ArmorShopLocation();
+        var items = (List<Equipment>)typeof(ArmorShopLocation).GetMethod("GetShopArmorForSlot", F)!.Invoke(shop, new object[] { slot })!;
+        var t = items.Take(5).Where(i => i.MinLevel <= h.Level && ArmorShopLocation.MeetsClass(h.Class, i) && i.Value >= 100).First();
+        h.Gold = Taxed(DirectPrice(h, t));
+        t.Value.Should().BeGreaterThan(h.Gold);
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(Enumerable.Repeat("", 5)), output);
+        Wire(shop, term, h);
+        typeof(ArmorShopLocation).GetMethod("ShowSlotItems", F)!.Invoke(shop, new object[] { slot });
+        term.StreamWriterInternal?.Flush();
+        string raw = Encoding.UTF8.GetString(output.ToArray());
+        raw.Should().Contain("\u001b[37m" + ItemNames.Column(t, 26), "drawn as one the player can buy, not greyed out");
+    }
+
+    [Fact]
+    public void D2_TheWeaponList_DrawsAnItemAffordable_AtItsDiscountedPrice()
+    {
+        var h = Aligned("WbList", evil: false, 0);
+        NeutralWorld(h);
+        var shop = new WeaponShopLocation();
+        var cat = Enum.Parse(typeof(WeaponShopLocation).GetNestedType("WeaponCategory", BindingFlags.NonPublic)!, "OneHanded");
+        var items = (List<Equipment>)typeof(WeaponShopLocation).GetMethod("GetShopItemsForCategory", F)!.Invoke(shop, new[] { cat })!;
+        var t = items.Take(5).Where(i => i.MinLevel <= h.Level && i.Value >= 100 && i.CanEquip(h, out _)).First();
+        h.Gold = Taxed(DirectPrice(h, t));
+        t.Value.Should().BeGreaterThan(h.Gold);
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(Enumerable.Repeat("", 5)), output);
+        Wire(shop, term, h);
+        typeof(WeaponShopLocation).GetMethod("ShowCategoryItems", F)!.Invoke(shop, new[] { cat });
+        term.StreamWriterInternal?.Flush();
+        string raw = Encoding.UTF8.GetString(output.ToArray());
+        raw.Should().Contain("\u001b[37m" + ItemNames.Column(t, 26), "drawn as one the player can buy, not greyed out");
+    }
 }
