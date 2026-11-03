@@ -104,15 +104,79 @@ public class QuestPicks1310Tests : IDisposable
 
     // ================= P8: bandits in the wilderness =================
 
+    /// <summary>A Random whose Next(max) returns the given values in turn (each checked against max).</summary>
+    private sealed class ScriptedRandom : Random
+    {
+        private readonly Queue<int> _values;
+        public readonly List<int> Maxes = new();
+        public ScriptedRandom(params int[] values) { _values = new Queue<int>(values); }
+        public override int Next(int maxValue)
+        {
+            Maxes.Add(maxValue);
+            int v = _values.Dequeue();
+            v.Should().BeLessThan(maxValue);
+            return v;
+        }
+    }
+
     [Theory]
     [InlineData("forest", "Bandit Scout")]
     [InlineData("mountains", "Mountain Bandit")]
-    public void P8_WhileBanditsAreAbout_TheBanditWeighsThree_AndEveryOtherNameOne(string region, string bandit)
+    public void P8_WhileBanditsAreAbout_ABanditIsMetInThreeFightsOfEight(string region, string bandit)
     {
-        var counts = Picks(Region(region), banditsAbout: true, out int total);
-        total.Should().Be(Region(region).MonsterNames.Length + 2, "the bandit weighs 3 and the 7 others 1 each");
-        counts[bandit].Should().Be(3);
-        counts.Where(p => p.Key != bandit).Should().OnlyContain(p => p.Value == 1);
+        // His pick, "3x as often": the bandit's base share is 1 in 8, so 3 in 8 (the first roll's 0, 1 and 2 of 8)
+        var r = Region(region);
+        for (int roll = 0; roll < r.MonsterNames.Length; roll++)
+        {
+            var rng = new ScriptedRandom(roll, 0);
+            string name = WildernessData.PickMonsterName(r, banditsAbout: true, rng);
+            rng.Maxes[0].Should().Be(8, "the first roll is over the region's 8 names");
+            if (roll < 3) name.Should().Be(bandit, $"roll {roll} of 8 meets the bandit");
+            else name.Should().NotBe(bandit, $"roll {roll} of 8 meets one of the rest");
+        }
+    }
+
+    [Theory]
+    [InlineData("forest", "Bandit Scout")]
+    [InlineData("mountains", "Mountain Bandit")]
+    public void P8_WhileBanditsAreAbout_TheRestAreDrawnEvenly(string region, string bandit)
+    {
+        var r = Region(region);
+        var seen = new List<string>();
+        for (int k = 0; k < 7; k++)
+        {
+            var rng = new ScriptedRandom(5, k);
+            seen.Add(WildernessData.PickMonsterName(r, banditsAbout: true, rng));
+            rng.Maxes[1].Should().Be(7, "the second roll is over the 7 others");
+        }
+        seen.Should().OnlyHaveUniqueItems().And.BeEquivalentTo(r.MonsterNames.Where(n => n != bandit));
+    }
+
+    [Theory]
+    [InlineData("forest", "Bandit Scout")]
+    [InlineData("mountains", "Mountain Bandit")]
+    public void P8_TheMeasuredBanditShare_IsThreeTimesItsBase(string region, string bandit)
+    {
+        var r = Region(region);
+        var rng = new Random(1310);
+        const int draws = 800_000;
+        int boosted = 0, plain = 0;
+        for (int i = 0; i < draws; i++)
+        {
+            if (WildernessData.PickMonsterName(r, true, rng) == bandit) boosted++;
+            if (WildernessData.PickMonsterName(r, false, rng) == bandit) plain++;
+        }
+        double share = boosted / (double)draws, baseShare = plain / (double)draws;
+        share.Should().BeApproximately(3.0 / 8, 0.003, "3 fights in 8");
+        baseShare.Should().BeApproximately(1.0 / 8, 0.002, "1 fight in 8 without bandits about");
+    }
+
+    [Fact]
+    public void P8_ARegionWithoutBandits_KeepsItsEvenTable()
+    {
+        foreach (var r in WildernessData.Regions.Where(x => !x.MonsterNames.Any(n => QuestSystem.BanditMonsters.Contains(n))))
+            for (int k = 0; k < r.MonsterNames.Length; k++)
+                WildernessData.PickMonsterName(r, banditsAbout: true, new ScriptedRandom(k)).Should().Be(r.MonsterNames[k]);
     }
 
     [Theory]

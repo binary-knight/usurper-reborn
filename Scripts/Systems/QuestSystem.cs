@@ -1587,7 +1587,7 @@ public partial class QuestSystem
     /// <summary>
     /// 1.3.10: whether bandits are about for this player: the player holds a quest with a bandit kill objective (the
     /// Sellsword contract "Bandits on the Trade Road", until it is turned in or ends) or a Bandit Raid runs. The
-    /// wilderness then weighs its bandits 3 times (WildernessData.PickMonsterName).
+    /// wilderness then meets its bandits 3 times as often (WildernessData.PickMonsterName).
     /// </summary>
     internal static bool BanditsAbout(Character? player)
     {
