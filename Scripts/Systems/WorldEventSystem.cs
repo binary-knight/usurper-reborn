@@ -785,7 +785,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("world_event.mod_gold", $"{(GlobalGoldModifier > 1.0f ? "+" : "")}{((GlobalGoldModifier - 1.0f) * 100):F0}")}");
             }
 
-            // 1.3.10: no "Stats" row: GlobalStatModifier is summed and saved but nothing applies it to a character
+            // 1.3.10: no "Stats" row; 1.3.11 (K15): events carry no stat effect at all
 
             // Show king's decree if any
             if (!string.IsNullOrEmpty(CurrentKingDecree))
