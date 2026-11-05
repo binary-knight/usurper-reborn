@@ -22010,6 +22010,7 @@
   "petition.dying.legacy_task": "Find {0} in town and talk to them to deliver it.",
   "petition.dying.deliver": "You tell {0} that {1} forgave them.",
   "petition.dying.deliver_moved": "{0} is quiet for a long moment, then thanks you.",
+  "petition.dying.undeliverable": "{0} is dead. {1}'s message goes undelivered.",
   "_comment_petition_dying_confession": "--- Dying Wish: Confession ---",
   "petition.dying.confession_intro": "\"Before I go, I must confess something.\"",
   "petition.dying.confession_secret": "\"I've kept a secret for years...\"",

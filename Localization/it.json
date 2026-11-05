@@ -21761,6 +21761,7 @@
   "petition.dying.legacy_task": "Trova {0} in città e parlagli per consegnarlo.",
   "petition.dying.deliver": "Dici a {0} che {1} l'ha perdonato.",
   "petition.dying.deliver_moved": "{0} resta in silenzio a lungo, poi ti ringrazia.",
+  "petition.dying.undeliverable": "{0} non c'è più. Il messaggio di {1} resta non consegnato.",
   "_comment_petition_dying_confession": "--- Ultimo Desiderio: Confessione ---",
   "petition.dying.confession_intro": "\"Prima di andarmene, devo confessare una cosa.\"",
   "petition.dying.confession_secret": "\"Ho custodito un segreto per anni...\"",

@@ -21784,6 +21784,7 @@
   "petition.dying.legacy_task": "Keresd meg a városban {0} nevű lakót, és beszélj vele.",
   "petition.dying.deliver": "Elmondod {0} lakónak: {1} megbocsátott.",
   "petition.dying.deliver_moved": "{0} sokáig hallgat, aztán megköszöni.",
+  "petition.dying.undeliverable": "{0} meghalt. {1} üzenete nem jut el hozzá.",
   "_comment_petition_dying_confession": "--- Dying Wish: Confession ---",
   "petition.dying.confession_intro": "\"Mielőtt elmegyek, be kell vallanom valamit.\"",
   "petition.dying.confession_secret": "\"Évek óta őrzök egy titkot...\"",

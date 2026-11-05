@@ -398,6 +398,83 @@ public sealed class GameSmall1311Tests : IDisposable
             Loc.HasIn(lang, key).Should().BeFalse(lang);
     }
 
+    // ---------- K16: a dying wish message whose recipient has died permanently ----------
+
+    private static DyingMessageSaveData Message(string recipient) => new() { Recipient = recipient, Elder = "Gs Elder", Gold = 500 };
+
+    private static int Drop(Character hero)
+    {
+        var drop = typeof(NPCPetitionSystem).GetMethod("DropMessagesToTheDead", PS);
+        drop.Should().NotBeNull();
+        return (int)drop!.Invoke(null, new object[] { hero })!;
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void K16_APermanentlyDeadRecipient_DropsTheMessage_WithNoReward_AndSaysSo(bool perma, bool aged)
+    {
+        var dead = Npc("gs_dead", "Gs Dead");
+        dead.IsDead = true; dead.HP = 0;
+        dead.IsPermaDead = perma; dead.IsAgedDeath = aged;
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(dead);
+        var hero = Hero();
+        long gold = hero.Gold, chivalry = hero.Chivalry;
+        hero.DyingMessages.Add(Message(dead.Name2));
+        Drop(hero).Should().Be(1);
+        hero.DyingMessages.Should().BeEmpty();
+        hero.Gold.Should().Be(gold, "no reward");
+        hero.Chivalry.Should().Be(chivalry);
+        GameEngine.PendingNotifications.Should().ContainSingle().Which.Should().Be(Loc.Get("petition.dying.undeliverable", dead.Name2, "Gs Elder"));
+    }
+
+    [Fact]
+    public void K16_ARecipientPrunedFromTheRoster_DropsTheMessage()
+    {
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(Npc("gs_other", "Gs Other"));
+        var hero = Hero();
+        hero.DyingMessages.Add(Message("Gs Long Gone"));
+        Drop(hero).Should().Be(1);
+        hero.DyingMessages.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void K16_AnEmptyRoster_DropsNothing()
+    {
+        var hero = Hero();
+        hero.DyingMessages.Add(Message("Gs Anyone"));
+        Drop(hero).Should().Be(0);
+        hero.DyingMessages.Should().HaveCount(1);
+        GameEngine.PendingNotifications.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void K16_ATemporaryDeath_OrALivingRecipient_KeepsTheMessage()
+    {
+        var down = Npc("gs_down", "Gs Down");
+        down.IsDead = true; down.HP = 0;
+        var alive = Npc("gs_alive", "Gs Alive");
+        NPCSpawnSystem.Instance.ActiveNPCs.AddRange(new[] { down, alive });
+        var hero = Hero();
+        hero.DyingMessages.Add(Message(down.Name2));
+        hero.DyingMessages.Add(Message(alive.Name2));
+        Drop(hero).Should().Be(0);
+        hero.DyingMessages.Should().HaveCount(2);
+        GameEngine.PendingNotifications.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void K16_TheDailyReset_RunsTheDrop_AndTheLineFits()
+    {
+        string daily = File.ReadAllText(RepoFile("Scripts", "Systems", "DailySystemManager.cs"));
+        int basic = daily.IndexOf("private async Task RunBasicDailyReset()", StringComparison.Ordinal);
+        int next = daily.IndexOf("public void RunCatchUpDailyReset()", StringComparison.Ordinal);
+        basic.Should().BeGreaterThan(0);
+        daily.IndexOf("NPCPetitionSystem.DropMessagesToTheDead(player)", basic, StringComparison.Ordinal).Should().BeInRange(basic, next);
+        foreach (var lang in new[] { "en", "hu" })
+            string.Format(Loc.GetIn(lang, "petition.dying.undeliverable"), "Fcii Twenty Chars Nm", "Fcii Twenty Chars Nm").Length.Should().BeLessOrEqualTo(79, lang);
+    }
+
     // ---------- K17: a recipient holding a family grudge ----------
 
     private static (HealerLocation place, TerminalEmulator term, MemoryStream output, Character hero, NPC npc) GrudgeTalk(params string[] lines)
