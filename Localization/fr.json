@@ -25430,8 +25430,6 @@
   "world_event.demon_portal.desc": "Un portail vers l'abîme ! Des démons errent dans le pays. +75 % d'XP.",
   "world_event.dragon_sighting.title": "Dragon en vue",
   "world_event.dragon_sighting.desc": "Un dragon a été aperçu ! De grandes richesses attendent les braves.",
-  "world_event.bandit_lord_rises.title": "Un seigneur bandit se lève",
-  "world_event.bandit_lord_rises.desc": "Un seigneur bandit menace les routes ! Voyager est dangereux.",
   "world_event.eclipse_darkness.title": "Éclipse solaire",
   "world_event.eclipse_darkness.desc": "Les ténèbres couvrent le pays !",
   "world_event.meteor_shower.title": "Pluie de météores",

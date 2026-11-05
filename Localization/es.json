@@ -25441,8 +25441,6 @@
   "world_event.demon_portal.desc": "¡Un portal al abismo! Los demonios vagan por la tierra. +75% PX.",
   "world_event.dragon_sighting.title": "Avistamiento de un dragón",
   "world_event.dragon_sighting.desc": "¡Han visto un dragón! Grandes riquezas aguardan a los valientes.",
-  "world_event.bandit_lord_rises.title": "Surge un señor de los bandidos",
-  "world_event.bandit_lord_rises.desc": "¡Un señor de los bandidos amenaza los caminos! Viajar es peligroso.",
   "world_event.eclipse_darkness.title": "Eclipse solar",
   "world_event.eclipse_darkness.desc": "¡La oscuridad cubre la tierra!",
   "world_event.meteor_shower.title": "Lluvia de meteoros",

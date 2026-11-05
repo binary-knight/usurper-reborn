@@ -398,6 +398,44 @@ public sealed class GameSmall1311Tests : IDisposable
             Loc.HasIn(lang, key).Should().BeFalse(lang);
     }
 
+    // ---------- K12: BanditLordRises ----------
+
+    private static WorldEventData SavedEvent(string type, params (string Key, object Value)[] parameters)
+    {
+        var data = new WorldEventData { Id = "gs", Type = type, Title = type, Description = "d", Parameters = new Dictionary<string, object> { ["DaysRemaining"] = 3, ["StartDay"] = 1 } };
+        foreach (var (k, v) in parameters) data.Parameters[k] = v;
+        return data;
+    }
+
+    private static WorldEventSystem Fresh()
+    {
+        var system = (WorldEventSystem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(WorldEventSystem));
+        typeof(WorldEventSystem).GetField("_random", F)!.SetValue(system, new Random(1311));
+        typeof(WorldEventSystem).GetField("_activeEvents", F)!.SetValue(system, new List<WorldEventSystem.WorldEvent>());
+        return system;
+    }
+
+    [Fact]
+    public void K12_TheEvent_IsGone_AndItsTextWithIt()
+    {
+        Enum.TryParse<WorldEventSystem.EventType>("BanditLordRises", out _).Should().BeFalse();
+        foreach (var lang in Langs)
+        {
+            Loc.HasIn(lang, "world_event.bandit_lord_rises.title").Should().BeFalse(lang);
+            Loc.HasIn(lang, "world_event.bandit_lord_rises.desc").Should().BeFalse(lang);
+        }
+    }
+
+    [Fact]
+    public void K12_AWorldStateNamingIt_StillLoads_AndKeepsTheOthers()
+    {
+        var system = Fresh();
+        system.RestoreFromSaveData(new List<WorldEventData> { SavedEvent("BanditLordRises", ("Effect_price", 1.2f)), SavedEvent("HarvestFestival", ("Effect_xp", 1.5f)) }, 10);
+        system.GetActiveEvents().Select(e => e.Type).Should().Equal(WorldEventSystem.EventType.HarvestFestival);
+        system.GlobalPriceModifier.Should().Be(1.0f, "the dropped event's price effect is not applied");
+        system.GlobalXPModifier.Should().Be(1.5f);
+    }
+
     // ---------- K16: a dying wish message whose recipient has died permanently ----------
 
     private static DyingMessageSaveData Message(string recipient) => new() { Recipient = recipient, Elder = "Gs Elder", Gold = 500 };

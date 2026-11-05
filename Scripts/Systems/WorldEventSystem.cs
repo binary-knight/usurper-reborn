@@ -72,7 +72,6 @@ namespace UsurperRemake.Systems
             MonsterInvasion,
             DemonPortal,
             DragonSighting,
-            BanditLordRises,
 
             // Misc Events
             EclipseDarkness,
@@ -540,13 +539,6 @@ namespace UsurperRemake.Systems
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(5, 10);
                     evt.Effects["gold"] = 1.5f;
-                    break;
-
-                case EventType.BanditLordRises:
-                    evt.Title = StoredText(type, "title");
-                    evt.Description = StoredText(type, "desc");
-                    evt.DaysRemaining = _random.Next(7, 14);
-                    evt.Effects["price"] = 1.2f;
                     break;
 
                 // === MISC EVENTS ===
