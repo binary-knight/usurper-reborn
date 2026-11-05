@@ -5682,12 +5682,15 @@ public abstract class BaseLocation
                 terminal.ClearScreen();
                 WriteBoxHeader(Loc.Get("base.talking_to", headerName), "bright_cyan");
                 terminal.WriteLine("");
+                // 1.3.11 (K17): a dying wish message still reaches them, on this screen, after the clear; the refusal stands
+                bool messageDelivered = NPCPetitionSystem.DeliverDyingMessages(currentPlayer, npc, terminal);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get("family.grudge_refuse_talk", npc.Name2)}");
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("family.grudge_refuse_talk_sub")}");
-                await Pacing.Wait(1500);
+                if (messageDelivered) await terminal.PressAnyKey();   // the savings and the refusal both stay until Enter
+                else await Pacing.Wait(1500);
                 return;
             }
 

@@ -397,4 +397,71 @@ public sealed class GameSmall1311Tests : IDisposable
         foreach (var lang in Langs)
             Loc.HasIn(lang, key).Should().BeFalse(lang);
     }
+
+    // ---------- K17: a recipient holding a family grudge ----------
+
+    private static (HealerLocation place, TerminalEmulator term, MemoryStream output, Character hero, NPC npc) GrudgeTalk(params string[] lines)
+    {
+        var hero = Hero();
+        var npc = Npc("gs_son", "Gs Son");
+        npc.Memory!.RecordEvent(new MemoryEvent { Type = MemoryType.KilledMyParent, InvolvedCharacter = hero.Name2, Description = "killed", Importance = 1f });
+        FamilySystem.HasGrudgeAgainst(npc, hero).Should().BeTrue();
+        var place = new HealerLocation();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(lines), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(place, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(place, hero);
+        return (place, term, output, hero, npc);
+    }
+
+    private static async Task Talk(HealerLocation place, NPC npc)
+    {
+        var talk = typeof(BaseLocation).GetMethod("InteractWithNPC", F)!;
+        await ((Task)talk.Invoke(place, new object[] { npc })!).WaitAsync(TimeSpan.FromSeconds(60));
+    }
+
+    [Fact]
+    public async Task K17_TheGrudgeHolder_ReceivesTheMessage_AndTheRefusalStands_BothOnOneScreen_UntilEnter()
+    {
+        var (place, term, output, hero, npc) = GrudgeTalk("");
+        long gold = hero.Gold;
+        hero.DyingMessages.Add(Message(npc.Name2));
+        await Talk(place, npc);
+
+        hero.DyingMessages.Should().BeEmpty();
+        hero.Gold.Should().Be(gold + 500);
+        npc.Memory!.HasMemoryOfEvent(MemoryType.Helped, hero.Name2, hoursAgo: 24).Should().BeTrue();
+
+        string raw = RawText(term, output);
+        int clear = raw.LastIndexOf("\u001b[2J", StringComparison.Ordinal);
+        clear.Should().BeGreaterOrEqualTo(0);
+        string lastScreen = Plain(raw.Substring(clear));
+        lastScreen.Should().Contain(Loc.Get("petition.dying.deliver", npc.Name2, "Gs Elder"), "no clear follows the delivery");
+        lastScreen.Should().Contain(Loc.Get("family.grudge_refuse_talk", npc.Name2));
+        lastScreen.TrimEnd().Should().EndWith(Loc.Get("ui.press_enter").TrimEnd(), "both stay until Enter");
+        lastScreen.Should().NotContain(Loc.Get("base.npc_says", npc.Name2), "the refusal stands: no talk follows");
+    }
+
+    [Fact]
+    public async Task K17_WithNoMessage_TheRefusal_IsAsBefore()
+    {
+        var (place, term, output, hero, npc) = GrudgeTalk();
+        long gold = hero.Gold;
+        await Talk(place, npc);
+        hero.Gold.Should().Be(gold);
+        string shown = Plain(term, output);
+        shown.Should().Contain(Loc.Get("family.grudge_refuse_talk", npc.Name2));
+        shown.Should().NotContain(Loc.Get("ui.press_enter").TrimEnd());
+    }
+
+    [Fact]
+    public async Task K17_AMessageForSomeoneElse_StaysWithThePlayer()
+    {
+        var (place, _, _, hero, npc) = GrudgeTalk();
+        hero.DyingMessages.Add(Message("Gs Someone Else"));
+        long gold = hero.Gold;
+        await Talk(place, npc);
+        hero.DyingMessages.Should().HaveCount(1);
+        hero.Gold.Should().Be(gold);
+    }
 }
