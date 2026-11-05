@@ -20015,7 +20015,7 @@
   "street_encounter.merchant.item.poison_vial": "Méregfiola",
   "street_encounter.merchant.item.poison_vial_desc": "Megmérgezi a fegyvered a következő kazamataharcra",
   "street_encounter.merchant.item.smoke_bomb": "Füstbomba",
-  "street_encounter.merchant.item.smoke_bomb_desc": "Garantált menekülés a következő harcodból",
+  "street_encounter.merchant.item.smoke_bomb_desc": "Sötétség +2. Harcból nem menekít ki.",
   "street_encounter.merchant.item.healing_potions_x3": "Gyógyitalok (x3)",
   "street_encounter.merchant.item.healing_potions_x3_desc": "Három gyógyital kedvezménnyel",
   "street_encounter.merchant.item.dark_tonic": "Sötét tonik",

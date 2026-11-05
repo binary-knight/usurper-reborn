@@ -2180,7 +2180,7 @@ public class StreetEncounterSystem
                 // The poison value on the player is repurposed here temporarily
                 break;
             case "Smoke Bomb":
-                // Gives a free flee for next combat — minor darkness boost as token
+                // 1.3.11 (K7): Darkness +2 and nothing else; it does not help you flee, and the text says so
                 player.Darkness += 2;
                 break;
             case "Fortifying Elixir":

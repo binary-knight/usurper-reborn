@@ -19992,7 +19992,7 @@
   "street_encounter.merchant.item.poison_vial": "Fiole de poison",
   "street_encounter.merchant.item.poison_vial_desc": "Empoisonne ton arme pour ton prochain combat dans le donjon",
   "street_encounter.merchant.item.smoke_bomb": "Bombe fumigène",
-  "street_encounter.merchant.item.smoke_bomb_desc": "Fuite garantie lors de ton prochain combat",
+  "street_encounter.merchant.item.smoke_bomb_desc": "Ténèbres +2. Ne te sort pas d'un combat.",
   "street_encounter.merchant.item.healing_potions_x3": "Potions de soin (x3)",
   "street_encounter.merchant.item.healing_potions_x3_desc": "Trois potions de soin à prix réduit",
   "street_encounter.merchant.item.dark_tonic": "Tonique sombre",

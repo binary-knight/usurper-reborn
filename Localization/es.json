@@ -20003,7 +20003,7 @@
   "street_encounter.merchant.item.poison_vial": "Vial de veneno",
   "street_encounter.merchant.item.poison_vial_desc": "Envenena tu arma para tu próximo combate en la mazmorra",
   "street_encounter.merchant.item.smoke_bomb": "Bomba de humo",
-  "street_encounter.merchant.item.smoke_bomb_desc": "Huida garantizada de tu próximo combate",
+  "street_encounter.merchant.item.smoke_bomb_desc": "Oscuridad +2. No te saca de un combate.",
   "street_encounter.merchant.item.healing_potions_x3": "Pociones curativas (x3)",
   "street_encounter.merchant.item.healing_potions_x3_desc": "Tres pociones curativas con descuento",
   "street_encounter.merchant.item.dark_tonic": "Tónico oscuro",

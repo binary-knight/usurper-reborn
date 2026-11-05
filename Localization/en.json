@@ -20241,7 +20241,7 @@
   "street_encounter.merchant.item.poison_vial": "Poison Vial",
   "street_encounter.merchant.item.poison_vial_desc": "Poisons your weapon for your next dungeon fight",
   "street_encounter.merchant.item.smoke_bomb": "Smoke Bomb",
-  "street_encounter.merchant.item.smoke_bomb_desc": "Guaranteed escape from your next combat",
+  "street_encounter.merchant.item.smoke_bomb_desc": "Darkness +2. It will not get you out of a fight.",
   "street_encounter.merchant.item.healing_potions_x3": "Healing Potions (x3)",
   "street_encounter.merchant.item.healing_potions_x3_desc": "Three healing potions at a discount",
   "street_encounter.merchant.item.dark_tonic": "Dark Tonic",
