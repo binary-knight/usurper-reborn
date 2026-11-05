@@ -37,11 +37,16 @@ public sealed class GameSmall1311Tests : IDisposable
     private readonly bool _pacing = Pacing.Disabled;
     private readonly List<string> _noticesBefore = GameEngine.PendingNotifications.ToList();
     private readonly object? _streetRandomBefore = typeof(StreetEncounterSystem).GetField("_random", F)!.GetValue(StreetEncounterSystem.Instance);
+    private readonly object? _rosterMarkBefore = RosterMark.GetValue(NPCSpawnSystem.Instance);
+    private readonly bool _rebuildingBefore = NPCSpawnSystem.Instance.IsRebuilding;
+    private static readonly FieldInfo RosterMark = typeof(NPCSpawnSystem).GetField("_rosterHighWaterMark", F)!;
 
     public GameSmall1311Tests()
     {
         Pacing.Disabled = true;
         NPCSpawnSystem.Instance.ActiveNPCs.Clear();
+        NPCSpawnSystem.Instance.IsRebuilding = false;
+        RosterMark.SetValue(NPCSpawnSystem.Instance, 0);
         GameEngine.PendingNotifications.Clear();
     }
 
@@ -55,6 +60,8 @@ public sealed class GameSmall1311Tests : IDisposable
         GameEngine.PendingNotifications.Clear();
         foreach (var n in _noticesBefore) GameEngine.PendingNotifications.Enqueue(n);
         typeof(StreetEncounterSystem).GetField("_random", F)!.SetValue(StreetEncounterSystem.Instance, _streetRandomBefore);
+        RosterMark.SetValue(NPCSpawnSystem.Instance, _rosterMarkBefore);
+        NPCSpawnSystem.Instance.IsRebuilding = _rebuildingBefore;
     }
 
     // ---------- helpers ----------
@@ -487,6 +494,12 @@ public sealed class GameSmall1311Tests : IDisposable
 
     private static DyingMessageSaveData Message(string recipient) => new() { Recipient = recipient, Elder = "Gs Elder", Gold = 500 };
 
+    /// <summary>A roster large enough to answer "this NPC does not exist" (IsRosterTrustworthy has a floor of 25).</summary>
+    private static void Crowd(int count = 30)
+    {
+        for (int i = 0; i < count; i++) NPCSpawnSystem.Instance.ActiveNPCs.Add(Npc($"gs_crowd_{i}", $"Gs Crowd {i}"));
+    }
+
     private static int Drop(Character hero)
     {
         var drop = typeof(NPCPetitionSystem).GetMethod("DropMessagesToTheDead", PS);
@@ -502,6 +515,7 @@ public sealed class GameSmall1311Tests : IDisposable
         var dead = Npc("gs_dead", "Gs Dead");
         dead.IsDead = true; dead.HP = 0;
         dead.IsPermaDead = perma; dead.IsAgedDeath = aged;
+        Crowd();
         NPCSpawnSystem.Instance.ActiveNPCs.Add(dead);
         var hero = Hero();
         long gold = hero.Gold, chivalry = hero.Chivalry;
@@ -516,7 +530,7 @@ public sealed class GameSmall1311Tests : IDisposable
     [Fact]
     public void K16_ARecipientPrunedFromTheRoster_DropsTheMessage()
     {
-        NPCSpawnSystem.Instance.ActiveNPCs.Add(Npc("gs_other", "Gs Other"));
+        Crowd();
         var hero = Hero();
         hero.DyingMessages.Add(Message("Gs Long Gone"));
         Drop(hero).Should().Be(1);
@@ -534,11 +548,41 @@ public sealed class GameSmall1311Tests : IDisposable
     }
 
     [Fact]
+    public void K16_APartlyFilledRoster_DropsNothing_NotEvenForAPermanentlyDeadRecipient()
+    {
+        var dead = Npc("gs_dead", "Gs Dead");
+        dead.IsDead = true; dead.HP = 0; dead.IsPermaDead = true;
+        Crowd();
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(dead);
+        RosterMark.SetValue(NPCSpawnSystem.Instance, 151);   // the list is part way back to its 151 during a rebuild
+        NPCSpawnSystem.Instance.IsRosterTrustworthy.Should().BeFalse();
+        var hero = Hero();
+        hero.DyingMessages.Add(Message("Gs Not Back Yet"));
+        hero.DyingMessages.Add(Message(dead.Name2));
+        Drop(hero).Should().Be(0);
+        hero.DyingMessages.Should().HaveCount(2, "a name missing from a partly filled list is not a dead recipient");
+        GameEngine.PendingNotifications.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void K16_ARosterBeingRebuilt_DropsNothing()
+    {
+        Crowd();
+        NPCSpawnSystem.Instance.IsRebuilding = true;
+        var hero = Hero();
+        hero.DyingMessages.Add(Message("Gs Not Back Yet"));
+        Drop(hero).Should().Be(0);
+        hero.DyingMessages.Should().HaveCount(1);
+        GameEngine.PendingNotifications.Should().BeEmpty();
+    }
+
+    [Fact]
     public void K16_ATemporaryDeath_OrALivingRecipient_KeepsTheMessage()
     {
         var down = Npc("gs_down", "Gs Down");
         down.IsDead = true; down.HP = 0;
         var alive = Npc("gs_alive", "Gs Alive");
+        Crowd();
         NPCSpawnSystem.Instance.ActiveNPCs.AddRange(new[] { down, alive });
         var hero = Hero();
         hero.DyingMessages.Add(Message(down.Name2));
