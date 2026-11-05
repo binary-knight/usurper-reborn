@@ -592,7 +592,7 @@ public class Settlement1310Tests : IDisposable
         (gold - hero.Gold).Should().Be(price);
         (mana ? hero.ManaPotions : hero.Healing).Should().Be(1);
         (mana ? hero.Healing : hero.ManaPotions).Should().Be(0);
-        screen.Text.Should().NotContain(Loc.Get("settlement.market_coming_soon"));
+        screen.Text.Should().NotContain("future update", "the old notice that the stall was not open yet");
         screen.Text.Should().Contain(Loc.Get(mana ? "settlement.market_buy_mana" : "settlement.market_buy_heal", $"{price:N0}", 0, mana ? hero.MaxManaPotions : hero.MaxPotions));
     }
 

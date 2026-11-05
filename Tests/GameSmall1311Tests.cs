@@ -210,4 +210,15 @@ public sealed class GameSmall1311Tests : IDisposable
             .Distinct().Count().Should().BeLessOrEqualTo(1, "the prices start in one column");
         rows.Should().OnlyContain(r => r.TrimEnd().Length <= 79);
     }
+
+    // ---------- K10, K14: two unused keys ----------
+
+    [Theory]
+    [InlineData("settlement.market_coming_soon")]
+    [InlineData("petition.dying.someone_special")]
+    public void K10_K14_TheUnusedKeys_AreGone(string key)
+    {
+        foreach (var lang in Langs)
+            Loc.HasIn(lang, key).Should().BeFalse(lang);
+    }
 }
