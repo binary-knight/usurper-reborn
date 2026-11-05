@@ -207,6 +207,72 @@ public sealed class GameSmall1311Tests : IDisposable
         shown.Should().NotContain(Loc.Get("street_encounter.grudge.barely_escape", npc.Name2));
     }
 
+    // ---------- K6: the arrest text ----------
+
+    private static King PlotKing(params string[] conspirators)
+    {
+        var king = King.CreateNewKing("Gs Hero", CharacterAI.Human, CharacterSex.Male);
+        king.Treasury = 1_000_000;
+        king.CourtMembers.Clear();
+        king.ActivePlots.Clear();
+        foreach (var n in conspirators)
+            king.CourtMembers.Add(new CourtMember { Name = n, LoyaltyToKing = 50 });
+        king.ActivePlots.Add(new CourtIntrigue { PlotType = "Coup", Conspirators = conspirators.ToList(), Target = king.Name, Progress = 20, IsDiscovered = true });
+        CastleLocation.SetKing(king);
+        return king;
+    }
+
+    private static async Task<string> Arrest()
+    {
+        var castle = new CastleLocation();
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(new[] { "1" }.Concat(Enumerable.Repeat("", 6))), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(castle, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(castle, Hero());
+        typeof(CastleLocation).GetField("playerIsKing", F)!.SetValue(castle, true);
+        await Run(castle, typeof(CastleLocation), "CourtAction_Arrest");
+        return Plain(term, output);
+    }
+
+    [Fact]
+    public async Task K6_APlotOfCourtTitlesOnly_IsNotCalledImprisoned()
+    {
+        PlotKing("Lord Invented", "Lady Invented");
+        string shown = await Arrest();
+        string cost = GameConfig.ArrestTrialCost.ToString("N0");
+        CastleLocation.GetCurrentKing().Prisoners.Should().BeEmpty("no real NPC to jail");
+        CastleLocation.GetCurrentKing().ActivePlots.Should().BeEmpty();
+        shown.Should().NotContain(Loc.Get("castle.arrested", cost));
+        shown.Should().Contain(Loc.Get("castle.arrested_dismissed", cost));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task K6_APlotWithARealNpc_SaysImprisoned(int invented)
+    {
+        var real = Npc("gs_plotter", "Gs Plotter");
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(real);
+        PlotKing(new[] { real.Name2 }.Concat(Enumerable.Range(0, invented - 1).Select(i => $"Lord Invented {i}")).ToArray());
+        string shown = await Arrest();
+        string cost = GameConfig.ArrestTrialCost.ToString("N0");
+        CastleLocation.GetCurrentKing().Prisoners.Keys.Should().Contain(real.Name2);
+        shown.Should().Contain(Loc.Get("castle.arrested", cost));
+        shown.Should().NotContain(Loc.Get("castle.arrested_dismissed", cost));
+    }
+
+    [Fact]
+    public void K6_TheNewText_FitsAndIsTranslated()
+    {
+        foreach (var lang in Langs)
+        {
+            Loc.HasIn(lang, "castle.arrested_dismissed").Should().BeTrue(lang);
+            Loc.GetIn(lang, "castle.arrested_dismissed").Should().Contain("{0}", lang);
+        }
+        foreach (var lang in new[] { "en", "hu" })
+            string.Format(Loc.GetIn(lang, "castle.arrested_dismissed"), "1,000,000").Length.Should().BeLessOrEqualTo(79, lang);
+    }
+
     // ---------- K7: the street merchant's Smoke Bomb text ----------
 
     [Fact]

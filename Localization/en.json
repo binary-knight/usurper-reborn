@@ -15263,6 +15263,7 @@
   "castle.foiled_plot": "FOILED: {0} plot by {1}",
   "castle.spies_report": "Your spies report {0} rumor(s) of intrigue...",
   "castle.arrested": "The conspirators have been arrested and imprisoned! (-{0}g)",
+  "castle.arrested_dismissed": "The conspirators are thrown out of court and the plot is over! (-{0}g)",
   "castle.promote_which": "Promote which court member? (Cost: {0}g from treasury)",
   "castle.current_heir": "Current designated heir: {0}",
   "castle.max_bodyguards": "Maximum bodyguards: {0}",

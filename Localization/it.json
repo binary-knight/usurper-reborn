@@ -15026,6 +15026,7 @@
   "castle.foiled_plot": "SVENTATO: complotto di {0} da parte di {1}",
   "castle.spies_report": "Le tue spie riportano {0} voc(i) d'intrigo...",
   "castle.arrested": "I cospiratori sono stati arrestati e imprigionati! (-{0}g)",
+  "castle.arrested_dismissed": "I cospiratori sono cacciati dalla corte e il complotto è finito! (-{0}g)",
   "castle.promote_which": "Promuovere quale membro della corte? (Costo: {0}g dal tesoro)",
   "castle.current_heir": "Erede designato attuale: {0}",
   "castle.max_bodyguards": "Guardie del corpo massime: {0}",

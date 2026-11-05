@@ -15026,6 +15026,7 @@
   "castle.foiled_plot": "FRUSTRADO: Complot {0} por {1}",
   "castle.spies_report": "Tus espías reportan {0} rumor(es) de intriga...",
   "castle.arrested": "¡Los conspiradores han sido arrestados y encarcelados! (-{0}g)",
+  "castle.arrested_dismissed": "¡Los conspiradores son expulsados de la corte y el complot termina! (-{0}g)",
   "castle.promote_which": "¿Promover a qué miembro de la corte? (Costo: {0}g de la tesorería)",
   "castle.current_heir": "Heredero designado actual: {0}",
   "castle.max_bodyguards": "Máximo de guardaespaldas: {0}",

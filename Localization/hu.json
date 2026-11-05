@@ -15034,6 +15034,7 @@
   "castle.foiled_plot": "MEGHIÚSÍTVA: {0} összeesküvés, elkövető: {1}",
   "castle.spies_report": "Kémeid {0} intrikáról szóló pletykát jelentettek...",
   "castle.arrested": "Az összeesküvőket letartóztatták és bebörtönözték! (-{0} arany)",
+  "castle.arrested_dismissed": "Az összeesküvőket kiűzték az udvarból, a cselszövésnek vége! (-{0} arany)",
   "castle.promote_which": "Melyik udvartagot lépteted elő? (Költség: {0} arany a kincstárból)",
   "castle.current_heir": "Jelenlegi kijelölt örökös: {0}",
   "castle.max_bodyguards": "Testőrök maximális száma: {0}",
