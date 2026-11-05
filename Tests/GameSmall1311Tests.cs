@@ -161,6 +161,52 @@ public sealed class GameSmall1311Tests : IDisposable
         Count(shown, Loc.Get("ui.press_enter").TrimEnd()).Should().Be(1);
     }
 
+    // ---------- G1: the murder revenge grudge asks again on a key it does not offer ----------
+
+    private static NPC MurderGrudge(Character hero)
+    {
+        var npc = Npc("gs_grudge", "Gs Grudge", hero.Level);
+        npc.Memory!.RecordEvent(new MemoryEvent { Type = MemoryType.Murdered, InvolvedCharacter = hero.Name2, Description = "murdered", Importance = 1f });
+        return npc;
+    }
+
+    private static async Task Grudge(NPC npc, Character hero, TerminalEmulator term, EncounterResult result)
+    {
+        typeof(StreetEncounterSystem).GetField("_random", F)!.SetValue(StreetEncounterSystem.Instance, new FixedRandom(0));
+        var run = (Task)typeof(StreetEncounterSystem).GetMethod("ExecuteGrudgeConfrontation", F)!
+            .Invoke(StreetEncounterSystem.Instance, new object[] { npc, hero, term, result })!;
+        await run.WaitAsync(TimeSpan.FromSeconds(60));
+    }
+
+    [Fact]
+    public async Task G1_AnInvalidKey_AsksAgain_AndRStillRuns()
+    {
+        var hero = Hero();
+        var npc = MurderGrudge(hero);
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(new[] { "Z", "R" }.Concat(Enumerable.Repeat("", 8))), output);
+        var result = new EncounterResult();
+        await Grudge(npc, hero, term, result);
+        string shown = Plain(term, output);
+        shown.Should().Contain(Loc.Get("ui.invalid_choice_choose", "F, R"), "Z is not an option");
+        shown.Should().Contain(Loc.Get("street_encounter.grudge.barely_escape", npc.Name2), "the second answer is taken");
+    }
+
+    [Fact]
+    public async Task G1_ThreeInvalidKeys_AreTheFight_AsTheOtherEncountersFallBack()
+    {
+        var hero = Hero();
+        var npc = MurderGrudge(hero);
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(new[] { "Z", "Y", "X" }), output);
+        var result = new EncounterResult();
+        try { await Grudge(npc, hero, term, result); }
+        catch (Exception) { /* the fight reads past the end of the input */ }
+        string shown = Plain(term, output);
+        Count(shown, Loc.Get("ui.invalid_choice_choose", "F, R")).Should().Be(3);
+        shown.Should().NotContain(Loc.Get("street_encounter.grudge.barely_escape", npc.Name2));
+    }
+
     // ---------- K7: the street merchant's Smoke Bomb text ----------
 
     [Fact]

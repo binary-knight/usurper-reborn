@@ -2583,11 +2583,12 @@ public class StreetEncounterSystem
             UIHelper.DrawMenuOption(terminal, "R", Loc.Get("street_encounter.grudge.opt_run"), "dark_red", "bright_yellow", "gray");
             UIHelper.DrawBoxBottom(terminal, "dark_red");
 
-            var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
+            // 1.3.11 (G1): a typo asks again instead of starting the fight; the fight stays the answer after three
+            var choice = await terminal.GetValidChoice(Loc.Get("street_encounter.grudge.your_response"), new[] { "F", "R" }, "F");
 
             // v1.2.0: a clean escape is no fight, so neither the victory nor the defeat branch applies
             bool fought = false;
-            if (choice.Trim().ToUpper() == "R")
+            if (choice == "R")
             {
                 int fleeChance = Math.Min(50, 20 + (int)(player.Dexterity * 1.5)); // Harder to flee murder revenge
                 if (_random.Next(100) < fleeChance)
@@ -2605,7 +2606,7 @@ public class StreetEncounterSystem
             }
             else
             {
-                // Fight (default for any input)
+                // Fight: F, or three invalid keys
                 await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage, rageHpMult: murderRageHp);
                 fought = true;
             }
