@@ -163,4 +163,51 @@ public sealed class GameSmall1311Tests : IDisposable
         hero.Darkness.Should().Be(7);
         hero.SmokeBombs.Should().Be(bombs);
     }
+
+    // ---------- K8: the outpost torch and lockpick ----------
+
+    [Theory]
+    [InlineData("en", "HP", "Dexterity")]
+    [InlineData("es", "PV", "Destreza")]
+    [InlineData("fr", "PV", "Dextérité")]
+    [InlineData("hu", "ÉP", "Ügyesség")]
+    [InlineData("it", "PV", "Destrezza")]
+    public void K8_TheNames_SayWhatEachDoes(string lang, string hp, string dex)
+    {
+        Loc.GetIn(lang, "dungeon.settlement_item_torch").Should().Contain($"+10 {hp}");
+        Loc.GetIn(lang, "dungeon.settlement_item_lockpick").Should().Contain($"+2 {dex}");
+    }
+
+    [Fact]
+    public void K8_TheEffects_AreWhatTheNamesSay()
+    {
+        var (d, _, _, hero) = Dungeon(new FixedRandom(0), 8, 5);
+        hero.HP = 100;
+        var apply = typeof(DungeonLocation).GetMethod("ApplySettlementPurchase", F)!;
+        apply.Invoke(d, new object[] { hero, "torch" });
+        hero.HP.Should().Be(110);
+        apply.Invoke(d, new object[] { hero, "lockpick" });
+        hero.TimedStatBuffs.Should().Contain(b => b.Source == "settlement_lockpick" && b.Stat == StatKind.Dexterity && b.Amount == 2);
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")] [InlineData("it")]
+    public void K8_ThePriceColumn_StaysLinedUp_AndTheRowsFit(string lang)
+    {
+        var (d, term, output, hero) = Dungeon(new FixedRandom(0), 8, 5, "0");
+        string prev = GameConfig.Language;
+        GameConfig.Language = lang;
+        try
+        {
+            var settlement = Enumerable.Range(1, 100).Select(DungeonSettlementData.GetSettlement).First(s => s != null && s.TradeItems.Contains("Lockpick"))!;
+            var r = typeof(DungeonLocation).GetMethod("SettlementTrade", F)!.Invoke(d, new object[] { hero, settlement });
+            if (r is Task t) t.GetAwaiter().GetResult();
+        }
+        finally { GameConfig.Language = prev; }
+        var rows = Plain(term, output).Split('\n').Where(r => Regex.IsMatch(r, @"^  \[\d+\] ") && r.TrimEnd().EndsWith("g")).ToList();
+        rows.Should().HaveCountGreaterThan(1);
+        rows.Select(r => Regex.Match(r, @" +[\d,.]+g\s*$").Index + Regex.Match(r, @" +[\d,.]+g\s*$").Length - Regex.Match(r, @"[\d,.]+g\s*$").Length)
+            .Distinct().Count().Should().BeLessOrEqualTo(1, "the prices start in one column");
+        rows.Should().OnlyContain(r => r.TrimEnd().Length <= 79);
+    }
 }

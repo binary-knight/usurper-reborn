@@ -15820,11 +15820,12 @@ public class DungeonLocation : BaseLocation
 
             // Generate trade items based on floor level
             var items = GetSettlementTradeItems(settlement);
+            int nameWidth = items.Count > 0 ? Math.Max(25, items.Max(it => it.name.Length)) : 25;   // 1.3.11 (K8): names that state their effect run longer; the prices stay in one column
 
             for (int i = 0; i < items.Count; i++)
             {
                 terminal.SetColor("white");
-                terminal.WriteLine($"  [{i + 1}] {items[i].name,-25} {items[i].cost:N0}g");
+                terminal.WriteLine($"  [{i + 1}] {items[i].name.PadRight(nameWidth)} {items[i].cost:N0}g");
             }
 
             terminal.WriteLine("");
