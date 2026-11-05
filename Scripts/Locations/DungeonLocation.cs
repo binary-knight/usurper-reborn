@@ -9899,6 +9899,8 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.ancient_scroll_symbols"), "gray");
 
         await HandleMagicScroll();
+
+        await terminal.PressAnyKey();   // 1.3.11 (B7): the result stays on screen until Enter
     }
 
     /// <summary>

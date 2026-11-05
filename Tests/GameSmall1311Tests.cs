@@ -135,6 +135,32 @@ public sealed class GameSmall1311Tests : IDisposable
         return Path.Combine(new[] { dir!.FullName }.Concat(parts).ToArray());
     }
 
+    // ---------- B7: the Ancient Scroll result waits for Enter ----------
+
+    [Fact]
+    public async Task B7_DecliningTheScroll_ShowsTheResult_ThenOneEnterPrompt()
+    {
+        var (d, term, output, _) = Dungeon(new FixedRandom(0), 8, 5, "N", "");
+        await Run(d, typeof(DungeonLocation), "AncientScrollEncounter");
+        string shown = Plain(term, output).TrimEnd();
+        shown.Should().Contain(Loc.Get("dungeon.scroll_stored"));
+        shown.Should().EndWith(Loc.Get("ui.press_enter").TrimEnd(), "the result stays until Enter");
+        Count(shown, Loc.Get("ui.press_enter").TrimEnd()).Should().Be(1, "one prompt, not two");
+    }
+
+    [Theory]
+    [InlineData(0, "dungeon.scroll_divine_light")]
+    [InlineData(2, "dungeon.scroll_hidden_passage")]
+    public async Task B7_RecitingTheScroll_ShowsItsEffect_ThenOneEnterPrompt(int scrollType, string key)
+    {
+        var (d, term, output, _) = Dungeon(new FixedRandom(scrollType), 8, 5, "Y", "");
+        await Run(d, typeof(DungeonLocation), "AncientScrollEncounter");
+        string shown = Plain(term, output).TrimEnd();
+        shown.Should().Contain(Loc.Get(key));
+        shown.Should().EndWith(Loc.Get("ui.press_enter").TrimEnd());
+        Count(shown, Loc.Get("ui.press_enter").TrimEnd()).Should().Be(1);
+    }
+
     // ---------- K7: the street merchant's Smoke Bomb text ----------
 
     [Fact]
