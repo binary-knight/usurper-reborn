@@ -10152,9 +10152,9 @@ public class DungeonLocation : BaseLocation
 
     private async Task MerchantTradeMenu(Character player)
     {
-        // v0.57.16: dungeon merchant uses the quadratic potion cost formula with a small flat
-        // discount (15g cheaper than shop). At floor 1 ~86g, floor 50 ~1335g, floor 100 ~5085g.
-        int potionPrice = (int)GameConfig.GetHealingPotionCost(currentDungeonLevel) - 15;
+        // 1.3.11 (K9): the town healing potion price for the player's level, minus 15: level 1 85g, level 50 1335g,
+        // level 100 5085g on any floor. The mega potion and the rare items stay by floor.
+        int potionPrice = (int)GameConfig.GetHealingPotionCost(player.Level) - 15;
         int megaPotionPrice = currentDungeonLevel * 100;
         int antidotePrice = 75;
 

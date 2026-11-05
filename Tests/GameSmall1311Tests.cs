@@ -349,6 +349,44 @@ public sealed class GameSmall1311Tests : IDisposable
         rows.Should().OnlyContain(r => r.TrimEnd().Length <= 79);
     }
 
+    // ---------- K9: the dungeon merchant's healing potion follows the player's level ----------
+
+    [Theory]
+    [InlineData(1, 1, 85)]
+    [InlineData(50, 50, 1335)]
+    [InlineData(100, 100, 5085)]
+    [InlineData(50, 10, 1335)]
+    [InlineData(100, 20, 5085)]
+    [InlineData(50, 60, 1335)]
+    public async Task K9_TheHealingPotion_IsTheTownPriceAtYourLevel_MinusFifteen(int level, int floor, int price)
+    {
+        var (d, term, output, hero) = Dungeon(new FixedRandom(0), level, floor, "1", "L");
+        hero.Healing = 0;
+        long gold = hero.Gold;
+        await Run(d, typeof(DungeonLocation), "MerchantTradeMenu", hero);
+        (gold - hero.Gold).Should().Be(price);
+        hero.Healing.Should().Be(1);
+        string shown = Plain(term, output);
+        shown.Should().Contain(Loc.Get("dungeon.merchant_healing_potion", price));
+    }
+
+    [Fact]
+    public async Task K9_TheMegaPotion_StaysByFloor()
+    {
+        var (d, term, output, hero) = Dungeon(new FixedRandom(0), 50, 10, "2", "L");
+        long gold = hero.Gold;
+        await Run(d, typeof(DungeonLocation), "MerchantTradeMenu", hero);
+        (gold - hero.Gold).Should().Be(1000, "floor 10 x 100");
+        Plain(term, output).Should().Contain(Loc.Get("dungeon.merchant_mega_potion", 1000));
+    }
+
+    [Fact]
+    public void K9_TheRareItems_StayByFloor()
+    {
+        File.ReadAllText(RepoFile("Scripts", "Locations", "DungeonLocation.cs"))
+            .Should().Contain("var rareItems = GenerateMerchantRareItems(currentDungeonLevel);");
+    }
+
     // ---------- K10, K14: two unused keys ----------
 
     [Theory]
