@@ -436,6 +436,53 @@ public sealed class GameSmall1311Tests : IDisposable
         system.GlobalXPModifier.Should().Be(1.5f);
     }
 
+    // ---------- K15: the unread stat effects ----------
+
+    [Fact]
+    public void K15_NoEventCarriesAStatEffect_AndTheModifierIsGone()
+    {
+        typeof(WorldEventSystem).GetProperty("GlobalStatModifier").Should().BeNull();
+        var create = typeof(WorldEventSystem).GetMethod("CreateEvent", F)!;
+        foreach (WorldEventSystem.EventType type in Enum.GetValues(typeof(WorldEventSystem.EventType)))
+        {
+            var evt = (WorldEventSystem.WorldEvent)create.Invoke(Fresh(), new object[] { type, 1 })!;
+            evt.Effects.Should().NotContainKey("stat", type.ToString());
+        }
+    }
+
+    [Fact]
+    public void K15_CursedLand_KeepsItsTitleAndText_AndHasNoEffectsEntry_AndItsTextPromisesNone()
+    {
+        var create = typeof(WorldEventSystem).GetMethod("CreateEvent", F)!;
+        var evt = (WorldEventSystem.WorldEvent)create.Invoke(Fresh(), new object[] { WorldEventSystem.EventType.CursedLand, 1 })!;
+        evt.Effects.Should().BeEmpty();
+        evt.Title.Should().Be("Cursed Land");
+        evt.Description.Should().Be("Dark magic curses the land.");
+        foreach (var lang in Langs)
+        {
+            Loc.HasIn(lang, "world_event.cursed_land.title").Should().BeTrue(lang);
+            Regex.IsMatch(Loc.GetIn(lang, "world_event.cursed_land.desc"), @"[0-9+%]").Should().BeFalse("{0}: names no number", lang);
+        }
+    }
+
+    [Fact]
+    public void K15_OldWorldStateWithTheModifierAndAStatEffect_StillLoads()
+    {
+        var system = Fresh();
+        var global = new WorldEventData { Id = "g", Type = "GlobalState", Title = "World State", Description = "",
+            Parameters = new Dictionary<string, object> { ["PlaguActive"] = true, ["WarActive"] = false, ["FestivalActive"] = false, ["GlobalStatModifier"] = -3 } };
+        system.RestoreFromSaveData(new List<WorldEventData> { global, SavedEvent("CursedLand", ("Effect_stat", -3f)), SavedEvent("HarvestFestival", ("Effect_xp", 1.5f)) }, 10);
+        system.GetActiveEvents().Select(e => e.Type).Should().Equal(WorldEventSystem.EventType.CursedLand, WorldEventSystem.EventType.HarvestFestival);
+        system.PlaguActive.Should().BeTrue();
+        system.GlobalXPModifier.Should().Be(1.5f);
+    }
+
+    [Fact]
+    public void K15_TheSave_WritesNoStatModifier()
+    {
+        File.ReadAllText(RepoFile("Scripts", "Systems", "SaveSystem.cs")).Should().NotContain("GlobalStatModifier");
+    }
+
     // ---------- K16: a dying wish message whose recipient has died permanently ----------
 
     private static DyingMessageSaveData Message(string recipient) => new() { Recipient = recipient, Elder = "Gs Elder", Gold = 500 };
