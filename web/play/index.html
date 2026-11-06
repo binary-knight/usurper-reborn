@@ -1038,15 +1038,12 @@
     }
 
     // What the screen waits for, read from its shape so it holds in every language.
-    // B6: the game's "Press Enter to continue" and "Press any key to continue" in each language (ui.press_enter and
-    // ui.press_any_key in Localization/*.json). A screen whose last line asks for one waits for Enter: a key printed in
-    // a box above it (an achievement's tier tag, [S] or [B]) is not a choice.
-    var ENTER_ASKS = ['Press Enter to continue', 'Press any key to continue', 'Presiona Enter para continuar', 'Presiona cualquier tecla para continuar',
-        'Appuyez sur Entrée pour continuer', 'Appuyez sur une touche pour continuer', 'Nyomd meg az Entert a folytatáshoz',
-        'Nyomj meg egy gombot a folytatáshoz', 'Premi Invio per continuare', 'Premi un tasto per continuare'];
+    // B6, N8: a line that asks the player for Enter or any key, in each language the game speaks: it starts with the press
+    // verb (the "[...]" form too), names Enter or a key, and leaves out a Q to quit (that line is a menu). The wordings
+    // are the Localization values; web/test/play-1311.test.js reads them all and fails on one this does not cover.
+    var ENTER_ASK = /^\[?\s*(?:press|presiona|pulsa|appuyez|appuie|nyomj|nyomd|premi)\b(?!.*\bQ\b).*?(?:enter|entr[eé]e|entrer|intro\b|invio|any key|cualquier tecla|une touche|un tasto|egy gombot|egy billenty)/i;
     function asksEnter(text) {
-        var s = String(text).toLowerCase();
-        return ENTER_ASKS.some(function (a) { return s.indexOf(a.toLowerCase()) !== -1; });
+        return ENTER_ASK.test(String(text).trim());
     }
     function promptOf(rows, cmds) {
         var said = rows.filter(function (r) { return r.trim(); });
@@ -1253,6 +1250,17 @@
         'Tidesworn', 'Wavecaller', 'Cyclebreaker', 'Abysswarden', 'Voidreaver', 'MysticShaman'];
     // The game's 16 colours on the book page: black and grey are the quiet ink, blue reads as cyan, white is body ink.
     var PAL = ['k-gry', 'k-red', 'k-grn', 'k-gold', 'k-cyn', 'k-pur', 'k-cyn', '', 'k-gry', 'k-red', 'k-grn', 'k-gold', 'k-cyn', 'k-pur', 'k-cyn', 'k-wht'];
+    // K2: a cell the game paints with one of the 256 colours (16 to 255) or with a true colour is drawn in that colour, in
+    // the foreground and the background; the 16 colours above keep the book's inks. A colour is a "#rrggbb" string.
+    var HEX_OK = /^#[0-9a-f]{6}$/i;
+    function hex2(n) { return (n < 16 ? '0' : '') + n.toString(16); }
+    function paletteHex(i) {
+        if (i < 16 || i > 255) return '';
+        if (i >= 232) { var g = 8 + (i - 232) * 10; return '#' + hex2(g) + hex2(g) + hex2(g); }
+        var k = i - 16, lv = [0, 95, 135, 175, 215, 255];
+        return '#' + hex2(lv[Math.floor(k / 36)]) + hex2(lv[Math.floor(k / 6) % 6]) + hex2(lv[k % 6]);
+    }
+    function rgbHex(n) { return '#' + hex2((n >> 16) & 255) + hex2((n >> 8) & 255) + hex2(n & 255); }
     var KEY_OK = /^[\x21-\x7e]{1,8}$/;
     var BOX_ONLY = /^[\s─-▟=*+_~-]*$/;
 
@@ -1514,14 +1522,22 @@
         for (var x = 0; x < n; x++) {
             cell = line.getCell(x, cell);
             if (!cell || cell.getWidth() === 0) continue;
-            var ch = cell.getChars() || ' ', c = '';
+            var ch = cell.getChars() || ' ', c = '', fg = '', bg = '';
             if (cell.isFgPalette()) {
                 var i = cell.getFgColor();
                 if (i < 8 && cell.isBold()) i += 8;
                 c = PAL[i] || '';
+                if (i > 15) fg = paletteHex(i);
+            } else if (typeof cell.isFgRGB === 'function' && cell.isFgRGB()) fg = rgbHex(cell.getFgColor());
+            if (typeof cell.isBgPalette === 'function' && cell.isBgPalette()) bg = paletteHex(cell.getBgColor());
+            else if (typeof cell.isBgRGB === 'function' && cell.isBgRGB()) bg = rgbHex(cell.getBgColor());
+            if (cur && cur.c === c && (cur.fg || '') === fg && (cur.bg || '') === bg) cur.t += ch;
+            else {
+                cur = { t: ch, c: c };
+                if (fg) cur.fg = fg;
+                if (bg) cur.bg = bg;
+                out.push(cur);
             }
-            if (cur && cur.c === c) cur.t += ch;
-            else { cur = { t: ch, c: c }; out.push(cur); }
         }
         while (!keep && out.length) {
             var last = out[out.length - 1];
@@ -1604,6 +1620,13 @@
         var at = joinWrapped(rows.slice(0, cy + 1), wrapped, 0).rows.length - 1;
         return { rows: joined.rows, start: joined.start, cursorText: screen.length ? screen[screen.length - 1] : '', cursorRow: typed || cx > 0 ? at : -1 };
     }
+    // A run with its class and, when given as "#rrggbb", its own foreground and background.
+    function inkOf(t, c, fg, bg) {
+        var r = { t: t, c: c };
+        if (typeof fg === 'string' && HEX_OK.test(fg)) r.fg = fg;
+        if (typeof bg === 'string' && HEX_OK.test(bg)) r.bg = bg;
+        return r;
+    }
     // A row given as a string, a list of runs, or {text or runs, wrapped: true} for a row the terminal wrapped.
     function segsOf(row) {
         var o = obj(row);
@@ -1611,7 +1634,7 @@
         if (typeof row === 'string') return row ? [{ t: row, c: '' }] : [];
         if (!Array.isArray(row)) return [];
         return row.filter(function (r) { return r && typeof r.t === 'string'; })
-            .map(function (r) { return { t: r.t, c: PAL.indexOf(r.c) !== -1 ? r.c : '' }; });
+            .map(function (r) { return inkOf(r.t, PAL.indexOf(r.c) !== -1 ? r.c : '', r.fg, r.bg); });
     }
     function rowText(segs) { return segs.map(function (r) { return r.t; }).join(''); }
     // Draws the book from rows given as strings or runs, as if the terminal held them (the current screen starts at row
@@ -2008,14 +2031,14 @@
         var out = [], at = 0;
         segs.forEach(function (r) {
             var a = Math.max(from, at), b = Math.min(to, at + r.t.length);
-            if (b > a) out.push({ t: r.t.slice(a - at, b - at), c: r.c });
+            if (b > a) out.push(inkOf(r.t.slice(a - at, b - at), r.c, r.fg, r.bg));
             at += r.t.length;
         });
         return out;
     }
     // A rule row's title ("TIP", "MAIN STREET" inside a top edge) in its own colours, the line characters gone.
     function titleSegs(segs) {
-        var out = segs.map(function (r) { return { t: r.t.replace(FRAME_CH, ' '), c: r.c }; });
+        var out = segs.map(function (r) { return inkOf(r.t.replace(FRAME_CH, ' '), r.c, r.fg, r.bg); });
         var text = rowText(out), a = text.search(/\S/);
         if (a < 0) return [];
         return sliceSegs(out, a, text.replace(/\s+$/, '').length);
@@ -2059,7 +2082,12 @@
                 ln.style.width = row.width + 'ch';
             }
             if (!segs.length) ln.textContent = ' ';
-            segs.forEach(function (r) { ln.appendChild(el('span', r.c || null, r.t)); });
+            segs.forEach(function (r) {
+                var sp = el('span', r.c || null, r.t);
+                if (r.fg) sp.style.color = r.fg;
+                if (r.bg) sp.style.backgroundColor = r.bg;
+                ln.appendChild(sp);
+            });
             pre.appendChild(ln);
         });
         return pre;
@@ -2577,7 +2605,7 @@
 
     window.UsurperPlay = {
         handleFrame: handleFrame, handleGmcp: handleGmcp, state: state, setDrawer: setDrawer,
-        scanCommands: scanCommands, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad, roomFresh: roomFresh, seesClear: seesClear,
+        scanCommands: scanCommands, asksEnter: asksEnter, promptOf: promptOf, rowsFromBuffer: rowsFromBuffer, renderPad: renderPad, roomFresh: roomFresh, seesClear: seesClear,
         padFresh: function () { return roomFresh(roomEnter, enterCount); },
         applyTouch: applyTouch, fitMode: function () { return fitMode; },
         view: function () { return view; }, setView: setView, layout: layoutNow, renderChron: renderChron,
