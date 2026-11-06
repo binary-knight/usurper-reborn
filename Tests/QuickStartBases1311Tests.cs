@@ -50,8 +50,8 @@ public class QuickStartBases1311Tests : IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
-    private void StoreRoll(string key) =>
-        _db.SaveCreationRoll(key, JsonSerializer.Serialize(new CharacterCreationSystem.CreationRoll { Dice = Dice, RerollsRemaining = 4 }));
+    private void StoreRoll(string key, int[]? dice = null) =>
+        _db.SaveCreationRoll(key, JsonSerializer.Serialize(new CharacterCreationSystem.CreationRoll { Dice = dice ?? Dice, RerollsRemaining = 4 }));
 
     /// <summary>Quick Start through the real screens. The online path asks for a display name first; an empty one keeps the account name.</summary>
     private async Task<Character> Quick(string key, string archetype, bool online)
@@ -148,7 +148,6 @@ public class QuickStartBases1311Tests : IDisposable
         BasesHoldTheRoll(c, archetype);
         c.HP.Should().Be(c.MaxHP);
         c.Mana.Should().Be(c.MaxMana);
-        c.MaxHP.Should().BeGreaterThan(c.BaseMaxHP, "the Constitution bonus is applied at creation");
     }
 
     [Theory]
@@ -230,5 +229,29 @@ public class QuickStartBases1311Tests : IDisposable
         custom.Race.Should().Be(quick.Race);
         custom.Class.Should().Be(quick.Class);
         Numbers(quick).Should().Be(Numbers(custom));
+    }
+
+    // The lowest and highest rolls. A low Constitution takes max HP below the rolled number, on both paths: the
+    // Constitution bonus is negative under 10 (StatEffectsSystem.GetConstitutionHPBonus).
+    [Theory]
+    [InlineData("1", true, 3, 2)] [InlineData("2", true, 3, 2)] [InlineData("3", true, 3, 2)]
+    [InlineData("1", false, 3, 2)] [InlineData("2", false, 3, 2)] [InlineData("3", false, 3, 2)]
+    [InlineData("1", true, 18, 12)] [InlineData("2", true, 18, 12)] [InlineData("3", true, 18, 12)]
+    [InlineData("1", false, 18, 12)] [InlineData("2", false, 18, 12)] [InlineData("3", false, 18, 12)]
+    public async Task LowestAndHighestRolls_MatchTheCustomPath_AndStaySteady(string archetype, bool online, int stat, int hp)
+    {
+        var dice = new[] { stat, stat, stat, stat, stat, stat, stat, stat, hp };
+        StoreRoll("qsedge" + archetype, dice);
+        var quick = await Quick("qsedge" + archetype, archetype, online);
+        StoreRoll("cuedge" + archetype, dice);
+        var custom = await Custom("cuedge" + archetype, archetype, online);
+        string created = Numbers(quick);
+        created.Should().Be(Numbers(custom));
+        quick.HP.Should().Be(quick.MaxHP);
+        quick.Mana.Should().Be(quick.MaxMana);
+        BasesHoldTheRoll(quick, archetype);
+        Numbers(Load(Save(quick))).Should().Be(created);
+        quick.RecalculateStats();
+        Numbers(quick).Should().Be(created);
     }
 }
