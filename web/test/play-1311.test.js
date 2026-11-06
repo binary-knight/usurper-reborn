@@ -24,7 +24,7 @@ async function load(opts = {}) {
 // ("Press [A] to Attack"), the text about Ctrl and a hint of two sentences are help text, not a wait.
 const VERB = /^\[?\s*(press|presiona|pulsa|appuyez|appuie|nyomj|nyomd|premi)\b/i;
 const NAMES_KEY = /enter|entr|intro|invio|key|tecla|touche|tasto|gomb|billenty/i;
-const HINT = /\[[^\]\s]{1,4}\]|ctrl\+|\bu para\b|\. [A-Z]/;
+const HINT = /\[[^\]\s]{1,4}\]|[Cc]trl\+|\b[Uu] para\b|\. [A-Z]/;
 // The one wording that names Enter and a Q to quit: a menu line, not a plain Enter screen.
 const MENU_Q = /\bQ\b/;
 
