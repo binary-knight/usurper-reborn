@@ -75,7 +75,8 @@ services:
 | `--mud-server` | (none) | Start as MUD server (required) |
 | `--mud-port <port>` | 4000 | TCP listen port |
 | `--db <path>` | (next to exe) | SQLite database path |
-| `--auto-provision` | off | Auto-create accounts for trusted auth connections |
+| `--allow-trusted-auth` | off | Accept the password-free AUTH form from a loopback peer (see BBS Passthrough) |
+| `--auto-provision` | off | Auto-create accounts for trusted auth connections (needs `--allow-trusted-auth`) |
 | `--log-stdout` | off | Route logs to stdout instead of files |
 | `--sim-interval <sec>` | 60 | World simulation tick interval, at least 10 (compose sets 30) |
 | `--npc-xp <mult>` | 5.0 | NPC XP gain multiplier (0.01 to 10.0) |
@@ -85,7 +86,7 @@ services:
 | `--worldsim` | (none) | Headless 24/7 world simulator with no players (only with `--no-worldsim` on the server) |
 | `--idle-timeout <min>` | 15 | Idle disconnect for BBS door and MUD sessions (1 to 60) |
 
-Run `UsurperReborn --help` for the single-player, BBS door and online flags; it does not list `--mud-server`, `--mud-port`, `--auto-provision`, `--log-stdout`, `--admin` or `--idle-timeout`.
+Run `UsurperReborn --help` for the single-player, BBS door and online flags; it does not list `--mud-server`, `--mud-port`, `--allow-trusted-auth`, `--auto-provision`, `--log-stdout`, `--admin` or `--idle-timeout`.
 
 ### Web Proxy Environment Variables
 
@@ -147,20 +148,20 @@ BBS software connects via raw TCP to port 4000 and sends an AUTH header:
 AUTH:username:connectionType\n
 ```
 
-The game server accepts this trusted form (no password) only from a loopback peer, a process on the same host or in the same container; from any other address it answers `ERR:Authentication required. Trusted auth is only available from local relays.` A BBS on another machine sends one of the password forms below. With `--auto-provision` enabled (set in the Docker command; off by default), a trusted login creates the account if the username doesn't exist.
+The game server refuses this trusted form (no password) unless it is started with `--allow-trusted-auth`, which the Docker command does not pass; add it to the command to use the form. With the flag, it is accepted only from a loopback peer, a process on the same host or in the same container, that sent no PROXY header and no `X-Client:` line. Every refusal gets `ERR:Authentication required. Trusted auth is only available from local relays.` A BBS on another machine sends one of the password forms below. With `--auto-provision` enabled (set in the Docker command) and `--allow-trusted-auth`, a trusted login creates the account if the username doesn't exist.
 
 **Example BBS integration** (Synchronet JavaScript):
 ```javascript
 var sock = new Socket();
 sock.connect("your-server", 4000);
-// Trusted form: only when the BBS runs on the same host as the game server
+// Trusted form: only when the BBS runs on the same host and the server has --allow-trusted-auth
 sock.send("AUTH:" + user.alias + ":BBS\n");
 // Relay I/O between BBS user and game socket
 ```
 
 **AUTH header formats**:
 ```
-AUTH:username:connectionType              Trusted auth, loopback only (auto-provision if enabled)
+AUTH:username:connectionType              Trusted auth, --allow-trusted-auth and loopback only (auto-provision if enabled)
 AUTH:username:password:connectionType     Password auth
 AUTH:username:password:REGISTER:type      Register new account with password
 ```
