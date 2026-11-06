@@ -64,7 +64,7 @@ public class MentalTherapyTax1115Tests
     [Fact]
     public void Healer_menu_lists_the_taxed_therapy_price()
     {
-        Healer().Should().Contain("Loc.Get(\"healer.menu_therapy\", $\"{CityControlSystem.CalculateHealingTaxedPrice(MentalSystem.TherapyCost(player)).total:N0}\")");
+        Healer().Should().Contain("Loc.Get(\"healer.menu_therapy\", $\"{CityControlSystem.CalculateHealingTaxedPrice(FaithPrice(MentalSystem.TherapyCost(player))).total:N0}\")");
     }
 
     [Fact]

@@ -1961,8 +1961,7 @@ namespace UsurperRemake.Systems
                         ["FestivalActive"] = WorldEventSystem.Instance.FestivalActive,
                         ["GlobalPriceModifier"] = WorldEventSystem.Instance.GlobalPriceModifier,
                         ["GlobalXPModifier"] = WorldEventSystem.Instance.GlobalXPModifier,
-                        ["GlobalGoldModifier"] = WorldEventSystem.Instance.GlobalGoldModifier,
-                        ["GlobalStatModifier"] = WorldEventSystem.Instance.GlobalStatModifier
+                        ["GlobalGoldModifier"] = WorldEventSystem.Instance.GlobalGoldModifier
                     }
                 };
                 eventDataList.Add(stateData);

@@ -304,7 +304,7 @@ module.exports = [
   ["C64","is healing taxed","/wiki/en/world/healer/","Every Healer price has the king's tax and the city tax added","miss: characters/classes/ ranks first"],
   ["C65","how much does rehab cost","/wiki/en/world/healer/","Rehab (A) costs 2000 gold plus 50 per point of addiction, before tax.","first"],
   ["C66","willow draught price","/wiki/en/items/consumables/","A Willow Draught costs as much as 2 healing potions at your level","first"],
-  ["C68","does faith get cheaper healing","/wiki/en/world/castle/","the Healer charges a Faith member the same","miss: gods/ ranks first"],
+  ["C68","does faith get cheaper healing","/wiki/en/world/castle/","Members of The Faith pay 15 to 35 percent less at the Healer","miss: gods/ ranks first"],
   ["C69","how much is a room at the inn","/wiki/en/world/rest/","costs level x 75 gold, 1,500 at level 20","first"],
   ["C70","how much do inn guards cost","/wiki/en/world/rest/","Base price and HP: rookie 100 and 80, hound 150 and 60, veteran 300 and 150","first"],
   ["C71","drinking game limit","/wiki/en/world/rest/","Drinking game (G): 20 gold a game, 5 games a day.","miss: combat/party/ ranks first"],

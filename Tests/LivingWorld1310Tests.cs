@@ -630,13 +630,10 @@ public class LivingWorld1310Tests : IDisposable
     public void C6_TheWorldStatusPanel_ShowsNoStatsRow()
     {
         var events = WorldEventSystem.Instance;
-        var stat = typeof(WorldEventSystem).GetProperty("GlobalStatModifier")!;
         var price = typeof(WorldEventSystem).GetProperty("GlobalPriceModifier")!;
-        int statBefore = events.GlobalStatModifier;
         float priceBefore = events.GlobalPriceModifier;
         try
         {
-            stat.SetValue(events, -3);
             price.SetValue(events, 0.8f);
             var screen = new Screen();
             screen.Term = new TerminalEmulator(new LineStream(Enumerable.Repeat("", 4)), screen.Output);
@@ -647,7 +644,6 @@ public class LivingWorld1310Tests : IDisposable
         }
         finally
         {
-            stat.SetValue(events, statBefore);
             price.SetValue(events, priceBefore);
         }
     }

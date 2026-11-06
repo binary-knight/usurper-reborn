@@ -1297,6 +1297,35 @@ namespace UsurperRemake.Systems
             return true;
         }
 
+        /// <summary>
+        /// 1.3.11 (K16): at the daily reset, drops each dying wish message whose recipient has died permanently, with no
+        /// reward, and tells the player. A temporary death keeps it. A name not on a trustworthy roster counts as permanently
+        /// dead: WorldSimulator.PrunePermanentlyDeadNPCs is the only thing that takes an NPC off. Returns the number dropped.
+        /// </summary>
+        public static int DropMessagesToTheDead(Character player)
+        {
+            var messages = player?.DyingMessages;
+            var spawner = NPCSpawnSystem.Instance;
+            if (messages == null || messages.Count == 0 || spawner == null) return 0;
+
+            // The roster is process wide and not atomic during ClearAllNPCs and its rebuild: a name missing from a partly
+            // filled list is not a dead recipient. The count check is on the list this decision reads (IsCountPlausible).
+            var roster = spawner.ActiveNPCs?.ToList();
+            if (roster == null || !spawner.IsRosterTrustworthy || !spawner.IsCountPlausible(roster.Count)) return 0;
+
+            int dropped = 0;
+            foreach (var message in messages.ToList())
+            {
+                bool reachable = roster.Any(n => string.Equals(n.Name2, message.Recipient, StringComparison.OrdinalIgnoreCase)
+                    && !n.IsPermaDead && !n.IsAgedDeath);
+                if (reachable) continue;
+                messages.Remove(message);
+                GameEngine.AddNotification(Loc.Get("petition.dying.undeliverable", message.Recipient, message.Elder));
+                dropped++;
+            }
+            return dropped;
+        }
+
         private async Task ExecuteDyingWish(NPC elder, Character player, TerminalEmulator terminal)
         {
             var race = elder.Race;

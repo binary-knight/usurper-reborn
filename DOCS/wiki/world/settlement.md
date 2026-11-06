@@ -37,7 +37,7 @@ Your gold goes to the core building under construction; with none, to the propos
 A service opens when its building reaches the tier below. You can hold only one of the timed settlement buffs at a time (Tavern, Palisade, Arena, Thieves' Den, Prison, Library or Barracks); it lasts {{balance:SettlementBuffDuration}} fights, the Barracks 3.
 
 - **Tavern (Built):** +10 percent experience from fights.
-- **Market Stall (Built):** sells healing and mana potions one at a time at the [Healer's](/wiki/en/world/healer/) price for your level, tax included, up to what you can carry, and buys an identified, uncursed weapon, shield, armor piece or accessory from your backpack for half its value, as the town shops do (the Shadows fence bonus included).
+- **Market Stall (Built):** sells healing and mana potions one at a time at the [Healer's](/wiki/en/world/healer/) full price for your level, tax included (the Faith's Healer discount does not apply here), up to what you can carry, and buys an identified, uncursed weapon, shield, armor piece or accessory from your backpack for half its value, as the town shops do (the Shadows fence bonus included).
 - **Council Hall (Built):** once a day, 10 percent of (the treasury x your share of all player contributions), at least 50 gold and at most the treasury; with no contribution of yours, 50 gold. Terran's boon can add to it.
 - **Shrine (Upgraded):** once a day, heals 30 percent of your maximum HP.
 - **Palisade (Upgraded):** +5 percent defense.

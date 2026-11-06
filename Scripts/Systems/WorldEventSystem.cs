@@ -24,7 +24,6 @@ namespace UsurperRemake.Systems
         public float GlobalPriceModifier { get; private set; } = 1.0f;
         public float GlobalXPModifier { get; private set; } = 1.0f;
         public float GlobalGoldModifier { get; private set; } = 1.0f;
-        public int GlobalStatModifier { get; private set; } = 0;
         public bool PlaguActive { get; private set; } = false;
         public bool WarActive { get; private set; } = false;
         public bool FestivalActive { get; private set; } = false;
@@ -72,7 +71,6 @@ namespace UsurperRemake.Systems
             MonsterInvasion,
             DemonPortal,
             DragonSighting,
-            BanditLordRises,
 
             // Misc Events
             EclipseDarkness,
@@ -432,7 +430,6 @@ namespace UsurperRemake.Systems
                     evt.Title = StoredText(type, "title");
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(10, 20);
-                    evt.Effects["stat"] = -2f; // Stat penalty
                     PlaguActive = true;
                     break;
 
@@ -448,14 +445,12 @@ namespace UsurperRemake.Systems
                     evt.Title = StoredText(type, "title");
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(5, 10);
-                    evt.Effects["stat"] = -3f;
                     break;
 
                 case EventType.BlessedRain:
                     evt.Title = StoredText(type, "title");
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(3, 5);
-                    evt.Effects["stat"] = 1f;
                     break;
 
                 // === FESTIVAL EVENTS ===
@@ -531,7 +526,6 @@ namespace UsurperRemake.Systems
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(3, 7);
                     evt.Effects["xp"] = 1.75f;
-                    evt.Effects["stat"] = -1f;
                     WarActive = true;
                     break;
 
@@ -540,13 +534,6 @@ namespace UsurperRemake.Systems
                     evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = _random.Next(5, 10);
                     evt.Effects["gold"] = 1.5f;
-                    break;
-
-                case EventType.BanditLordRises:
-                    evt.Title = StoredText(type, "title");
-                    evt.Description = StoredText(type, "desc");
-                    evt.DaysRemaining = _random.Next(7, 14);
-                    evt.Effects["price"] = 1.2f;
                     break;
 
                 // === MISC EVENTS ===
@@ -620,7 +607,6 @@ namespace UsurperRemake.Systems
             GlobalPriceModifier = 1.0f;
             GlobalXPModifier = 1.0f;
             GlobalGoldModifier = 1.0f;
-            GlobalStatModifier = 0;
 
             // Apply all active event effects
             foreach (var evt in _activeEvents)
@@ -633,16 +619,12 @@ namespace UsurperRemake.Systems
 
                 if (evt.Effects.TryGetValue("gold", out float goldEffect))
                     GlobalGoldModifier *= goldEffect;
-
-                if (evt.Effects.TryGetValue("stat", out float statEffect))
-                    GlobalStatModifier += (int)statEffect;
             }
 
             // Clamp modifiers to reasonable ranges
             GlobalPriceModifier = Math.Max(0.25f, Math.Min(4.0f, GlobalPriceModifier));
             GlobalXPModifier = Math.Max(0.5f, Math.Min(3.0f, GlobalXPModifier));
             GlobalGoldModifier = Math.Max(0.25f, Math.Min(3.0f, GlobalGoldModifier));
-            GlobalStatModifier = Math.Max(-10, Math.Min(10, GlobalStatModifier));
         }
 
         /// <summary>
@@ -803,7 +785,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("world_event.mod_gold", $"{(GlobalGoldModifier > 1.0f ? "+" : "")}{((GlobalGoldModifier - 1.0f) * 100):F0}")}");
             }
 
-            // 1.3.10: no "Stats" row: GlobalStatModifier is summed and saved but nothing applies it to a character
+            // 1.3.10: no "Stats" row; 1.3.11 (K15): events carry no stat effect at all
 
             // Show king's decree if any
             if (!string.IsNullOrEmpty(CurrentKingDecree))
@@ -858,7 +840,6 @@ namespace UsurperRemake.Systems
             GlobalPriceModifier = 1.0f;
             GlobalXPModifier = 1.0f;
             GlobalGoldModifier = 1.0f;
-            GlobalStatModifier = 0;
             PlaguActive = false;
             WarActive = false;
             FestivalActive = false;
