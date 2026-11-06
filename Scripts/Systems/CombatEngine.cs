@@ -1373,7 +1373,7 @@ public partial class CombatEngine
             // Show monster silhouette for single monster (skip for screen readers, BBS mode, compact mode, and art-disabled)
             if (player is Player pp3 && !pp3.ScreenReaderMode && !DoorMode.IsInDoorMode && !GameConfig.CompactMode && !GameConfig.DisableCharacterMonsterArt)
             {
-                var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
+                var art = MonsterArtDatabase.GetArtForFamily(monster.ArtFamilyName);
                 if (art != null)
                 {
                     terminal.WriteLine("");
@@ -1386,7 +1386,7 @@ public partial class CombatEngine
             // Show first monster's silhouette if 3 or fewer (skip for screen readers, BBS mode, compact mode, and art-disabled)
             if (monsters.Count <= 3 && player is Player pp4 && !pp4.ScreenReaderMode && !DoorMode.IsInDoorMode && !GameConfig.CompactMode && !GameConfig.DisableCharacterMonsterArt)
             {
-                var art = MonsterArtDatabase.GetArtForFamily(monsters[0].FamilyName);
+                var art = MonsterArtDatabase.GetArtForFamily(monsters[0].ArtFamilyName);
                 if (art != null)
                     ANSIArt.DisplayArt(terminal, art);
             }
@@ -2631,7 +2631,7 @@ public partial class CombatEngine
         // Show monster silhouette (skip for screen readers, BBS mode, compact mode, and art-disabled)
         if (player is Player pp2 && !pp2.ScreenReaderMode && !DoorMode.IsInDoorMode && !GameConfig.CompactMode && !GameConfig.DisableCharacterMonsterArt)
         {
-            var art = MonsterArtDatabase.GetArtForFamily(monster.FamilyName);
+            var art = MonsterArtDatabase.GetArtForFamily(monster.ArtFamilyName);
             if (art != null)
                 ANSIArt.DisplayArt(terminal, art);
         }

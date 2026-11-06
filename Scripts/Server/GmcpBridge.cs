@@ -493,7 +493,7 @@ public static class GmcpBridge
 
     /// <summary>
     /// 2.0 phase 3a: Client.Enemies, {enemies:[{name, family}]}, the same members in the same order as Char.Combat.Start
-    /// and Char.Combat.Enemies, with each foe's monster family (Monster.FamilyName, empty when it has none) so the web
+    /// and Char.Combat.Enemies, with each foe's monster family for its picture (Monster.ArtFamilyName: FamilyName, or a floor boss's theme family; empty when it has none) so the web
     /// client can pick its art. Sent at the fight's start, and beside Char.Combat.Enemies when the names or families
     /// changed since the last Client.Enemies of the fight. Web client only.
     /// </summary>
@@ -502,11 +502,11 @@ public static class GmcpBridge
         if (monsters == null || !IsWebClientActive) return;
         var ctx = SessionContext.Current!;
         var sb = new StringBuilder();
-        foreach (var m in monsters) sb.Append(m.Name).Append('|').Append(m.FamilyName).Append(';');
+        foreach (var m in monsters) sb.Append(m.Name).Append('|').Append(m.ArtFamilyName).Append(';');
         string snapshot = sb.ToString();
         if (!fightStart && snapshot == ctx.LastWebEnemiesSnapshot) return;
         ctx.LastWebEnemiesSnapshot = snapshot;
-        EmitWebClient("Client.Enemies", new { enemies = monsters.Select(m => new { name = m.Name, family = m.FamilyName }).ToList() });
+        EmitWebClient("Client.Enemies", new { enemies = monsters.Select(m => new { name = m.Name, family = m.ArtFamilyName }).ToList() });
     }
 
     /// <summary>

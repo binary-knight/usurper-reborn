@@ -86,52 +86,14 @@ public class ArenaLocation : BaseLocation
 
     private void ShowArenaMenu()
     {
-        terminal.SetColor("darkgray");
-        terminal.Write("  [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("A");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("arena.attack_player"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("L");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("arena.leaderboard_menu"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("  [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("H");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("arena.history_menu"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("S");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("arena.stats_menu"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("R");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("arena.return_menu"));
+        WriteMenuCells(MenuRows());
         terminal.WriteLine("");
     }
+
+    /// <summary>1.3.11 (K3): the arena menu as cells for MenuGridRows.</summary>
+    internal static List<List<(string Key, string Label)>> MenuRows() => MenuCells(
+        new[] { ("A", Loc.Get("arena.attack_player")), ("L", Loc.Get("arena.leaderboard_menu")) },
+        new[] { ("H", Loc.Get("arena.history_menu")), ("S", Loc.Get("arena.stats_menu")), ("R", Loc.Get("arena.return_menu")) });
 
     // =====================================================================
     // Attack Player (Core PvP Flow)

@@ -347,6 +347,7 @@ namespace UsurperRemake.Systems
             LoadChildrenState();
             LoadMarriageRegistryState();
             LoadWorldEventsState();
+            LoadEndedQuestsState();   // 1.3.11 (K4)
             LoadSettlementState();
             LoadUsedNamesState();
 
@@ -1198,6 +1199,19 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save world events: {ex.Message}");
             }
+        }
+
+        /// <summary>1.3.11 (K4): the quests the world failed, kept in world_state so a restart does not revive them.</summary>
+        private void LoadEndedQuestsState()
+        {
+            try { QuestSystem.LoadEndedByWorld(sqlBackend.LoadWorldState(QuestSystem.EndedByWorldKey).GetAwaiter().GetResult()); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load ended quests: {ex.Message}"); }
+        }
+
+        private void SaveEndedQuestsState()
+        {
+            try { sqlBackend.SaveWorldState(QuestSystem.EndedByWorldKey, QuestSystem.SerializeEndedByWorld(DateTime.Now)).GetAwaiter().GetResult(); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("WORLDSIM", $"Failed to save ended quests: {ex.Message}"); }
         }
 
         /// <summary>
@@ -2095,6 +2109,7 @@ namespace UsurperRemake.Systems
 
                 // Process quest maintenance
                 QuestSystem.ProcessDailyQuestMaintenance();
+                SaveEndedQuestsState();   // 1.3.11 (K4)
 
                 // v1.2: the bank's robbery reserve grows once per server day
                 BankVaultSystem.DailyRefill().GetAwaiter().GetResult();
