@@ -448,4 +448,200 @@ public class QuickStartRepair1311Tests : IDisposable
 
         ShouldHaveTheSavedBasesPlus(Load(after), saved, Row(archetype));
     }
+
+    // Reloaded rows. Each reload before the repair is the real load and the real save. The race is out of the key for
+    // that one load, so the repair stays off, and is put back before the save.
+    private readonly record struct LoadRow(long BaseHP, long BaseMana, long BaseDef, long BaseSta, long BaseAgi, long MaxHP, long MaxMana, long Def, long Sta, long Agi);
+
+    private static readonly CharacterRace[] OutOfKeyRace = { CharacterRace.Elf, CharacterRace.Human, CharacterRace.Human };
+
+    private static LoadRow Read(Character c)
+    {
+        c.RecalculateStats();
+        return new LoadRow(c.BaseMaxHP, c.BaseMaxMana, c.BaseDefence, c.BaseStamina, c.BaseAgility, c.MaxHP, c.MaxMana, c.Defence, c.Stamina, c.Agility);
+    }
+
+    private static Character LoadWithNoRepair(PlayerData row, string archetype)
+    {
+        var real = row.Race;
+        var copy = Copy(row);
+        copy.Race = OutOfKeyRace[int.Parse(archetype) - 1];
+        var c = Load(copy);
+        c.Race = real;
+        return c;
+    }
+
+    private static void WearDefenceGear(Character c, int defence)
+    {
+        c.EquippedItems[EquipmentSlot.Body] = EquipmentDatabase.RegisterDynamic(new Equipment { Name = "Test Plate", Slot = EquipmentSlot.Body, DefenceBonus = defence });
+        c.RecalculateStats();
+    }
+
+    /// <summary>The hurt save after that many real loads and saves with no repair; gear goes on at the last of them.</summary>
+    private async Task<PlayerData> ReloadedRow(string archetype, int reloads, int gearDefence = 0)
+    {
+        var row = await HurtRow(archetype, 1);
+        for (int i = 1; i <= reloads; i++)
+        {
+            var c = LoadWithNoRepair(row, archetype);
+            if (i == reloads && gearDefence > 0) WearDefenceGear(c, gearDefence);
+            row = Save(c);
+        }
+        return row;
+    }
+
+    /// <summary>Hurt, reloaded once at level 1 with no repair, then levelled through the real automatic level up.</summary>
+    private async Task<PlayerData> ReloadedThenLevelledRow(string archetype, int level)
+    {
+        var c = LoadWithNoRepair(await HurtRow(archetype, 1), archetype);
+        LevelUpTo(c, level);
+        return Save(c);
+    }
+
+    private static void LevelUpTo(Character c, int level)
+    {
+        c.Experience = LevelMasterLocation.GetExperienceForLevel(level);
+        LevelMasterLocation.CheckAutoLevelUp(c).Should().Be(level - 1);
+        c.RecalculateStats();
+    }
+
+    private async Task<LoadRow> CustomAt(string archetype, int level)
+    {
+        var c = await Quick($"qsr{Guid.NewGuid():N}", archetype);
+        c.InitializeBaseStats();
+        c.RecalculateStats();
+        if (level > 1) LevelUpTo(c, level);
+        return Read(c);
+    }
+
+    /// <summary>The repairing load, then that many more, each a real save and load of the one before.</summary>
+    private static LoadRow[] ThroughLoads(PlayerData row, int after = 3)
+    {
+        var rows = new LoadRow[after + 1];
+        for (int i = 0; i <= after; i++)
+        {
+            var c = Load(Copy(row));
+            rows[i] = Read(c);
+            row = Save(c);
+        }
+        return rows;
+    }
+
+    // Measured numbers, pinned. Each row: BaseMaxHP, BaseMaxMana, BaseDefence, BaseStamina, BaseAgility, then MaxHP, MaxMana,
+    // Defence, Stamina, Agility after RecalculateStats. The first is the repairing load, the rest are later loads.
+    private static LoadRow Parse(string row)
+    {
+        var v = row.Split(',').Select(long.Parse).ToArray();
+        return new LoadRow(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9]);
+    }
+
+    private static long[] Numbers(LoadRow r) => new[] { r.BaseHP, r.BaseMana, r.BaseDef, r.BaseSta, r.BaseAgi, r.MaxHP, r.MaxMana, r.Def, r.Sta, r.Agi };
+
+    private static void ShouldBeThePinnedLoads(LoadRow[] got, params string[] pinned)
+    {
+        for (int i = 0; i < pinned.Length; i++) got[i].Should().Be(Parse(pinned[i]), $"load {i} after the repair");
+    }
+
+    private static void ShouldNeverFall(LoadRow[] loads)
+    {
+        for (int i = 1; i < loads.Length; i++)
+        {
+            var was = Numbers(loads[i - 1]);
+            var now = Numbers(loads[i]);
+            for (int n = 0; n < was.Length; n++) now[n].Should().BeGreaterThanOrEqualTo(was[n], $"number {n} at load {i} after the repair");
+        }
+    }
+
+    private static string SavedRow(PlayerData d) => $"{d.BaseMaxHP},{d.BaseMaxMana},{d.BaseDefence},{d.BaseStamina},{d.BaseAgility},{d.MaxHP},{d.MaxMana},{d.Defence},{d.Stamina},{d.Agility}";
+
+    [Theory]
+    [InlineData("1", 1, "34,0,-3,0,0,68,0,-6,0,0")]
+    [InlineData("1", 2, "34,0,-6,0,0,68,0,-9,0,0")]
+    [InlineData("1", 3, "34,0,-9,0,0,68,0,-12,0,0")]
+    [InlineData("2", 1, "25,0,-3,0,0,50,0,-6,0,0")]
+    [InlineData("2", 2, "25,0,-6,0,0,50,0,-9,0,0")]
+    [InlineData("2", 3, "25,0,-9,0,0,50,0,-12,0,0")]
+    [InlineData("3", 1, "31,0,-3,0,0,62,0,-6,0,0")]
+    [InlineData("3", 2, "31,0,-6,0,0,62,0,-9,0,0")]
+    [InlineData("3", 3, "31,0,-9,0,0,62,0,-12,0,0")]
+    public async Task ReloadedRow_BeforeTheRepair_IsWhatTheRealLoadLeaves(string archetype, int reloads, string saved)
+    {
+        SavedRow(await ReloadedRow(archetype, reloads)).Should().Be(saved);
+    }
+
+    // A Warrior whose base Defence is 0 or below is not steady on the next loads: the empty base fallback takes the stat,
+    // which holds the Agility bonus of 1, so it rises by 1 a load until the base is above 0. The other two have a bonus of
+    // 0 and stay where they are, below 0 when the reloads outran the row.
+    [Theory]
+    [InlineData("1", 1, "71,0,5,18,13,105,0,6,18,13", "71,0,5,18,13,105,0,6,18,13", "71,0,5,18,13,105,0,6,18,13", "71,0,5,18,13,105,0,6,18,13")]
+    [InlineData("1", 2, "71,0,2,18,13,105,0,3,18,13", "71,0,2,18,13,105,0,3,18,13", "71,0,2,18,13,105,0,3,18,13", "71,0,2,18,13,105,0,3,18,13")]
+    [InlineData("1", 3, "71,0,-1,18,13,105,0,0,18,13", "71,0,0,18,13,105,0,1,18,13", "71,0,1,18,13,105,0,2,18,13", "71,0,1,18,13,105,0,2,18,13")]
+    [InlineData("2", 1, "52,43,0,14,12,77,127,0,14,12", "52,43,0,14,12,77,127,0,14,12", "52,43,0,14,12,77,127,0,14,12", "52,43,0,14,12,77,127,0,14,12")]
+    [InlineData("2", 2, "52,43,-3,14,12,77,127,-3,14,12", "52,43,-3,14,12,77,127,-3,14,12", "52,43,-3,14,12,77,127,-3,14,12", "52,43,-3,14,12,77,127,-3,14,12")]
+    [InlineData("2", 3, "52,43,-6,14,12,77,127,-6,14,12", "52,43,-6,14,12,77,127,-6,14,12", "52,43,-6,14,12,77,127,-6,14,12", "52,43,-6,14,12,77,127,-6,14,12")]
+    [InlineData("3", 1, "68,23,4,16,12,99,97,4,16,12", "68,23,4,16,12,99,97,4,16,12", "68,23,4,16,12,99,97,4,16,12", "68,23,4,16,12,99,97,4,16,12")]
+    [InlineData("3", 2, "68,23,1,16,12,99,97,1,16,12", "68,23,1,16,12,99,97,1,16,12", "68,23,1,16,12,99,97,1,16,12", "68,23,1,16,12,99,97,1,16,12")]
+    [InlineData("3", 3, "68,23,-2,16,12,99,97,-2,16,12", "68,23,-2,16,12,99,97,-2,16,12", "68,23,-2,16,12,99,97,-2,16,12", "68,23,-2,16,12,99,97,-2,16,12")]
+    public async Task ReloadedRow_PerLoad(string archetype, int reloads, string repairing, string second, string third, string fourth)
+    {
+        var loads = ThroughLoads(await ReloadedRow(archetype, reloads));
+        ShouldBeThePinnedLoads(loads, repairing, second, third, fourth);
+    }
+
+    // Defence gear on a row with base Defence 0 or below: the fallback takes the stat, gear included, into the base at
+    // the next load, and again if the base is still 0 or below.
+    [Theory]
+    [InlineData("1", 1, "71,0,5,18,13,105,0,11,18,13", "71,0,5,18,13,105,0,11,18,13", "71,0,5,18,13,105,0,11,18,13", "71,0,5,18,13,105,0,11,18,13")]
+    [InlineData("1", 3, "71,0,-1,18,13,105,0,5,18,13", "71,0,5,18,13,105,0,11,18,13", "71,0,5,18,13,105,0,11,18,13", "71,0,5,18,13,105,0,11,18,13")]
+    [InlineData("2", 1, "52,43,0,14,12,77,127,5,14,12", "52,43,5,14,12,77,127,10,14,12", "52,43,5,14,12,77,127,10,14,12", "52,43,5,14,12,77,127,10,14,12")]
+    [InlineData("2", 3, "52,43,-6,14,12,77,127,-1,14,12", "52,43,-1,14,12,77,127,4,14,12", "52,43,4,14,12,77,127,9,14,12", "52,43,4,14,12,77,127,9,14,12")]
+    [InlineData("3", 1, "68,23,4,16,12,99,97,9,16,12", "68,23,4,16,12,99,97,9,16,12", "68,23,4,16,12,99,97,9,16,12", "68,23,4,16,12,99,97,9,16,12")]
+    [InlineData("3", 3, "68,23,-2,16,12,99,97,3,16,12", "68,23,3,16,12,99,97,8,16,12", "68,23,3,16,12,99,97,8,16,12", "68,23,3,16,12,99,97,8,16,12")]
+    public async Task ReloadedRow_WithDefenceGear_PerLoad(string archetype, int reloads, string repairing, string second, string third, string fourth)
+    {
+        var loads = ThroughLoads(await ReloadedRow(archetype, reloads, gearDefence: 5));
+        ShouldBeThePinnedLoads(loads, repairing, second, third, fourth);
+    }
+
+    [Theory]
+    [InlineData("1", 1, 105L, "40,0,8,19,15,74,0,9,19,15")]
+    [InlineData("1", 2, 105L, "40,0,8,19,15,74,0,9,19,15")]
+    [InlineData("1", 3, 105L, "40,0,8,19,15,74,0,9,19,15")]
+    [InlineData("2", 1, 77L, "30,45,3,15,14,55,129,4,15,14")]
+    [InlineData("2", 2, 77L, "30,45,3,15,14,55,129,4,15,14")]
+    [InlineData("2", 3, 77L, "30,45,3,15,14,55,129,4,15,14")]
+    [InlineData("3", 1, 99L, "39,24,7,17,14,70,98,8,17,14")]
+    [InlineData("3", 2, 99L, "39,24,7,17,14,70,98,8,17,14")]
+    [InlineData("3", 3, 99L, "39,24,7,17,14,70,98,8,17,14")]
+    public async Task ReloadedRow_FinalMaxHp_AgainstCustom(string archetype, int reloads, long finalMaxHp, string custom)
+    {
+        var loads = ThroughLoads(await ReloadedRow(archetype, reloads));
+        loads[^1].MaxHP.Should().Be(finalMaxHp);
+        (await CustomAt(archetype, 1)).Should().Be(Parse(custom));
+    }
+
+    [Theory]
+    [InlineData("1", 5, "139,12,17,22,13,218,0,18,22,13", "139,12,17,22,13,218,0,18,22,13", "139,12,17,22,13,218,0,18,22,13", "139,12,17,22,13,218,0,18,22,13", "108,12,20,23,15,187,0,21,23,15")]
+    [InlineData("1", 10, "224,27,32,27,13,368,0,33,27,13", "224,27,32,27,13,368,0,33,27,13", "224,27,32,27,13,368,0,33,27,13", "224,27,32,27,13,368,0,33,27,13", "193,27,35,28,15,337,0,36,28,15")]
+    [InlineData("2", 5, "96,115,8,18,12,149,358,8,18,12", "96,115,8,18,12,149,358,8,18,12", "96,115,8,18,12,149,358,8,18,12", "96,115,8,18,12,149,358,8,18,12", "74,117,11,19,14,127,360,12,19,14")]
+    [InlineData("2", 10, "151,205,18,23,12,249,673,18,23,12", "151,205,18,23,12,249,673,18,23,12", "151,205,18,23,12,249,673,18,23,12", "151,205,18,23,12,249,673,18,23,12", "129,207,21,24,14,227,675,22,24,14")]
+    [InlineData("3", 5, "112,83,8,20,12,171,278,8,20,12", "112,83,8,20,12,171,278,8,20,12", "112,83,8,20,12,171,278,8,20,12", "112,83,8,20,12,171,278,8,20,12", "83,84,11,21,14,142,279,12,21,14")]
+    [InlineData("3", 10, "167,158,13,25,12,271,523,13,25,12", "167,158,13,25,12,271,523,13,25,12", "167,158,13,25,12,271,523,13,25,12", "167,158,13,25,12,271,523,13,25,12", "138,159,16,26,14,242,524,17,26,14")]
+    public async Task ReloadedThenLevelled_PerLoad_AgainstCustom(string archetype, int level, string repairing, string second, string third, string fourth, string custom)
+    {
+        var loads = ThroughLoads(await ReloadedThenLevelledRow(archetype, level));
+        ShouldBeThePinnedLoads(loads, repairing, second, third, fourth);
+        (await CustomAt(archetype, level)).Should().Be(Parse(custom));
+    }
+
+    [Fact]
+    public async Task NoLoadAfterTheRepair_LowersAnyNumber()
+    {
+        foreach (var a in new[] { "1", "2", "3" })
+        {
+            foreach (var n in new[] { 1, 2, 3 }) ShouldNeverFall(ThroughLoads(await ReloadedRow(a, n)));
+            foreach (var n in new[] { 1, 3 }) ShouldNeverFall(ThroughLoads(await ReloadedRow(a, n, gearDefence: 5)));
+            foreach (var l in new[] { 5, 10 }) ShouldNeverFall(ThroughLoads(await ReloadedThenLevelledRow(a, l)));
+        }
+    }
 }
