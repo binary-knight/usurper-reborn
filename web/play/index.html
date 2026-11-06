@@ -974,6 +974,9 @@
 
     // Menu options as the game prints them: [D] Dungeons, [E]nter the dungeon, [AUTO] Auto-Combat.
     var COMMAND = /\[([^\[\]\s]{1,5})\]([a-z]*)([^\[\]║│]*)/g;
+    // N4: the other way the game prints a choice, the key in round brackets at the start of a word: "(E)quip immediately",
+    // "(P)ray, (D)esecrate, or (L)eave". The label runs to a comma, the next bracket or two spaces.
+    var PAREN_COMMAND = /(^|[\s,;])\(([A-Za-z0-9])\)([A-Za-z]+)([^,;(\[║│]*)/g;
     // R8: a label longer than LABEL_MAX ends at a word with an ellipsis, never in the middle of one; the key cap keeps the
     // whole label for its title and its spoken name.
     var LABEL_MAX = 40;
@@ -997,6 +1000,12 @@
                 // A key named inside a sentence ("in Settings [~].") does not claim the key.
                 if (/^to\b/i.test(label) || !/[A-Za-z0-9\u00C0-\u024F]/.test(label)) continue;
                 found.push({ key: key, label: label, row: r, col: m.index });
+            }
+            PAREN_COMMAND.lastIndex = 0;
+            while ((m = PAREN_COMMAND.exec(row)) && found.length < 80) {
+                var pkey = m[2], plabel = pkey + (m[3] + m[4]).split(/\s{2,}/)[0].replace(/\s+(or|and)\s*$/i, '').replace(/[\s:>?.!]+$/, '').trim();
+                if (/\bPress\s*$/i.test(row.slice(0, m.index))) continue;
+                found.push({ key: pkey, label: plabel, row: r, col: m.index + m[1].length });
             }
         });
         // N5: a block of three or more rows set as two text columns (at most two keys a row, the second well to the right) is read down

@@ -150,3 +150,18 @@ test('N2: a right page taller than the window shows a bar that stays on, so a ha
   assert.match(rule('.chron .recto'), /scrollbar-width: thin;/);
   assert.match(CSS, /\.chron \.recto::-webkit-scrollbar \{ width: 8px; \}/);
 });
+
+// ---------------------------------------------------------------- N4: keys written (E)quip
+
+test('N4: a choice the game prints as (E)quip or (P)ray, (D)esecrate, or (L)eave gets its keys', async () => {
+  const p = await load();
+  const keys = (rows) => {
+    p.ctx.__r = rows;
+    return JSON.parse(p.run('JSON.stringify(UsurperPlay.scanCommands(__r).map(function (c) { return [c.key, c.label]; }))'));
+  };
+  assert.deepStrictEqual(keys(['(E)quip immediately', '(T)ake to inventory', '(P)ass', 'Your choice: ']),
+    [['E', 'Equip immediately'], ['T', 'Take to inventory'], ['P', 'Pass']]);
+  assert.deepStrictEqual(keys(['A shrine glows.', '(P)ray, (D)esecrate, or (L)eave']), [['P', 'Pray'], ['D', 'Desecrate'], ['L', 'Leave']]);
+  assert.deepStrictEqual(keys(['Defeated 1 monster(s)!', 'Be a Ranger? (Y/n)', 'Press (Enter) now']), [], 'no word, no key');
+  assert.deepStrictEqual(keys(['[A] Attack', '(1) not a key']), [['A', 'Attack']]);
+});
