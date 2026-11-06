@@ -520,6 +520,7 @@ public partial class MagicShopLocation : BaseLocation
     
     private async Task IdentifyItem(Character player)
     {
+        terminal.ClearScreen();   // 1.3.11 (R10): a new page, not rows under the shop menu
         DisplayMessage("");
 
         var unidentifiedItems = player.Inventory.Where(item => !item.IsIdentified).ToList();
@@ -698,6 +699,7 @@ public partial class MagicShopLocation : BaseLocation
     /// </summary>
     private async Task RemoveCurse(Character player)
     {
+        terminal.ClearScreen();   // 1.3.11 (R10): a new page, not rows under the shop menu
         DisplayMessage("");
         WriteSectionHeader(Loc.Get("magic_shop.curse_removal"), "magenta");
         DisplayMessage("");
@@ -1117,6 +1119,7 @@ public partial class MagicShopLocation : BaseLocation
         // v0.60.8: use the central DungeonLocation.OldGodFloors constant rather
         // than duplicating the literal here.
 
+        terminal.ClearScreen();   // 1.3.11 (R10): a new page, not rows under the shop menu
         DisplayMessage("");
         WriteSectionHeader(Loc.Get("magic_shop.reset_scroll_header"), "magenta");
         DisplayMessage("");
