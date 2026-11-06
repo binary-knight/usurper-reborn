@@ -81,7 +81,7 @@ function cellsLine(cells) {
   };
 }
 function bufferOf(lines) {
-  return { baseY: 0, cursorY: lines.length - 1, cursorX: 0, getLine: (y) => lines[y] };
+  return { baseY: 0, cursorY: lines.length-1, cursorX: 0, getLine: (y) => lines[y] };
 }
 const runsRead = (p, lines) => {
   p.ctx.__buf = bufferOf(lines);

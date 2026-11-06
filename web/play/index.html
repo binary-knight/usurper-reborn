@@ -1271,8 +1271,8 @@
     function hex2(n) { return (n < 16 ? '0' : '') + n.toString(16); }
     function paletteHex(i) {
         if (i < 16 || i > 255) return '';
-        if (i >= 232) { var g = 8 + (i - 232) * 10; return '#' + hex2(g) + hex2(g) + hex2(g); }
-        var k = i - 16, lv = [0, 95, 135, 175, 215, 255];
+        if (i >= 232) { var g = 8 + (i-232)*10; return '#' + hex2(g) + hex2(g) + hex2(g); }
+        var k = i-16, lv = [0, 95, 135, 175, 215, 255];
         return '#' + hex2(lv[Math.floor(k / 36)]) + hex2(lv[Math.floor(k / 6) % 6]) + hex2(lv[k % 6]);
     }
     function rgbHex(n) { return '#' + hex2((n >> 16) & 255) + hex2((n >> 8) & 255) + hex2(n & 255); }
@@ -2048,7 +2048,7 @@
         var out = [], at = 0;
         segs.forEach(function (r) {
             var a = Math.max(from, at), b = Math.min(to, at + r.t.length);
-            if (b > a) out.push(inkOf(r.t.slice(a - at, b - at), r.c, r.fg, r.bg));
+            if (b > a) out.push(inkOf(r.t.slice(a-at, b-at), r.c, r.fg, r.bg));
             at += r.t.length;
         });
         return out;
