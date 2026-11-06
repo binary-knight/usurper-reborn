@@ -287,6 +287,9 @@ public class Monster
 
     // Enhanced monster family system properties
     public string FamilyName { get; set; } = "";            // Monster family (Goblinoid, Undead, etc.)
+    /// <summary>1.3.11 (N6): the family the picture is drawn from when it is not the monster's own; a floor boss carries its theme's, since its name is the theme's and its family was drawn for its level. Draws nothing else: no rule reads it.</summary>
+    internal string ArtFamily { get; set; } = "";
+    internal string ArtFamilyName => string.IsNullOrEmpty(ArtFamily) ? FamilyName : ArtFamily;
     [System.Text.Json.Serialization.JsonIgnore]
     public UsurperRemake.Systems.OldGodType? OldGod { get; set; }   // 1.2.0: the Old God this boss is (OldGodBossSystem), for the Old Gods link; run time only
     public string TierName { get; set; } = "";              // Tier name (Goblin, Hobgoblin, etc.)

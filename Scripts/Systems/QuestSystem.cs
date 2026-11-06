@@ -4,6 +4,7 @@ using UsurperRemake.Systems;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -278,6 +279,52 @@ public partial class QuestSystem
     /// </summary>
     internal static bool WorldResetAgesQuests =>
         UsurperRemake.BBS.DoorMode.IsOnlineMode && UsurperRemake.Server.MudServer.Instance != null;
+
+    // 1.3.11 (K4): the ids of the quests the world reset failed, with the time it failed them, so a server restart does
+    // not hand one back from the player's save before that player's next login. The shared quest list is in memory and
+    // the world_state quest record drops a quest once it is past its limit, so neither remembers. The sim keeps this
+    // list in world_state under EndedByWorldKey, loaded at start and written after each daily maintenance.
+    internal const string EndedByWorldKey = "quest_ended";
+    internal const int EndedByWorldKeepDays = 30;   // the same 30 days CleanupOldQuests keeps a deleted quest
+    private static readonly Dictionary<string, DateTime> endedByWorld = new();
+
+    internal static void RecordEndedByWorld(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        lock (endedByWorld) endedByWorld[id] = DateTime.Now;
+    }
+
+    internal static bool IsEndedByWorld(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        lock (endedByWorld) return endedByWorld.ContainsKey(id);
+    }
+
+    /// <summary>The record as JSON (quest id to the time it was failed), without the ones older than the keep days.</summary>
+    internal static string SerializeEndedByWorld(DateTime now)
+    {
+        lock (endedByWorld)
+        {
+            foreach (var old in endedByWorld.Where(kv => kv.Value < now.AddDays(-EndedByWorldKeepDays)).Select(kv => kv.Key).ToList())
+                endedByWorld.Remove(old);
+            return JsonSerializer.Serialize(endedByWorld);
+        }
+    }
+
+    /// <summary>Adds the stored record at start. A missing or unreadable record adds nothing (world state from before this loads).</summary>
+    internal static void LoadEndedByWorld(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return;
+        try
+        {
+            var stored = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json);
+            if (stored == null) return;
+            lock (endedByWorld)
+                foreach (var kv in stored)
+                    if (!string.IsNullOrEmpty(kv.Key) && !endedByWorld.ContainsKey(kv.Key)) endedByWorld[kv.Key] = kv.Value;
+        }
+        catch (JsonException) { }
+    }
 
     /// <summary>
     /// Process daily quest maintenance (Pascal: Quest aging and failure)
@@ -1040,6 +1087,7 @@ public partial class QuestSystem
         // Mark quest as failed/deleted
         quest.Deleted = true;
         quest.Occupier = "";
+        if (WorldResetAgesQuests) RecordEndedByWorld(quest.Id);   // 1.3.11 (K4): a restart must not revive it from a save
         
         // GD.Print($"[QuestSystem] Quest failed: {quest.Id} by {quest.Occupier}");
     }
@@ -1489,6 +1537,8 @@ public partial class QuestSystem
                 if (sharedCopy.Deleted) continue;   // 1.3.10: failed (or ended) by the world while away
                 quest.OccupiedDays = Math.Max(quest.OccupiedDays, sharedCopy.OccupiedDays);
             }
+            else if (WorldResetAgesQuests && !quest.Deleted && IsEndedByWorld(quest.Id))
+                continue;   // 1.3.11 (K4): the world failed it before a server restart, which emptied the shared list
 
             foreach (var objData in questData.Objectives)
             {

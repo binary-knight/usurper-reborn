@@ -415,6 +415,7 @@ public class CharacterCreationSystem
         var savedRoll = LoadRoll(character);
         if (savedRoll != null) ApplyDice(character, savedRoll.Dice);
         else RollStats(character);
+        FinishRolledStats(character);
 
         GeneratePhysicalAppearance(character);
         SetStartingConfiguration(character);
@@ -2675,6 +2676,14 @@ public class CharacterCreationSystem
             }
         }
 
+        FinishRolledStats(character);
+    }
+
+    /// <summary>
+    /// 1.3.11: the setup every new character gets once its roll is final, on both the custom and the Quick Start path.
+    /// </summary>
+    private static void FinishRolledStats(Character character)
+    {
         // CRITICAL: Initialize base stats from the rolled values
         // This prevents RecalculateStats() from resetting stats to 0
         character.InitializeBaseStats();
