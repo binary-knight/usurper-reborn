@@ -5332,6 +5332,32 @@ public abstract class BaseLocation
     /// Write a centered box header (╔═══╗ / ║ TITLE ║ / ╚═══╝).
     /// In screen reader mode, outputs plain text title only.
     /// </summary>
+    /// <summary>
+    /// 1.3.11 (K3): menu rows as " [K] Label" cells laid out by HealerLocation.MenuGridRows, so a label never runs into
+    /// the next key and no row passes 79 columns in any language. Labels come through Loc with their own leading space.
+    /// </summary>
+    internal static List<List<(string Key, string Label)>> MenuCells(params (string Key, string Label)[][] rows)
+        => rows.Select(r => r.Select(c => (c.Key, c.Label.Trim())).ToList()).ToList();
+
+    protected void WriteMenuCells(List<List<(string Key, string Label)>> rows, Func<string, string> keyColor = null)
+    {
+        foreach (var row in HealerLocation.MenuGridRows(rows, 79))
+        {
+            foreach (var (key, label, pad) in row)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(" [");
+                terminal.SetColor(keyColor?.Invoke(key) ?? "bright_yellow");
+                terminal.Write(key);
+                terminal.SetColor("darkgray");
+                terminal.Write("]");
+                terminal.SetColor("white");
+                terminal.Write(" " + label + new string(' ', pad));
+            }
+            terminal.WriteLine("");
+        }
+    }
+
     protected void WriteBoxHeader(string title, string color = "bright_cyan", int width = 78)
     {
         if (IsScreenReader)

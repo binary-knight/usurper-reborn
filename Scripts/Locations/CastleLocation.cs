@@ -202,201 +202,27 @@ public class CastleLocation : BaseLocation
         }
         else
         {
-            // Row 1
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("P");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_prison_cells"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("O");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_orders"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("1");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_royal_mail"));
-
-            // Row 2
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("G");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_go_sleep"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("C");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_check_security"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("H");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_history"));
-
-            // Row 3
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("A");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_abdicate"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("M");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_magic"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("F");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_fiscal"));
-
-            // Row 4
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("S");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_status"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_quests"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("T");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_orphanage"));
-
-            // Row 5 - Political systems
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("W");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_wedding"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("U");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("castle.menu_court"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("E");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_estate"));
-
-            // Row 6 - Royal Bodyguards
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("B");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_bodyguards"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("V");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_statues"));
-
-            // v0.63.0 slice 5 D3: Sponsor adult child to court (king-only)
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_magenta");
-            terminal.Write("Y");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_d3_sponsor"));
-
-            // v0.63.0 Bloodlines of the Realm (read-only family-tree records).
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_magenta");
-            terminal.Write("Z");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_e3_bloodlines"));
-
+            // 1.3.11 (K3): cells laid out by MenuGridRows (no label touches the next key, no row passes 79 columns)
+            WriteMenuCells(RoyalMenuRows(), k => k == "Y" || k == "Z" ? "bright_magenta" : "bright_yellow");
             terminal.WriteLine("");
-
-            // Navigation
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.menu_return_town"));
+            WriteMenuCells(MenuCells(new[] { ("R", Loc.Get("castle.menu_return_town")) }));
             terminal.WriteLine("");
         }
 
         ShowStatusLine();
     }
+
+    /// <summary>1.3.11 (K3): the throne room menu as cells for MenuGridRows.</summary>
+    internal static List<List<(string Key, string Label)>> RoyalMenuRows() => MenuCells(
+        new[] { ("P", Loc.Get("castle.menu_prison_cells")), ("O", Loc.Get("castle.menu_orders")), ("1", Loc.Get("castle.menu_royal_mail")) },
+        new[] { ("G", Loc.Get("castle.menu_go_sleep")), ("C", Loc.Get("castle.menu_check_security")), ("H", Loc.Get("castle.menu_history")) },
+        new[] { ("A", Loc.Get("castle.menu_abdicate")), ("M", Loc.Get("castle.menu_magic")), ("F", Loc.Get("castle.menu_fiscal")) },
+        new[] { ("S", Loc.Get("castle.menu_status")), ("Q", Loc.Get("castle.menu_quests")), ("T", Loc.Get("castle.menu_orphanage")) },
+        new[] { ("W", Loc.Get("castle.menu_wedding")), ("U", Loc.Get("castle.menu_court")), ("E", Loc.Get("castle.menu_estate")) },
+        new[] { ("B", Loc.Get("castle.menu_bodyguards")) },
+        new[] { ("V", Loc.Get("castle.menu_statues")) },
+        new[] { ("Y", Loc.Get("castle.menu_d3_sponsor")) },
+        new[] { ("Z", Loc.Get("castle.menu_e3_bloodlines")) });
 
     /// <summary>
     /// Show castle exterior menu for commoners
