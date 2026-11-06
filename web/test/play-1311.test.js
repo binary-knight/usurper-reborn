@@ -183,3 +183,20 @@ test('R8: on a phone a label ends at a word within 24 characters; elsewhere the 
   p.ctx.__l = long;
   assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Follow the faint chanting toward the…');
 });
+
+// ---------------------------------------------------------------- N5: the question the fight asks
+
+test('N5: a prompt that asks a question stays in the fight log; "Choose action:" does not', async () => {
+  const p = await load({ storage: { playView: 'chronicle' } });
+  const f = (g, d) => { p.ctx.__f = JSON.stringify({ gmcp: g, data: d }); p.run('UsurperPlay.handleFrame(__f)'); };
+  f('Char.Vitals', { hp: 40, maxHp: 40, mp: 0, maxMp: 0, combatSp: 70, maxCombatSp: 70 });
+  f('Char.Combat.Start', { enemies: [{ name: 'Goblin', level: 1, hp: 20, maxHp: 20 }, { name: 'Zombie', level: 1, hp: 20, maxHp: 20 }] });
+  f('Client.Menu', { screen: 'combat', oneKey: true, round: 1, groups: [{ label: 'Actions', items: [{ key: 'A', label: 'Attack' }] }] });
+  const events = () => p.el('c-body').querySelector('.clog').children.filter((e) => /\bev\b/.test(e.getAttribute('class'))).map((e) => e.textContent);
+  p.ctx.__rows = ['You are facing: Goblin', 'Target which monster? (1-2, ENTER=random, Q=cancel)'];
+  p.run('UsurperPlay.renderChron(__rows, 0, 1)');
+  assert.deepStrictEqual(events(), ['You are facing: Goblin', 'Target which monster? (1-2, ENTER=random, Q=cancel)']);
+  p.ctx.__rows = ['You are facing: Goblin', 'Choose action: '];
+  p.run('UsurperPlay.renderChron(__rows, 0, 1)');
+  assert.deepStrictEqual(events(), ['You are facing: Goblin']);
+});

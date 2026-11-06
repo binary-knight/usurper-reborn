@@ -1691,7 +1691,9 @@
             if (/^\s*[═─]{2,}\s*\S.*\S\s*[═─]{2,}\s*$/.test(s)) return;
             // the prompt: the row the cursor waits on, with what the player has typed so far ("Choose action: I"), or
             // a last row shaped like a prompt
-            if (i === cursor || (i === lastText && /[:?>]\s*$/.test(s)) || (asked && s.trim() === asked)) return;
+            // N5: a prompt that asks a question ("Target which monster? (1-2, ENTER=random, Q=cancel)") stays in the log, for the
+            // keys do not answer it; "Choose action:" has no question and the keys answer it
+            if ((i === cursor || (i === lastText && /[:?>]\s*$/.test(s)) || (asked && s.trim() === asked)) && !/\?/.test(s)) return;
             var line = unbox(s), cmds = scanCommands([s]);
             // A menu line opens with a key; a sentence that names a key ("Use [1] Power Strike") is kept.
             if (cmds.length && /^\[/.test(line) && (!known || cmds.every(function (c) { return known[c.key.toUpperCase()] === 1; }))) return;
