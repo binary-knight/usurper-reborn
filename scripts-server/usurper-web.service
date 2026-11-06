@@ -2,6 +2,7 @@
 # Runs the WebSocket-to-SSH bridge for browser-based play
 #
 # Install:
+#   sudo install -d -m 750 -o root -g root /etc/usurper   (once; holds web.env, see DOCS/SERVER_DEPLOYMENT.md)
 #   sudo cp usurper-web.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable usurper-web
@@ -19,7 +20,11 @@ After=network.target
 Type=simple
 User=usurper
 WorkingDirectory=/opt/usurper/web
-EnvironmentFile=-/opt/usurper/web/.env
+# The environment file is outside the web folder, which nginx serves. The leading dash makes it
+# optional (a self-hoster can run with none), so a missing file starts the service with no
+# settings; the startup log line "Environment:" shows which names are set. An install that
+# still has /opt/usurper/web/.env: see "Moving the environment file" in DOCS/SERVER_DEPLOYMENT.md.
+EnvironmentFile=-/etc/usurper/web.env
 ExecStart=/usr/bin/node ssh-proxy.js
 Restart=on-failure
 RestartSec=5
