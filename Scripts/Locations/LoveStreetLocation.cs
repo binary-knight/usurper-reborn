@@ -161,86 +161,13 @@ public class LoveStreetLocation : BaseLocation
         WriteBoxHeader(Loc.Get("love_street.pleasure"), "bright_cyan", 77);
         terminal.WriteLine("");
 
-        // Pleasure Houses
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("1");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("love_street.menu_beauty"));
+        // 1.3.11 (K3): cells laid out by MenuGridRows, one group of rows at a time
+        foreach (var group in MenuGroups())
+        {
+            WriteMenuCells(group);
+            terminal.WriteLine("");
+        }
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("2");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("love_street.menu_hall"));
-
-        terminal.WriteLine("");
-
-        // Social Options
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("M");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("love_street.menu_mingle"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("D");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("love_street.menu_date"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("G");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("love_street.menu_gift"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("V");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("love_street.menu_gossip"));
-
-        terminal.WriteLine("");
-
-        // Potions & Return
-        terminal.SetColor("darkgray");
-        terminal.Write(" [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("L");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("love_street.menu_potions"));
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("R");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("love_street.menu_return"));
-
-        terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("+---------------------------------------------------------------------------+");
         terminal.WriteLine("");
@@ -259,6 +186,16 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("");
     }
+
+    /// <summary>1.3.11 (K3): the visual menu's groups of rows as cells for MenuGridRows.</summary>
+    internal static List<List<List<(string Key, string Label)>>> MenuGroups() => new()
+    {
+        MenuCells(new[] { ("1", Loc.Get("love_street.menu_beauty")), ("2", Loc.Get("love_street.menu_hall")) }),
+        MenuCells(
+            new[] { ("M", Loc.Get("love_street.menu_mingle")), ("D", Loc.Get("love_street.menu_date")) },
+            new[] { ("G", Loc.Get("love_street.menu_gift")), ("V", Loc.Get("love_street.menu_gossip")) }),
+        MenuCells(new[] { ("L", Loc.Get("love_street.menu_potions")), ("R", Loc.Get("love_street.menu_return")) }),
+    };
 
     /// <summary>
     /// Compact BBS display for 80x25 terminals.

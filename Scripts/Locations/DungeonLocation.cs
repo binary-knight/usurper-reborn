@@ -5772,6 +5772,7 @@ public class DungeonLocation : BaseLocation
             {
                 var boss = MonsterGenerator.GenerateMonster(effectiveMonsterLevel, isBoss: true, random: dungeonRandom);
                 boss.Name = GetBossName(currentFloor.Theme);
+                boss.ArtFamily = BossArtFamily(currentFloor.Theme);   // 1.3.11 (N6): drawn as its theme's boss, not the family drawn for its level
                 GiveFloorBossPhrase(boss, currentFloor.Theme);
                 if (monsters.Count == 0)
                     monsters.Add(boss);
@@ -5989,6 +5990,20 @@ public class DungeonLocation : BaseLocation
         { DungeonTheme.FrozenDepths, new[] { "Frost Wyrm", "Glacial Titan", "Permafrost Revenant", "Blizzard Elemental", "Ice Lich" } },
         { DungeonTheme.VolcanicPit, new[] { "Magma Elemental", "Volcanic Behemoth", "Molten Serpent", "Cinder Lord", "Lava Golem" } },
         { DungeonTheme.AbyssalVoid, new[] { "Void Horror", "Entropy Weaver", "Null Devourer", "Shadow Sovereign", "Abyssal Maw" } },
+    };
+
+    /// <summary>1.3.11 (N6): the monster family whose picture a floor boss of the theme is drawn with (art only; the boss keeps the family it was generated with).</summary>
+    internal static string BossArtFamily(DungeonTheme theme) => theme switch
+    {
+        DungeonTheme.Catacombs => "Undead",
+        DungeonTheme.Sewers => "Aberration",
+        DungeonTheme.Caverns => "Elemental",
+        DungeonTheme.AncientRuins => "Construct",
+        DungeonTheme.DemonLair => "Demonic",
+        DungeonTheme.FrozenDepths => "Elemental",
+        DungeonTheme.VolcanicPit => "Elemental",
+        DungeonTheme.AbyssalVoid => "Shadow",
+        _ => ""
     };
 
     private string GetBossName(DungeonTheme theme)
