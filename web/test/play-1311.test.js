@@ -165,3 +165,21 @@ test('N4: a choice the game prints as (E)quip or (P)ray, (D)esecrate, or (L)eave
   assert.deepStrictEqual(keys(['Defeated 1 monster(s)!', 'Be a Ranger? (Y/n)', 'Press (Enter) now']), [], 'no word, no key');
   assert.deepStrictEqual(keys(['[A] Attack', '(1) not a key']), [['A', 'Attack']]);
 });
+
+// ---------------------------------------------------------------- R8: key labels on a phone
+
+test('R8: on a phone a label ends at a word within 24 characters; elsewhere the limit stays 40', async () => {
+  const p = await load();
+  const long = 'Follow the faint chanting toward the altars of Mirael the Lost';
+  p.ctx.__l = long;
+  assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Follow the faint chanting toward the altars…'.slice(0, 0) + 'Follow the faint chanting toward the…');
+  p.run('window.innerWidth = 390');
+  assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Follow the faint…');
+  p.ctx.__l = 'Understand what the priests whisper';
+  assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Understand what the…');
+  p.ctx.__l = 'Remove Enchantment';
+  assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Remove Enchantment');
+  p.run('window.innerWidth = 481');
+  p.ctx.__l = long;
+  assert.strictEqual(p.run('UsurperPlay.shortLabel(__l)'), 'Follow the faint chanting toward the…');
+});

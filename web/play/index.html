@@ -977,13 +977,19 @@
     // N4: the other way the game prints a choice, the key in round brackets at the start of a word: "(E)quip immediately",
     // "(P)ray, (D)esecrate, or (L)eave". The label runs to a comma, the next bracket or two spaces.
     var PAREN_COMMAND = /(^|[\s,;])\(([A-Za-z0-9])\)([A-Za-z]+)([^,;(\[║│]*)/g;
-    // R8: a label longer than LABEL_MAX ends at a word with an ellipsis, never in the middle of one; the key cap keeps the
+    // R8: a label longer than the limit (labelMax) ends at a word with an ellipsis, never in the middle of one; the key cap keeps the
     // whole label for its title and its spoken name.
-    var LABEL_MAX = 40;
+    // R8, 1.3.11: on a phone (four keys across, a label about 75px wide) the limit is 24, so a label of two short lines never
+    // reaches the clamp that cut a word ("chantin...").
+    function labelMax() {
+        var w = typeof window !== 'undefined' ? window.innerWidth : 0;
+        return typeof w === 'number' && w > 0 && w <= 480 ? 24 : 40;
+    }
     function shortLabel(label) {
-        if (label.length <= LABEL_MAX) return label;
-        var cut = label.slice(0, LABEL_MAX), sp = cut.lastIndexOf(' ');
-        return (sp > LABEL_MAX / 2 ? cut.slice(0, sp) : cut).replace(/[\s,;:.]+$/, '') + '\u2026';
+        var max = labelMax();
+        if (label.length <= max) return label;
+        var cut = label.slice(0, max), sp = cut.lastIndexOf(' ');
+        return (sp > max / 2 ? cut.slice(0, sp) : cut).replace(/[\s,;:.]+$/, '') + '\u2026';
     }
     function scanCommands(rows) {
         var found = [];
