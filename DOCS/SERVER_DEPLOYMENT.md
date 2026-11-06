@@ -236,6 +236,7 @@ Browser -> https://your-domain.com (nginx)
 - `play/` - The full page client at `/play/`
 - `dashboard.html` - The Observatory at `/dashboard`, a public page fed by `/api/dash/` (an unknown `/api/dash/` path answers 404)
 - nginx proxies `/ws` (WebSocket) and `/api/` (HTTP) to Node.js on port 3000
+- Node.js listens on `127.0.0.1` only, so nginx on the same host reaches it and nothing else does. The setting is `WEB_BIND_HOST`. If you reach port 3000 from another host (nginx on a second machine, a container network, a test from your laptop), set `WEB_BIND_HOST=0.0.0.0`, or one interface address, in the web service environment and restart `usurper-web`; then keep port 3000 closed to the internet with a firewall rule. The startup log line `HTTP + WebSocket server listening on` names the address in use
 - The web folder also holds the service's own files (`.env`, `.bak` copies, `package.json`, `node_modules`, the server scripts). `nginx-private.conf` answers 404 for them and `ssh-proxy.js` refuses them when it serves the folder
 
 **Setup**:

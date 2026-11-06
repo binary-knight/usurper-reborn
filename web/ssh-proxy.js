@@ -34,6 +34,16 @@ try {
 }
 
 const WS_PORT = 3000;
+// --- Bind host (1.3.11) ---
+// The HTTP and WebSocket server listens on WEB_BIND_HOST, loopback unless the operator says otherwise.
+// docker compose sets 0.0.0.0 for usurper-web because nginx reaches it by service name; compose
+// publishes only nginx. A self-hoster who reaches port 3000 from another host sets it too.
+function resolveBindHost(env) {
+  const v = typeof env.WEB_BIND_HOST === 'string' ? env.WEB_BIND_HOST.trim() : '';
+  return v || '127.0.0.1';
+}
+// --- End bind host ---
+const WS_BIND_HOST = resolveBindHost(process.env);
 const SSH_HOST = '127.0.0.1';
 const SSH_PORT = 4000;
 // Gateway account for the legacy SSH hop (only used when MUD_MODE=0). This is
@@ -5722,8 +5732,8 @@ function wsConnRelease(ip) {
   if (count <= 1) wsConnPerIp.delete(ip); else wsConnPerIp.set(ip, count - 1);
 }
 
-httpServer.listen(WS_PORT, () => {
-  console.log(`[usurper-web] HTTP + WebSocket server listening on port ${WS_PORT}`);
+httpServer.listen(WS_PORT, WS_BIND_HOST, () => {
+  console.log(`[usurper-web] HTTP + WebSocket server listening on ${WS_BIND_HOST}:${WS_PORT}`);
   console.log(`[usurper-web] Stats API: http://127.0.0.1:${WS_PORT}/api/stats`);
 
   // v0.57.13: start Discord gossip bridge (no-op if env vars not set)
