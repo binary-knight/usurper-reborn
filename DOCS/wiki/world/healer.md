@@ -2,7 +2,7 @@
 title: The Healer
 path: /wiki/en/world/healer/
 checked: 1.3.10
-sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
 history: 1.3.10 | While Blessed Rain falls, healing HP at the Healer (H and F) is free with no tax, and the menu rows no longer run into each other in any language.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none
@@ -22,7 +22,7 @@ The Healer restores HP for 2 gold per HP before tax. H heals the amount you choo
 
 ## Healer tax
 
-Every Healer price has the king's tax and the city tax added, but the two together are capped at 15 percent however high the ruler sets them. With no ruler there is no tax. The Healer's prices do not change with your alignment, faction or difficulty.
+Every Healer price has the king's tax and the city tax added, but the two together are capped at 15 percent however high the ruler sets them. With no ruler there is no tax. The Healer's prices do not change with your alignment or difficulty. Members of The Faith pay 15 to 35 percent less by rank on every Healer price, before tax, and the menu shows what they pay: a member's HP rate is 1.7 gold per HP at rank 0 and 1.3 at rank 8. The total rounds half up, so a small amount can differ slightly from the rate x HP: 1 HP at 1.65 costs 2 gold. Nobody else's price changes, and what Blessed Rain makes free stays free.
 
 ## Potions and antidotes
 

@@ -5265,7 +5265,8 @@ public class CastleLocation : BaseLocation
             }
 
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("castle.arrested", GameConfig.ArrestTrialCost.ToString("N0")));
+            // 1.3.11 (K6): only a real NPC goes to jail; a plot of court titles alone is thrown out of court
+            terminal.WriteLine(Loc.Get(npcConspirators.Count > 0 ? "castle.arrested" : "castle.arrested_dismissed", GameConfig.ArrestTrialCost.ToString("N0")));
             NewsSystem.Instance?.Newsy(true, Loc.Get("castle.news_plot_crushed", KingTitle(), currentKing.Name, PlotTypeLabel(plot.PlotType)));
         }
         terminal.WriteLine("");

@@ -138,7 +138,7 @@ Your rank rises with the reputation you earn in your faction after you join: Cro
 
 {{table:faction-bonuses}}
 
-The Faith's listed healing discount is not applied at the Healer: the Healer charges a Faith member the same.
+Members of The Faith pay 15 to 35 percent less at the Healer, by rank, before tax ([Healer tax](/wiki/en/world/healer/#healer-tax)).
 
 ## Royal quests
 
