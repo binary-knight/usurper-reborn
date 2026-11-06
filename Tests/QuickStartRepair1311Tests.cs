@@ -98,8 +98,6 @@ public class QuickStartRepair1311Tests : IDisposable
     private async Task<PlayerData> CustomRow(string archetype, int level)
     {
         var c = await Quick($"qsr{Guid.NewGuid():N}", archetype);
-        c.InitializeBaseStats();
-        c.RecalculateStats();
         LevelTo(c, level);
         return Save(c);
     }
@@ -508,8 +506,6 @@ public class QuickStartRepair1311Tests : IDisposable
     private async Task<LoadRow> CustomAt(string archetype, int level)
     {
         var c = await Quick($"qsr{Guid.NewGuid():N}", archetype);
-        c.InitializeBaseStats();
-        c.RecalculateStats();
         if (level > 1) LevelUpTo(c, level);
         return Read(c);
     }
