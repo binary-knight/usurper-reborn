@@ -12,6 +12,7 @@ const LANGS = ['en', 'es', 'fr', 'hu', 'it'];
 const WEB = path.join(__dirname, '..');
 const ROOT = path.join(WEB, '..');
 const lang = (l) => JSON.parse(fs.readFileSync(path.join(WEB, 'lang', l + '.json'), 'utf8'));
+const CSS = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
 const gameLang = (l) => JSON.parse(fs.readFileSync(path.join(ROOT, 'Localization', l + '.json'), 'utf8'));
 
 async function load(opts = {}) {
@@ -127,4 +128,25 @@ test('B6: the two wordings the old exact list pinned (ui.press_enter, ui.press_a
       assert.strictEqual(p.run('UsurperPlay.asksEnter(__w)'), true, l + ' ' + k + ': ' + w);
     }
   }
+});
+
+// ---------------------------------------------------------------- N3, N2: the right page
+
+// A rule of the stylesheet from its selector to its closing brace.
+function rule(sel) {
+  const at = CSS.indexOf('\n' + sel + ' {');
+  assert.ok(at !== -1, 'no rule ' + sel);
+  return CSS.slice(at, CSS.indexOf('}', at) + 1);
+}
+
+test('N3: the street text takes its whole height and the right page scrolls; it keeps no inner window of its own', () => {
+  const r = rule('.chron .cbody.b-street > .prose');
+  assert.match(r, /flex: none;/);
+  assert.match(r, /overflow: visible;/);
+  assert.doesNotMatch(rule('.chron .cbody.b-street'), /12em/, 'the 12 line window is gone');
+});
+
+test('N2: a right page taller than the window shows a bar that stays on, so a half line at its foot reads as more page', () => {
+  assert.match(rule('.chron .recto'), /scrollbar-width: thin;/);
+  assert.match(CSS, /\.chron \.recto::-webkit-scrollbar \{ width: 8px; \}/);
 });
