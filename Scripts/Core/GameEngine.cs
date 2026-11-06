@@ -6074,6 +6074,7 @@ public partial class GameEngine
         player.BaseDefence = playerData.BaseDefence > 0 ? playerData.BaseDefence : playerData.Defence;
         player.BaseStamina = playerData.BaseStamina > 0 ? playerData.BaseStamina : playerData.Stamina;
         player.BaseAgility = playerData.BaseAgility > 0 ? playerData.BaseAgility : playerData.Agility;
+        RepairQuickStartBases(player, playerData);
 
         // If this is an old save without equipment data, initialize from WeapPow/ArmPow.
         // 1.3.1: only a save that carries no base stats is an old save. The base stats and the
@@ -6658,6 +6659,37 @@ public partial class GameEngine
             || playerData.BaseIntelligence > 0 || playerData.BaseWisdom > 0 || playerData.BaseCharisma > 0
             || playerData.BaseMaxHP > 0 || playerData.BaseMaxMana > 0 || playerData.BaseDefence > 0
             || playerData.BaseStamina > 0 || playerData.BaseAgility > 0;
+    }
+
+    /// <summary>
+    /// 1.3.11: true for a save whose rolled bases were lost: Quick Start used to skip InitializeBaseStats, so the first
+    /// recalculation zeroed Max HP, Max Mana, Defence, Stamina and Agility and later level ups built on those zeros.
+    /// A level 1 save with Agility above 0 cannot be told from one that has not fought and is left to the load below.
+    /// A base Agility above 0, which the repair itself leaves, stops it repeating.
+    /// </summary>
+    private static bool SaveLostQuickStartBases(PlayerData playerData)
+    {
+        return SaveCarriesBaseStats(playerData)
+            && playerData.BaseAgility == 0
+            && (playerData.Level > 1 || playerData.Agility == 0)
+            && CharacterCreationSystem.QuickStartAverageBases(playerData.Race, playerData.Class) != null;
+    }
+
+    /// <summary>
+    /// 1.3.11: adds the average roll once to the saved bases of such a save. It reads only the saved row, so the empty
+    /// base fallback's result (a saved MaxHP, or a negative saved Defence) never enters the new base. Current HP and
+    /// Mana are not raised. Only the owner's own load reaches this; PlayerCharacterLoader does not.
+    /// </summary>
+    private static void RepairQuickStartBases(Character player, PlayerData playerData)
+    {
+        if (!SaveLostQuickStartBases(playerData)) return;
+        var add = CharacterCreationSystem.QuickStartAverageBases(playerData.Race, playerData.Class)!.Value;
+        player.BaseMaxHP = playerData.BaseMaxHP + add.MaxHP;
+        player.BaseMaxMana = playerData.BaseMaxMana + add.MaxMana;
+        player.BaseDefence = playerData.BaseDefence + add.Defence;
+        player.BaseStamina = playerData.BaseStamina + add.Stamina;
+        player.BaseAgility = playerData.BaseAgility + add.Agility;
+        DebugLogger.Instance.LogInfo("MIGRATION", $"Quick Start bases repaired for {playerData.Name2}");
     }
 
     /// <summary>
