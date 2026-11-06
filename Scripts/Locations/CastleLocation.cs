@@ -203,7 +203,7 @@ public class CastleLocation : BaseLocation
         else
         {
             // 1.3.11 (K3): cells laid out by MenuGridRows (no label touches the next key, no row passes 79 columns)
-            WriteMenuCells(RoyalMenuRows(), k => k == "Y" || k == "Z" ? "bright_magenta" : "bright_yellow");
+            WriteMenuCells(RoyalMenuRows(), k => k is "Y" or "Z" ? "bright_magenta" : "bright_yellow");
             terminal.WriteLine("");
             WriteMenuCells(MenuCells(new[] { ("R", Loc.Get("castle.menu_return_town")) }));
             terminal.WriteLine("");
