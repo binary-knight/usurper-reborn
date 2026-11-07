@@ -55,6 +55,7 @@ services:
       - usurper-data:/var/usurper
     environment:
       - MUD_MODE=1
+      - WEB_BIND_HOST=0.0.0.0         # nginx reaches this container by service name; only nginx is published
       - MUD_HOST=usurper-game
       - MUD_PORT=4000                 # must match --mud-port above (the proxy's own default is 4001)
       - DB_PATH=/var/usurper/usurper_online.db
