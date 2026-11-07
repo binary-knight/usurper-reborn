@@ -99,6 +99,7 @@ Run `UsurperReborn --help` for the single-player, BBS door and online flags; it 
 | `BALANCE_USER` | `admin` | Dashboard login username |
 | `BALANCE_PASS` | `changeme` | Dashboard login password; the shipped default keeps `/balance` and `/admin` locked |
 | `BALANCE_SECRET` | (random) | JWT signing secret (auto-generated if not set) |
+| `WEB_BIND_HOST` | `127.0.0.1` | Address the web service listens on; compose sets `0.0.0.0` because nginx reaches the container by service name, and publishes only nginx |
 | `WS_MAX_CONN_PER_IP` | `8` | Browser sessions allowed per client IP |
 | `BUG_REPORT_WEBHOOK_URL` | (unset) | Discord webhook that receives in-game `/bug` reports; reports are dropped when unset |
 | `DISCORD_BOT_TOKEN` | (unset) | With `DISCORD_GOSSIP_CHANNEL_ID`, mirrors world news to a Discord channel (`discord.js` is installed in the image) |

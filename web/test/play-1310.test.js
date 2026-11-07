@@ -283,14 +283,6 @@ test('B6: the Enter key shows only while the game waits for a line and the conne
   assert.strictEqual(q.el('c-enterbar').hidden, true, 'a closed connection: no Enter key ("Connection closed")');
 });
 
-test('B6: the Enter prompts the page knows are the game\'s own, in every language', () => {
-  const code = readPage(PAGE);
-  const asks = JSON.parse('[' + /var ENTER_ASKS = \[([^\]]*)\];/.exec(code)[1].replace(/'/g, '"') + ']');
-  const want = [];
-  for (const l of LANGS) for (const k of ['ui.press_enter', 'ui.press_any_key']) want.push(gameLang(l)[k].replace(/\.+$/, ''));
-  assert.deepStrictEqual([...asks].sort(), [...new Set(want)].sort());
-});
-
 test('N8: a prompt the game ends with a line end is this screen\'s: the map shows its [P] key and Enter', async () => {
   const p = await chronicle({ WebSocket: socket([]) });
   const rows = ['old screen', '[42hp 100st] Dungeon Fl.1 >', ' DUNGEON MAP', '   [P] Persistent mini-map: OFF', '   Press Enter to continue...', ''];

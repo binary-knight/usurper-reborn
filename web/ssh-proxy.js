@@ -34,6 +34,25 @@ try {
 }
 
 const WS_PORT = 3000;
+// --- Bind host (1.3.11) ---
+// The HTTP and WebSocket server listens on WEB_BIND_HOST, loopback unless the operator says otherwise.
+// docker compose sets 0.0.0.0 for usurper-web because nginx reaches it by service name; compose
+// publishes only nginx. A self-hoster who reaches port 3000 from another host sets it too.
+function resolveBindHost(env) {
+  const v = typeof env.WEB_BIND_HOST === 'string' ? env.WEB_BIND_HOST.trim() : '';
+  return v || '127.0.0.1';
+}
+// --- End bind host ---
+const WS_BIND_HOST = resolveBindHost(process.env);
+// --- Startup env line (1.3.11) ---
+// One startup line names the variables the service reads from its environment file, each set or unset.
+// Names only, never a value. The unit's file is optional, so a missing file starts the service with no
+// settings and is-active still passes; this line shows it in the journal.
+const STARTUP_ENV_NAMES = ['BALANCE_PASS', 'BALANCE_SECRET', 'RESEND_API_KEY', 'MAIL_FROM', 'DISCORD_BOT_TOKEN', 'BUG_REPORT_WEBHOOK_URL'];
+function startupEnvLine(env) {
+  return '[usurper-web] Environment: ' + STARTUP_ENV_NAMES.map((n) => n + '=' + (env[n] ? 'set' : 'unset')).join(' ');
+}
+// --- End startup env line ---
 const SSH_HOST = '127.0.0.1';
 const SSH_PORT = 4000;
 // Gateway account for the legacy SSH hop (only used when MUD_MODE=0). This is
@@ -491,7 +510,7 @@ function sendJson(res, status, data, extraHeaders) {
 }
 
 // --- Bug Report Proxy ---
-// Real webhook URL lives only in this env var (loaded from /opt/usurper/web/.env).
+// Real webhook URL lives only in this env var (loaded from /etc/usurper/web.env by the service unit).
 // Game clients POST to /api/bug-report, we forward to Discord server-side so the
 // URL is never baked into Steam / BBS distributions.
 const BUG_REPORT_WEBHOOK_URL = process.env.BUG_REPORT_WEBHOOK_URL || '';
@@ -5033,7 +5052,7 @@ function handleHttpRequest(req, res) {
   // The game client POSTs { content: "..." } here; we forward to the real
   // Discord webhook stored server-side in BUG_REPORT_WEBHOOK_URL. This exists
   // because the client URL is baked into Steam/BBS binaries and was scraped
-  // and abused — the real URL now lives only in /opt/usurper/web/.env.
+  // and abused, the real URL now lives only in the service's environment file (/etc/usurper/web.env).
   if (req.method === 'POST' && req.url === '/api/bug-report') {
     handleBugReport(req, res).catch(err => {
       console.error(`[usurper-web] Bug report proxy error: ${err.message}`);
@@ -5722,8 +5741,9 @@ function wsConnRelease(ip) {
   if (count <= 1) wsConnPerIp.delete(ip); else wsConnPerIp.set(ip, count - 1);
 }
 
-httpServer.listen(WS_PORT, () => {
-  console.log(`[usurper-web] HTTP + WebSocket server listening on port ${WS_PORT}`);
+httpServer.listen(WS_PORT, WS_BIND_HOST, () => {
+  console.log(`[usurper-web] HTTP + WebSocket server listening on ${WS_BIND_HOST}:${WS_PORT}`);
+  console.log(startupEnvLine(process.env));
   console.log(`[usurper-web] Stats API: http://127.0.0.1:${WS_PORT}/api/stats`);
 
   // v0.57.13: start Discord gossip bridge (no-op if env vars not set)
