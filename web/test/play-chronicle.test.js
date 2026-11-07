@@ -289,10 +289,10 @@ test('the street box title the page already shows is left out, whatever its case
   assert.ok(!/MAIN STREET/.test(pre.textContent), 'the box title is not repeated under the heading: ' + pre.textContent);
   assert.match(pre.textContent, /You are standing on the main street of Usurper\./);
   assert.match(pre.textContent, /Players online: 1/);
-  // the street text has a floor beside the keys, the right page scrolls when both do not fit, and on a phone the
+  // the street text takes its whole height (N3, 1.3.11: no inner window to cut it), the right page scrolls when both do not fit, and on a phone the
   // keys follow the text instead of covering it
   const css = fs.readFileSync(path.join(WEB, 'play', 'chronicle.css'), 'utf8');
-  assert.match(css, /^\.chron \.cbody\.b-street \{ flex: 1 0 12em; \}$/m);
+  assert.match(css, /^\.chron \.cbody\.b-street \{ flex: 1 0 auto; \}$/m);
   assert.match(css, /^\.chron\[data-layout="street"\] \.recto \{ overflow-y: auto; \}$/m);
   const phone = css.slice(css.indexOf('@media (max-width: 600px) {'));
   assert.match(phone.slice(0, phone.indexOf('\n}')), /^  \.chron \.dock \{ order: 5; position: static;/m);

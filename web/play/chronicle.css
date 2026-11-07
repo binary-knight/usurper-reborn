@@ -184,7 +184,16 @@ html.hc .chron .typedline { font-family: var(--mono); font-size: 18px; color: #f
 .chron .cbody.b-room { flex: 1 0 auto; overflow: visible; }
 /* The street text keeps at least 12 lines beside the keys; when the page is too short for both, the right page scrolls */
 .chron[data-layout="street"] .recto { overflow-y: auto; }
-.chron .cbody.b-street { flex: 1 0 12em; }
+/* N3: the street's text is never cut inside its own window: it takes its whole height and the right page scrolls, as the
+   room's does */
+.chron .cbody.b-street { flex: 1 0 auto; }
+.chron .cbody.b-street > .prose { flex: none; min-height: 0; overflow: visible; }
+/* N2: a right page taller than the window scrolls, and says so: a thin bar that stays on show, so a half line at the foot
+   reads as more page, not as a cut */
+.chron .recto { scrollbar-width: thin; scrollbar-color: var(--iron-hi) var(--page-edge); }
+.chron .recto::-webkit-scrollbar { width: 8px; }
+.chron .recto::-webkit-scrollbar-track { background: var(--page-edge); }
+.chron .recto::-webkit-scrollbar-thumb { background: var(--iron-hi); border-radius: 4px; }
 .chron .compcard { flex: none; align-items: center; }
 /* D3: the map and the exits side by side above the keys (2.0 phase 3a) */
 .chron .nav { flex: none; display: flex; justify-content: flex-end; align-items: stretch; gap: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
