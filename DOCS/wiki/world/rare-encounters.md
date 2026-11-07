@@ -1,8 +1,9 @@
 ---
 title: Rare dungeon encounters
 path: /wiki/en/world/rare-encounters/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/RareEncounters.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | none

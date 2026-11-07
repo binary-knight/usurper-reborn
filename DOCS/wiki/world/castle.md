@@ -1,8 +1,9 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.11 | Members of the Faith pay 15 to 35 percent less at the Healer, the throne room menu rows fit within 79 columns in every language, and arresting a plot made only of court titles says the conspirators are thrown out of court, not imprisoned.
 history: 1.3.10 | Detect Threats has a 50 percent chance to uncover an active plot, a discovered plot waits 7 days for the king's arrest before it lapses, the king no longer executes an NPC you rescued, and the royal quest to recover a stolen artifact places a Relic Thief on a named dungeon floor.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none

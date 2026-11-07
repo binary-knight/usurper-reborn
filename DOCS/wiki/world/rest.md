@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | none
@@ -21,7 +22,7 @@ The Inn and Home provide different rest and social actions. Recovering HP, recov
 
 ## The Inn
 
-A table rest restores Mental, with a better result when a close NPC friend is present. Sleep in single-player or renting a room online gives another recovery source. Paid options warn when Mental recovery would do nothing at the cap.
+A table rest restores Mental, with a better result when a close NPC friend is present. Sleep in single-player or renting a room online gives another recovery source. Paid options warn when Mental recovery would do nothing at the cap. O orders a meal: each of the six dishes costs its own base price, 15 to 50 gold, plus 2 gold per level, with the king's and city's tax added, you can eat 3 meals a day, and only one meal's effect is active at a time.
 
 ## Stat training at the Inn
 
