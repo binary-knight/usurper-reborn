@@ -1,8 +1,9 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Core/King.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/MarketplaceSystem.cs
+history: 1.3.11 | The Magic Shop's identify, curse removal and dungeon reset scroll pages open on a clear screen instead of under the shop menu.
 history: 1.3.10 | Armor auto-buy shows every piece and the total with tax and asks once, auto-buy and the shop list charge the price of a direct buy, the Smugglers' Cache takes 10 percent off your next 5 purchases, and the offline Auction House lets you take a listing back (W) and returns an unsold listing after 30 days.
 history: 1.3.9 | none
 history: 1.3.7 | The Magic Shop says when an item's name is too long to carry the enchant's tag; the enchant is applied all the same.
