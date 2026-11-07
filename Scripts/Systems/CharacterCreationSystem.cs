@@ -2722,7 +2722,7 @@ public class CharacterCreationSystem
     }
 
     /// <summary>v1.1.15: set the character's stats from rolled dice plus its class and race modifiers.</summary>
-    private void ApplyDice(Character character, int[] dice)
+    private static void ApplyDice(Character character, int[] dice)
     {
         // Get class base attributes (these are now modifiers, not fixed values)
         var classAttrib = GameConfig.ClassStartingAttributes[character.Class];
@@ -2766,6 +2766,29 @@ public class CharacterCreationSystem
             character.Mana = 0;
             character.MaxMana = 0;
         }
+    }
+
+    private const int Average3d6 = 10;   // 10.5 rounded down
+    private const int Average2d6 = 7;
+
+    /// <summary>
+    /// 1.3.11: what load adds to the bases of a save that lost them (GameEngine.RepairQuickStartBases): ApplyDice on
+    /// the average roll, because the real roll was not kept. Null unless the pair is one of the three Quick Start
+    /// archetypes.
+    /// </summary>
+    internal static (long MaxHP, long MaxMana, long Defence, long Stamina, long Agility)? QuickStartAverageBases(CharacterRace race, CharacterClass characterClass)
+    {
+        bool archetype = (race, characterClass) is (CharacterRace.Human, CharacterClass.Warrior)
+            or (CharacterRace.Elf, CharacterClass.Magician)
+            or (CharacterRace.Dwarf, CharacterClass.Cleric);
+        if (!archetype) return null;
+
+        var dice = new int[DiceCount];
+        Array.Fill(dice, Average3d6);
+        dice[DiceCount - 1] = Average2d6;
+        var average = new Character { Race = race, Class = characterClass };
+        ApplyDice(average, dice);
+        return (average.MaxHP, average.MaxMana, average.Defence, average.Stamina, average.Agility);
     }
 
     /// <summary>
