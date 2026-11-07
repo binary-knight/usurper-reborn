@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | none
