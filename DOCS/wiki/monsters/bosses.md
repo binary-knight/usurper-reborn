@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.11 | A floor boss is drawn as its theme's boss, not with the picture of the family rolled for its level.
 history: 1.3.10 | A second try at an Old God uses the answer given in that attempt, and a floor's boss hint stops once the god is defeated, saved, allied or consumed.
 history: 1.3.9 | none
 history: 1.3.8 | An ally told to wait is not in the fight and does not count among Maelketh's fighters.

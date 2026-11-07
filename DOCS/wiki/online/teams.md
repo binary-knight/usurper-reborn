@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Systems/TeamHQBonus.cs, Scripts/Server/GroupSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Server/MudChatSystem.cs
+history: 1.3.11 | none
 history: 1.3.10 | Online, each player pays the daily wage of the NPCs on the team at their own daily reset.
 history: 1.3.9 | none
 history: 1.3.8 | none

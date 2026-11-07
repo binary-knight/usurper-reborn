@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.10; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.11; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
@@ -431,6 +431,7 @@ Option B: Single shared account with in-game auth (simpler)
   - `story_systems` - Not written since 1.3.8 (a player's story stays in that player's save); a row an older version wrote is kept and only read
   - `daily_state` - Daily reset coordination
   - `marriages` - NPC marriage registry
+  - `quest_ended` - Quests the world reset failed, as quest id and failure time, kept 30 days so a restart does not return one from a save (1.3.11; written by `WorldSimService` after each daily maintenance)
 - `SaveAllSharedState()` / `LoadAllSharedState()` for bulk operations
 - Daily reset coordination via `TryProcessDailyReset()` with atomic locking
 - `SaveAllSharedState()` writes the NPCs, world events and quests; it does not write `story_systems`

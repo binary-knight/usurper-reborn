@@ -1,8 +1,9 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs
+history: 1.3.11 | Members of the Faith pay 15 to 35 percent less at the Healer for Talk Therapy, Willow Draught and addiction rehab.
 history: 1.3.10 | Grief also begins when your spouse dies away from your fights, at once in single-player and at your next login online.
 history: 1.3.9 | none
 history: 1.3.8 | A story companion told to wait in a dungeon room does not ease the strain of new rooms while it waits.

@@ -1,8 +1,9 @@
 ---
 title: Relationships and Love Street
 path: /wiki/en/world/relationships/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/LoveStreetLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs
+history: 1.3.11 | The Love Street menu rows fit within 79 columns in every language.
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.3 | none
@@ -15,7 +16,7 @@ Love Street contains dating, gifts, gossip and adult-themed services. Relationsh
 
 ## Courtship
 
-Mingling, conversations, compliments, gifts and dates have their own eligibility and response rules. The NPC's current relationship and availability matter. Do not assume that a previous successful visit guarantees the next response.
+The Gift Shop (G) sells nine gifts, from Red Roses at 100 gold to the Star of Eternity at 100,000 gold. Mingling, conversations, compliments, gifts and dates have their own eligibility and response rules. The NPC's current relationship and availability matter. Do not assume that a previous successful visit guarantees the next response.
 
 ## Marriage and home life
 

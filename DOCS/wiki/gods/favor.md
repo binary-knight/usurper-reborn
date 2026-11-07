@@ -1,8 +1,9 @@
 ---
 title: Favor, prayer and sacrifice
 path: /wiki/en/gods/favor/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/FaithSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | none

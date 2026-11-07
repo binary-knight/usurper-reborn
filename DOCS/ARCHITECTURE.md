@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.10; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.11; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.10. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.11. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -1091,7 +1091,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 | `Client.Menu` | Web client sessions only (2.0). Sent when a screen draws its menu, never per keystroke: Main Street (both layouts, `MainStreetWebMenu.cs`), the dungeon room view (`EmitRoomMenu`), the combat owner's dungeon fight prompt and the PvP prompt (`CombatEngine.WebMenu.cs`) | `{ screen, oneKey, round?, groups: [{ label, items: [{ key, label, enabled }] }], hint?: { text, label } }`; screen is `main_street`, `main_street_classic`, `dungeon_room`, `combat` or `combat_pvp`. Built from the list the screen's key handler reads (`MainStreetLines`, `RoomActions`, the handler's cases); `enabled` is false where the handler takes the key but refuses it. The dungeon room sends each action's printed key (`DrawKey`, 1.3.10): `*` Inventory and `%` Status, the global keys, while the room still takes `I` and `=` typed. On the combat screens (1.3.10) the list is exactly the keys the text menu drew this round: an action that cannot be taken (Aid Ally with no ally in need, Rescue, a Miracle not offered, Save, Rage, Backstab, Smite, Coat Blade, the herb pouch, and Power Attack, Precise Strike, Fight to Death and Beg for Mercy in PvP) is left out, and a key left out still does what it did when typed. `oneKey` (1.3.9) is true when the page may send a menu key on one press: the character has one key menus on (`WebMenuKeysNeedEnter` false, the default) and is not in screen reader mode (`WebClientMenu.OneKey`). `round` (1.3.9) is the fight's current round on a combat screen and is left out elsewhere. `hint` only when the text menu printed that line. Labels in the session's language |
 | `Client.Waiting` | Web client sessions only (1.3.9). At the start of each stream input read (`ReadLineInteractiveAsync`, `GetMaskedInput`), and with `poll` true when a poll that throws away the key it catches starts listening (the auto-combat stop key, the opening story skip) (`GmcpBridge.EmitWebWaiting`, `EmitWebPollWaiting`) | Empty for a read, `{ poll: true }` for a poll. Tells the page the game is reading input now, in any language. Goes to the session that owns the terminal being read (a grouped follower's terminal read on the leader's session reaches the follower), written under that terminal's writer lock; straight to the owner's stream, so a spectator never gets it |
 | `Room.Detail` | Web client sessions only (2.0). Each dungeon room view (`EmitRoomDetail`) | `{ name, level, theme, themeId, header, danger: { rating, max }, status, boss, exits: [{ key, description, state, stateLabel }], features }`: what the room text shows. `theme` is the translated short name; `themeId` (phase 3a) is the `DungeonTheme` name, the same in every language, for the scene art. Exit state is `cleared`, `fully_cleared` (only where the text says it), `explored` or `unknown`; no target room, no trap |
-| `Client.Enemies` | Web client sessions only (2.0 phase 3a). Beside `Char.Combat.Start`, and beside `Char.Combat.Enemies` when the names or families changed since the last one of the fight (`GmcpBridge.EmitWebEnemies`) | `{ enemies: [{ name, family }] }`: the same members in the same order as the enemy list, `family` the monster family (`Monster.FamilyName`, empty when none) for the sprite |
+| `Client.Enemies` | Web client sessions only (2.0 phase 3a). Beside `Char.Combat.Start`, and beside `Char.Combat.Enemies` when the names or families changed since the last one of the fight (`GmcpBridge.EmitWebEnemies`) | `{ enemies: [{ name, family }] }`: the same members in the same order as the enemy list, `family` the monster family for the sprite (`Monster.ArtFamilyName`: `FamilyName`, or a floor boss's theme family since 1.3.11; empty when none) |
 | `Client.Footer` | Web client sessions only (2.0 phase 3a). When the status line draws and a value changed since the last one (`BaseLocation.EmitWebFooter`) | `{ potions, maxPotions, lives, maxLives, livesKind, xpPercent }`: potions as the potion line prints them (`Healing` of `MaxPotions`); the lives or revives counter (`livesKind` `lives` or `revives`) and the XP percent only where the line prints them (`StatusLineLives`, `StatusLineXpPercent`, the rules the line itself uses) |
 | `Client.Sheet` | Web client sessions only (2.0 phase 3a). As the Character Status sheet draws (`BaseLocation.EmitWebSheet`), once per sheet | `{ title, name, classId, basic, level, combat, equipment, totals }`: the sections the G2 layout shows, labels from the text's own Loc strings without padding and colon, values as the text prints them, each equipment slot with its item name and stats or its empty word. Only for the character the session plays (its engine's `CurrentPlayer`) |
 | `Client.Map` | Web client sessions only (2.0 phase 3a). With each dungeon room draw, beside `Room.Detail` (`EmitWebMapForRoom`), and as the map screen (M) draws (`DungeonLocation.EmitWebMap`); neither for the screen reader | `{ level, theme, themeId, explored, total, cleared, room, location, bossDefeated, rooms: [{ x, y, kind }], links: [{ x1, y1, x2, y2 }] }`: rooms at their `BuildRoomPositionMap` places with the symbol the text prints (`here`, `boss`, `stairs`, `cleared`, `monsters`, `safe`, and `unknown` for a "?") and the corridors it draws. Explored rooms and the current one are always listed. An unexplored room is `unknown` with nothing else about it, and is listed only when exits that are not hidden and unrevealed lead to it from the entrance or a room the player has seen. A corridor through a hidden, unrevealed exit is never listed, though the text map draws it. `room` is the current room's id, as `Room.Info` sends it |
@@ -1267,6 +1267,8 @@ The royal artifact quest (a Relic Thief), Crown criminal bounties and bounty boa
 
 ### Quest Aging
 Online, the world reset ages every claimed quest once a day (`WorldSimService`); a player's own daily reset does not (`QuestSystem.WorldResetAgesQuests`, 1.3.10). Single player and a BBS door session in its own process age quests at the player's daily reset.
+
+Online, the quests the world reset failed are kept as `world_state` key `quest_ended` (quest id and the time it failed, kept 30 days; `QuestSystem.EndedByWorldKey`, `WorldSimService`), so a server restart does not give one back from a player's save (1.3.11). No schema change.
 
 ### Quest Completion
 Gold rewards reduced 7-10x in v0.52.5 (was overtuned). Failure penalties enabled. Abandoned quests serialize with `QuestStatus.Abandoned`.
@@ -1589,6 +1591,7 @@ Dark-themed responsive page with:
 ### Web Proxy
 **File**: `web/ssh-proxy.js` (Node.js, port 3000)
 
+- **Bind address**: the HTTP and WebSocket server listens on `127.0.0.1:3000` unless `WEB_BIND_HOST` is set (1.3.11; Docker sets `0.0.0.0`). At startup it logs one `Environment:` line that names which of six settings are set, names only
 - **HTTP**: serves `/api/stats`, `/api/feed` (SSE), and `/api/admin/*` family
 - **WebSocket bridge**: browser -> TCP to the MUD server on 127.0.0.1:4001 (`MUD_MODE` on by default); `MUD_MODE=0` falls back to SSH on 127.0.0.1:4000
 - **GMCP split for the play page** (`web/gmcp-split.js`): only a MUD mode websocket opened as `/ws?gmcp=1`. When the game sends `IAC WILL GMCP`, the proxy answers `IAC DO GMCP` once, inside the server's 250ms probe window. Each `IAC SB GMCP ... IAC SE` frame goes to the page as one JSON text frame; terminal bytes go as binary with all other telnet negotiation removed. State carries across TCP chunks, `IAC IAC` becomes one 0xFF, a payload over 20 KB is dropped whole (the game's own cap is 16 KB with framing), and a malformed subnegotiation, or one still open after 64 KB or 5 seconds, closes the session; the terminal text before it is sent first. Every other connection, the Electron client included, keeps the plain byte pipe.
@@ -1757,7 +1760,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.10"
+Version = "1.3.11"
 VersionName = "Reckoning"
 ```
 

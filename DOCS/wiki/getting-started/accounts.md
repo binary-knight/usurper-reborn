@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md, web/index.html
+history: 1.3.11 | The game server requires a password on connections forwarded through a proxy and accepts a forwarded client address only from a local connection, and password-free relay logins are off unless the server is started with --allow-trusted-auth.
 history: 1.3.10 | Starting over, which deletes your main character, is listed apart in red at the foot of the local menu and names the character.
 history: 1.3.9 | The browser, MUD client and SSH login screens show a purple border and title, a green menu and a red Quit, and the SSH gateway no longer shows its relay startup lines.
 history: 1.3.8 | Loading a single-player character now starts clean, with no story, companions, party, faction or memories left from the character played before it, and the SSH relay keeps the game's last lines when its input ends first.
