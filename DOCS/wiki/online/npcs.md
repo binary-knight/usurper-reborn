@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.11 | none
 history: 1.3.10 | A player whose NPC spouse dies grieves (online at the next login), an NPC married to a player is never another NPC's partner, and a jailed NPC stays in its cell and takes no part in weddings.
 history: 1.3.9 | The website's Observatory page counts NPC births, deaths and marriages in its hourly world history.
 history: 1.3.8 | An NPC now holds the opinion of you it had when the game was saved, and NPC allies who see a teammate finished remember it.

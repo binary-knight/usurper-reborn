@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | Enter at the target prompt of a single-target spell takes the last foe you picked by number in this fight while it lives.
 history: 1.3.8 | none

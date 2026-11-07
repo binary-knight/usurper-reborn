@@ -1,8 +1,9 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.11 | A quest the world reset failed on the online server no longer comes back after a server restart.
 history: 1.3.10 | A stolen royal artifact's Relic Thief, a Crown criminal and a bounty board champion wait on a named dungeon floor once you take the quest and killing them completes it, Sellsword contracts are turned in at the Sellsword Hall, and a Survive quest counts only the floors you go down after taking it.
 history: 1.3.9 | The Castle's line that sends you to the Quest Hall names the keys of the Main Street layout you use.
 history: 1.3.8 | none

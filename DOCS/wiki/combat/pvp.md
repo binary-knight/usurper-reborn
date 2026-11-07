@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/ArenaLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DormitoryLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.11 | The Arena and Dormitory menu rows fit within 79 columns in every language.
 history: 1.3.10 | none
 history: 1.3.9 | Combat speed in a player fight is now the key X.
 history: 1.3.8 | none

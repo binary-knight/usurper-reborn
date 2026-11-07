@@ -1,8 +1,9 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Core/Child.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.11 | none
 history: 1.3.10 | The Reinforced Door is sold only online, the Vitality Fountain gives a real 10 percent more maximum HP at every level, and with the district layout H opens Home at once while it is the only place open there.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
 history: 1.3.8 | none

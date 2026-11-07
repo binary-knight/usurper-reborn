@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 history: 1.3.8 | A companion can be told to wait in a cleared dungeon room, one that sees an ally finished when you could have rescued it loses loyalty, and a reload now keeps each companion's disabled spells and its recruit time, so Vex's 30 days no longer start over.
@@ -46,6 +47,8 @@ From level 15, the first mysterious shrine you find on dungeon floor 15 shows Ly
 ### Mira: the Temple
 
 From level 20 the Temple menu shows M, the Meditation Chapel. R there recruits Mira. The option is gone after one visit, whatever you choose. From level 5 a one-time line at the Healer hints at her.
+
+In the dungeon Mira's idle remarks turn to Veloura on floors 35 to 39, are only about Veloura on floor 40, and below floor 40 she can add a remark on how you saved or defeated Veloura.
 
 ### Vex: the prison
 

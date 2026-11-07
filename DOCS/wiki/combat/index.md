@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.10
+checked: 1.3.11
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.11 | none
 history: 1.3.10 | The standard combat menus list Power Attack, Precise Strike, Taunt, Disarm and Hide, and Rage for a Barbarian who is not raging; a healing potion is refused at full health and asks first when under 10 percent of maximum HP is missing; and new characters start on Fast combat speed.
 history: 1.3.9 | Auto-Combat is now the key O and combat speed the key X, Enter at the target prompt takes the last foe you picked by number in this fight while it lives, and a combat tip shows only when every key it names is one the combat menu uses.
 history: 1.3.8 | none
