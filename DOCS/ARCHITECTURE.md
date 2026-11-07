@@ -97,7 +97,8 @@ Headless 24/7 NPC simulation (deprecated since v0.60.0; the MUD server has integ
 --mud-relay                Run as relay client (used by sshd-usurper)
 --mud-port <N>             Port for server / relay
 --admin <username>         Mark this account as admin in the MUD process
---auto-provision           Auto-create accounts for trusted BBS auth
+--allow-trusted-auth       Accept the password-free AUTH form from local relays (off by default)
+--auto-provision           Auto-create accounts for trusted BBS auth (needs --allow-trusted-auth)
 --user <username>          Pre-set username (skip auth)
 --db <path>                SQLite database path
 --worldsim                 Headless simulator (deprecated)
@@ -749,7 +750,7 @@ Per-session AsyncLocal context: `Username`, `CharacterKey`, `ConnectionType`, `C
 
 Two paths:
 
-1. **Trusted AUTH (loopback only as of v0.60.6)**: 3-part `AUTH:user:type` form with no password. Used by the SSH gateway relay (`sshd-usurper` -> `--mud-relay` -> `127.0.0.1:4001`) and local BBS gateway. Validated against `IPAddress.IsLoopback(rawTcpPeer)` -- the raw socket peer cannot be spoofed by external clients (X-IP forwarded headers don't bypass the gate). External callers get `ERR:Authentication required. Trusted auth is only available from local relays.` and a logged rejection.
+1. **Trusted AUTH (off by default as of 1.3.11)**: 3-part `AUTH:user:type` form with no password. Refused unless the server is started with `--allow-trusted-auth`. With the flag it is accepted only from a loopback raw TCP peer (`IPAddress.IsLoopback(rawTcpPeer)`; no header changes the raw peer) that sent no PROXY v2 header and no `X-Client:` line on that connection. It is for a relay started with a named user (`--mud-relay --user <name>`) and a local BBS gateway; the SSH gateway relay without `--user` prompts for a password and sends the password form. Every refusal gets `ERR:Authentication required. Trusted auth is only available from local relays.` and a logged rejection with its reason.
 
 2. **Password AUTH (4-part)**: `AUTH:user:password:type` or `AUTH:user:password:REGISTER:type`. Routed through `SqlSaveBackend.AuthenticatePlayer` / `RegisterPlayer` with PBKDF2-SHA256 (100k iterations, 16-byte salt, constant-time comparison).
 
@@ -1472,7 +1473,7 @@ BBS saves stored in `saves/{BBSName}/` to prevent cross-BBS conflicts. Single-pl
 BBS passes raw TCP socket handle for BOTH telnet and SSH. Writing to the raw socket on SSH bypasses encryption -> "Bad packet length" errors. Mitigation: `Console.IsInputRedirected` detection auto-routes SSH BBSes to stdio mode.
 
 ### `--auto-provision`
-Trusted BBS sysops can pass `--auto-provision` so BBS-authenticated users get their game-server account auto-created on first connect. Only valid in trusted-AUTH path (loopback only as of v0.60.6).
+Trusted BBS sysops can pass `--auto-provision` so BBS-authenticated users get their game-server account auto-created on first connect. Only valid in the trusted-AUTH path, so it needs `--allow-trusted-auth` as well (1.3.11).
 
 ---
 
@@ -1672,7 +1673,8 @@ Direct SSH / Raw TCP / Telnet / BBS Online Play
      │      -> ForceCommand --mud-relay --mud-port 4001 -> 127.0.0.1:4001 (MudServer)
      └── default (raw TCP / telnet / MUD client) -> 127.0.0.1:4001 (MudServer)
             WITH a PROXY v2 header prepended so MudServer records the real client IP
-            for ban enforcement (MudServer.TryReadProxyProtocolV2Async parses it)
+            for ban enforcement (MudServer.TryReadProxyProtocolV2Async parses it;
+            the header's address is used only when the raw peer is loopback)
 
 usurper-mud (port 4001) -> game server (multi-user, SQLite-backed, integrated world sim)
 ```
@@ -2172,7 +2174,7 @@ GameData/                           (optional, beside the executable; not in the
 
 14. **Defense in Depth on Permadeath** -- 4 layers prevent re-INSERT of erased characters: in-memory blacklist (`MarkUsernameErased` checked at WriteGameData), session `SuppressDisconnectSave`, world-state purge before account delete, 7-day archive.
 
-15. **Loopback-Only Trusted AUTH** -- raw TCP peer (cannot be spoofed) gates the no-password trusted-AUTH path. X-IP forwarded headers (which can be spoofed) are used for ban tracking, never for trust.
+15. **Opt-In, Loopback-Only Trusted AUTH** -- the no-password trusted-AUTH path is off unless the server is started with `--allow-trusted-auth`, and then gated by the raw TCP peer (loopback only) with no PROXY v2 header and no `X-Client:` line on the connection. Forwarded addresses (`X-IP`, the PROXY v2 source) are believed only from a loopback peer, are used for ban tracking, and never grant trust.
 
 16. **Markdown-Style Sentinel for System Events** -- Discord bridge uses `__SYSTEM__` author sentinel rather than schema change to differentiate login/logout from chat.
 

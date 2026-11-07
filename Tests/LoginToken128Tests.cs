@@ -310,7 +310,7 @@ public class LoginToken128Tests : IDisposable
     [InlineData("X-IP:198.51.100.71\nAUTH:Old Timer:oldpass-long:Local:1.0.0\n")]        // relay X-IP
     [InlineData("X-IP:198.51.100.72\nX-Client:Web\nAUTH:Old Timer:oldpass-long:Web\n")]  // X-IP and X-Client
     [InlineData("AUTH:Old Timer:oldpass-long:SSH;echo=1\n")]                             // 1.0.6 echo parameter
-    [InlineData("AUTH:Old Timer:Steam\n")]                                          // 3 parts, trusted from loopback
+    [InlineData("AUTH:Old Timer:Steam\n")]                                          // 3 parts, trusted from loopback (with --allow-trusted-auth)
     [InlineData("AUTH:CAPS:capspass:Steam\n")]                                      // an account named CAPS
     [InlineData("AUTH:TOKEN1 x:tokpass-long:Steam:1.2.8\n")]                             // an account named "TOKEN1 x"
     [InlineData("AUTH:Fresh One:freshpw-long:REGISTER:Steam\n")]                         // registration
@@ -321,7 +321,13 @@ public class LoginToken128Tests : IDisposable
         await Register("TOKEN1 x", "tokpass-long");
         foreach (var ip in new[] { "198.51.100.71", "198.51.100.72" }) { FailedLogins().TryRemove(ip, out _); _throttleIps.Add(ip); }
 
-        var (lines, raw, stderr, _) = await Exchange(request);
+        // 1.3.11: the password-free form needs the server's --allow-trusted-auth (ForwardedConnectionTrust_Tests)
+        bool flagBefore = UsurperRemake.BBS.DoorMode.AllowTrustedAuth;
+        UsurperRemake.BBS.DoorMode.AllowTrustedAuth = true;
+        (List<string> Lines, string Raw, string Stderr, MudServer Server) result;
+        try { result = await Exchange(request); }
+        finally { UsurperRemake.BBS.DoorMode.AllowTrustedAuth = flagBefore; }
+        var (lines, raw, stderr, _) = result;
 
         lines[0].Should().Be("OK", $"the old shape logs in as it did before 1.2.8: {raw}");
         (LineAfterOk(lines) ?? "").Should().NotStartWith("TOKEN:", "row 2: no token line without ;token=1");

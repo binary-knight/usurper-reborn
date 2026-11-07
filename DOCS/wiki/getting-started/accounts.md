@@ -164,14 +164,15 @@ Command line flags:
 - `--mud-port <port>`: Game server port (default 4000)
 - `--mud-relay`: Relay used as the SSH gateway command
 - `--admin <name>`: Gives a username full admin rights on the game server; repeatable (default none)
-- `--auto-provision`: Creates accounts for password-less logins from the local machine (default off)
+- `--allow-trusted-auth`: Accepts password-less logins from a gateway on the local machine (default off)
+- `--auto-provision`: Creates accounts for password-less logins from the local machine; needs `--allow-trusted-auth` (default off)
 - `--sysop-level <n>`: BBS security level that opens the SysOp console (default 100)
 - `--idle-timeout <min>`: Idle disconnect, 1 to 60 minutes (default 15)
 - `--screen-reader`: Start in screen reader mode (default off)
 - `--worldsim`, `--no-worldsim`, `--sim-interval`, `--npc-xp`, `--save-interval`: Background world simulation
 - `--editor`: Open the game editor
 
-The built-in help, `--help`, lists the door and online flags. Password-less logins are accepted only from the same machine.
+The built-in help, `--help`, lists the door and online flags. Password-less logins are refused unless the server is started with `--allow-trusted-auth`, and then accepted only from the same machine.
 
 A multiplayer server keeps its settings in the game database and the admin dashboard edits them. The settings and defaults:
 

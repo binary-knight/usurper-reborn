@@ -5819,10 +5819,11 @@ wss.on('connection', (ws, req) => {
 
     const tcp = net.connect({ host: MUD_HOST, port: MUD_PORT }, () => {
       console.log(`[usurper-web] TCP connected to MUD server for ${clientIP} (${clientType})`);
-      // Forward real client IP and client type to game server
-      tcp.write(`X-IP:${clientIP}\n`);
-      tcp.write(`X-Client:${clientType}\n`);
     });
+    // Forward real client IP and client type to game server. 1.3.11: written as the
+    // connection is made, so these lines go to the game before any browser byte.
+    tcp.write(`X-IP:${clientIP}\n`);
+    tcp.write(`X-Client:${clientType}\n`);
 
     // TCP → WebSocket
     tcp.on('data', (data) => {

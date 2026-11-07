@@ -43,6 +43,7 @@ namespace UsurperRemake.BBS
         private static int _mudPort = 4000;
         private static readonly List<string> _mudAdminUsers = new();
         private static bool _autoProvision = false;
+        private static bool _allowTrustedAuth = false;
 
         // Idle timeout and session time tracking
         private static int _idleTimeoutMinutes = GameConfig.DefaultBBSIdleTimeoutMinutes;
@@ -268,6 +269,13 @@ namespace UsurperRemake.BBS
         public static bool AutoProvision => _autoProvision;
 
         /// <summary>
+        /// 1.3.11: true only when the server is started with --allow-trusted-auth. Without it the password-free
+        /// AUTH form is refused on every connection; with it, that form is accepted only from a loopback peer that
+        /// sent no forwarding header and no client-type line.
+        /// </summary>
+        public static bool AllowTrustedAuth { get => _allowTrustedAuth; internal set => _allowTrustedAuth = value; }
+
+        /// <summary>
         /// Check command line args for door mode parameters
         /// Returns true if door mode should be used
         /// </summary>
@@ -405,6 +413,12 @@ namespace UsurperRemake.BBS
                     _autoProvision = true;
                     Console.Error.WriteLine("[MUD] Auto-provision enabled — trusted auth will auto-create accounts");
                 }
+                // --allow-trusted-auth accepts the password-free AUTH form, from a loopback peer only (1.3.11; off by default)
+                else if (arg == "--allow-trusted-auth")
+                {
+                    _allowTrustedAuth = true;
+                    Console.Error.WriteLine("[MUD] Trusted auth allowed: password-free logins accepted from local relays");
+                }
                 // --log-stdout routes DebugLogger output to stdout instead of logs/debug.log
                 else if (arg == "--log-stdout")
                 {
@@ -412,6 +426,9 @@ namespace UsurperRemake.BBS
                     Console.Error.WriteLine("[BOOT] Log output directed to stdout");
                 }
             }
+
+            if (_autoProvision && !_allowTrustedAuth)
+                Console.Error.WriteLine("[MUD] --auto-provision applies only with --allow-trusted-auth");
 
             // Second pass: process commands (--door, --door32, etc.)
             for (int i = 0; i < args.Length; i++)
