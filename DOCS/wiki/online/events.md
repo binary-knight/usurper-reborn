@@ -1,8 +1,10 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.3.11
+checked: 1.3.13
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimService.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Systems/WeeklyGodSystem.cs
+history: 1.3.13 | none
+history: 1.3.12 | none
 history: 1.3.11 | The Healer no longer shows alignment or world event price lines it never applied, and the Bandit Lord Rises event, which never started, is removed from the event list.
 history: 1.3.10 | While Blessed Rain falls, healing HP at the Healer is free; on a Holy Day the Cloister meditation and an act of atonement are free; no event changes anyone's stats; and the event descriptions state what each event does.
 history: 1.3.9 | The website's Observatory page shows public world data and an hourly history of the world.

@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.12; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.13; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
 > A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.12. Section
@@ -591,6 +591,8 @@ Conway-style neighbor pressure (isolation and overcrowding change location selec
 ## 12. World Simulator
 
 **Files**: `Scripts/Systems/WorldSimulator.cs` (in-game, single-player + MUD), `Scripts/Systems/WorldSimService.cs` (the host the MUD server and `--worldsim` run it in)
+
+A BBS door hosts the same service in its own process when no other process holds the world sim lock, and cancels it on Quit. The periodic save writes the world state and then runs the maintenance (news, combat and orphan prunes, team and guild upkeep, world edit cleanup); the shutdown save writes the world state only, so a door that exits a few seconds after Quit is not cut off in a long prune (1.3.13).
 
 ### Tick (every 30 seconds)
 
