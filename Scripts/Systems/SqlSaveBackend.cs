@@ -3285,33 +3285,75 @@ namespace UsurperRemake.Systems
             }
         }
 
-        /// <summary>Remove orphaned rows from tables that reference deleted players.</summary>
+        /// <summary>
+        /// Remove orphaned rows from tables that reference deleted players. Names compare as ulower folds them (C#
+        /// ToLowerInvariant, v1.3.10), so a stored case can never orphan a live row. 1.3.13: the fold happens here in
+        /// C#, not through the ulower SQL function: a prune ran it once per row from inside SQLite, and a door process
+        /// that exited mid-prune crashed on Windows (0xC0000005 in sqlite3_step) when SQLite called back into .NET.
+        /// </summary>
         public async Task PruneOrphanedPlayerData()
         {
             try
             {
-                // v1.3.10: OpenConnection registers ulower, so a stored case can never orphan a live row
-                using var conn = OpenConnection();
+                using var conn = new SqliteConnection(connectionString);
+                await conn.OpenAsync();
 
-                // sleeping_players, online_players, combat_events keyed on username/player_name
-                string[] orphanQueries = new[]
+                var usernames = new HashSet<string>(StringComparer.Ordinal);
+                var displayNames = new HashSet<string>(StringComparer.Ordinal);
+                using (var cmd = conn.CreateCommand())
                 {
-                    "DELETE FROM sleeping_players WHERE ulower(username) NOT IN (SELECT ulower(username) FROM players)",
-                    "DELETE FROM online_players WHERE ulower(username) NOT IN (SELECT ulower(username) FROM players)",
-                    "DELETE FROM combat_events WHERE ulower(player_name) NOT IN (SELECT ulower(username) FROM players) AND ulower(player_name) NOT IN (SELECT ulower(display_name) FROM players)",
-                    // v0.65.0 (save-state-review F1): reap pending wire transfers + inheritance
-                    // whose recipient permadied/was deleted before delivery. The gold was already
-                    // a sink (sender paid, recipient gone); this just stops dead rows accumulating.
-                    // Both columns are stored lowercase, matching players.username (also lowercase).
-                    "DELETE FROM pending_gold_transfers WHERE ulower(recipient_username) NOT IN (SELECT ulower(username) FROM players)",
-                    "DELETE FROM pending_inheritance WHERE ulower(player_username) NOT IN (SELECT ulower(username) FROM players)",
+                    cmd.CommandText = "SELECT username, display_name FROM players";
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        if (!reader.IsDBNull(0)) usernames.Add(reader.GetString(0).ToLowerInvariant());
+                        if (!reader.IsDBNull(1)) displayNames.Add(reader.GetString(1).ToLowerInvariant());
+                    }
+                }
+
+                // sleeping_players, online_players, combat_events keyed on username/player_name.
+                // v0.65.0 (save-state-review F1): also reap pending wire transfers and inheritance whose recipient
+                // permadied or was deleted before delivery. The gold was already a sink (sender paid, recipient
+                // gone); this just stops dead rows accumulating.
+                var targets = new (string Table, string Column, bool AlsoDisplayName)[]
+                {
+                    ("sleeping_players", "username", false),
+                    ("online_players", "username", false),
+                    ("combat_events", "player_name", true),
+                    ("pending_gold_transfers", "recipient_username", false),
+                    ("pending_inheritance", "player_username", false),
                 };
 
-                foreach (var sql in orphanQueries)
+                foreach (var (table, column, alsoDisplayName) in targets)
                 {
-                    using var cmd = conn.CreateCommand();
-                    cmd.CommandText = sql;
-                    await cmd.ExecuteNonQueryAsync();
+                    var orphans = new List<string>();
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = $"SELECT DISTINCT {column} FROM {table} WHERE {column} IS NOT NULL";
+                        using var reader = await cmd.ExecuteReaderAsync();
+                        while (await reader.ReadAsync())
+                        {
+                            string stored = reader.GetString(0);
+                            string folded = stored.ToLowerInvariant();
+                            if (!usernames.Contains(folded) && !(alsoDisplayName && displayNames.Contains(folded)))
+                                orphans.Add(stored);
+                        }
+                    }
+                    if (orphans.Count == 0) continue;
+
+                    using var tx = conn.BeginTransaction();
+                    using (var del = conn.CreateCommand())
+                    {
+                        del.Transaction = tx;
+                        del.CommandText = $"DELETE FROM {table} WHERE {column} = @name";
+                        var p = del.Parameters.Add("@name", SqliteType.Text);
+                        foreach (var name in orphans)
+                        {
+                            p.Value = name;
+                            await del.ExecuteNonQueryAsync();
+                        }
+                    }
+                    tx.Commit();
                 }
             }
             catch (Exception ex)

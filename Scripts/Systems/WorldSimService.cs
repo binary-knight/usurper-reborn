@@ -283,9 +283,10 @@ namespace UsurperRemake.Systems
         /// <summary>The loop's end: the final save (v1.1.14: skipped by a sim paused without the lock), then the lock released.</summary>
         internal async Task ShutdownAsync()
         {
-            // Graceful shutdown: save state one final time
+            // Graceful shutdown: save state one final time, without the maintenance (1.3.13: a door exits about five
+            // seconds after Quit, and on Windows an exit during a long prune crashed the process)
             DebugLogger.Instance.LogInfo("WORLDSIM", "Shutting down - saving final state...");
-            await SaveWorldState();
+            await SaveWorldStateCore(maintenance: false);
 
             // Release worldsim lock (embedded mode)
             if (_heartbeatOwnerId != null)
@@ -471,7 +472,14 @@ namespace UsurperRemake.Systems
         /// Before saving, checks if a player session has modified the NPC data since our last save.
         /// If so, reloads from DB first to pick up player changes (prevents divergence).
         /// </summary>
-        private async Task SaveWorldState()
+        private async Task SaveWorldState() => await SaveWorldStateCore(maintenance: true);
+
+        /// <summary>
+        /// 1.3.13: maintenance (the news, combat and orphan prunes, team and guild upkeep, world edit cleanup) runs
+        /// on the periodic saves only. The shutdown save skips it, so a door session that exits a few seconds after
+        /// Quit is not cut off in the middle of a long prune.
+        /// </summary>
+        private async Task SaveWorldStateCore(bool maintenance)
         {
             // v1.1.14: a sim paused without the lock writes nothing (the periodic save and the final one)
             if (PausedWithoutLock)
@@ -763,6 +771,8 @@ namespace UsurperRemake.Systems
 
                 // v1.0.4: names ever used by NPCs (survives corpse pruning and restarts)
                 await SaveUsedNamesState();
+
+                if (!maintenance) return;
 
                 // Prune old news with per-category caps (NPC news doesn't evict player news)
                 await sqlBackend.PruneAllNews(hoursToKeep: 48, maxNpcNews: 500, maxPlayerNews: 200);
