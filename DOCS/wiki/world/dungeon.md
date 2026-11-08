@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.12 | none
 history: 1.3.11 | The outpost's torch and lockpick are named Enchanted Torch (+10 HP) and Lockpick Set (+2 Dexterity), and the outpost supply rows keep the prices in one column.
 history: 1.3.10 | A fifth outpost, the Cinder Post, stands on floor 85, healing and mana potions at an outpost cost 1.25 times the town price for your level, and the outpost's smoke bomb is now Smoke Powder (+2 Agility).
 history: 1.3.9 | none

@@ -1,8 +1,9 @@
 ---
 title: The Old Church
 path: /wiki/en/world/church/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/ChurchLocation.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | The Church's alignment line reads Demonic when Darkness is more than 3 times Chivalry, Very Evil above 2 times and otherwise Evil.
 history: 1.3.9 | Main Street opens in the classic layout by default, and the marriage steps at the Church name the keys of the Main Street layout you use.

@@ -1,8 +1,9 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | On cycle 2 or later, the New Game+ shop discount takes 10 percent off Dark Alley prices.
 history: 1.3.9 | Main Street opens in the classic layout by default, where Y opens the Dark Alley; with the districts layout, chosen in Settings, it is A.

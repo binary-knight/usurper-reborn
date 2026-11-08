@@ -1,8 +1,9 @@
 ---
 title: Balance rules
 path: /wiki/en/reference/balance/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/GameDataLoader.cs, Scripts/Data/BalanceConfig.cs, Scripts/Systems/WikiDataExporter.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none

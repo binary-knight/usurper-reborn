@@ -1,8 +1,9 @@
 ---
 title: Crafting materials
 path: /wiki/en/items/materials/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/MetaProgressionSystem.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none

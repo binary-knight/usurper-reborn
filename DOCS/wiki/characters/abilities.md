@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | Lay on Hands and other plain healing abilities are refused with nothing spent when no one they can reach is hurt, and ask first when everyone hurt is missing under 10 percent of maximum HP.
 history: 1.3.9 | Enter at the target prompt of a single-target ability takes the last foe you picked by number in this fight while it lives.

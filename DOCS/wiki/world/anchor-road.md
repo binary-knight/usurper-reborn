@@ -1,8 +1,9 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | A contract is claimed only while it is still free, shows its days and says that failing takes no gold or standing, Sellsword contracts are turned in at the Sellsword Hall, and while you hold a bandit contract bandits are met in 3 fights in 8 in the forest and mountains.
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.
