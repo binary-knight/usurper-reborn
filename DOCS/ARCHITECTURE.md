@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.11; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.12; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.11. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.12. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -614,7 +614,7 @@ The order below is the older one. In 1.3.4 immigration and the recruit pool top-
 ```
 
 ### Race Extinction Floor
-Any race with fewer than 5 living NPCs gets immigrants from a name pool to keep the population diverse; `PermadeathRaceFloor = 3` instead blocks permadeath for a race that small. `IsAgedDeath` is a hard NO-respawn flag.
+Any race with fewer than 5 living NPCs gets immigrants from a name pool to keep the population diverse; `PermadeathRaceFloor = 3` instead blocks permadeath for a race that small. `IsAgedDeath` is a hard NO-respawn flag. Every arrival (the extinction top up, the diversity arrival and the recruit pool) takes the sex the living town has fewer of, a tie by a coin (`WorldSimulator.FewerSex`).
 
 ### World State Authority
 The world sim is the authoritative source for shared state (NPCs, royal court, economy, settlement, marriages, children, world events) in MUD mode. Player saves write player-specific data only; world state is loaded from `world_state` SQLite rows on every login and pushed back on mutating actions. Concurrent online edits are protected by row-level versioning and `OnlineStateManager.SaveAllSharedState()`.
@@ -1760,7 +1760,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.11"
+Version = "1.3.12"
 VersionName = "Reckoning"
 ```
 
