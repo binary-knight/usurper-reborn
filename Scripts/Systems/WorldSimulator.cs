@@ -1674,6 +1674,11 @@ public class WorldSimulator
                 raceCounts[npc.Race]++;
         }
 
+        // v1.3.12: every arrival comes as the sex the living town has fewer of (FewerSex), counted again
+        // after each arrival, so a skewed town moves back toward even as it turns over
+        int livingMale = aliveNPCs.Count(n => n.Sex == CharacterSex.Male);
+        int livingFemale = aliveNPCs.Count(n => n.Sex == CharacterSex.Female);
+
         // Phase 1: Extinction prevention — races below 5 get immediate immigrants (always active)
         foreach (var kvp in raceCounts)
         {
@@ -1683,8 +1688,13 @@ public class WorldSimulator
 
             for (int i = 0; i < needed; i++)
             {
-                var sex = (i % 2 == 0) ? CharacterSex.Male : CharacterSex.Female;
-                SpawnImmigrant(kvp.Key, sex, avgLevel);
+                // v1.3.12: before, (i % 2) decided and one arrival was always male; now a tie is a coin,
+                // drawn only on a tie
+                var sex = FewerSex(livingMale, livingFemale, random);
+                if (SpawnImmigrant(kvp.Key, sex, avgLevel))
+                {
+                    if (sex == CharacterSex.Female) livingFemale++; else livingMale++;
+                }
             }
         }
 
@@ -1707,11 +1717,27 @@ public class WorldSimulator
             var targetRace = raceCounts.OrderBy(kv => kv.Value).First();
             if (targetRace.Value < diversityThreshold)
             {
-                var sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
+                // v1.3.12: the coin is still drawn, and now only breaks a tie (FewerSex)
+                var sex = FewerSex(livingMale, livingFemale, random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female);
                 SpawnImmigrant(targetRace.Key, sex, avgLevel);
             }
         }
     }
+
+    /// <summary>
+    /// v1.3.12: the sex of an arrival: the one the living town has fewer of; on a tie, tieBreak. A town that
+    /// leans one way gets the other until it is even, and an even town keeps the old draw or alternation.
+    /// </summary>
+    internal static CharacterSex FewerSex(int livingMale, int livingFemale, CharacterSex tieBreak) =>
+        livingFemale < livingMale ? CharacterSex.Female
+        : livingMale < livingFemale ? CharacterSex.Male
+        : tieBreak;
+
+    /// <summary>v1.3.12: FewerSex with a coin from rng for a tie, drawn only on a tie.</summary>
+    internal static CharacterSex FewerSex(int livingMale, int livingFemale, Random rng) =>
+        livingMale == livingFemale
+            ? (rng.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female)
+            : FewerSex(livingMale, livingFemale, CharacterSex.Male);
 
     /// <summary>
     /// Spawn a single immigrant NPC of the given race and sex.
@@ -1789,7 +1815,9 @@ public class WorldSimulator
         int race = 0;
         for (int r = 1; r < raceCount; r++)
             if (raceCounts[r] < raceCounts[race]) race = r;
-        var sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
+        // v1.3.12: the coin is still drawn, and now only breaks a tie (FewerSex)
+        var sex = FewerSex(aliveNPCs.Count(n => n.Sex == CharacterSex.Male), aliveNPCs.Count(n => n.Sex == CharacterSex.Female),
+            random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female);
 
         if (SpawnImmigrant((CharacterRace)race, sex, level, forRecruitPool: true))
             _lastRecruitPoolArrivalTick = _currentTick;
