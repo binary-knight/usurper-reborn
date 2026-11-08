@@ -8472,6 +8472,13 @@ public partial class GameEngine
         terminal.SetColor("bright_green");
         terminal.WriteLine("looneybinbbs.com:2023");
 
+        terminal.SetColor("bright_white");
+        terminal.Write("  UORealms                       ");
+        terminal.SetColor("gray");
+        terminal.Write("-          ");
+        terminal.SetColor("bright_green");
+        terminal.WriteLine("uorealms.com (web)");
+
         // --- End BBS Entries ---
 
         terminal.WriteLine("");
