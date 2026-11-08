@@ -1726,7 +1726,8 @@ public class WorldSimulator
 
     /// <summary>
     /// v1.3.12: the sex of an arrival: the one the living town has fewer of; on a tie, tieBreak. A town that
-    /// leans one way gets the other until it is even, and an even town keeps the old draw or alternation.
+    /// leans one way gets the other until it is even. Phase 2 and the recruit pool pass their drawn coin as
+    /// tieBreak; Phase 1 uses the overload below, which draws a coin only on a tie.
     /// </summary>
     internal static CharacterSex FewerSex(int livingMale, int livingFemale, CharacterSex tieBreak) =>
         livingFemale < livingMale ? CharacterSex.Female
