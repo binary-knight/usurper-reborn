@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.12 | none
 history: 1.3.11 | The Arena menu rows fit within 79 columns in every language.
 history: 1.3.10 | none
 history: 1.3.9 | Main Street opens in the classic layout by default, with the districts layout a choice in Settings.

@@ -1,8 +1,9 @@
 ---
 title: Specializations
 path: /wiki/en/characters/specializations/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/LevelMasterLocation.cs, Scripts/Data/SpecializationData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none

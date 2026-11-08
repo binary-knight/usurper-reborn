@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none

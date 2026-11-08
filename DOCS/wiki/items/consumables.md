@@ -1,8 +1,9 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs
+history: 1.3.12 | none
 history: 1.3.11 | Members of the Faith pay 15 to 35 percent less at the Healer for potions, antidotes and Willow Draught, and the dungeon merchant's healing potion costs the town price for your level minus 15 on any floor.
 history: 1.3.10 | A healing potion drunk in a fight is refused at full health and asks first when under 10 percent of maximum HP is missing, and a dungeon outpost or street merchant sells potions at 1.25 times the town price and takes no gold for one you cannot carry.
 history: 1.3.9 | none

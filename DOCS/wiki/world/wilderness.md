@@ -1,8 +1,9 @@
 ---
 title: Wilderness exploration
 path: /wiki/en/world/wilderness/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Data/WildernessData.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/DruidShrineData.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Data/BeastData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | While you hold a bandit contract or a Bandit Raid runs, the forest's Bandit Scout and the mountains' Mountain Bandit are met in 3 fights in 8 there, not 1 in 8.
 history: 1.3.9 | none

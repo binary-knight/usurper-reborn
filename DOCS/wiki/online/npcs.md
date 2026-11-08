@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.12 | Every newcomer comes as the sex the town has fewer of, so a town that leans one way evens out as it turns over.
 history: 1.3.11 | none
 history: 1.3.10 | A player whose NPC spouse dies grieves (online at the next login), an NPC married to a player is never another NPC's partner, and a jailed NPC stays in its cell and takes no part in weddings.
 history: 1.3.9 | The website's Observatory page counts NPC births, deaths and marriages in its hourly world history.
@@ -27,7 +28,7 @@ A town NPC made when the world starts is aged 18 to 49 and an ordinary newcomer 
 
 ### Can a race die out
 
-No. While 3 or fewer NPCs of a race are alive, old age passes them by: an NPC of that race who reaches the lifespan has its birth date moved 7 real days later instead. A race with fewer than 5 living NPCs receives newcomers up to 5 at the next tick, alternating male and female.
+No. While 3 or fewer NPCs of a race are alive, old age passes them by: an NPC of that race who reaches the lifespan has its birth date moved 7 real days later instead. A race with fewer than 5 living NPCs receives newcomers up to 5 at the next tick; every newcomer comes as the sex the town has fewer of, a tie decided at random.
 
 ### When an NPC dies of old age
 

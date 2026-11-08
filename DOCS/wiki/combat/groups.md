@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.3.11
+checked: 1.3.12
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
