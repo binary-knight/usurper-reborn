@@ -98,7 +98,7 @@ Opt-in JSON mods drop into a `GameData/` folder next to the executable: NPCs, mo
 - **5 languages:** English, Spanish, French, Hungarian, Italian. Swap via in-game preferences. Per-character language preference saved.
 
 ### Graphical Client (Beta)
-An optional Electron-based graphical client is in active development with Darkest Dungeon-style combat sprites, a dungeon map overlay, paperdoll inventory, party panels, status overlays, and an audio infrastructure layer (sound files filling in over time). Text mode remains the primary supported way to play.
+An optional Electron-based graphical client exists as a beta, with Darkest Dungeon-style combat sprites, a dungeon map overlay, paperdoll inventory, party panels, status overlays and an audio layer. It is not in active development; text mode is the supported way to play.
 
 ---
 
