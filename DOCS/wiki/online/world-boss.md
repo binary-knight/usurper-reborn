@@ -1,8 +1,9 @@
 ---
 title: The world boss
 path: /wiki/en/online/world-boss/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none

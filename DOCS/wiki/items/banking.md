@@ -1,8 +1,9 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | The bank pays only its stated daily rate, not a further hidden 3 percent, and a player the bank has banned can only repay the loan.

@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.11; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.13; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
@@ -385,7 +385,7 @@ Option B: Single shared account with in-game auth (simpler)
 ### Crash/Disconnect Recovery
 - `online_players` entries expire after 120 seconds without heartbeat
 - Background cleanup process removes stale entries
-- The orphan cleanup (`SqlSaveBackend.PruneOrphanedPlayerData`) compares names with `ulower`, which folds case as C# does (1.3.10), so a name stored in another case never removes a connected player's `online_players` row or restarts the connected time the online list shows
+- The orphan cleanup (`SqlSaveBackend.PruneOrphanedPlayerData`) folds names with C# `ToLowerInvariant`, as `ulower` does (1.3.10), so a name stored in another case never removes a connected player's `online_players` row or restarts the connected time the online list shows. Since 1.3.13 it reads the player names once and deletes orphans by exact value, so SQLite never calls back into .NET during the prune; a door process that exited mid-prune crashed on Windows (0xC0000005 in sqlite3_step). The world sim's shutdown save skips it; the periodic save runs it
 - Player data auto-saved before any risky operation
 - SQLite WAL mode prevents corruption on process crash
 
