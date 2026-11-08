@@ -1,0 +1,13 @@
+[h1]Usurper Reborn 1.3.12[/h1]
+
+[h2]Changelist[/h2]
+[h3]Town and places[/h3]
+[list]
+[*]Added UORealms to the BBS list on the website and in the game (#248)
+[/list]
+[h3]Quests and the living world[/h3]
+[list]
+[*]Fixed towns slowly becoming mostly male; each new arrival comes as the sex the town has fewer of, so saved towns even out as they turn over (#249)
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.3.12.md
