@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | The Arena menu rows fit within 79 columns in every language.
 history: 1.3.10 | none

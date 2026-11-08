@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | The Ancient Scroll event's result stays on screen until Enter, and the dungeon merchant's healing potion costs the town price for your level minus 15 on any floor.
 history: 1.3.10 | A fifth outpost, the Cinder Post, stands on floor 85, and room names that repeat on a floor are numbered II, III and so on.

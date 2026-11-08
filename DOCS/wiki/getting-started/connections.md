@@ -1,8 +1,9 @@
 ---
 title: Ways to play
 path: /wiki/en/getting-started/connections/
-checked: 1.3.12
+checked: 1.3.13
 sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md, web/index.html
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | The play page shows the Continue key on Enter screens in every language, draws 256 colour and true colour art in colour, shows the whole Main Street text, adds a scroll bar when the right page runs past the window and gives key buttons to choices written (E)quip or (P)ray, (D)esecrate, or (L)eave, and the web service listens on loopback only unless WEB_BIND_HOST is set.
 history: 1.3.10 | The Docker page links to the play page at /play/.

@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none

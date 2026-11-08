@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | On a Holy Day the Cloister meditation and an act of atonement are free.

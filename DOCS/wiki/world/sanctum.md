@@ -1,8 +1,9 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.3.12
+checked: 1.3.13
 sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | none
 history: 1.3.10 | none
