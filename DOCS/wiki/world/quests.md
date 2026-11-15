@@ -1,8 +1,9 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.3.13
+checked: 1.3.14
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | A quest the world reset failed on the online server no longer comes back after a server restart.
