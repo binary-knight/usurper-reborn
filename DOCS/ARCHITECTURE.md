@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.13; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.14; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.12. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.14. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -1358,7 +1358,7 @@ Full political system: guard loyalty, treasury management, court factions (Loyal
 
 50+ achievements across 7 categories: Combat, Exploration, Economy, Social, Progression, Challenge, Secret.
 
-5 tiers: Bronze, Silver, Gold, Platinum, Diamond. Tier-scaled Fame rewards.
+5 tiers: Bronze, Silver, Gold, Platinum, Diamond. Tier-scaled Fame rewards. The table loads once, under a lock, and is marked loaded only after the load completes.
 
 Notable: `first_steps`, `monster_slayer_1000`, `boss_killer`, `level_100`, `married`, `ruler`, `pvp_veteran`, `nightmare_master`, `completionist`, `first_blood`, `guardian_slayer`, `dedicated_adventurer`, `devoted_champion`, `legendary_devotion`, `world_boss_first`, `world_boss_5_unique`, `world_boss_25_total`, `world_boss_mvp`. Steam achievements wired through `OSC` markers in online mode.
 
@@ -1762,7 +1762,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.12"
+Version = "1.3.14"
 VersionName = "Reckoning"
 ```
 
