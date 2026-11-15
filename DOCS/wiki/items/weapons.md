@@ -1,8 +1,9 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.3.10
+checked: 1.3.14
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
+history: 1.3.14 | none
 history: 1.3.10 | none
 history: 1.3.7 | A loot weapon keeps its effect line after it has been worn.
 history: 1.3.6 | Weapon poison now poisons a monster for 4 rounds in place of a single hit, a new proc refreshes it, and it is one hit in a player fight and on the world boss.

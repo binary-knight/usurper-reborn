@@ -1,8 +1,9 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.3.13
+checked: 1.3.14
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | Members of the Faith pay 15 to 35 percent less on every Healer price, and the Healer screen no longer shows alignment or world event price lines it never applied.

@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.3.13
+checked: 1.3.14
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | The street merchant's Smoke Bomb gives Darkness +2 and does not help you flee, and its text says so.
