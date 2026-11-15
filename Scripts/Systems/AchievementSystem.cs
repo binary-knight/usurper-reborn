@@ -179,7 +179,9 @@ public class PlayerAchievements
 public static class AchievementSystem
 {
     private static readonly Dictionary<string, Achievement> _achievements = new();
-    private static bool _initialized = false;
+    // 1.3.14: Initialize fills the table once, under _initLock, and marks it done only after the fill.
+    private static readonly object _initLock = new();
+    private static volatile bool _initialized;
 
     /// <summary>
     /// Pending achievements to show to player
@@ -197,11 +199,14 @@ public static class AchievementSystem
     public static void Initialize()
     {
         if (_initialized) return;
-        _initialized = true;
-
-        var achievements = UsurperRemake.Systems.GameDataLoader.Achievements ?? GetBuiltInAchievements();
-        foreach (var a in achievements)
-            Register(a);
+        lock (_initLock)
+        {
+            if (_initialized) return;
+            var achievements = UsurperRemake.Systems.GameDataLoader.Achievements ?? GetBuiltInAchievements();
+            foreach (var a in achievements)
+                Register(a);
+            _initialized = true;
+        }
     }
 
     /// <summary>

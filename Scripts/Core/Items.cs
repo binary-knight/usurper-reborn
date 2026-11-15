@@ -400,8 +400,10 @@ public class ClassicArmor
 public static class ItemManager
 {
     private static Dictionary<int, Item> gameItems = new Dictionary<int, Item>();
-    private static Dictionary<int, ClassicWeapon> classicWeapons = new Dictionary<int, ClassicWeapon>();
-    private static Dictionary<int, ClassicArmor> classicArmor = new Dictionary<int, ClassicArmor>();
+    // 1.3.14: the classic weapon and armour tables are shared by every session; they are built once, by the
+    // static constructor below, and only read after.
+    private static readonly Dictionary<int, ClassicWeapon> classicWeapons;
+    private static readonly Dictionary<int, ClassicArmor> classicArmor;
 
     // From Pascal INIT.PAS: weapon[x].name, value, pow. The names are stored on items picked up from
     // a monster (CombatEngine) and stay English; ItemNames shows them in the reader's language.
@@ -505,42 +507,52 @@ public static class ItemManager
         ClassicWeaponTable.Select(w => w.name).Concat(ClassicArmorTable.Select(a => a.name));
     
     /// <summary>
-    /// Initialize items from Pascal data - based on Init_Items procedure
+    /// 1.3.14: runs after every static field initializer above (they run in text order, then this body), so the
+    /// two tables are read here only once they exist.
+    /// </summary>
+    static ItemManager()
+    {
+        classicWeapons = BuildClassicWeapons();
+        classicArmor = BuildClassicArmor();
+    }
+
+    /// <summary>
+    /// From the Pascal Init_Items procedure. 1.3.14: the tables are built once by the static constructor and this
+    /// writes nothing. Kept so GameEngine.InitializeGame and the tests still have their one call.
     /// </summary>
     public static void InitializeItems()
     {
-        InitializeClassicWeapons();
-        InitializeClassicArmor();
         // v1.2.5: the four supreme being items (IDs 1001 to 1004) were removed: nothing read them
     }
-    
+
     /// <summary>
-    /// Initialize classic weapons from Pascal weapon array
+    /// The classic weapons from the Pascal weapon array, keyed from 0 (0 is Fists).
     /// </summary>
-    private static void InitializeClassicWeapons()
+    private static Dictionary<int, ClassicWeapon> BuildClassicWeapons()
     {
         // From Pascal INIT.PAS weapon initialization
         // weapon[x].name := 'Weapon Name'; weapon[x].value := cost; weapon[x].pow := damage;
+        var table = new Dictionary<int, ClassicWeapon>(ClassicWeaponTable.Length);
         for (int i = 0; i < ClassicWeaponTable.Length; i++)
         {
-            classicWeapons[i] = new ClassicWeapon(ClassicWeaponTable[i].name, ClassicWeaponTable[i].value, ClassicWeaponTable[i].power);
+            table[i] = new ClassicWeapon(ClassicWeaponTable[i].name, ClassicWeaponTable[i].value, ClassicWeaponTable[i].power);
         }
+        return table;
     }
-    
-    /// <summary>
-    /// Initialize classic armor from Pascal armor array
-    /// Extended to 50 armors for comprehensive progression
-    /// </summary>
-    private static void InitializeClassicArmor()
-    {
-        // Expanded armor list from basic to legendary (50 total)
 
+    /// <summary>
+    /// The classic armour from the Pascal armor array, extended to 50, keyed from 1.
+    /// </summary>
+    private static Dictionary<int, ClassicArmor> BuildClassicArmor()
+    {
+        var table = new Dictionary<int, ClassicArmor>(ClassicArmorTable.Length);
         for (int i = 0; i < ClassicArmorTable.Length; i++)
         {
-            classicArmor[i + 1] = new ClassicArmor(ClassicArmorTable[i].name, ClassicArmorTable[i].value, ClassicArmorTable[i].power);
+            table[i + 1] = new ClassicArmor(ClassicArmorTable[i].name, ClassicArmorTable[i].value, ClassicArmorTable[i].power);
         }
+        return table;
     }
-    
+
     /// <summary>
     /// Get item by ID
     /// </summary>
