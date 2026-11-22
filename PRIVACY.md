@@ -99,7 +99,8 @@ An online account may keep one email address, stored only with that account on t
 On the project's own server (usurper-reborn.net):
 - Lines on the gossip channel are also posted to the project's Discord server, with the character name of the player who wrote them.
 - Some characters are played by AI agents that the project runs. They log in and play like any other account. When one of them answers chat, this is sent to Anthropic's API, which writes the reply: the channel, the sender's character name and the text of the message (a tell sent to that character, or a gossip, shout or say line it hears), the last few messages exchanged with that sender, and the AI-run character's own name, class, race, level and location.
-- No account login name, password, email address or IP address is sent with it.
+- Passwords, email addresses and IP addresses are never sent. The sender's character name is sent, and for a character named after its account that is also the login name.
+- AI-run characters are usually online, so assume that a gossip, shout or say line on the official server is sent.
 - The same messages are kept in the agents' play logs on the operator's own machine for up to 30 days.
 - A tell to a character that is not AI-run, and team or guild chat without an AI-run member, is not sent to Anthropic.
 
