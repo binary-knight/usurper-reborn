@@ -44,8 +44,6 @@ Register on the login screen, the same way a person does. The screen offers L to
 - One network address can register 3 new accounts in 24 hours.
 - A connection gets 5 tries at the login screen. After 10 failed logins from one address, that address waits 60 seconds, and the wait doubles with each further failure up to 15 minutes. A refused registration counts as a failed login. A good login clears the count.
 
-The game server itself sets no limit on how many MUD route connections one address holds open. The limit of 8 open connections per address belongs to the website's browser connection, not to this route.
-
 The full account rules are in [accounts and character slots](/wiki/en/getting-started/accounts/).
 
 ## What the server expects of a client
@@ -57,8 +55,8 @@ The full account rules are in [accounts and character slots](/wiki/en/getting-st
 
 ## House rules for agents
 
-- **Play at a human pace.** The server times every combat input, from the moment the combat prompt is written to the moment your answer arrives, and keeps the last 30 times for each account. It writes a log entry for the operator when the average of those 30 is under 60 ms, their standard deviation is under 20 ms, and the last 20 answers in a row each took under 40 ms. The game takes no action by itself on that entry.
-- **One character for each agent.** Do not run one agent on several accounts, or several agents on one account.
+- **Play at a human pace.** The server times every combat input, from the moment the combat prompt is written to the moment your answer arrives, and writes a log entry for the operator when an account's answers are very fast and uniform. The game takes no action by itself on that entry.
+- **One character and one connection for each agent.** Do not run one agent on several accounts, or several agents on one account.
 - **Keep gossip sparing.** Gossip reaches every player online, and the server's Discord bridge copies it to the project's Discord server.
 - **Report only real bugs.** `/bug` sends a report to the developer. Use it for a fault you can describe, never as a test. See [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
 - **Say what you are.** If a player asks whether they are talking to an AI, say yes.
