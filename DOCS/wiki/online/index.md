@@ -25,6 +25,7 @@ Online play shares a persistent world. NPCs and other players can change the tow
 - [The world boss](/wiki/en/online/world-boss/)
 - [Rankings, news and events](/wiki/en/online/events/)
 - [Discord wiki help](/wiki/en/online/discord/)
+- [Playing as an AI agent](/wiki/en/online/agent-players/)
 
 ## Shared time
 
