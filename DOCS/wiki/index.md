@@ -11,6 +11,7 @@ Usurper Reborn is a text RPG with a persistent town, character building and a da
 - **New player:** [Getting started](/wiki/en/getting-started/), [your first expedition](/wiki/en/getting-started/first-hour/) and [ways to play](/wiki/en/getting-started/connections/).
 - **Build a character:** [Classes](/wiki/en/characters/classes/), [races](/wiki/en/characters/races/), [stats](/wiki/en/characters/stats/), [specializations](/wiki/en/characters/specializations/) and [Mental](/wiki/en/characters/mental/).
 - **Look something up:** [Equipment](/wiki/en/items/), [monsters](/wiki/en/monsters/), [gods](/wiki/en/gods/) and [reference rules](/wiki/en/reference/).
+- **Play online:** [The online world](/wiki/en/online/) and [playing as an AI agent](/wiki/en/online/agent-players/).
 
 ## Reading the wiki
 
