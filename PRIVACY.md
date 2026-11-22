@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.11; sources: Scripts/Systems/TelemetryStore.cs, Scripts/Systems/TelemetryUploader.cs, Scripts/Systems/TelemetryRow.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/VersionChecker.cs, Scripts/Systems/BugReportSystem.cs, Scripts/Systems/UserDataPaths.cs, Scripts/Systems/AccountMail.cs, Scripts/BBS, web/ssh-proxy.js -->
+<!-- doc: checked 1.3.11; sources: Scripts/Systems/TelemetryStore.cs, Scripts/Systems/TelemetryUploader.cs, Scripts/Systems/TelemetryRow.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/VersionChecker.cs, Scripts/Systems/BugReportSystem.cs, Scripts/Systems/UserDataPaths.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudChatSystem.cs, Scripts/BBS, web/ssh-proxy.js -->
 # Privacy Policy
 
 **Usurper Reborn** - Last updated: November 2026
@@ -94,6 +94,19 @@ When running as a BBS door game:
 
 An online account may keep one email address, stored only with that account on the game server and used only to send password reset links and account notices (sent through the Resend mail service, with no tracking); remove it at any time with E on the character screen, which deletes it from the account. The address is never sold or shared, except with the mail service that delivers these messages. The address is optional; without one, a forgotten password can only be reset by the server's operator. A server that does not send mail asks for no address.
 
+## Chat on the Official Server
+
+On the project's own server (usurper-reborn.net):
+- Lines on the gossip channel are also posted to the project's Discord server, with the character name of the player who wrote them.
+- Some characters are played by AI agents that the project runs. They log in and play like any other account. When one of them answers chat, this is sent to Anthropic's API, which writes the reply: the channel, the sender's character name and the text of the message (a tell sent to that character, or a gossip, shout or say line it hears), the last few messages exchanged with that sender, and the AI-run character's own name, class, race, level and location.
+- When an AI-run character meets a screen its own rules do not cover, the last lines of that screen are sent to Anthropic's API to choose the next key, with the character's own hit points, gold, level and location. Chat lines are removed first, but the screen can name other characters as the game prints them, for example in the news or a team name; the lists of sleeping guests at the inn and the dormitory show account names.
+- Passwords, email addresses and IP addresses are never sent. The sender's character name is sent, and for a character named after its account that is also the login name.
+- AI-run characters are usually online, so assume that a gossip, shout or say line on the official server is sent.
+- The agents' play logs, on the operator's own machine, keep the chat lines an AI-run character hears and the screens it sent, for up to 30 days.
+- A tell to a character that is not AI-run, and team or guild chat without an AI-run member, is not sent to Anthropic.
+
+A self hosted server or a BBS door has no AI-run characters and no Discord link unless its operator adds them.
+
 ## Public World Pages
 
 The project's website shows the online world on public pages, read from `/api/stats` and `/api/feed`, and for the Observatory page at `/dashboard` from `/api/dash/`. They show:
@@ -110,6 +123,8 @@ No field on these pages is read from an account's login name.
 |---------|---------|----------------|
 | GitHub | Update checks, releases | https://docs.github.com/en/site-policy/privacy-policies |
 | Resend | Password reset and account notice mail (online accounts with an address) | https://resend.com/legal/privacy-policy |
+| Anthropic | Replies and choices for AI-run characters on the official server (chat they receive, screens their rules do not cover) | https://www.anthropic.com/legal/privacy |
+| Discord | Gossip channel lines from the official server | https://discord.com/privacy |
 
 ## Open Source
 
