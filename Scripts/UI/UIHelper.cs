@@ -253,7 +253,6 @@ namespace UsurperRemake.UI
             terminal.Write("[", "white");
             terminal.Write(new string('█', Math.Max(0, Math.Min(barWidth, filled))), barColor);
             terminal.Write(new string('░', Math.Max(0, barWidth - filled)), "gray");
-            terminal.Write($"] {stats}".PadRight(Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
             terminal.Write(TextWidth.PadRight($"] {stats}", Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
         }
 

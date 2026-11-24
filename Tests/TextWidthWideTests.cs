@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using UsurperRemake.Systems;
 using UsurperRemake.UI;
@@ -134,5 +137,18 @@ public class TextWidthWideTests
         lines.Should().NotBeEmpty();
         lines.Should().OnlyContain(line => TextWidth.Width(line) <= width);
         string.Concat(lines).Should().Be(text);
+    }
+
+    [Fact]
+    public void DrawStatBar_WritesTheStatsOnce()
+    {
+        var output = new MemoryStream();
+        var terminal = new TerminalEmulator(new MemoryStream(), output);
+        UIHelper.DrawStatBar(terminal, "生命", 5, 10);
+        terminal.StreamWriterInternal?.Flush();
+
+        string text = Regex.Replace(Encoding.UTF8.GetString(output.ToArray()),
+                                    "\u001b\\[[0-9;?]*[A-Za-z]", "");
+        Regex.Matches(text, "5/10").Count.Should().Be(1);
     }
 }
