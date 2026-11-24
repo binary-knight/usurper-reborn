@@ -401,7 +401,7 @@ public class MarketplaceLocation : BaseLocation
                 terminal.SetColor("bright_yellow");
                 // v1.2.5: the coin abbreviation in the player's language, in the same 14 columns
                 string priceCell = $"{listing.Price,12:N0} {Loc.Get("marketplace.gc")}";
-                terminal.Write(" " + Cell(priceCell, 15) + " ");
+                terminal.Write(" " + CellWhole(priceCell, 15) + " ");
 
                 // Seller
                 terminal.SetColor(listing.IsNPCSeller ? "bright_cyan" : "bright_green");

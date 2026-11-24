@@ -602,7 +602,7 @@ public partial class MainStreetLocation : BaseLocation
     /// </summary>
     internal static List<string> CitizenRows(string marker, string name, string sex, int level, string className, string tail)
     {
-        string head = $"  {marker} {Cell(name, 18)} {sex} {Loc.Get("main_street.citizen_lv", level)} {Cell(className, 10)}";
+        string head = $"  {marker} {CellWhole(name, 18)} {sex} {Loc.Get("main_street.citizen_lv", level)} {CellWhole(className, 10)}";
         if (TextWidth.Width(head) + 1 + TextWidth.Width(tail) <= 79)
             return new List<string> { $"{head} {tail}" };
         return new List<string> { head.TrimEnd(), $"{new string(' ', 6)}{tail}" };
