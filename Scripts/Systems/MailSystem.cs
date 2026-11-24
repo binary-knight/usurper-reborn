@@ -294,7 +294,7 @@ public static partial class MailSystem
                 Date = DateTime.Now,
                 ReadFlag = false,
                 Special = GameConfig.MailRequestNews,
-                Lines = new List<string> { headline, new string('-', headline.Length) }
+                Lines = new List<string> { headline, new string('-', UsurperRemake.UI.TextWidth.Width(headline)) }
             };
             
             mail.Lines.AddRange(newsLines);

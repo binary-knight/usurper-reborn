@@ -528,7 +528,7 @@ public class TeamCornerLocation : BaseLocation
                 WriteBoxHeader(Loc.Get("team_corner.rankings_header"), "bright_magenta");
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                terminal.WriteLine($"{Loc.Get("team.rank_col_rank"),-5} {Loc.Get("team.rank_col_name").PadRight(nameWidth)} {Loc.Get("team.rank_col_mbrs"),-6} {Loc.Get("team.rank_col_power"),-8} {Loc.Get("team.rank_col_avg_lvl"),-8} {Loc.Get("team.rank_col_turf"),-5}");
+                terminal.WriteLine($"{Cell(Loc.Get("team.rank_col_rank"), 5)} {Cell(Loc.Get("team.rank_col_name"), nameWidth)} {Cell(Loc.Get("team.rank_col_mbrs"), 6)} {Cell(Loc.Get("team.rank_col_power"), 8)} {Cell(Loc.Get("team.rank_col_avg_lvl"), 8)} {Cell(Loc.Get("team.rank_col_turf"), 5)}");
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("darkgray");
@@ -539,7 +539,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 terminal.SetColor(team.ControlsTurf ? "bright_yellow" : team.IsPlayerTeam ? "bright_cyan" : "white");
                 string turfMark = team.ControlsTurf ? "*" : "-";
-                terminal.WriteLine($"{index + 1,-5} {NameDisplay(team).PadRight(nameWidth)} {team.MemberCount,-6} {team.TotalPower,-8} {team.AverageLevel,-8} {turfMark,-5}");
+                terminal.WriteLine($"{Cell((index + 1).ToString(), 5)} {Cell(NameDisplay(team), nameWidth)} {Cell(team.MemberCount.ToString(), 6)} {Cell(team.TotalPower.ToString(), 8)} {Cell(team.AverageLevel.ToString(), 8)} {Cell(turfMark, 5)}");
             },
             footer: () =>
             {
@@ -976,7 +976,7 @@ public class TeamCornerLocation : BaseLocation
         if (detailed)
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("team.detail_col_name"),-20} {Loc.Get("team.detail_col_class"),-12} {Loc.Get("team.detail_col_lvl"),-5} {Loc.Get("team.detail_col_hp"),-12} {Loc.Get("team.detail_col_location"),-15} {Loc.Get("team.detail_col_status"),-8}");
+            terminal.WriteLine($"{Cell(Loc.Get("team.detail_col_name"), 20)} {Cell(Loc.Get("team.detail_col_class"), 12)} {Cell(Loc.Get("team.detail_col_lvl"), 5)} {Cell(Loc.Get("team.detail_col_hp"), 12)} {Cell(Loc.Get("team.detail_col_location"), 15)} {Cell(Loc.Get("team.detail_col_status"), 8)}");
             if (!IsScreenReader)
             {
                 terminal.SetColor("darkgray");
@@ -989,7 +989,7 @@ public class TeamCornerLocation : BaseLocation
                 terminal.SetColor("bright_cyan");
                 string className = GameConfig.GetLocalizedClassName(pm.ClassId);   // v1.1.12: localized, was the enum name
                 string onlineStatus = pm.IsOnline ? Loc.Get("team.status_online") : Loc.Get("team.status_offline");
-                terminal.WriteLine($"{pm.DisplayName,-20} {className,-12} {pm.Level,-5} {"?",-12} {"?",-15} {onlineStatus,-8}");
+                terminal.WriteLine($"{Cell(pm.DisplayName, 20)} {Cell(className, 12)} {Cell(pm.Level.ToString(), 5)} {Cell("?", 12)} {Cell("?", 15)} {Cell(onlineStatus, 8)}");
             }
 
             // Show NPC members
@@ -1773,7 +1773,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.available_recruits"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("team.col_num"),-3} {Loc.Get("team.col_name"),-20} {Loc.Get("team.col_class"),-12} {Loc.Get("team.col_level"),-4} {Loc.Get("team.recruit_col_rel"),-10} {Loc.Get("team.col_cost"),-13} {Loc.Get("team.col_wage"),-10}");
+        terminal.WriteLine($"{Cell(Loc.Get("team.col_num"), 3)} {Cell(Loc.Get("team.col_name"), 20)} {Cell(Loc.Get("team.col_class"), 12)} {Cell(Loc.Get("team.col_level"), 4)} {Cell(Loc.Get("team.recruit_col_rel"), 10)} {Cell(Loc.Get("team.col_cost"), 13)} {Cell(Loc.Get("team.col_wage"), 10)}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -1802,7 +1802,7 @@ public class TeamCornerLocation : BaseLocation
             ? Loc.Get("team.recruit_wont_join")
             : $"{row.Cost:N0}g";
 
-        terminal.WriteLine($"{displayIndex,-3} {TruncateName(row.Npc.DisplayName, 20),-20} {row.Npc.ClassName,-12} {row.Npc.Level,-4} {relTag,-10} {costCol,-13} {row.DailyWage:N0}g");
+        terminal.WriteLine($"{Cell(displayIndex.ToString(), 3)} {Cell(row.Npc.DisplayName, 20)} {Cell(row.Npc.ClassName, 12)} {Cell(row.Npc.Level.ToString(), 4)} {Cell(relTag, 10)} {Cell(costCol, 13)} {row.DailyWage:N0}g");
     }
 
     private static string TruncateName(string name, int max)
@@ -2978,7 +2978,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("team.available_player_allies"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("team.col_num"),-3} {Loc.Get("team.col_name"),-18} {Loc.Get("team.col_class"),-12} {Loc.Get("team.col_level_full"),-6} {Loc.Get("team.col_status"),-10}");
+        terminal.WriteLine($"{Cell(Loc.Get("team.col_num"), 3)} {Cell(Loc.Get("team.col_name"), 18)} {Cell(Loc.Get("team.col_class"), 12)} {Cell(Loc.Get("team.col_level_full"), 6)} {Cell(Loc.Get("team.col_status"), 10)}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -3733,7 +3733,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("team_corner.choose_opponent"), "bright_yellow");
         terminal.SetColor("darkgray");
-        terminal.WriteLine($"  {Loc.Get("team.col_num"),-4} {Loc.Get("team.col_team"),-25} {Loc.Get("team.col_members"),-10}");
+        terminal.WriteLine($"  {Cell(Loc.Get("team.col_num"), 4)} {Cell(Loc.Get("team.col_team"), 25)} {Cell(Loc.Get("team.col_members"), 10)}");
         if (!IsScreenReader)
             terminal.WriteLine("  " + new string('─', 40));
 

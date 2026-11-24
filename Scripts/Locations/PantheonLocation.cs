@@ -1188,7 +1188,7 @@ public class PantheonLocation : BaseLocation
         if (gods.Count > 0)
         {
             terminal.SetColor("cyan");
-            terminal.Write($"  {Loc.Get("pantheon.rankings_col_num"),-4}{Loc.Get("pantheon.rankings_col_name"),-22}{Loc.Get("pantheon.rankings_col_title"),-14}{Loc.Get("pantheon.rankings_col_lvl"),4}{Loc.Get("pantheon.rankings_col_exp"),12}{Loc.Get("pantheon.rankings_col_believers"),7}{Loc.Get("pantheon.rankings_col_status"),9}");
+            terminal.Write($"  {Cell(Loc.Get("pantheon.rankings_col_num"), 4)}{Cell(Loc.Get("pantheon.rankings_col_name"), 22)}{Cell(Loc.Get("pantheon.rankings_col_title"), 14)}{CellRight(Loc.Get("pantheon.rankings_col_lvl"), 4)}{CellRight(Loc.Get("pantheon.rankings_col_exp"), 12)}{CellRight(Loc.Get("pantheon.rankings_col_believers"), 7)}{CellRight(Loc.Get("pantheon.rankings_col_status"), 9)}");
             terminal.WriteLine("");
             if (!IsScreenReader)
             {
@@ -1208,16 +1208,16 @@ public class PantheonLocation : BaseLocation
                 terminal.SetColor(isYou ? "bright_yellow" : "white");
                 terminal.Write($"  {rank,-4}");
                 terminal.SetColor(isYou ? "bright_yellow" : "bright_green");
-                terminal.Write($"{god.DivineName,-22}");
+                terminal.Write(Cell(god.DivineName, 22));
                 terminal.SetColor(isYou ? "bright_yellow" : "gray");
-                terminal.Write($"{title,-14}");
+                terminal.Write(Cell(title, 14));
                 terminal.SetColor("white");
-                terminal.Write($"{god.GodLevel,4}");
-                terminal.Write($"{god.GodExperience,12:N0}");
+                terminal.Write(CellRight(god.GodLevel.ToString(), 4));
+                terminal.Write(CellRight(god.GodExperience.ToString("N0"), 12));
                 terminal.SetColor("bright_green");
-                terminal.Write($"{believers,7}");
+                terminal.Write(CellRight(believers.ToString(), 7));
                 terminal.SetColor(god.IsOnline || isYou ? "bright_green" : "gray");
-                terminal.WriteLine($"{status,9}");
+                terminal.WriteLine(Cell(status, 9));
                 rank++;
             }
         }

@@ -265,6 +265,17 @@ namespace UsurperRemake.UI
         }
 
         /// <summary>
+        /// A left-aligned table cell of the given display width. Text wider than the cell is cut on a
+        /// character boundary first, so a wide-script label never pushes the next column out.
+        /// </summary>
+        public static string Cell(string? text, int width) =>
+            TextWidth.PadRight(TextWidth.Truncate(text, width), width);
+
+        /// <summary>A right-aligned table cell of the given display width.</summary>
+        public static string CellRight(string? text, int width) =>
+            TextWidth.PadLeft(TextWidth.Truncate(text, width), width);
+
+        /// <summary>
         /// Format gold with color code
         /// </summary>
         public static string FormatGold(long amount)

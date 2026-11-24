@@ -2554,43 +2554,43 @@ public class CharacterCreationSystem
 
             terminal.WriteLine(Loc.Get("character_creation.rolled_attributes"), "cyan");
             terminal.WriteLine("");
-            terminal.Write($"  {Loc.Get("ui.stat_hp"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_hp"), 15)} ");
             terminal.Write($"{character.HP,3}", GetStatColor(character.HP, 15, 25));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_hp")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_strength"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_strength"), 15)} ");
             terminal.Write($"{character.Strength,3}", GetStatColor(character.Strength, 6, 12));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_str")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_defense"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_defense"), 15)} ");
             terminal.Write($"{character.Defence,3}", GetStatColor(character.Defence, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_def")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_stamina"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_stamina"), 15)} ");
             terminal.Write($"{character.Stamina,3}", GetStatColor(character.Stamina, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_sta")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_agility"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_agility"), 15)} ");
             terminal.Write($"{character.Agility,3}", GetStatColor(character.Agility, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_agi")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_dexterity"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_dexterity"), 15)} ");
             terminal.Write($"{character.Dexterity,3}", GetStatColor(character.Dexterity, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_dex")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_constitution"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_constitution"), 15)} ");
             terminal.Write($"{character.Constitution,3}", GetStatColor(character.Constitution, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_con")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_intelligence"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_intelligence"), 15)} ");
             terminal.Write($"{character.Intelligence,3}", GetStatColor(character.Intelligence, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_int")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_wisdom"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_wisdom"), 15)} ");
             terminal.Write($"{character.Wisdom,3}", GetStatColor(character.Wisdom, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_wis")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_charisma"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_charisma"), 15)} ");
             terminal.Write($"{character.Charisma,3}", GetStatColor(character.Charisma, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_cha")}", "gray");
 
@@ -2603,13 +2603,13 @@ public class CharacterCreationSystem
             }
             if (effectiveMana > 0)
             {
-                terminal.Write($"  {Loc.Get("ui.stat_mana"),-15} ");
+                terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_mana"), 15)} ");
                 terminal.Write($"{effectiveMana,3}/{effectiveMana}", "cyan");
                 terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_mana")}", "gray");
             }
             else if (GetClassManaPerLevel(character.Class) > 0)
             {
-                terminal.Write($"  {Loc.Get("ui.stat_mana"),-15} ");
+                terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_mana"), 15)} ");
                 terminal.Write(Loc.Get("charcreate.mana_per_level_label", GetClassManaPerLevel(character.Class).ToString()), "cyan");
                 terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_mana_grows")}", "gray");
             }

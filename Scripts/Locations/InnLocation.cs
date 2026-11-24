@@ -4604,7 +4604,7 @@ public class InnLocation : BaseLocation
         var statLabels = new[] { Loc.Get("inn.train_stat_strength"), Loc.Get("inn.train_stat_dexterity"), Loc.Get("inn.train_stat_constitution"), Loc.Get("inn.train_stat_intelligence"), Loc.Get("inn.train_stat_wisdom"), Loc.Get("inn.train_stat_charisma"), Loc.Get("inn.train_stat_agility"), Loc.Get("inn.train_stat_stamina") };
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"{Loc.Get("inn.train_header_num"),-4} {Loc.Get("inn.train_header_stat"),-16} {Loc.Get("inn.train_header_current"),-10} {Loc.Get("inn.train_header_trained"),-10} {Loc.Get("inn.train_header_next_cost"),-12}");
+        terminal.WriteLine($"{Cell(Loc.Get("inn.train_header_num"), 4)} {Cell(Loc.Get("inn.train_header_stat"), 16)} {Cell(Loc.Get("inn.train_header_current"), 10)} {Cell(Loc.Get("inn.train_header_trained"), 10)} {Cell(Loc.Get("inn.train_header_next_cost"), 12)}");
         WriteDivider(55, "darkgray");
 
         for (int i = 0; i < statNames.Length; i++)
@@ -4618,13 +4618,13 @@ public class InnLocation : BaseLocation
             if (timesTrained >= GameConfig.MaxStatTrainingsPerStat)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {Loc.Get("inn.train_maxed"),-12}");
+                terminal.WriteLine($"{Cell((i + 1).ToString(), 4)} {Cell(statLabels[i], 16)} {Cell(currentVal.ToString(), 10)} {Cell(trainedStr, 10)} {Cell(Loc.Get("inn.train_maxed"), 12)}");
             }
             else
             {
                 long cost = CalculateTrainingCost(timesTrained);
                 terminal.SetColor("white");
-                string trainRow = $"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {cost:N0}g";
+                string trainRow = $"{Cell((i + 1).ToString(), 4)} {Cell(statLabels[i], 16)} {Cell(currentVal.ToString(), 10)} {Cell(trainedStr, 10)} {cost:N0}g";
                 terminal.Write(trainRow);
 
                 // Show material requirements for 4th/5th training
@@ -4632,7 +4632,7 @@ public class InnLocation : BaseLocation
                 if (matReqs != null)
                 {
                     // v1.2.5: the materials go on a second row, under the stat, when they would pass 79 columns
-                    if (trainRow.Length + 2 + TrainingMaterialsWidth(matReqs) > 79)
+                    if (TextWidth.Width(trainRow) + 2 + TrainingMaterialsWidth(matReqs) > 79)
                     {
                         terminal.WriteLine("");
                         terminal.Write("   ");

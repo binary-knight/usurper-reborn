@@ -839,7 +839,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_rank"),-15} {Loc.Get("castle.header_loyalty"),-10}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_rank"), 15)} {Cell(Loc.Get("castle.header_loyalty"), 10)}");
             WriteDivider(50);
 
             int i = 1;
@@ -851,7 +851,7 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($"{i,-3} {guard.Name,-20} ");
                 terminal.SetColor("cyan");
-                terminal.Write($"{Loc.Get("castle.guard_rank"),-15} ");
+                terminal.Write($"{Cell(Loc.Get("castle.guard_rank"), 15)} ");
                 terminal.SetColor(loyaltyColor);
                 terminal.WriteLine($"{guard.Loyalty}%");
                 i++;
@@ -890,7 +890,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_crime"),-20} {Loc.Get("castle.header_days_left"),-10}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_crime"), 20)} {Cell(Loc.Get("castle.header_days_left"), 10)}");
             WriteDivider(55);
 
             foreach (var prisoner in currentKing.Prisoners)
@@ -1169,7 +1169,7 @@ public class CastleLocation : BaseLocation
                 else
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-18} {Loc.Get("castle.header_crime"),-18} {Loc.Get("castle.header_sentence"),-10} {Loc.Get("castle.header_served"),-8} {Loc.Get("castle.header_bail"),-10}");
+                    terminal.WriteLine($"  {Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 18)} {Cell(Loc.Get("castle.header_crime"), 18)} {Cell(Loc.Get("castle.header_sentence"), 10)} {Cell(Loc.Get("castle.header_served"), 8)} {Cell(Loc.Get("castle.header_bail"), 10)}");
                     WriteDivider(75);
 
                     foreach (var prisoner in currentKing.Prisoners)
@@ -1321,7 +1321,7 @@ public class CastleLocation : BaseLocation
 
         // Show numbered list
         terminal.SetColor("cyan");
-        terminal.WriteLine($"{Loc.Get("castle.header_num"),-4} {Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_type"),-20}");
+        terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 4)} {Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_type"), 20)}");
         WriteDivider(44);
 
         for (int i = 0; i < targets.Count; i++)
@@ -2280,7 +2280,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_from"),-20} {Loc.Get("castle.header_subject"),-35} {Loc.Get("castle.header_status"),-10}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_from"), 20)} {Cell(Loc.Get("castle.header_subject"), 35)} {Cell(Loc.Get("castle.header_status"), 10)}");
             WriteDivider(70);
 
             for (int i = 0; i < royalMail.Count; i++)
@@ -2478,7 +2478,7 @@ public class CastleLocation : BaseLocation
 
             // Individual guard listing
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_loyalty"),-12} {Loc.Get("castle.header_salary"),-12} {Loc.Get("castle.header_status"),-10}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_loyalty"), 12)} {Cell(Loc.Get("castle.header_salary"), 12)} {Cell(Loc.Get("castle.header_status"), 10)}");
             WriteDivider(55);
 
             foreach (var guard in currentKing.Guards)
@@ -2515,7 +2515,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
 
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_level"),-8} {Loc.Get("castle.header_hp"),-12} {Loc.Get("castle.header_strength"),-10}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_level"), 8)} {Cell(Loc.Get("castle.header_hp"), 12)} {Cell(Loc.Get("castle.header_strength"), 10)}");
             WriteDivider(55);
 
             foreach (var monster in currentKing.MonsterGuards)
@@ -2644,7 +2644,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-15} {Loc.Get("castle.header_lvl"),-5} {Loc.Get("castle.header_hp"),-7} {Loc.Get("castle.header_str"),-6} {Loc.Get("castle.header_def"),-6} {Loc.Get("castle.header_cost"),-10} {Loc.Get("castle.header_feed"),-10}");
+        terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 15)} {Cell(Loc.Get("castle.header_lvl"), 5)} {Cell(Loc.Get("castle.header_hp"), 7)} {Cell(Loc.Get("castle.header_str"), 6)} {Cell(Loc.Get("castle.header_def"), 6)} {Cell(Loc.Get("castle.header_cost"), 10)} {Cell(Loc.Get("castle.header_feed"), 10)}");
         WriteDivider(75);
 
         // Sort by level for easier selection
@@ -2901,7 +2901,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-25} {Loc.Get("castle.header_title"),-8} {Loc.Get("castle.header_reign"),-12} {Loc.Get("castle.header_end"),-15}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 25)} {Cell(Loc.Get("castle.header_title"), 8)} {Cell(Loc.Get("castle.header_reign"), 12)} {Cell(Loc.Get("castle.header_end"), 15)}");
             WriteDivider(65);
 
             int i = 1;
@@ -3876,7 +3876,7 @@ public class CastleLocation : BaseLocation
             else
             {
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"{Loc.Get("castle.header_num"),-4} {Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_age"),-6} {Loc.Get("castle.header_sex"),-8} {Loc.Get("castle.header_race"),-10} {Loc.Get("castle.header_type"),-10} {Loc.Get("castle.header_happy"),-6}");
+                terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 4)} {Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_age"), 6)} {Cell(Loc.Get("castle.header_sex"), 8)} {Cell(Loc.Get("castle.header_race"), 10)} {Cell(Loc.Get("castle.header_type"), 10)} {Cell(Loc.Get("castle.header_happy"), 6)}");
                 WriteDivider(66);
 
                 for (int i = 0; i < currentKing.Orphans.Count; i++)
@@ -4509,7 +4509,7 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_level"),-8} {Loc.Get("castle.header_dowry"),-12} {Loc.Get("castle.header_faction_benefit")}");
+        terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_level"), 8)} {Cell(Loc.Get("castle.header_dowry"), 12)} {Loc.Get("castle.header_faction_benefit")}");
         WriteDivider(70);
 
         int i = 1;
@@ -4829,7 +4829,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("castle.header_role"),-18} {Loc.Get("castle.header_name"),-23} {Loc.Get("castle.header_faction"),-15} {Loc.Get("castle.header_loyalty"),-10} {Loc.Get("castle.header_influence")}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_role"), 18)} {Cell(Loc.Get("castle.header_name"), 23)} {Cell(Loc.Get("castle.header_faction"), 15)} {Cell(Loc.Get("castle.header_loyalty"), 10)} {Loc.Get("castle.header_influence")}");
             WriteDivider(78);
 
             foreach (var member in currentKing.CourtMembers)
@@ -5275,7 +5275,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("castle.header_num"),-3} {Loc.Get("castle.header_name"),-20} {Loc.Get("castle.header_age"),-6} {Loc.Get("castle.header_sex"),-8} {Loc.Get("castle.header_claim"),-10} {Loc.Get("castle.header_status")}");
+            terminal.WriteLine($"{Cell(Loc.Get("castle.header_num"), 3)} {Cell(Loc.Get("castle.header_name"), 20)} {Cell(Loc.Get("castle.header_age"), 6)} {Cell(Loc.Get("castle.header_sex"), 8)} {Cell(Loc.Get("castle.header_claim"), 10)} {Loc.Get("castle.header_status")}");
             WriteDivider(60);
 
             int i = 1;

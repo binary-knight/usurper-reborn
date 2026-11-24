@@ -215,7 +215,7 @@ public class ArenaLocation : BaseLocation
 
         // Display opponent list
         terminal.SetColor("yellow");
-        terminal.WriteLine($"  {Loc.Get("arena.col_num"),-4} {Loc.Get("arena.col_name"),-20} {Loc.Get("arena.col_level"),-8} {Loc.Get("arena.col_class"),-12} {Loc.Get("arena.col_status")}");
+        terminal.WriteLine($"  {Cell(Loc.Get("arena.col_num"), 4)} {Cell(Loc.Get("arena.col_name"), 20)} {Cell(Loc.Get("arena.col_level"), 8)} {Cell(Loc.Get("arena.col_class"), 12)} {Loc.Get("arena.col_status")}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -229,11 +229,11 @@ public class ArenaLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write($"  {i + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write($"{p.DisplayName,-20}");
+            terminal.Write(Cell(p.DisplayName, 20));
             terminal.SetColor("cyan");
-            terminal.Write($"{Loc.Get("arena.lv_prefix")}{p.Level,-5}");
+            terminal.Write(Cell(Loc.Get("arena.lv_prefix") + p.Level, 8));
             terminal.SetColor("gray");
-            terminal.Write($"{className,-12}");
+            terminal.Write(Cell(className, 12));
             if (p.IsOnline)
             {
                 terminal.SetColor("bright_green");
@@ -543,7 +543,7 @@ public class ArenaLocation : BaseLocation
         else
         {
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"  {Loc.Get("arena.lb_col_num"),-4} {Loc.Get("arena.lb_col_name"),-20} {Loc.Get("arena.lb_col_wl"),-10} {Loc.Get("arena.lb_col_level"),-8} {Loc.Get("arena.lb_col_gold")}");
+            terminal.WriteLine($"  {Cell(Loc.Get("arena.lb_col_num"), 4)} {Cell(Loc.Get("arena.lb_col_name"), 20)} {Cell(Loc.Get("arena.lb_col_wl"), 10)} {Cell(Loc.Get("arena.lb_col_level"), 8)} {Loc.Get("arena.lb_col_gold")}");
             if (!IsScreenReader)
             {
                 terminal.SetColor("darkgray");
@@ -561,8 +561,9 @@ public class ArenaLocation : BaseLocation
                 };
                 terminal.SetColor(rankColor);
                 terminal.WriteLine(
-                    $"  {entry.Rank,-4} {entry.DisplayName,-20} " +
-                    $"{Loc.Get("arena.lb_wl_format", entry.Wins, entry.Losses)}    {Loc.Get("arena.lv_prefix")}{entry.Level,-5} {entry.TotalGoldStolen:N0}g");
+                    $"  {Cell(entry.Rank.ToString(), 4)} {Cell(entry.DisplayName, 20)} " +
+                    $"{Cell(Loc.Get("arena.lb_wl_format", entry.Wins, entry.Losses), 10)}    " +
+                    $"{Cell(Loc.Get("arena.lv_prefix") + entry.Level, 8)} {entry.TotalGoldStolen:N0}g");
             }
         }
 

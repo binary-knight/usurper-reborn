@@ -1428,8 +1428,11 @@ public partial class GameEngine
             string Fit(string key)
             {
                 var s = Loc.Get(key) ?? "";
-                // Translations drift; never let one blow the border apart.
-                return s.Length > BoxInner ? s.Substring(0, BoxInner) : TextWidth.PadRight(s, BoxInner);
+                // Translations drift; never let one blow the border apart. Measured in columns, so
+                // a Chinese line is cut by display width, not by its UTF-16 length.
+                return TextWidth.Width(s) > BoxInner
+                    ? TextWidth.Truncate(s, BoxInner)
+                    : TextWidth.PadRight(s, BoxInner);
             }
 
             terminal.SetColor("bright_cyan");

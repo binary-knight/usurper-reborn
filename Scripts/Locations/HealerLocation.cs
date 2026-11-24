@@ -372,21 +372,21 @@ public class HealerLocation : BaseLocation
         var colWidth = new int[cols];
         foreach (var r in rows)
             for (int i = 0; i < r.Count - 1; i++)
-                colWidth[i] = Math.Max(colWidth[i], r[i].Label.Length + 2);
-        bool fits = rows.All(r => r.Select((c, i) => i < r.Count - 1 ? 5 + colWidth[i] : 5 + c.Label.Length).Sum() <= width);
+                colWidth[i] = Math.Max(colWidth[i], UsurperRemake.UI.TextWidth.Width(r[i].Label) + 2);
+        bool fits = rows.All(r => r.Select((c, i) => i < r.Count - 1 ? 5 + colWidth[i] : 5 + UsurperRemake.UI.TextWidth.Width(c.Label)).Sum() <= width);
         var outRows = new List<List<(string, string, int)>>();
         foreach (var r in rows)
         {
             if (fits)
             {
-                outRows.Add(r.Select((c, i) => (c.Key, c.Label, i < r.Count - 1 ? colWidth[i] - c.Label.Length : 0)).ToList());
+                outRows.Add(r.Select((c, i) => (c.Key, c.Label, i < r.Count - 1 ? colWidth[i] - UsurperRemake.UI.TextWidth.Width(c.Label) : 0)).ToList());
                 continue;
             }
             var line = new List<(string, string, int)>();
             int used = 0;
             foreach (var c in r)
             {
-                int len = 5 + c.Label.Length;
+                int len = 5 + UsurperRemake.UI.TextWidth.Width(c.Label);
                 if (line.Count > 0 && used + 2 + len > width)
                 {
                     line[^1] = (line[^1].Item1, line[^1].Item2, 0);

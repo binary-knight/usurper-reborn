@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 /// <summary>
 /// Achievement categories for organization
@@ -1542,7 +1543,7 @@ public static class AchievementSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
-            terminal.Write($"{Loc.Get("achievement.unlocked_header"),58}");
+            terminal.Write($"{UIHelper.CellRight(Loc.Get("achievement.unlocked_header"), 58)}");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
