@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
+using UsurperRemake.Systems;
 using UsurperRemake.UI;
 using Xunit;
 
@@ -120,6 +121,18 @@ public class TextWidthWideTests
 
         lines.Should().NotBeEmpty();
         lines.Should().OnlyContain(line => UIHelper.VisibleLength(line) <= width);
+        string.Concat(lines).Should().Be(text);
+    }
+
+    [Fact]
+    public void HintWordWrap_UsesTheSharedColumnWrapper()
+    {
+        const int width = 30;
+        string text = "提示框里的中文通常没有空格，也要按显示列换行，不能整行溢出。";
+        var lines = HintSystem.WordWrap(text, width);
+
+        lines.Should().NotBeEmpty();
+        lines.Should().OnlyContain(line => TextWidth.Width(line) <= width);
         string.Concat(lines).Should().Be(text);
     }
 }
