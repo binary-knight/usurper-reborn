@@ -9337,14 +9337,19 @@ public abstract class BaseLocation
     internal static string MailboxHeader() =>
         $"{"#",-4} {Cell(Loc.Get("base.from_label"), 16)} {Cell(Loc.Get("base.col_date"), 12)} {Cell(Loc.Get("base.col_message"), 36)}";
 
-    /// <summary>v1.2.5: a column label padded to its field, and clipped to it so the columns stay aligned.</summary>
-    internal static string Cell(string text, int width) => (text.Length > width ? text.Substring(0, width) : text).PadRight(width);
+    /// <summary>v1.2.5: a column label padded to its field, and clipped to it so the columns stay aligned.
+    /// v1.3.8: measured in display columns, so a Chinese label stays in its field.</summary>
+    internal static string Cell(string text, int width) =>
+        TextWidth.PadRight(TextWidth.Truncate(text, width), width);
 
-    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.</summary>
+    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.
+    /// v1.3.8: every field is padded by display columns, not characters.</summary>
     internal static string MailboxRow(string unreadMark, int number, string from, string date, string preview)
     {
-        string sender = from.Length > 16 ? from.Substring(0, 16) : from;
-        return $"{unreadMark}{number,-3} {sender,-16} {date,-12} {preview,-36}";
+        string sender = TextWidth.Truncate(from, 16);
+        return $"{unreadMark}{number,-3} {TextWidth.PadRight(sender, 16)} " +
+               $"{TextWidth.PadRight(TextWidth.Truncate(date, 12), 12)} " +
+               $"{TextWidth.PadRight(TextWidth.Truncate(preview, 36), 36)}";
     }
 
     private async Task ReadMail(SqlSaveBackend backend, PlayerMessage msg)

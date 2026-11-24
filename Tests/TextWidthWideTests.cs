@@ -140,6 +140,16 @@ public class TextWidthWideTests
     }
 
     [Fact]
+    public void MailboxCells_PadByColumns()
+    {
+        BaseLocation.Cell("中文", 6).Should().Be("中文  ");
+        TextWidth.Width(BaseLocation.Cell("很长的列标题", 6)).Should().Be(6);
+
+        string row = BaseLocation.MailboxRow("", 1, "中文名字", "2026-01-01", "一段中文预览");
+        TextWidth.Width(row).Should().BeLessOrEqualTo(79);
+    }
+
+    [Fact]
     public void DrawStatBar_WritesTheStatsOnce()
     {
         var output = new MemoryStream();
