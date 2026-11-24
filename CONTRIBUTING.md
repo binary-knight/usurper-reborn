@@ -90,6 +90,7 @@ The game has months/years of player saves on public BBSes and the online server.
 - Every new user-facing string needs keys in all five files: `en.json`, `es.json`, `fr.json`, `hu.json`, `it.json`.
 - Keys stay identical across languages; only values differ.
 - `{0}`, `{1}` format args must be present in all translations.
+- Layout is measured in terminal columns, not characters: a Chinese, Japanese or Korean character and an emoji are two columns wide. `UIHelper` and `TextWidth` measure this for you; if you pad or centre a string by hand, use `TextWidth.PadRight`/`PadLeft`/`Truncate` rather than `String.PadRight` or `.Length`.
 - If you don't speak a language, English-to-machine-translation with a note in the PR (`"[MT, needs review]"`) is acceptable for non-English files, as long as the English version is correct.
 - Don't translate localization keys themselves, only values.
 
