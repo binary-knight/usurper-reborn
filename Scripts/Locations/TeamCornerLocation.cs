@@ -1802,7 +1802,7 @@ public class TeamCornerLocation : BaseLocation
             ? Loc.Get("team.recruit_wont_join")
             : $"{row.Cost:N0}g";
 
-        terminal.WriteLine($"{Cell(displayIndex.ToString(), 3)} {Cell(row.Npc.DisplayName, 20)} {Cell(row.Npc.ClassName, 12)} {Cell(row.Npc.Level.ToString(), 4)} {Cell(relTag, 10)} {Cell(costCol, 13)} {row.DailyWage:N0}g");
+        terminal.WriteLine($"{Cell(displayIndex.ToString(), 3)} {Cell(TextWidth.Truncate(row.Npc.DisplayName, 20), 20)} {Cell(row.Npc.ClassName, 12)} {Cell(row.Npc.Level.ToString(), 4)} {Cell(relTag, 10)} {Cell(costCol, 13)} {row.DailyWage:N0}g");
     }
 
     private static string TruncateName(string name, int max)

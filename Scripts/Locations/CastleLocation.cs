@@ -849,7 +849,7 @@ public class CastleLocation : BaseLocation
                                      guard.Loyalty > 50 ? "yellow" : "red";
 
                 terminal.SetColor("white");
-                terminal.Write($"{Cell(i.ToString(), 3)} {Cell(guard.Name, 20)} ");
+                terminal.Write($"{Cell(i.ToString(), 3)} {CellWhole(guard.Name, 20)} ");
                 terminal.SetColor("cyan");
                 terminal.Write($"{Cell(Loc.Get("castle.guard_rank"), 15)} ");
                 terminal.SetColor(loyaltyColor);
@@ -897,7 +897,7 @@ public class CastleLocation : BaseLocation
             {
                 int daysLeft = Math.Max(0, prisoner.Value.Sentence - prisoner.Value.DaysServed);
                 terminal.SetColor("white");
-                terminal.WriteLine($"{Cell(prisoner.Value.CharacterName, 20)} {Cell(prisoner.Value.Crime, 20)} {Cell(daysLeft.ToString(), 10)}");
+                terminal.WriteLine($"{CellWhole(prisoner.Value.CharacterName, 20)} {CellWhole(prisoner.Value.Crime, 20)} {Cell(daysLeft.ToString(), 10)}");
             }
         }
 
@@ -1178,14 +1178,14 @@ public class CastleLocation : BaseLocation
                         string bailStr = p.BailAmount > 0 ? $"{p.BailAmount:N0}g" : Loc.Get("ui.none");
                         terminal.SetColor("white");
                         string tail = $"{Cell(p.Sentence.ToString(), 10)} {Cell(p.DaysServed.ToString(), 8)} {Cell(bailStr, 10)}";
-                        string row = $"  {Cell(i.ToString(), 3)} {Cell(p.CharacterName, 18)} {Cell(p.Crime, 18)} {tail}";
+                        string row = $"  {Cell(i.ToString(), 3)} {CellWhole(p.CharacterName, 18)} {CellWhole(p.Crime, 18)} {tail}";
                         if (row.Length <= 79)
                             terminal.WriteLine(row);
                         else
                         {
                             // v1.2.5: a long name or crime goes on its own row; the numbers keep their columns
                             terminal.WriteLine($"  {Cell(i.ToString(), 3)} {p.CharacterName}");
-                            string crimeRow = $"{new string(' ', 25)}{Cell(p.Crime, 18)} {tail}";
+                            string crimeRow = $"{new string(' ', 25)}{CellWhole(p.Crime, 18)} {tail}";
                             if (crimeRow.Length <= 79)
                                 terminal.WriteLine(crimeRow);
                             else
@@ -1327,7 +1327,7 @@ public class CastleLocation : BaseLocation
         for (int i = 0; i < targets.Count; i++)
         {
             terminal.SetColor(targets[i].IsNPC ? "white" : "bright_yellow");
-            terminal.WriteLine($"{Cell((i + 1).ToString(), 4)} {Cell(targets[i].Name, 20)} {Cell(targets[i].Type, 20)}");
+            terminal.WriteLine($"{Cell((i + 1).ToString(), 4)} {CellWhole(targets[i].Name, 20)} {CellWhole(targets[i].Type, 20)}");
         }
 
         terminal.WriteLine("");
@@ -2290,7 +2290,7 @@ public class CastleLocation : BaseLocation
                 string statusColor = mail.IsRead ? "gray" : "bright_yellow";
 
                 terminal.SetColor("white");
-                terminal.Write($"{Cell((i + 1).ToString(), 3)} {Cell(mail.Sender, 20)} {Cell(mail.Subject, 35)} ");
+                terminal.Write($"{Cell((i + 1).ToString(), 3)} {CellWhole(mail.Sender, 20)} {CellWhole(mail.Subject, 35)} ");
                 terminal.SetColor(statusColor);
                 terminal.WriteLine(status);
             }
@@ -2488,7 +2488,7 @@ public class CastleLocation : BaseLocation
                 string status = guard.IsActive ? Loc.Get("castle.guard_active") : Loc.Get("castle.guard_inactive");
 
                 terminal.SetColor("white");
-                terminal.Write($"{Cell(guard.Name, 20)} ");
+                terminal.Write($"{CellWhole(guard.Name, 20)} ");
                 terminal.SetColor(loyaltyColor);
                 terminal.Write($"{guard.Loyalty}%{"",-9} ");
                 terminal.SetColor("white");
@@ -2521,7 +2521,7 @@ public class CastleLocation : BaseLocation
             foreach (var monster in currentKing.MonsterGuards)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine($"{Cell(MonsterNames.Display(monster.Name), 20)} {Cell(monster.Level.ToString(), 8)} {monster.HP}/{monster.MaxHP} {Cell(monster.Strength.ToString(), 10)}");
+                terminal.WriteLine($"{CellWhole(MonsterNames.Display(monster.Name), 20)} {Cell(monster.Level.ToString(), 8)} {monster.HP}/{monster.MaxHP} {Cell(monster.Strength.ToString(), 10)}");
             }
         }
         else
@@ -2662,7 +2662,7 @@ public class CastleLocation : BaseLocation
 
             bool canAfford = currentKing.Treasury >= actualCost;
             terminal.SetColor(canAfford ? "white" : "darkgray");
-            terminal.WriteLine($"{Cell(i.ToString(), 3)} {Cell(MonsterNames.Display(name), 15)} {Cell(level.ToString(), 5)} {Cell(hp.ToString(), 7)} {Cell(str.ToString(), 6)} {Cell(def.ToString(), 6)} {Cell(actualCost.ToString("N0"), 10)} {Cell(feedingCost.ToString("N0"), 10)}");
+            terminal.WriteLine($"{Cell(i.ToString(), 3)} {CellWhole(MonsterNames.Display(name), 15)} {Cell(level.ToString(), 5)} {Cell(hp.ToString(), 7)} {Cell(str.ToString(), 6)} {Cell(def.ToString(), 6)} {Cell(actualCost.ToString("N0"), 10)} {Cell(feedingCost.ToString("N0"), 10)}");
             i++;
         }
 
@@ -2909,13 +2909,13 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("white");
                 string reason = EndReasonLabel(monarch.EndReason);
-                string row = $"{Cell(i.ToString(), 3)} {Cell(monarch.Name, 25)} {Cell(NobleTitleLabel(monarch.Title), 8)} {Cell(monarch.DaysReigned.ToString(), 12)} {reason}";
+                string row = $"{Cell(i.ToString(), 3)} {CellWhole(monarch.Name, 25)} {NobleTitleLabel(monarch.Title),-8} {Cell(monarch.DaysReigned.ToString(), 12)} {reason}";
                 if (row.Length <= 79)
                     terminal.WriteLine(row);
                 else
                 {
                     // v1.2.5: a long name or reason puts the reason on the next row, under its column
-                    terminal.WriteLine($"{Cell(i.ToString(), 3)} {Cell(monarch.Name, 25)} {Cell(NobleTitleLabel(monarch.Title), 8)} {monarch.DaysReigned}");
+                    terminal.WriteLine($"{Cell(i.ToString(), 3)} {CellWhole(monarch.Name, 25)} {NobleTitleLabel(monarch.Title),-8} {monarch.DaysReigned}");
                     terminal.WriteLine($"{new string(' ', 4)}{reason}");
                 }
                 i++;
@@ -3892,9 +3892,9 @@ public class CastleLocation : BaseLocation
                     terminal.SetColor("gray");
                     terminal.Write($"{i + 1,-4} ");
                     terminal.SetColor("white");
-                    terminal.Write($"{Cell(orphan.Name, 20)} {Cell(orphan.Age.ToString(), 6)} {Cell(sexStr, 8)} {Cell(raceStr, 10)} ");
+                    terminal.Write($"{CellWhole(orphan.Name, 20)} {Cell(orphan.Age.ToString(), 6)} {CellWhole(sexStr, 8)} {CellWhole(raceStr, 10)} ");
                     terminal.SetColor(typeColor);
-                    terminal.Write($"{Cell(typeStr, 10)} ");
+                    terminal.Write($"{CellWhole(typeStr, 10)} ");
                     terminal.SetColor(happyColor);
                     terminal.Write($"{orphan.Happiness}%");
 
@@ -4520,7 +4520,7 @@ public class CastleLocation : BaseLocation
             var faction = DetermineFactionForNPC(npc);
 
             terminal.SetColor("white");
-            terminal.WriteLine($"{Cell(i.ToString(), 3)} {Cell(npc.Name, 20)} {Cell(npc.Level.ToString(), 8)} {Cell($"{dowry:N0}", 12)} {Loc.Get("castle.candidate_entry", "", CourtFactionLabel(faction)).Trim()}");
+            terminal.WriteLine($"{Cell(i.ToString(), 3)} {CellWhole(npc.Name, 20)} {Cell(npc.Level.ToString(), 8)} {Cell($"{dowry:N0}", 12)} {Loc.Get("castle.candidate_entry", "", CourtFactionLabel(faction)).Trim()}");
             i++;
         }
 
@@ -4839,7 +4839,7 @@ public class CastleLocation : BaseLocation
                 string plottingMark = member.IsPlotting ? " *" : "";
 
                 terminal.SetColor("white");
-                terminal.Write($"{Cell(CourtRoleLabel(member.Role), 18)} ");
+                terminal.Write($"{CellWhole(CourtRoleLabel(member.Role), 18)} ");
                 terminal.SetColor("cyan");
                 // v1.2.5: the name column is 23 (the header was 81 columns); a longer name keeps its own row
                 if (member.Name.Length > 23)
@@ -4848,11 +4848,11 @@ public class CastleLocation : BaseLocation
                     terminal.Write(new string(' ', 43));
                 }
                 else
-                    terminal.Write($"{Cell(member.Name, 23)} ");
+                    terminal.Write($"{CellWhole(member.Name, 23)} ");
                 terminal.SetColor("gray");
-                terminal.Write($"{Cell(CourtFactionLabel(member.Faction), 15)} ");
+                terminal.Write($"{CellWhole(CourtFactionLabel(member.Faction), 15)} ");
                 terminal.SetColor(loyaltyColor);
-                terminal.Write($"{member.LoyaltyToKing}%{Cell(plottingMark, 7)} ");
+                terminal.Write($"{member.LoyaltyToKing}%{CellWhole(plottingMark, 7)} ");
                 terminal.SetColor("white");
                 terminal.WriteLine($"{member.Influence}");
             }
@@ -4916,7 +4916,7 @@ public class CastleLocation : BaseLocation
                           avgLoyalty >= 40 ? "yellow" : "red";
 
             terminal.SetColor("white");
-            terminal.Write($"  {Cell(CourtFactionLabel(group.Key), 15)}: ");
+            terminal.Write($"  {CellWhole(CourtFactionLabel(group.Key), 15)}: ");
             terminal.SetColor(color);
             terminal.WriteLine($"{status} ({avgLoyalty}%)");
         }
@@ -5111,7 +5111,7 @@ public class CastleLocation : BaseLocation
             long cost = GameConfig.BribeBaseCost + (100 - m.LoyaltyToKing) * 50;
             string loyColor = m.LoyaltyToKing >= 70 ? "bright_green" : m.LoyaltyToKing >= 40 ? "yellow" : "red";
             terminal.SetColor("white");
-            terminal.Write($"  {i + 1}. {Cell(m.Name, 20)} ");
+            terminal.Write($"  {i + 1}. {CellWhole(m.Name, 20)} ");
             terminal.SetColor(loyColor);
             terminal.Write(Loc.Get("castle.loyalty_label", m.LoyaltyToKing));
             terminal.SetColor("gray");
@@ -5287,7 +5287,7 @@ public class CastleLocation : BaseLocation
                                     heir.IsAdult ? "white" : "gray";
 
                 terminal.SetColor("white");
-                terminal.Write($"{Cell(i.ToString(), 3)} {Cell(heir.Name, 20)} {Cell(heir.Age.ToString(), 6)} {Cell(Loc.Get(heir.Sex == CharacterSex.Male ? "base.male" : "base.female"), 8)} {heir.ClaimStrength}%     ");
+                terminal.Write($"{Cell(i.ToString(), 3)} {CellWhole(heir.Name, 20)} {Cell(heir.Age.ToString(), 6)} {CellWhole(Loc.Get(heir.Sex == CharacterSex.Male ? "base.male" : "base.female"), 8)} {heir.ClaimStrength}%     ");
                 terminal.SetColor(statusColor);
                 terminal.WriteLine(status);
                 i++;
@@ -7630,7 +7630,7 @@ public class CastleLocation : BaseLocation
             {
                 var npc = npcs[i];
                 terminal.SetColor("white");
-                terminal.Write($"  {i + 1}. {Cell(npc.Name, 20)}");
+                terminal.Write($"  {i + 1}. {CellWhole(npc.Name, 20)}");
                 terminal.SetColor("gray");
                 terminal.Write(Loc.Get("castle.npc_lv", npc.Level));
                 terminal.SetColor("red");

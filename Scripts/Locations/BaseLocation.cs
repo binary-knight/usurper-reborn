@@ -6877,7 +6877,7 @@ public abstract class BaseLocation
     /// one wraps at spaces, each later row indented under the text after its leading "  - ".</summary>
     internal static List<string> BuffRows(string row)
     {
-        if (row.Length <= 79) return new List<string> { row };
+        if (TextWidth.Width(row) <= 79) return new List<string> { row };
         string trimmed = row.TrimStart();
         int lead = row.Length - trimmed.Length + (trimmed.StartsWith("- ") ? 2 : 0);
         string indent = new string(' ', lead);
@@ -9346,6 +9346,9 @@ public abstract class BaseLocation
     internal static string CellRight(string text, int width) =>
         TextWidth.PadLeft(TextWidth.Truncate(text, width), width);
 
+    /// <summary>A cell that pads but keeps a longer value whole, for a name with a caller fallback.</summary>
+    internal static string CellWhole(string text, int width) => TextWidth.PadRight(text, width);
+
     /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.
     /// v1.3.8: every field is padded by display columns, not characters.</summary>
     internal static string MailboxRow(string unreadMark, int number, string from, string date, string preview)
@@ -9939,10 +9942,10 @@ public abstract class BaseLocation
 
     /// <summary>v1.2.5: a bounty board amount, "N gold" in the player's language, in the 15-column Bounty field
     /// (wider for an amount that needs it) and one space. The names beside it are clipped to their 20-column fields.</summary>
-    internal static string BountyAmountCell(long amount) => Loc.Get("anchor_road.gold_amount", amount.ToString("N0")).PadRight(15) + " ";
+    internal static string BountyAmountCell(long amount) => TextWidth.PadRight(Loc.Get("anchor_road.gold_amount", amount.ToString("N0")), 15) + " ";
 
     /// <summary>v1.2.5: the Posted By field, 20 columns, less when a very large amount leaves less room in 79.</summary>
-    internal static int BountyPlacedByWidth(string amountCell) => Math.Min(20, MaxRowWidth - (2 + 5 + 21) - amountCell.Length);
+    internal static int BountyPlacedByWidth(string amountCell) => Math.Min(20, MaxRowWidth - (2 + 5 + 21) - TextWidth.Width(amountCell));
 
     private const int MaxRowWidth = 79;
 

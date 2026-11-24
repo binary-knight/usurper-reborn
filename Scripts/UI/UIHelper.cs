@@ -275,6 +275,13 @@ namespace UsurperRemake.UI
         public static string CellRight(string? text, int width) =>
             TextWidth.PadLeft(TextWidth.Truncate(text, width), width);
 
+        /// <summary>A cell that pads to the width but keeps a longer value whole (for a name that
+        /// must stay readable, with the caller's own overflow fallback).</summary>
+        public static string CellWhole(string? text, int width) => TextWidth.PadRight(text, width);
+
+        /// <summary>A right-aligned cell that keeps a longer value whole.</summary>
+        public static string CellWholeRight(string? text, int width) => TextWidth.PadLeft(text, width);
+
         /// <summary>
         /// Format gold with color code
         /// </summary>

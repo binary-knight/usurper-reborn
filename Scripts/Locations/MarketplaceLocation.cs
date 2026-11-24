@@ -1,5 +1,6 @@
 using UsurperRemake.BBS;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using GlobalItem = global::Item;
 using System;
 using System.Collections.Generic;
@@ -393,7 +394,7 @@ public class MarketplaceLocation : BaseLocation
 
                 // Item name - color by rarity/type
                 terminal.SetColor("white");
-                string itemName = listing.Item.GetDisplayName();
+                string itemName = TextWidth.Truncate(listing.Item.GetDisplayName(), 29, "..");
                 terminal.Write(" " + Cell(itemName, 29) + " ");
 
                 // Price
@@ -404,7 +405,7 @@ public class MarketplaceLocation : BaseLocation
 
                 // Seller
                 terminal.SetColor(listing.IsNPCSeller ? "bright_cyan" : "bright_green");
-                terminal.Write(" " + Cell(sellerDisplay, 18));
+                terminal.Write(" " + Cell(TextWidth.Truncate(sellerDisplay, 18), 18));
 
                 // Age
                 terminal.SetColor("gray");

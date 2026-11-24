@@ -977,7 +977,7 @@ public partial class MainStreetLocation : BaseLocation
 
                 string rankStr = rank <= 3 ? $"#{rank}" : $"{rank}.";
                 string marker = entry.IsPlayer ? "*" : " ";
-                terminal.WriteLine($"  {Cell(rankStr, 5)}{marker}{Cell(entry.Name, 17)} {CellRight(entry.Level.ToString(), 3)} {Cell(entry.Class, 10)} {Cell(entry.Location, 12)} {CellRight(entry.Experience.ToString("N0"), 10)}");
+                terminal.WriteLine($"  {Cell(rankStr, 5)}{marker}{Cell(TextWidth.Truncate(entry.Name, 17), 17)} {CellRight(entry.Level.ToString(), 3)} {Cell(TextWidth.Truncate(entry.Class, 10), 10)} {Cell(TextWidth.Truncate(entry.Location, 12), 12)} {CellRight(entry.Experience.ToString("N0"), 10)}");
             }
 
             terminal.WriteLine("");
@@ -2430,7 +2430,7 @@ public partial class MainStreetLocation : BaseLocation
                 // Color based on rank
                 string color = rank == 1 ? "bright_yellow" : rank <= 3 ? "bright_cyan" : "white";
                 terminal.SetColor(color);
-                terminal.WriteLine($"  {Cell("#" + rank, 5)} {Cell(guildName, 22)} {Cell(memberStr, 9)} {Cell(leaderDisplay, 16)} {CellRight(g.BankGold.ToString("N0") + "g", 8)}");
+                terminal.WriteLine($"  {Cell("#" + rank, 5)} {Cell(TextWidth.Truncate(guildName, 22, ".."), 22)} {Cell(memberStr, 9)} {Cell(TextWidth.Truncate(leaderDisplay, 16, ".."), 16)} {CellRight(g.BankGold.ToString("N0") + "g", 8)}");
                 rank++;
             }
 

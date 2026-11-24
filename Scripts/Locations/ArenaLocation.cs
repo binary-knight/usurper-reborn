@@ -229,7 +229,7 @@ public class ArenaLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write($"  {i + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write(Cell(p.DisplayName, 20));
+            terminal.Write(CellWhole(p.DisplayName, 20));
             terminal.SetColor("cyan");
             terminal.Write(Cell(Loc.Get("arena.lv_prefix") + p.Level, 8));
             terminal.SetColor("gray");
@@ -561,7 +561,7 @@ public class ArenaLocation : BaseLocation
                 };
                 terminal.SetColor(rankColor);
                 terminal.WriteLine(
-                    $"  {Cell(entry.Rank.ToString(), 4)} {Cell(entry.DisplayName, 20)} " +
+                    $"  {Cell(entry.Rank.ToString(), 4)} {CellWhole(entry.DisplayName, 20)} " +
                     $"{Cell(Loc.Get("arena.lb_wl_format", entry.Wins, entry.Losses), 10)}    " +
                     $"{Cell(Loc.Get("arena.lv_prefix") + entry.Level, 8)} {entry.TotalGoldStolen:N0}g");
             }

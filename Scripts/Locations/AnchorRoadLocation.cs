@@ -456,7 +456,7 @@ public class AnchorRoadLocation : BaseLocation
                           target.Darkness > 200 ? Loc.Get("anchor_road.crime_assault") : Loc.Get("anchor_road.crime_troublemaker");
 
             terminal.SetColor("white");
-            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {Cell(target.DisplayName, 20)} {Cell(target.Level.ToString(), 6)} {Cell($"{bounty:N0}g", 12)} {Cell(crime, 15)}");
+            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {CellWhole(target.DisplayName, 20)} {Cell(target.Level.ToString(), 6)} {Cell($"{bounty:N0}g", 12)} {Cell(crime, 15)}");
         }
 
         terminal.WriteLine("");
@@ -623,7 +623,7 @@ public class AnchorRoadLocation : BaseLocation
             else
                 terminal.SetColor("white");
 
-            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {Cell(team.TeamName, 24)} {Cell(team.MemberCount.ToString(), 8)} {Cell(team.TotalPower.ToString(), 8)} {Cell(turfMark, 5)}");
+            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {CellWhole(team.TeamName, 24)} {Cell(team.MemberCount.ToString(), 8)} {Cell(team.TotalPower.ToString(), 8)} {Cell(turfMark, 5)}");
         }
 
         terminal.WriteLine("");

@@ -1208,7 +1208,7 @@ public class PantheonLocation : BaseLocation
                 terminal.SetColor(isYou ? "bright_yellow" : "white");
                 terminal.Write($"  {rank,-4}");
                 terminal.SetColor(isYou ? "bright_yellow" : "bright_green");
-                terminal.Write(Cell(god.DivineName, 22));
+                terminal.Write(CellWhole(god.DivineName, 22));
                 terminal.SetColor(isYou ? "bright_yellow" : "gray");
                 terminal.Write(Cell(title, 14));
                 terminal.SetColor("white");
