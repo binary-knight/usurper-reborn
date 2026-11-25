@@ -101,7 +101,7 @@ public class ChildSurname1315Tests : IDisposable
             Kid("Henry Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-e", 4),
         });
         var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-e");
-        FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", out var newName).Should().BeTrue();
+        FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", null, out var newName).Should().BeTrue();
         newName.Should().Be("Henry Ravenswood");
         child.Name.Should().Be("Henry Ravenswood");
     }
@@ -116,7 +116,7 @@ public class ChildSurname1315Tests : IDisposable
             Kid("Jane Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-g", 6),
         });
         var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-g");
-        FamilySystem.Instance.TryGiveSurname(child, "ravenswood", out var newName).Should().BeFalse();
+        FamilySystem.Instance.TryGiveSurname(child, "ravenswood", null, out var newName).Should().BeFalse();
         newName.Should().Be("Jane ravenswood");
         child.Name.Should().Be("Jane Oldfield");
     }
@@ -135,9 +135,9 @@ public class ChildSurname1315Tests : IDisposable
                 Kid("Isaac Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-h", 7),
             });
             var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-h");
-            FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", out _).Should().BeFalse();
+            FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", null, out _).Should().BeFalse();
             child.Name.Should().Be("Isaac Oldfield");
-            FamilySystem.Instance.TryGiveSurname(child, "Thornbury", out var other).Should().BeTrue();
+            FamilySystem.Instance.TryGiveSurname(child, "Thornbury", null, out var other).Should().BeTrue();
             other.Should().Be("Isaac Thornbury");
         }
         finally

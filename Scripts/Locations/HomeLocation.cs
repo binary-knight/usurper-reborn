@@ -2004,7 +2004,7 @@ public class HomeLocation : BaseLocation
         foreach (var child in targets)
         {
             string oldName = child.Name;
-            if (!FamilySystem.Instance.TryGiveSurname(child, surname, out string newName))
+            if (!FamilySystem.Instance.TryGiveSurname(child, surname, currentPlayer, out string newName))
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("home.child_surname_taken", newName, oldName));
@@ -2108,7 +2108,14 @@ public class HomeLocation : BaseLocation
             else if (!string.IsNullOrEmpty(newFirst) && newFirst.Length <= 20)
             {
                 string oldName = selectedChild.Name;
-                selectedChild.Name = newFirst + surname;
+                // v1.3.15: a first name that gives the child someone else's full name is refused
+                if (!FamilySystem.Instance.TryRename(selectedChild, newFirst + surname, currentPlayer))
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("home.child_surname_taken", newFirst + surname, oldName));
+                    await terminal.WaitForKey();
+                    return;
+                }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("home.child_renamed", oldName, selectedChild.Name));
 
