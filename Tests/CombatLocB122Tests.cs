@@ -534,10 +534,11 @@ public class CombatLocB122Tests
         string text = await WithLanguage(lang, () => string.Join("\n", RenderDeathLines(max, 0), RenderDeathLines(max - 1, 2),
             RenderDeathLines(max - 2, 1), RenderDeathLines(0, 1)));
         Capture($"combat-b-death-lines-{lang}.txt", text);
-        text.Should().Contain(Loc.GetIn(lang, "combat.final_death_warning")).And.Contain(Loc.GetIn(lang, "combat.final_death_times", max))
-            .And.Contain(Loc.GetIn(lang, "combat.deaths_remaining_one", max - 1, max, 1))
-            .And.Contain(Loc.GetIn(lang, "combat.deaths_remaining_many", max - 2, max, 2))
-            .And.Contain(Loc.GetIn(lang, "combat.deaths_used", 0, max))
+        // 1.3.15: the menu shows the count only; no line about erasure (nothing on this path erases)
+        text.Should().Contain(Loc.GetIn(lang, "combat.deaths_this_playthrough", max))
+            .And.Contain(Loc.GetIn(lang, "combat.deaths_this_playthrough", max - 1))
+            .And.Contain(Loc.GetIn(lang, "combat.deaths_this_playthrough", 0))
+            .And.NotContain(Loc.GetIn(lang, "combat.final_death_warning"))
             .And.Contain(Loc.GetIn(lang, "death.divine_restore", 250, 500)).And.Contain(Loc.GetIn(lang, "death.final_warning2"))
             .And.Contain(Loc.GetIn(lang, "death.rez_remaining", 2, 3));
         foreach (var english in new[] { "FINAL DEATH WARNING", "You have died", "deaths used", "Divine intervention", "Resurrections remaining", "death(s)" })
