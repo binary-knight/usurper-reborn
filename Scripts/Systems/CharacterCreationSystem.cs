@@ -1256,8 +1256,7 @@ public class CharacterCreationSystem
         {
             lines.Add(() =>
             {
-                int visLen = Math.Min(text.Length, panelWidth - 1);
-                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+                terminal.Write(" " + TextWidth.PadRight(TextWidth.Truncate(text, panelWidth - 1), panelWidth - 1), color);
             });
         }
 
@@ -1858,8 +1857,7 @@ public class CharacterCreationSystem
         {
             lines.Add(() =>
             {
-                int visLen = Math.Min(text.Length, panelWidth - 1);
-                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+                terminal.Write(" " + TextWidth.PadRight(TextWidth.Truncate(text, panelWidth - 1), panelWidth - 1), color);
             });
         }
 
@@ -2281,18 +2279,18 @@ public class CharacterCreationSystem
                 };
                 int prestigeIdx = prestigeStartIndex;
                 // v1.2.5: the name column is as wide as the longest prestige name in the reader's language (14 in English)
-                int prestigeNameWidth = Math.Max(14, allPrestige.Max(p => GameConfig.GetLocalizedClassName(p.Item1).Length));
+                int prestigeNameWidth = Math.Max(14, allPrestige.Max(p => TextWidth.Width(GameConfig.GetLocalizedClassName(p.Item1))));
                 foreach (var (pc, unlockReq) in allPrestige)
                 {
                     bool isUnlocked = unlockedPrestige.Contains(pc);
                     if (isUnlocked)
                     {
                         string head = $"({prestigeIdx}) ";
-                        string namePad = GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth);
+                        string namePad = TextWidth.PadRight(GameConfig.GetLocalizedClassName(pc), prestigeNameWidth);
                         terminal.Write(head, "bright_magenta");
                         terminal.Write(namePad, "bright_white");
                         // v1.2.5: the description wraps under itself so the row fits 79 columns
-                        int used = head.Length + namePad.Length + 1;
+                        int used = TextWidth.Width(head) + TextWidth.Width(namePad) + 1;
                         var descRows = UIHelper.WordWrap(GameConfig.GetLocalizedPrestigeDescription(pc), UIHelper.WrapWidth - used);
                         terminal.WriteLine($" {descRows[0]}", "magenta");
                         foreach (var more in descRows.Skip(1))
@@ -2302,7 +2300,7 @@ public class CharacterCreationSystem
                     else
                     {
                         terminal.Write($"     ", "dark_gray");
-                        terminal.Write(GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth), "dark_gray");
+                        terminal.Write(TextWidth.PadRight(GameConfig.GetLocalizedClassName(pc), prestigeNameWidth), "dark_gray");
                         terminal.WriteLine($" {Loc.Get("creation.prestige_locked", unlockReq)}", "dark_gray");
                     }
                 }
@@ -3124,14 +3122,15 @@ public class CharacterCreationSystem
     private static IEnumerable<string> HelpGroupRows(IEnumerable<(string Name, string Text)> entries)
     {
         var list = entries.ToList();
-        int nameWidth = Math.Max(9, list.Max(e => e.Name.Length)) + 1;
+        int nameWidth = Math.Max(9, list.Max(e => TextWidth.Width(e.Name))) + 1;
         foreach (var (name, text) in list)
         {
             string head = TextWidth.PadRight(name, nameWidth) + "- ";
-            var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - head.Length);
+            int headWidth = TextWidth.Width(head);
+            var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - headWidth);
             yield return head + wrapped[0];
             foreach (var more in wrapped.Skip(1))
-                yield return new string(' ', head.Length) + more;
+                yield return new string(' ', headWidth) + more;
         }
     }
 

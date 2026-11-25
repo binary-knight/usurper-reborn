@@ -10450,14 +10450,14 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{Truncate(l.ItemName, AuctionItemWidth - 1),-22} ");   // v1.2.5: 22 + one gap, so the row fits 79
+            terminal.Write(TextWidth.PadRight(Truncate(l.ItemName, AuctionItemWidth - 1), AuctionItemWidth) + " ");   // v1.2.5: 22 + one gap, so the row fits 79
             terminal.SetColor("cyan");
-            terminal.Write($"{stats,-16} ");
+            terminal.Write(TextWidth.PadRight(stats, 16) + " ");
             terminal.SetColor("bright_green");
             terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write(" ");
             terminal.SetColor(isMine ? "cyan" : "gray");
-            terminal.Write($"{Truncate(l.Seller, AuctionSellerWidth - 1),-13} ");
+            terminal.Write(TextWidth.PadRight(Truncate(l.Seller, AuctionSellerWidth - 1), AuctionSellerWidth) + " ");
             terminal.SetColor("darkgray");
             terminal.WriteLine(expires);
         }
@@ -10478,8 +10478,8 @@ public abstract class BaseLocation
 
     private static string Truncate(string s, int maxLen)
     {
-        if (s.Length <= maxLen) return s;
-        return s.Substring(0, maxLen - 3) + "...";
+        if (TextWidth.Width(s) <= maxLen) return s;
+        return TextWidth.Truncate(s, Math.Max(0, maxLen - 3)) + "...";
     }
 
     private static string GetItemStatsCompact(Item? item)
@@ -10937,7 +10937,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{Truncate(l.ItemName, 23),-24} ");
+            terminal.Write(TextWidth.PadRight(Truncate(l.ItemName, 23), 24) + " ");
             terminal.SetColor("bright_green");
             terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write("  ");
@@ -11264,7 +11264,7 @@ public abstract class BaseLocation
         // v1.2.2: the columns are sized from the longest slot name in the player's language and the
         // item names are cut to fit, so a row stays within 80 columns in every language (Spanish and
         // French slot names run to 16 letters; English keeps its 12-wide labels and 20-wide left names).
-        var (labelWidth, leftNameWidth, rightNameWidth) = SlotPickerColumns(slots.Max(s => s.label.Length));
+        var (labelWidth, leftNameWidth, rightNameWidth) = SlotPickerColumns(slots.Max(s => TextWidth.Width(s.label)));
 
         // Two-column layout: 1-7 left, 8-14 right
         for (int row = 0; row < 7; row++)
@@ -11280,7 +11280,7 @@ public abstract class BaseLocation
             if (lItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(lItem.IsIdentified ? ItemNames.Display(lItem) : "???", leftNameWidth - 1).PadRight(leftNameWidth));
+                terminal.Write(TextWidth.PadRight(Truncate(lItem.IsIdentified ? ItemNames.Display(lItem) : "???", leftNameWidth - 1), leftNameWidth));
             }
             else
             {
@@ -11299,7 +11299,7 @@ public abstract class BaseLocation
             if (rItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(rItem.IsIdentified ? ItemNames.Display(rItem) : "???", rightNameWidth));
+                terminal.Write(TextWidth.PadRight(Truncate(rItem.IsIdentified ? ItemNames.Display(rItem) : "???", rightNameWidth), rightNameWidth));
             }
             else
             {

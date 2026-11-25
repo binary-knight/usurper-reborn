@@ -568,7 +568,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗", "bright_cyan");
                 terminal.WriteLine($"║  {TextWidth.PadRight(puzzle.Title, 62)}║", "bright_cyan");
-                terminal.WriteLine($"║  {Loc.Get("puzzle.difficulty_label", diffText).PadRight(62)}║", "cyan");
+                terminal.WriteLine($"║  {TextWidth.PadRight(Loc.Get("puzzle.difficulty_label", diffText), 62)}║", "cyan");
                 terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝", "bright_cyan");
             }
             else

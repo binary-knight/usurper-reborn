@@ -23897,12 +23897,12 @@ public partial class CombatEngine
         {
             terminal.WriteLine("  ╔══════════════════════════════════════════════════╗");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("            ★  " + Loc.Get("combat.first_blood_title") + "  ★").PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("            ★  " + Loc.Get("combat.first_blood_title") + "  ★", boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("  " + Loc.Get("combat.first_blood_message")).PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("  " + Loc.Get("combat.first_blood_message"), boxWidth)}║");
             terminal.WriteLine($"  ║{TextWidth.PadRight(bonusLine, boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("  " + Loc.Get("combat.more_challenges")).PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("  " + Loc.Get("combat.more_challenges"), boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
             terminal.WriteLine("  ╚══════════════════════════════════════════════════╝");
         }
@@ -31827,7 +31827,7 @@ public partial class CombatEngine
                 terminal.Write(new string(' ', TextWidth.Width(keyText)));
             }
             terminal.SetColor(color);
-            terminal.Write(parts[i].PadRight(width));
+            terminal.Write(TextWidth.PadRight(parts[i], width));
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -32560,8 +32560,8 @@ public partial class CombatEngine
             else
             {
                 terminal.WriteLine("  ╔═══════════════════════════════════════════════╗");
-                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))}".PadRight(49) + "║");
-                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged_detail")}".PadRight(49) + "║");
+                terminal.WriteLine(TextWidth.PadRight($"  ║   {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))}", 49) + "║");
+                terminal.WriteLine(TextWidth.PadRight($"  ║   {Loc.Get("combat.boss_enraged_detail")}", 49) + "║");
                 terminal.WriteLine("  ╚═══════════════════════════════════════════════╝");
             }
         }

@@ -5462,10 +5462,10 @@ public class InnLocation : BaseLocation
         {
             var list = rows.ToList();
             return new SkillLayout(
-                Math.Max(Loc.Get("inn.skill_off").Length, Loc.Get("inn.skill_on").Length) + 2,
-                Math.Max(24, list.Select(r => r.name.Length).DefaultIfEmpty(0).Max()),
-                list.Select(r => r.cost.Length).DefaultIfEmpty(0).Max(),
-                Math.Max(5, list.Select(r => r.level.Length).DefaultIfEmpty(0).Max()));
+                Math.Max(TextWidth.Width(Loc.Get("inn.skill_off")), TextWidth.Width(Loc.Get("inn.skill_on"))) + 2,
+                Math.Max(24, list.Select(r => TextWidth.Width(r.name)).DefaultIfEmpty(0).Max()),
+                list.Select(r => TextWidth.Width(r.cost)).DefaultIfEmpty(0).Max(),
+                Math.Max(5, list.Select(r => TextWidth.Width(r.level)).DefaultIfEmpty(0).Max()));
         }
 
         /// <summary>The column the description starts at: "  [NN] " + tag + name + " " + cost + "  " + level + "  ".</summary>
@@ -5477,9 +5477,9 @@ public class InnLocation : BaseLocation
             int room = Width - DescColumn;
             var words = (desc ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
             int taken = 0, used = 0;
-            while (room >= 12 && taken < words.Length && used + (taken > 0 ? 1 : 0) + words[taken].Length <= room)
+            while (room >= 12 && taken < words.Length && used + (taken > 0 ? 1 : 0) + UsurperRemake.UI.TextWidth.Width(words[taken]) <= room)
             {
-                used += (taken > 0 ? 1 : 0) + words[taken].Length;
+                used += (taken > 0 ? 1 : 0) + UsurperRemake.UI.TextWidth.Width(words[taken]);
                 taken++;
             }
             string first = string.Join(" ", words.Take(taken));
@@ -5498,7 +5498,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write($"  [{index,2}] ");
         terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
-        terminal.Write($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]".PadRight(layout.TagWidth + 1));
+        terminal.Write(TextWidth.PadRight($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]", layout.TagWidth + 1));
         terminal.SetColor(isDisabled ? "gray" : "white");
         terminal.Write(TextWidth.PadRight(name, layout.NameWidth));
         terminal.SetColor("darkgray");
@@ -5641,7 +5641,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
 
             var guardOptions = GetGuardOptions();
-            int guardNameWidth = Math.Max(16, guardOptions.Max(o => o.name.Length));
+            int guardNameWidth = Math.Max(16, guardOptions.Max(o => TextWidth.Width(o.name)));
             terminal.SetColor("white");
             for (int i = 0; i < guardOptions.Length; i++)
             {
