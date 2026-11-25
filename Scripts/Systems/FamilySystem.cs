@@ -1468,23 +1468,40 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// v1.3.15: give <paramref name="child"/> a new surname unless the full name it would get is
-        /// already borne by another child or a living NPC. Kinship (GetParentNamesOf) and the orphan
-        /// list match children by full name, so two people may not share one. The name registry is not
-        /// asked: it keeps every name ever used, and the child's own earlier name (the one a load pass
-        /// replaced) is in it. Returns false and leaves the name as it was when the name is in use.
+        /// v1.3.15: true when <paramref name="candidate"/> is already borne by another child, a living NPC,
+        /// the renaming player (<paramref name="parent"/>: Name, which kinship at GetParentNamesOf reads, and
+        /// DisplayName), or online by any player's display name (the check character creation uses).
+        /// Kinship (GetParentNamesOf, GetGrandparentNamesOf) and the orphan list match children by full
+        /// name, so two people may not share one. The name registry is not asked: it keeps every name
+        /// ever used, and the child's own earlier name (the one a load pass replaced) is in it.
         /// </summary>
-        internal bool TryGiveSurname(Child child, string surname, out string newName)
+        internal bool IsChildNameInUse(string candidate, Child except, Character? parent)
+        {
+            bool Same(string? a) => !string.IsNullOrEmpty(a) && string.Equals(a, candidate, StringComparison.OrdinalIgnoreCase);
+            if (_children.Any(c => !ReferenceEquals(c, except) && !c.Deleted && Same(c.Name))) return true;
+            if (NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n => Same(n.Name2) || Same(n.Name1)) ?? false) return true;
+            if (parent != null && (Same(parent.Name) || Same(parent.DisplayName))) return true;
+            return UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance.IsDisplayNameTaken(candidate, "");
+        }
+
+        /// <summary>
+        /// v1.3.15: give <paramref name="child"/> a new surname unless the full name is in use
+        /// (IsChildNameInUse). Returns false and leaves the name as it was when it is.
+        /// </summary>
+        internal bool TryGiveSurname(Child child, string surname, Character? parent, out string newName)
         {
             newName = WithSurname(child.Name, surname);
+            return TryRename(child, newName, parent);
+        }
+
+        /// <summary>
+        /// v1.3.15: give <paramref name="child"/> the full name <paramref name="newName"/> unless it is in
+        /// use (IsChildNameInUse); the Home first-name rename and the last-name change both come here.
+        /// </summary>
+        internal bool TryRename(Child child, string newName, Character? parent)
+        {
             if (newName.Equals(child.Name, StringComparison.Ordinal)) return true;
-            string candidate = newName;
-            bool inUse = _children.Any(c => !ReferenceEquals(c, child) && !c.Deleted
-                                            && string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase))
-                || (NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n =>
-                        string.Equals(n.Name2, candidate, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(n.Name1, candidate, StringComparison.OrdinalIgnoreCase)) ?? false);
-            if (inUse) return false;
+            if (IsChildNameInUse(newName, child, parent)) return false;
             child.Name = newName;
             NPCNameRegistry.Reserve(newName);
             return true;
