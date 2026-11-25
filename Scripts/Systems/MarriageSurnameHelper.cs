@@ -122,7 +122,7 @@ public static class MarriageSurnameHelper
     }
 
     /// <summary>Letters / space / hyphen / apostrophe only; collapse, cap length.</summary>
-    private static string SanitizeSurname(string raw)
+    internal static string SanitizeSurname(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "";
         var sb = new StringBuilder();

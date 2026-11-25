@@ -1964,6 +1964,63 @@ public class HomeLocation : BaseLocation
         await terminal.WaitForKey();
     }
 
+    /// <summary>
+    /// v1.3.15: a parent gives a child a new last name, and may give it to every child at home.
+    /// The name is kept at the next load (FamilySystem's load pass no longer replaces a surname).
+    /// </summary>
+    private async Task ChangeChildSurname(Child selectedChild, List<Child> children)
+    {
+        terminal.SetColor("bright_yellow");
+        terminal.WriteLine(Loc.Get("home.child_current_name", selectedChild.Name));
+        terminal.SetColor("white");
+        string raw = (await terminal.GetInput("  " + Loc.Get("home.child_new_surname_prompt"))).Trim();
+        if (NameRules.HasMarkupChars(raw))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {NameRules.MarkupCharsMessage}");
+            await terminal.WaitForKey();
+            return;
+        }
+
+        string surname = MarriageSurnameHelper.SanitizeSurname(raw);
+        if (string.IsNullOrEmpty(surname))
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("home.child_name_unchanged"));
+            await terminal.WaitForKey();
+            return;
+        }
+
+        var targets = new List<Child> { selectedChild };
+        if (children.Count > 1)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write("  " + Loc.Get("home.child_surname_all_prompt", children.Count, surname));
+            terminal.SetColor("white");
+            if (await terminal.AskYesNoAsync(""))
+                targets = children;
+        }
+
+        foreach (var child in targets)
+        {
+            string oldName = child.Name;
+            string newName = FamilySystem.WithSurname(oldName, surname);
+            if (newName.Equals(oldName, StringComparison.Ordinal))
+                continue;
+            child.Name = newName;
+            NPCNameRegistry.Reserve(newName);
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("home.child_renamed", oldName, newName));
+        }
+
+        // Same as the first-name rename: online, the shared children are saved now
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.Instance != null)
+        {
+            _ = OnlineStateManager.Instance.SaveSharedChildrenNow();
+        }
+        await terminal.WaitForKey();
+    }
+
     private async Task InteractWithChild()
     {
         var children = FamilySystem.Instance.GetChildrenOf(currentPlayer)
@@ -2017,8 +2074,16 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.child_action_spend"), "white");
         terminal.Write("  [N] ", "bright_yellow");
         terminal.WriteLine(Loc.Get("home.child_action_rename", selectedChild.Name), "white");
+        terminal.Write("  [L] ", "bright_yellow");
+        terminal.WriteLine(Loc.Get("home.child_action_surname"), "white");
         terminal.WriteLine();
         string action = (await GetChoice()).ToUpper().Trim();
+
+        if (action == "L")
+        {
+            await ChangeChildSurname(selectedChild, children);
+            return;
+        }
 
         if (action == "N")
         {

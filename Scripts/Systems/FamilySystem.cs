@@ -1443,11 +1443,28 @@ namespace UsurperRemake.Systems
 
             // GD.Print($"[Family] Loaded {_children.Count} children from save");
 
-            // Migration: add father's surname to children who don't have one yet
+            // Migration: add a surname to children who don't have one yet (an existing one is kept)
             MigrateChildSurnames();
 
             // v1.0.4: restored children keep their names reserved (merge-only)
             NPCNameRegistry.ReserveAll(_children.Select(c => c.Name));
+        }
+
+        /// <summary>
+        /// v1.3.15: the child's name with a new surname: the given name (one first name, or two
+        /// when the pool ran out) followed by <paramref name="surname"/>. The old surname and any
+        /// uniqueness suffix after it ("II", a short fragment) are dropped; a one-word name gains one.
+        /// </summary>
+        internal static string WithSurname(string childName, string surname)
+        {
+            var parts = (childName ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return (surname ?? "").Trim();
+            string given = parts[0];
+            if (parts.Length >= 3
+                && (NPCSpawnSystem.ImmigrantMaleNames.Contains(parts[1]) || NPCSpawnSystem.ImmigrantFemaleNames.Contains(parts[1])))
+                given = $"{parts[0]} {parts[1]}";
+            surname = (surname ?? "").Trim();
+            return surname.Length == 0 ? given : $"{given} {surname}";
         }
 
         /// <summary>
@@ -1459,6 +1476,11 @@ namespace UsurperRemake.Systems
         /// NPCNameRegistry, and stripping one would recreate the duplicate it exists
         /// to prevent. Only a wrong surname is rewritten, and through the registry.
         /// v1.1.13: new names carry no suffix; two first names before the surname are accepted.
+        /// v1.3.15: a child who already has a surname keeps it. A child born to a father with a
+        /// one-word name takes the mother's surname or the player's family surname at birth, and
+        /// this pass used to replace it at every load with one generated from the father's name
+        /// (a Ravenswood child became an Oldfield); a surname set at Home was undone the same way.
+        /// Only a child with a one-word name is given a surname here.
         /// </summary>
         private void MigrateChildSurnames()
         {
@@ -1470,6 +1492,7 @@ namespace UsurperRemake.Systems
                 // Extract first name (always the first word)
                 var nameParts = child.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (nameParts.Length == 0) continue;
+                if (nameParts.Length > 1) continue;     // v1.3.15: already has a surname; never replaced
                 var firstName = nameParts[0];
 
                 // Compute the correct surname from father (extract or generate)

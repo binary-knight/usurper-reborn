@@ -360,10 +360,11 @@ public class NPCNameRegistryTests
         kept.Name.Should().Be("Halvar Copperfield II");
         NPCNameRegistry.IsTaken("Halvar Copperfield II").Should().BeTrue();
 
-        var generated = family.AllChildren.Single(c => c.FatherID == "f2");
-        // Wrong surname is rewritten (father "Shadow" has none, so one is generated); the suffix is dropped
-        // with the wrong surname, and the rewrite goes through the registry
-        generated.Name.Should().StartWith("Wren ").And.NotContain("Placeholder");
-        NPCNameRegistry.IsTaken(generated.Name).Should().BeTrue();
+        var kept2 = family.AllChildren.Single(c => c.FatherID == "f2");
+        // 1.3.15: a child who has a surname keeps it, even when it is not the father's
+        // (before, father "Shadow" with no surname of his own had one generated and the
+        // child's surname was replaced at every load)
+        kept2.Name.Should().Be("Wren Placeholder III");
+        NPCNameRegistry.IsTaken(kept2.Name).Should().BeTrue();
     }
 }
