@@ -2004,11 +2004,14 @@ public class HomeLocation : BaseLocation
         foreach (var child in targets)
         {
             string oldName = child.Name;
-            string newName = FamilySystem.WithSurname(oldName, surname);
+            if (!FamilySystem.Instance.TryGiveSurname(child, surname, out string newName))
+            {
+                terminal.SetColor("yellow");
+                terminal.WriteLine(Loc.Get("home.child_surname_taken", newName, oldName));
+                continue;
+            }
             if (newName.Equals(oldName, StringComparison.Ordinal))
                 continue;
-            child.Name = newName;
-            NPCNameRegistry.Reserve(newName);
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("home.child_renamed", oldName, newName));
         }

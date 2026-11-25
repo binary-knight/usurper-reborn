@@ -1468,6 +1468,29 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v1.3.15: give <paramref name="child"/> a new surname unless the full name it would get is
+        /// already borne by another child or a living NPC. Kinship (GetParentNamesOf) and the orphan
+        /// list match children by full name, so two people may not share one. The name registry is not
+        /// asked: it keeps every name ever used, and the child's own earlier name (the one a load pass
+        /// replaced) is in it. Returns false and leaves the name as it was when the name is in use.
+        /// </summary>
+        internal bool TryGiveSurname(Child child, string surname, out string newName)
+        {
+            newName = WithSurname(child.Name, surname);
+            if (newName.Equals(child.Name, StringComparison.Ordinal)) return true;
+            string candidate = newName;
+            bool inUse = _children.Any(c => !ReferenceEquals(c, child) && !c.Deleted
+                                            && string.Equals(c.Name, candidate, StringComparison.OrdinalIgnoreCase))
+                || (NPCSpawnSystem.Instance?.ActiveNPCs?.Any(n =>
+                        string.Equals(n.Name2, candidate, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(n.Name1, candidate, StringComparison.OrdinalIgnoreCase)) ?? false);
+            if (inUse) return false;
+            child.Name = newName;
+            NPCNameRegistry.Reserve(newName);
+            return true;
+        }
+
+        /// <summary>
         /// Migration: compute correct name for each child — first name + father's
         /// surname (extracted or generated). Safe to run multiple times (idempotent).
         /// v1.0.4: a name that already carries the right surname is left alone,

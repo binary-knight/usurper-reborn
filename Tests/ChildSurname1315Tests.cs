@@ -91,6 +91,61 @@ public class ChildSurname1315Tests : IDisposable
         NameOf("f-1315-d").Should().Be("Henry Ravenswood");
     }
 
+    [Fact]
+    public void TryGiveSurname_AllowsTheChildsOwnEarlierName_ThoughTheRegistryHoldsIt()
+    {
+        NPCNameRegistry.Reset();
+        NPCNameRegistry.Reserve("Henry Ravenswood");   // the birth name, kept by the registry after the load pass renamed him
+        FamilySystem.Instance.DeserializeChildren(new List<ChildData>
+        {
+            Kid("Henry Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-e", 4),
+        });
+        var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-e");
+        FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", out var newName).Should().BeTrue();
+        newName.Should().Be("Henry Ravenswood");
+        child.Name.Should().Be("Henry Ravenswood");
+    }
+
+    [Fact]
+    public void NEGATIVE_TryGiveSurname_RefusesANameAnotherChildBears_AndLeavesTheNameAsItWas()
+    {
+        NPCNameRegistry.Reset();
+        FamilySystem.Instance.DeserializeChildren(new List<ChildData>
+        {
+            Kid("Jane Ravenswood", "Bram Ravenswood", "Lucinda Ravenswood", "f-1315-f", 5),
+            Kid("Jane Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-g", 6),
+        });
+        var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-g");
+        FamilySystem.Instance.TryGiveSurname(child, "ravenswood", out var newName).Should().BeFalse();
+        newName.Should().Be("Jane ravenswood");
+        child.Name.Should().Be("Jane Oldfield");
+    }
+
+    [Fact]
+    public void NEGATIVE_TryGiveSurname_RefusesANameALivingNpcBears()
+    {
+        NPCNameRegistry.Reset();
+        var spawner = NPCSpawnSystem.Instance;
+        var npc = new NPC { Name1 = "Isaac Ravenswood", Name2 = "Isaac Ravenswood", ID = "npc_1315_isaac" };
+        spawner.AddRestoredNPC(npc);
+        try
+        {
+            FamilySystem.Instance.DeserializeChildren(new List<ChildData>
+            {
+                Kid("Isaac Oldfield", "Bubbles", "Nessa Ravenswood", "f-1315-h", 7),
+            });
+            var child = FamilySystem.Instance.AllChildren.Single(c => c.FatherID == "f-1315-h");
+            FamilySystem.Instance.TryGiveSurname(child, "Ravenswood", out _).Should().BeFalse();
+            child.Name.Should().Be("Isaac Oldfield");
+            FamilySystem.Instance.TryGiveSurname(child, "Thornbury", out var other).Should().BeTrue();
+            other.Should().Be("Isaac Thornbury");
+        }
+        finally
+        {
+            spawner.ActiveNPCs.Remove(npc);
+        }
+    }
+
     [Theory]
     [InlineData("Alice Oldfield", "Ravenswood", "Alice Ravenswood")]
     [InlineData("Alice", "Ravenswood", "Alice Ravenswood")]
@@ -134,7 +189,7 @@ public class ChildSurname1315Tests : IDisposable
         try
         {
             GameConfig.Language = lang;
-            foreach (var key in new[] { "home.child_action_surname", "home.child_new_surname_prompt", "home.child_surname_all_prompt" })
+            foreach (var key in new[] { "home.child_action_surname", "home.child_new_surname_prompt", "home.child_surname_all_prompt", "home.child_surname_taken" })
                 Loc.Get(key).Should().NotBe(key, $"{key} in {lang}");
             Loc.Get("home.child_surname_all_prompt", 3, "Ravenswood").Should().Contain("3").And.Contain("Ravenswood");
         }

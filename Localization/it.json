@@ -26469,6 +26469,7 @@
   "home.child_action_surname": "Cambia cognome",
   "home.child_new_surname_prompt": "Nuovo cognome (Invio per mantenere): ",
   "home.child_surname_all_prompt": "Dare a tutti i tuoi {0} figli il cognome {1}? (S/N) ",
+  "home.child_surname_taken": "  Qualcuno porta già il nome {0}; {1} mantiene il vecchio nome.",
   "equip.moved_to_inventory": "{0} spostato nell'inventario.",
   "equip.moved_to_offhand": "{0} spostato nella mano secondaria.",
   "equip.equipped_in_slot": "{0} equipaggiato in {1}",

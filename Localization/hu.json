@@ -26775,6 +26775,7 @@
   "home.child_action_surname": "Vezetéknév megváltoztatása",
   "home.child_new_surname_prompt": "Új vezetéknév (Enter a megtartáshoz): ",
   "home.child_surname_all_prompt": "Mind a(z) {0} gyermeked a(z) {1} vezetéknevet kapja? (Y = Igen/N = Nem) ",
+  "home.child_surname_taken": "  A(z) {0} nevet már valaki viseli; {1} megtartja a régi nevét.",
   "equip.moved_to_inventory": "{0} a hátizsákba került.",
   "equip.moved_to_offhand": "{0} a bal kézbe került.",
   "equip.equipped_in_slot": "{0} felszerelve: {1}",
