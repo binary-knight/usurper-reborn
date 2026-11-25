@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.14; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.15; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.14. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.15. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -1431,7 +1431,7 @@ Output modes (auto-detected):
 ### UIHelper
 **File**: `Scripts/UI/UIHelper.cs`
 
-Static utilities for 80-char box drawing:
+Static utilities for 80-char box drawing. Widths are measured in terminal columns, not characters (`TextWidth`, 1.3.15): a Chinese, Japanese or Korean character or an emoji takes two columns and a combining mark none, so boxes, centred titles and table cells (`UIHelper.Cell`) line up in every script:
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  Content with padding                                                        ║
@@ -1762,7 +1762,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.14"
+Version = "1.3.15"
 VersionName = "Reckoning"
 ```
 
@@ -2071,6 +2071,7 @@ Scripts/
 ├── UI/
 │   ├── TerminalEmulator.cs         Console / BBS / Electron abstraction (~3000 lines)
 │   ├── UIHelper.cs                 80-char box drawing
+│   ├── TextWidth.cs                Display width in terminal columns (wide scripts, emoji)
 │   ├── ANSIArt.cs                  Race / class portraits, monster art
 │   ├── RacePortraits.cs            ANSI portrait registry
 │   ├── ClassPortraitArt.cs         13 class portraits converted from the sprites (generated)
