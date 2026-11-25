@@ -1,8 +1,9 @@
 ---
 title: Wilderness exploration
 path: /wiki/en/world/wilderness/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Data/WildernessData.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/DruidShrineData.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Data/BeastData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

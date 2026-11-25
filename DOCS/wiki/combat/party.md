@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

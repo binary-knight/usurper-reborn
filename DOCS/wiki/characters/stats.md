@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

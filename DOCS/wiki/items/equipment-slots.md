@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.11 | none
 history: 1.3.10 | The loot comparison for a two-handed weapon counts the off hand weapon and names the off hand item it takes off.

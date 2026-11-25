@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

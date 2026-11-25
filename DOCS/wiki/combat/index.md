@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

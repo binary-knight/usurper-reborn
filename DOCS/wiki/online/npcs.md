@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | Every newcomer comes as the sex the town has fewer of, so a town that leans one way evens out as it turns over.

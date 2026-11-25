@@ -1,8 +1,9 @@
 ---
 title: Enchanting
 path: /wiki/en/items/enchanting/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

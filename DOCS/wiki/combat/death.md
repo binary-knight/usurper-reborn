@@ -1,8 +1,9 @@
 ---
 title: Death and resurrection
 path: /wiki/en/combat/death/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.15 | The death menu shows how many times you have died this playthrough, with no limit: nothing on that menu erases a character.
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
@@ -57,7 +58,7 @@ In single-player you choose how to come back from a menu:
 - **Deal with Death:** from level 5 with 500 Darkness or more. It costs 500 Darkness and permanently takes 2 to 5 points from one random stat among Strength, Defense, Stamina, Agility and Charisma, or 10 to 25 maximum HP. You come back where you fell with a quarter of your maximum HP.
 - **Accept Fate:** always offered. You lose up to 5 levels (never below level 1) and the stats those levels gave, your experience is set to the start of your new level, you lose 75 percent of the gold you carry (Mortis's boon lowers this), one random equipped item is destroyed, and gear above your new level moves to your pack. You wake at the Temple with a tenth of your maximum HP.
 
-Gold in the bank is never touched. The menu counts your deaths out of 5; a single-player character is never erased for dying, except on Nightmare.
+Gold in the bank is never touched. The menu shows how many times you have died this playthrough; a single-player character is never erased for dying, except on Nightmare.
 
 ### Nightmare
 

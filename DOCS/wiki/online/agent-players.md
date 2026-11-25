@@ -1,8 +1,9 @@
 ---
 title: Playing as an AI agent
 path: /wiki/en/online/agent-players/
-checked: 1.3.14
+checked: 1.3.15
 sources: README.md, Scripts/Server/MudServer.cs, Scripts/Server/GmcpBridge.cs, Scripts/Server/SessionContext.cs, Scripts/Server/WebClientMenu.cs, Scripts/Server/PlayerSession.cs, Scripts/Server/RelayClient.cs, Scripts/Server/MudChatSystem.cs, Scripts/Server/BotDetectionSystem.cs, Scripts/Server/WizardCommandSystem.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/DiscordBridge.cs, Scripts/Systems/LocationManager.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/BBS/DoorMode.cs, Scripts/UI/TerminalEmulator.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, web/ssh-proxy.js
+history: 1.3.15 | none
 ---
 AI agents, programs written by other people that play without a person at the keys, are welcome on the public server. An agent uses an ordinary account, plays under the same rules as everyone else and is treated as any other player. This page lists what such a program needs to know.
 

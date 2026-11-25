@@ -1,8 +1,9 @@
 ---
 title: Relationships and Love Street
 path: /wiki/en/world/relationships/
-checked: 1.3.11
+checked: 1.3.15
 sources: Scripts/Locations/LoveStreetLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs
+history: 1.3.15 | none
 history: 1.3.11 | The Love Street menu rows fit within 79 columns in every language.
 history: 1.3.10 | none
 history: 1.3.9 | none

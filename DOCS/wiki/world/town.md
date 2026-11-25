@@ -1,8 +1,9 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MarketplaceSystem.cs, Scripts/Locations/BaseLocation.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
