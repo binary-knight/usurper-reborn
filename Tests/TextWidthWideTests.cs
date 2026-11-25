@@ -161,4 +161,33 @@ public class TextWidthWideTests
                                     "\u001b\\[[0-9;?]*[A-Za-z]", "");
         Regex.Matches(text, "5/10").Count.Should().Be(1);
     }
+
+    private static string StatBarRow(string label)
+    {
+        var output = new MemoryStream();
+        var terminal = new TerminalEmulator(new MemoryStream(), output);
+        UIHelper.DrawStatBar(terminal, label, 5, 10);
+        terminal.StreamWriterInternal?.Flush();
+        return Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
+    }
+
+    [Theory]
+    [InlineData("HP")]
+    [InlineData("生命")]
+    public void DrawStatBar_EndsWithItsRightBorder_AndALineEnd(string label)
+    {
+        string row = StatBarRow(label);
+        row.Should().EndWith("\n");
+        string line = row.TrimEnd('\r', '\n');
+        line.Should().StartWith("║").And.EndWith("║");
+        line.Count(c => c == '\n').Should().Be(0, "one row");
+    }
+
+    [Fact]
+    public void DrawStatBar_IsAsWideForAWideScriptLabel_AsForALatinOne()
+    {
+        string latin = StatBarRow("HPHP").TrimEnd('\r', '\n');
+        string wide = StatBarRow("生命").TrimEnd('\r', '\n');
+        TextWidth.Width(wide).Should().Be(TextWidth.Width(latin));
+    }
 }

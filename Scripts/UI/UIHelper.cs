@@ -254,6 +254,7 @@ namespace UsurperRemake.UI
             terminal.Write(new string('█', Math.Max(0, Math.Min(barWidth, filled))), barColor);
             terminal.Write(new string('░', Math.Max(0, barWidth - filled)), "gray");
             terminal.Write(TextWidth.PadRight($"] {stats}", Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
+            terminal.WriteLine($"{Vertical}", borderColor);   // 1.3.15: the right border and the line end, lost in #259
         }
 
         /// <summary>
