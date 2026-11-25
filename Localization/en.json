@@ -23557,6 +23557,7 @@
   "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Community Code Contributor",
   "engine.credits_coosh": "    Coosh                    - Community Code Contributor",
   "engine.credits_testingbytes": "    TestingBytes             - Code Contributions",
+  "engine.credits_billkinggithub": "    billkinggithub           - Code Contributions",
   "combat.ability_execute_critical": "  EXECUTE! {0} is critically wounded -- {1} bonus damage!",
   "combat.ability_execute_finishing": "  Finishing blow! {0} takes {1} bonus damage!",
   "combat.ability_execute_too_healthy": "  {0} is too healthy for a finishing blow.",

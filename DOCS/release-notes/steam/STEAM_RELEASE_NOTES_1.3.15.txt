@@ -1,0 +1,19 @@
+[h1]Usurper Reborn 1.3.15[/h1]
+
+[h2]Changelist[/h2]
+[h3]Characters[/h3]
+[list]
+[*]Fixed a child's last name being replaced on every load when the father has a one word name; a child now keeps the last name it was given (#260)
+[*]Added a Change last name option to a child's menu at Home, for one child or every child at home; a child already renamed keeps that name until it is changed there (#260)
+[*]Adjusted the Home child renames to refuse a name another child, townsperson or player already has; a first name change that worked before can now be refused with "Someone already bears the name" (#261, #262)
+[/list]
+[h3]Combat[/h3]
+[list]
+[*]Fixed the death menu warning that the next death would erase the character when permadeath is off; it now shows the death count (#260)
+[/list]
+[h3]Interface[/h3]
+[list]
+[*]Improved boxes, tables and wrapped text for Chinese, Japanese and Korean so they line up by terminal columns (#259)
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.3.15.md
