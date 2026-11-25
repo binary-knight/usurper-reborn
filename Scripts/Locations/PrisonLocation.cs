@@ -281,7 +281,7 @@ public partial class PrisonLocation : BaseLocation
         {
             // v1.2.5: the bar is at least as wide as the framed title in the player's language
             string title = Loc.Get("prison.title");
-            string bar = new string('I', Math.Max(24, title.Length + 8)), pillar = bar[..3];
+            string bar = new string('I', Math.Max(24, UsurperRemake.UI.TextWidth.Width(title) + 8)), pillar = bar[..3];
             await terminal.WriteColorLineAsync(bar, TerminalEmulator.ColorCyan);
             await terminal.WriteColorLineAsync($"{pillar} {title} {pillar}", TerminalEmulator.ColorCyan);
             await terminal.WriteColorLineAsync(bar, TerminalEmulator.ColorCyan);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 /// <summary>
 /// Achievement categories for organization
@@ -1542,7 +1543,7 @@ public static class AchievementSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
-            terminal.Write($"{Loc.Get("achievement.unlocked_header"),58}");
+            terminal.Write($"{UIHelper.CellRight(Loc.Get("achievement.unlocked_header"), 58)}");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
@@ -1631,8 +1632,8 @@ public static class AchievementSystem
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             string headerText = Loc.Get("achievement.unlocked_many", achievements.Count);
-            int pad = (58 - headerText.Length) / 2;
-            string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - headerText.Length);
+            int pad = (58 - UsurperRemake.UI.TextWidth.Width(headerText)) / 2;
+            string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - UsurperRemake.UI.TextWidth.Width(headerText));
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
             terminal.Write(centeredHeader);

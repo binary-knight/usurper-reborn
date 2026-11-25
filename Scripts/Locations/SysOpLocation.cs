@@ -150,7 +150,7 @@ public class SysOpLocation : BaseLocation
                     // Pad to fit the box
                     int labelLen = Loc.Get("sysop_location.update_label").Length + 1 + _latestVersion.Length + 1 + Loc.Get("sysop_location.current_label").Length + 2 + GameConfig.Version.Length + 1;
                     terminal.WriteLine(new string(' ', Math.Max(0, 74 - labelLen)) + "║");
-                    terminal.WriteLine($"║  {Loc.Get("sysop_location.press_9_bracket"),-74}║");
+                    terminal.WriteLine($"║  {Cell(Loc.Get("sysop_location.press_9_bracket"), 74)}║");
                     terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
                 }
             }

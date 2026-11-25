@@ -3152,7 +3152,7 @@ public partial class CombatEngine
         terminal.WriteLine("╔═══════════════════════════════════════╗");
         terminal.Write("║");
         terminal.SetColor("bright_white");
-        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(ct.PadLeft(pl).PadRight(39)); }
+        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(TextWidth.PadLeft(ct, pl).PadRight(39)); }
         terminal.SetColor("green");
         terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
@@ -3407,7 +3407,7 @@ public partial class CombatEngine
         terminal.WriteLine("╔═══════════════════════════════════════╗");
         terminal.Write("║");
         terminal.SetColor("bright_white");
-        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(ct.PadLeft(pl).PadRight(39)); }
+        { var ct = Loc.Get("combat.choose_action"); var pl = (39 + ct.Length) / 2; terminal.Write(TextWidth.PadLeft(ct, pl).PadRight(39)); }
         terminal.SetColor("green");
         terminal.WriteLine("║");
         terminal.WriteLine("╠═══════════════════════════════════════╣");
@@ -13616,7 +13616,7 @@ public partial class CombatEngine
         else
         {
             string header = Loc.Get("combat.bbs_header");
-            terminal.WriteLine($"{new string('═', 31)} {header} {new string('═', Math.Max(3, 78 - 33 - header.Length))}");
+            terminal.WriteLine($"{new string('═', 31)} {header} {new string('═', Math.Max(3, 78 - 33 - TextWidth.Width(header)))}");
         }
 
         // Lines 2+: Monsters (two per line to save space)
@@ -23897,12 +23897,12 @@ public partial class CombatEngine
         {
             terminal.WriteLine("  ╔══════════════════════════════════════════════════╗");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("            ★  " + Loc.Get("combat.first_blood_title") + "  ★").PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("            ★  " + Loc.Get("combat.first_blood_title") + "  ★", boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("  " + Loc.Get("combat.first_blood_message")).PadRight(boxWidth)}║");
-            terminal.WriteLine($"  ║{bonusLine.PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("  " + Loc.Get("combat.first_blood_message"), boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight(bonusLine, boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
-            terminal.WriteLine($"  ║{("  " + Loc.Get("combat.more_challenges")).PadRight(boxWidth)}║");
+            terminal.WriteLine($"  ║{TextWidth.PadRight("  " + Loc.Get("combat.more_challenges"), boxWidth)}║");
             terminal.WriteLine("  ║                                                  ║");
             terminal.WriteLine("  ╚══════════════════════════════════════════════════╝");
         }
@@ -31793,7 +31793,7 @@ public partial class CombatEngine
     /// <summary>1.3.7: one fixed row of a 41 column combat box; a text wider than the box continues on rows inside it.</summary>
     private void WriteBoxRow(string keyText, string color, string text, string keyColor = "bright_yellow")
     {
-        int width = 38 - keyText.Length;
+        int width = 38 - TextWidth.Width(keyText);
         var parts = WrapQuickbarText(text, width);
         if (parts.Count == 0) parts.Add("");
         for (int i = 0; i < parts.Count; i++)
@@ -31807,10 +31807,10 @@ public partial class CombatEngine
             }
             else
             {
-                terminal.Write(new string(' ', keyText.Length));
+                terminal.Write(new string(' ', TextWidth.Width(keyText)));
             }
             terminal.SetColor(color);
-            terminal.Write(parts[i].PadRight(width));
+            terminal.Write(TextWidth.PadRight(parts[i], width));
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -32543,8 +32543,8 @@ public partial class CombatEngine
             else
             {
                 terminal.WriteLine("  ╔═══════════════════════════════════════════════╗");
-                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))}".PadRight(49) + "║");
-                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged_detail")}".PadRight(49) + "║");
+                terminal.WriteLine(TextWidth.PadRight($"  ║   {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))}", 49) + "║");
+                terminal.WriteLine(TextWidth.PadRight($"  ║   {Loc.Get("combat.boss_enraged_detail")}", 49) + "║");
                 terminal.WriteLine("  ╚═══════════════════════════════════════════════╝");
             }
         }
@@ -34781,13 +34781,13 @@ public partial class CombatEngine
     /// <summary>v1.2.2: a title centred in the 58 wide combat status box, between its side bars.</summary>
     internal static string BoxTitleLine(string title, int inner = 58)
     {
-        int left = Math.Max(0, (inner - title.Length) / 2);
-        return "║" + (new string(' ', left) + title).PadRight(inner) + "║";
+        int left = Math.Max(0, (inner - TextWidth.Width(title)) / 2);
+        return "║" + TextWidth.PadRight(new string(' ', left) + title, inner) + "║";
     }
 
     /// <summary>v1.2.2: the top edge of the first battle tip box, 78 wide, with the label set in it.</summary>
     internal static string TipBoxTop(string label)
-        => "┌─── " + label + " " + new string('─', Math.Max(3, 78 - 6 - label.Length - 1)) + "┐";
+        => "┌─── " + label + " " + new string('─', Math.Max(3, 78 - 6 - TextWidth.Width(label) - 1)) + "┐";
 
     /// <summary>
     /// v1.2.2: BroadcastGroupCombatEvent with each group member reading the message in their own language.

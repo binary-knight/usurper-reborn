@@ -1481,14 +1481,15 @@ namespace UsurperRemake.Systems
         {
             const int inner = 66;
             string word = string.Join("   ", header.Where(c => !char.IsWhiteSpace(c)).Select(c => c.ToString()));
-            if (word.Length > inner) word = header.Trim();
-            int left = (inner - word.Length) / 2;
+            if (UsurperRemake.UI.TextWidth.Width(word) > inner) word = header.Trim();
+            int wordWidth = UsurperRemake.UI.TextWidth.Width(word);
+            int left = (inner - wordWidth) / 2;
             string blank = "║" + new string(' ', inner) + "║";
             return new List<string>
             {
                 "╔" + new string('═', inner) + "╗",
                 blank,
-                "║" + new string(' ', left) + word + new string(' ', inner - left - word.Length) + "║",
+                "║" + new string(' ', left) + word + new string(' ', inner - left - wordWidth) + "║",
                 blank,
                 "╚" + new string('═', inner) + "╝",
             };

@@ -417,7 +417,7 @@ public class InnLocation : BaseLocation
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
                 terminal.SetColor("white");
-                terminal.Write(label1.PadRight(col - key1.Length - 4));
+                terminal.Write(TextWidth.PadRight(label1, col - key1.Length - 4));
                 terminal.SetColor("darkgray");
                 terminal.Write("[");
                 terminal.SetColor("bright_yellow");
@@ -4604,7 +4604,7 @@ public class InnLocation : BaseLocation
         var statLabels = new[] { Loc.Get("inn.train_stat_strength"), Loc.Get("inn.train_stat_dexterity"), Loc.Get("inn.train_stat_constitution"), Loc.Get("inn.train_stat_intelligence"), Loc.Get("inn.train_stat_wisdom"), Loc.Get("inn.train_stat_charisma"), Loc.Get("inn.train_stat_agility"), Loc.Get("inn.train_stat_stamina") };
 
         terminal.SetColor("cyan");
-        terminal.WriteLine($"{Loc.Get("inn.train_header_num"),-4} {Loc.Get("inn.train_header_stat"),-16} {Loc.Get("inn.train_header_current"),-10} {Loc.Get("inn.train_header_trained"),-10} {Loc.Get("inn.train_header_next_cost"),-12}");
+        terminal.WriteLine($"{Cell(Loc.Get("inn.train_header_num"), 4)} {Cell(Loc.Get("inn.train_header_stat"), 16)} {Cell(Loc.Get("inn.train_header_current"), 10)} {Cell(Loc.Get("inn.train_header_trained"), 10)} {Cell(Loc.Get("inn.train_header_next_cost"), 12)}");
         WriteDivider(55, "darkgray");
 
         for (int i = 0; i < statNames.Length; i++)
@@ -4618,13 +4618,13 @@ public class InnLocation : BaseLocation
             if (timesTrained >= GameConfig.MaxStatTrainingsPerStat)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {Loc.Get("inn.train_maxed"),-12}");
+                terminal.WriteLine($"{Cell((i + 1).ToString(), 4)} {Cell(statLabels[i], 16)} {Cell(currentVal.ToString(), 10)} {Cell(trainedStr, 10)} {Cell(Loc.Get("inn.train_maxed"), 12)}");
             }
             else
             {
                 long cost = CalculateTrainingCost(timesTrained);
                 terminal.SetColor("white");
-                string trainRow = $"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {cost:N0}g";
+                string trainRow = $"{Cell((i + 1).ToString(), 4)} {Cell(statLabels[i], 16)} {Cell(currentVal.ToString(), 10)} {Cell(trainedStr, 10)} {cost:N0}g";
                 terminal.Write(trainRow);
 
                 // Show material requirements for 4th/5th training
@@ -4632,7 +4632,7 @@ public class InnLocation : BaseLocation
                 if (matReqs != null)
                 {
                     // v1.2.5: the materials go on a second row, under the stat, when they would pass 79 columns
-                    if (trainRow.Length + 2 + TrainingMaterialsWidth(matReqs) > 79)
+                    if (TextWidth.Width(trainRow) + 2 + TrainingMaterialsWidth(matReqs) > 79)
                     {
                         terminal.WriteLine("");
                         terminal.Write("   ");
@@ -5462,10 +5462,10 @@ public class InnLocation : BaseLocation
         {
             var list = rows.ToList();
             return new SkillLayout(
-                Math.Max(Loc.Get("inn.skill_off").Length, Loc.Get("inn.skill_on").Length) + 2,
-                Math.Max(24, list.Select(r => r.name.Length).DefaultIfEmpty(0).Max()),
-                list.Select(r => r.cost.Length).DefaultIfEmpty(0).Max(),
-                Math.Max(5, list.Select(r => r.level.Length).DefaultIfEmpty(0).Max()));
+                Math.Max(TextWidth.Width(Loc.Get("inn.skill_off")), TextWidth.Width(Loc.Get("inn.skill_on"))) + 2,
+                Math.Max(24, list.Select(r => TextWidth.Width(r.name)).DefaultIfEmpty(0).Max()),
+                list.Select(r => TextWidth.Width(r.cost)).DefaultIfEmpty(0).Max(),
+                Math.Max(5, list.Select(r => TextWidth.Width(r.level)).DefaultIfEmpty(0).Max()));
         }
 
         /// <summary>The column the description starts at: "  [NN] " + tag + name + " " + cost + "  " + level + "  ".</summary>
@@ -5477,9 +5477,9 @@ public class InnLocation : BaseLocation
             int room = Width - DescColumn;
             var words = (desc ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
             int taken = 0, used = 0;
-            while (room >= 12 && taken < words.Length && used + (taken > 0 ? 1 : 0) + words[taken].Length <= room)
+            while (room >= 12 && taken < words.Length && used + (taken > 0 ? 1 : 0) + UsurperRemake.UI.TextWidth.Width(words[taken]) <= room)
             {
-                used += (taken > 0 ? 1 : 0) + words[taken].Length;
+                used += (taken > 0 ? 1 : 0) + UsurperRemake.UI.TextWidth.Width(words[taken]);
                 taken++;
             }
             string first = string.Join(" ", words.Take(taken));
@@ -5498,11 +5498,11 @@ public class InnLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write($"  [{index,2}] ");
         terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
-        terminal.Write($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]".PadRight(layout.TagWidth + 1));
+        terminal.Write(TextWidth.PadRight($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]", layout.TagWidth + 1));
         terminal.SetColor(isDisabled ? "gray" : "white");
-        terminal.Write(name.PadRight(layout.NameWidth));
+        terminal.Write(TextWidth.PadRight(name, layout.NameWidth));
         terminal.SetColor("darkgray");
-        terminal.Write($" {cost.PadLeft(layout.CostWidth)}  {level.PadRight(layout.LevelWidth)}  ");
+        terminal.Write($" {TextWidth.PadLeft(cost, layout.CostWidth)}  {TextWidth.PadRight(level, layout.LevelWidth)}  ");
         terminal.SetColor(isDisabled ? "darkgray" : "gray");
         if (IsScreenReader)
         {
@@ -5641,7 +5641,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
 
             var guardOptions = GetGuardOptions();
-            int guardNameWidth = Math.Max(16, guardOptions.Max(o => o.name.Length));
+            int guardNameWidth = Math.Max(16, guardOptions.Max(o => TextWidth.Width(o.name)));
             terminal.SetColor("white");
             for (int i = 0; i < guardOptions.Length; i++)
             {
@@ -5650,7 +5650,7 @@ public class InnLocation : BaseLocation
                 int hp = (int)(opt.baseHp * levelMultiplier);
                 bool canAfford = currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost >= cost;
                 terminal.SetColor(canAfford ? "white" : "dark_red");
-                terminal.WriteLine($"  [{i + 1}] {opt.name.PadRight(guardNameWidth)} {Loc.Get("magic_shop.gold_short", $"{cost,6:N0}")}  {Loc.Get("inn.guard_hp_tag", hp)}");
+                terminal.WriteLine($"  [{i + 1}] {TextWidth.PadRight(opt.name, guardNameWidth)} {Loc.Get("magic_shop.gold_short", $"{cost,6:N0}")}  {Loc.Get("inn.guard_hp_tag", hp)}");
             }
             terminal.SetColor("bright_yellow");
             terminal.Write("  [D]");

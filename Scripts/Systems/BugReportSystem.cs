@@ -44,7 +44,7 @@ public static class BugReportSystem
     }
 
     /// <summary>v1.2.5: the bug report title centred under the 59-column rule as the English one was.</summary>
-    internal static string TitleRow(string title) => new string(' ', Math.Max(0, 25 + (10 - title.Length) / 2)) + title;
+    internal static string TitleRow(string title) => new string(' ', Math.Max(0, 25 + (10 - UsurperRemake.UI.TextWidth.Width(title)) / 2)) + title;
 
     /// <summary>
     /// Generate a bug report, save locally, post to Discord, and optionally open browser.

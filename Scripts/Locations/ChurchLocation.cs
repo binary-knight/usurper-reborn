@@ -53,7 +53,7 @@ namespace UsurperRemake.Locations
                 else
                 {
                     term.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-                    { string t = Loc.Get("church.entry_denied"); int l = (78 - t.Length) / 2, r = 78 - t.Length - l; term.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+                    { string t = Loc.Get("church.entry_denied"); int l = (78 - UsurperRemake.UI.TextWidth.Width(t)) / 2, r = 78 - UsurperRemake.UI.TextWidth.Width(t) - l; term.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
                     term.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
                 }
                 term.WriteLine("");

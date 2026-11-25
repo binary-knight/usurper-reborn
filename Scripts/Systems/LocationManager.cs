@@ -848,7 +848,7 @@ public class PlaceholderLocation : BaseLocation
         if (!GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(new string('═', Name.Length));
+            terminal.WriteLine(new string('═', UsurperRemake.UI.TextWidth.Width(Name)));
         }
         terminal.WriteLine("");
         

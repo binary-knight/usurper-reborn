@@ -591,6 +591,7 @@ public partial class TerminalEmulator
     /// <summary>
     /// v1.2.5: the visible column the next Write lands on: the width written since the last line end
     /// (ANSI sequences and [colour] markup not counted). The stat tails use it to wrap at 79 columns.
+    /// v1.3.8: counted in display columns, so a double width character advances two.
     /// </summary>
     public int Column { get; private set; }
 
@@ -606,7 +607,7 @@ public partial class TerminalEmulator
         int nl = text.LastIndexOf('\n');
         if (nl >= 0) RowsSinceClear += text.Count(c => c == '\n');
         string tail = nl >= 0 ? text.Substring(nl + 1) : text;
-        int width = ColumnMarkup.Replace(tail, "").Length;
+        int width = UsurperRemake.UI.TextWidth.Width(ColumnMarkup.Replace(tail, ""));
         Column = nl >= 0 ? width : Column + width;
     }
 
@@ -1536,9 +1537,10 @@ public partial class TerminalEmulator
     internal static string TitleBoxRow(string text, int left)
     {
         const int inner = 77;
-        if (text.Length > inner) text = text.Substring(0, inner);
-        if (left + text.Length > inner) left = (inner - text.Length) / 2;
-        return "║" + new string(' ', left) + text + new string(' ', inner - left - text.Length) + "║";
+        text = UsurperRemake.UI.TextWidth.Truncate(text, inner);
+        int width = UsurperRemake.UI.TextWidth.Width(text);
+        if (left + width > inner) left = Math.Max(0, (inner - width) / 2);
+        return "║" + new string(' ', left) + text + new string(' ', inner - left - width) + "║";
     }
 
     private void DisplayANSI(string ansiContent)

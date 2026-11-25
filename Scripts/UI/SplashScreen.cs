@@ -70,7 +70,7 @@ namespace UsurperRemake.UI
 
             // Version info and press any key
             string version = $"v{GameConfig.Version} \"{GameConfig.VersionName}\"";
-            int pad = (80 - version.Length) / 2;
+            int pad = (80 - UsurperRemake.UI.TextWidth.Width(version)) / 2;
             terminal.SetColor("gray");
             terminal.Write(new string(' ', pad) + version);
             terminal.WriteLine("");
@@ -79,7 +79,7 @@ namespace UsurperRemake.UI
             // clients; BBS socket) says Enter; a console or door stdio session takes any one key as before
             bool needsEnter = terminal is TerminalEmulator te && te.PauseNeedsEnter;
             string prompt = UsurperRemake.Systems.Loc.Get(needsEnter ? "splash.press_enter" : "splash.press_any_key");
-            int promptPad = (80 - prompt.Length) / 2;
+            int promptPad = (80 - UsurperRemake.UI.TextWidth.Width(prompt)) / 2;
             terminal.Write(new string(' ', promptPad) + prompt);
             terminal.SetColor("white");
 

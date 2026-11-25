@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
@@ -601,8 +602,8 @@ public partial class MainStreetLocation : BaseLocation
     /// </summary>
     internal static List<string> CitizenRows(string marker, string name, string sex, int level, string className, string tail)
     {
-        string head = $"  {marker} {name,-18} {sex} {Loc.Get("main_street.citizen_lv", level)} {className,-10}";
-        if (head.Length + 1 + tail.Length <= 79)
+        string head = $"  {marker} {CellWhole(name, 18)} {sex} {Loc.Get("main_street.citizen_lv", level)} {CellWhole(className, 10)}";
+        if (TextWidth.Width(head) + 1 + TextWidth.Width(tail) <= 79)
             return new List<string> { $"{head} {tail}" };
         return new List<string> { head.TrimEnd(), $"{new string(' ', 6)}{tail}" };
     }
@@ -706,7 +707,7 @@ public partial class MainStreetLocation : BaseLocation
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"║{Loc.Get("main_street.level_eligible"),78}║");
+                terminal.WriteLine($"║{CellRight(Loc.Get("main_street.level_eligible"), 78)}║");
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
             }
@@ -949,7 +950,7 @@ public partial class MainStreetLocation : BaseLocation
 
             // Column headers (adjusted for location)
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("main_street.fame_rank"),-5} {Loc.Get("main_street.fame_name"),-18} {Loc.Get("main_street.fame_lv"),3} {Loc.Get("main_street.fame_class"),-10} {Loc.Get("main_street.fame_location"),-12} {Loc.Get("main_street.fame_experience"),10}");
+            terminal.WriteLine($"  {Cell(Loc.Get("main_street.fame_rank"), 5)} {Cell(Loc.Get("main_street.fame_name"), 18)} {CellRight(Loc.Get("main_street.fame_lv"), 3)} {Cell(Loc.Get("main_street.fame_class"), 10)} {Cell(Loc.Get("main_street.fame_location"), 12)} {CellRight(Loc.Get("main_street.fame_experience"), 10)}");
             WriteDivider(64);
 
             // Display current page
@@ -976,10 +977,7 @@ public partial class MainStreetLocation : BaseLocation
 
                 string rankStr = rank <= 3 ? $"#{rank}" : $"{rank}.";
                 string marker = entry.IsPlayer ? "*" : " ";
-                string nameDisplay = entry.Name.Length > 17 ? entry.Name.Substring(0, 17) : entry.Name;
-                string classDisplay = entry.Class.Length > 10 ? entry.Class.Substring(0, 10) : entry.Class;
-                string locDisplay = entry.Location.Length > 12 ? entry.Location.Substring(0, 12) : entry.Location;
-                terminal.WriteLine($"  {rankStr,-5}{marker}{nameDisplay,-17} {entry.Level,3} {classDisplay,-10} {locDisplay,-12} {entry.Experience,10:N0}");
+                terminal.WriteLine($"  {Cell(rankStr, 5)}{marker}{Cell(TextWidth.Truncate(entry.Name, 17), 17)} {CellRight(entry.Level.ToString(), 3)} {Cell(TextWidth.Truncate(entry.Class, 10), 10)} {Cell(TextWidth.Truncate(entry.Location, 12), 12)} {CellRight(entry.Experience.ToString("N0"), 10)}");
             }
 
             terminal.WriteLine("");
@@ -1171,57 +1169,61 @@ public partial class MainStreetLocation : BaseLocation
         terminal.ClearScreen();
         WriteBoxHeader(Loc.Get("main_street.statistics"), "bright_cyan");
         terminal.WriteLine("");
+        string L(string key, int width) => UIHelper.Cell(Loc.Get(key), width);
+        string V(object value, int width, string? format = null) =>
+            UIHelper.CellRight(format is null ? value?.ToString() ?? "" :
+                string.Format(System.Globalization.CultureInfo.CurrentCulture, "{0:" + format + "}", value), width);
 
         // Combat Stats
         WriteSectionHeader(Loc.Get("main_street.section_combat"), "bright_red");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_monsters_slain"),-21} {stats.TotalMonstersKilled,10:N0}     {Loc.Get("main_street.stat_bosses_killed"),-17} {stats.TotalBossesKilled,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_unique_monsters"),-21} {stats.TotalUniquesKilled,10:N0}     {Loc.Get("main_street.stat_combat_win_rate"),-17} {stats.GetCombatWinRate(),7:F1}%");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_combats_won"),-21} {stats.TotalCombatsWon,10:N0}     {Loc.Get("main_street.stat_combats_lost"),-17} {stats.TotalCombatsLost,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_times_fled"),-21} {stats.TotalCombatsFled,10:N0}     {Loc.Get("main_street.stat_player_kills"),-18}{stats.TotalPlayerKills,7:N0}");
+        terminal.WriteLine($"  {L("main_street.stat_monsters_slain", 21)} {V(stats.TotalMonstersKilled, 10, "N0")}     {L("main_street.stat_bosses_killed", 17)} {V(stats.TotalBossesKilled, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_unique_monsters", 21)} {V(stats.TotalUniquesKilled, 10, "N0")}     {L("main_street.stat_combat_win_rate", 17)} {V($"{stats.GetCombatWinRate():F1}%", 7)}");
+        terminal.WriteLine($"  {L("main_street.stat_combats_won", 21)} {V(stats.TotalCombatsWon, 10, "N0")}     {L("main_street.stat_combats_lost", 17)} {V(stats.TotalCombatsLost, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_times_fled", 21)} {V(stats.TotalCombatsFled, 10, "N0")}     {L("main_street.stat_player_kills", 18)}{V(stats.TotalPlayerKills, 7, "N0")}");
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_damage_dealt"),-21} {stats.TotalDamageDealt,10:N0}     {Loc.Get("main_street.stat_damage_taken"),-17} {stats.TotalDamageTaken,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_highest_hit"),-21} {stats.HighestSingleHit,10:N0}     {Loc.Get("main_street.stat_critical_hits"),-17} {stats.TotalCriticalHits,8:N0}");
+        terminal.WriteLine($"  {L("main_street.stat_damage_dealt", 21)} {V(stats.TotalDamageDealt, 10, "N0")}     {L("main_street.stat_damage_taken", 17)} {V(stats.TotalDamageTaken, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_highest_hit", 21)} {V(stats.HighestSingleHit, 10, "N0")}     {L("main_street.stat_critical_hits", 17)} {V(stats.TotalCriticalHits, 8, "N0")}");
         terminal.WriteLine("");
 
         // Economic Stats
         WriteSectionHeader(Loc.Get("main_street.section_economy"), "bright_green");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_gold_earned"),-21} {stats.TotalGoldEarned,10:N0}     {Loc.Get("main_street.stat_gold_monsters"),-18}{stats.TotalGoldFromMonsters,7:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_gold_spent"),-21} {stats.TotalGoldSpent,10:N0}     {Loc.Get("main_street.stat_peak_gold"),-17} {stats.HighestGoldHeld,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_items_bought"),-21} {stats.TotalItemsBought,10:N0}     {Loc.Get("main_street.stat_items_sold"),-17} {stats.TotalItemsSold,8:N0}");
+        terminal.WriteLine($"  {L("main_street.stat_gold_earned", 21)} {V(stats.TotalGoldEarned, 10, "N0")}     {L("main_street.stat_gold_monsters", 18)}{V(stats.TotalGoldFromMonsters, 7, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_gold_spent", 21)} {V(stats.TotalGoldSpent, 10, "N0")}     {L("main_street.stat_peak_gold", 17)} {V(stats.HighestGoldHeld, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_items_bought", 21)} {V(stats.TotalItemsBought, 10, "N0")}     {L("main_street.stat_items_sold", 17)} {V(stats.TotalItemsSold, 8, "N0")}");
         terminal.WriteLine("");
 
         // Experience Stats
         WriteSectionHeader(Loc.Get("main_street.section_experience"), "bright_magenta");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_xp_earned"),-21} {stats.TotalExperienceEarned,10:N0}     {Loc.Get("main_street.stat_level_ups"),-17} {stats.TotalLevelUps,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_highest_level"),-21} {stats.HighestLevelReached,10}     {Loc.Get("main_street.stat_current_level"),-17} {currentPlayer.Level,8}");
+        terminal.WriteLine($"  {L("main_street.stat_xp_earned", 21)} {V(stats.TotalExperienceEarned, 10, "N0")}     {L("main_street.stat_level_ups", 17)} {V(stats.TotalLevelUps, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_highest_level", 21)} {V(stats.HighestLevelReached, 10)}     {L("main_street.stat_current_level", 17)} {V(currentPlayer.Level, 8)}");
         terminal.WriteLine("");
 
         // Exploration Stats
         WriteSectionHeader(Loc.Get("main_street.section_exploration"), "bright_blue");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_deepest_dungeon"),-21} {stats.DeepestDungeonLevel,10}     {Loc.Get("main_street.stat_floors_explored"),-17} {stats.TotalDungeonFloorsCovered,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_chests_opened"),-21} {stats.TotalChestsOpened,10:N0}     {Loc.Get("main_street.stat_secrets_found"),-17} {stats.TotalSecretsFound,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_traps_triggered"),-21} {stats.TotalTrapsTriggered,10:N0}     {Loc.Get("main_street.stat_traps_disarmed"),-17} {stats.TotalTrapsDisarmed,8:N0}");
+        terminal.WriteLine($"  {L("main_street.stat_deepest_dungeon", 21)} {V(stats.DeepestDungeonLevel, 10)}     {L("main_street.stat_floors_explored", 17)} {V(stats.TotalDungeonFloorsCovered, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_chests_opened", 21)} {V(stats.TotalChestsOpened, 10, "N0")}     {L("main_street.stat_secrets_found", 17)} {V(stats.TotalSecretsFound, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_traps_triggered", 21)} {V(stats.TotalTrapsTriggered, 10, "N0")}     {L("main_street.stat_traps_disarmed", 17)} {V(stats.TotalTrapsDisarmed, 8, "N0")}");
         terminal.WriteLine("");
 
         // Survival Stats
         WriteSectionHeader(Loc.Get("main_street.section_survival"), "yellow");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_deaths_monster"),-21} {stats.TotalMonsterDeaths,10:N0}     {Loc.Get("main_street.stat_deaths_pvp"),-17} {stats.TotalPlayerDeaths,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_potions_used"),-21} {stats.TotalHealingPotionsUsed,10:N0}     {Loc.Get("main_street.stat_health_restored"),-17} {stats.TotalHealthRestored,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_resurrections"),-21} {stats.TotalTimesResurrected,10:N0}     {Loc.Get("main_street.stat_diseases_cured"),-17} {stats.TotalDiseasesCured,8:N0}");
+        terminal.WriteLine($"  {L("main_street.stat_deaths_monster", 21)} {V(stats.TotalMonsterDeaths, 10, "N0")}     {L("main_street.stat_deaths_pvp", 17)} {V(stats.TotalPlayerDeaths, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_potions_used", 21)} {V(stats.TotalHealingPotionsUsed, 10, "N0")}     {L("main_street.stat_health_restored", 17)} {V(stats.TotalHealthRestored, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_resurrections", 21)} {V(stats.TotalTimesResurrected, 10, "N0")}     {L("main_street.stat_diseases_cured", 17)} {V(stats.TotalDiseasesCured, 8, "N0")}");
         terminal.WriteLine("");
 
         // Time Stats
         WriteSectionHeader(Loc.Get("main_street.section_time"), "gray");
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_play_time"),-21} {stats.GetFormattedPlayTime(),10}     {Loc.Get("main_street.stat_sessions"),-17} {stats.TotalSessionsPlayed,8:N0}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_created"),-21} {GameConfig.FormatDate(stats.CharacterCreated, currentPlayer.DateFormatPreference),10}     {Loc.Get("main_street.stat_current_streak"),-17} {stats.CurrentStreak,8} {Loc.Get("main_street.stat_days")}");
-        terminal.WriteLine($"  {Loc.Get("main_street.stat_longest_streak"),-21} {stats.LongestStreak,10} {Loc.Get("main_street.stat_days")}");
+        terminal.WriteLine($"  {L("main_street.stat_play_time", 21)} {V(stats.GetFormattedPlayTime(), 10)}     {L("main_street.stat_sessions", 17)} {V(stats.TotalSessionsPlayed, 8, "N0")}");
+        terminal.WriteLine($"  {L("main_street.stat_created", 21)} {V(GameConfig.FormatDate(stats.CharacterCreated, currentPlayer.DateFormatPreference), 10)}     {L("main_street.stat_current_streak", 17)} {V(stats.CurrentStreak, 8)} {Loc.Get("main_street.stat_days")}");
+        terminal.WriteLine($"  {L("main_street.stat_longest_streak", 21)} {V(stats.LongestStreak, 10)} {Loc.Get("main_street.stat_days")}");
         terminal.WriteLine("");
 
         // Difficulty indicator (v0.65.7: localized mode name).
@@ -2407,7 +2409,7 @@ public partial class MainStreetLocation : BaseLocation
         {
             // Guild rankings
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("guild.board_col_rank"),-5} {Loc.Get("guild.board_col_guild"),-22} {Loc.Get("guild.board_col_members"),-9} {Loc.Get("guild.board_col_leader"),-16} {Loc.Get("guild.board_col_bank"),8}");
+            terminal.WriteLine($"  {Cell(Loc.Get("guild.board_col_rank"), 5)} {Cell(Loc.Get("guild.board_col_guild"), 22)} {Cell(Loc.Get("guild.board_col_members"), 9)} {Cell(Loc.Get("guild.board_col_leader"), 16)} {CellRight(Loc.Get("guild.board_col_bank"), 8)}");
             terminal.SetColor("gray");
             terminal.WriteLine("  " + new string('-', 62));
 
@@ -2428,7 +2430,7 @@ public partial class MainStreetLocation : BaseLocation
                 // Color based on rank
                 string color = rank == 1 ? "bright_yellow" : rank <= 3 ? "bright_cyan" : "white";
                 terminal.SetColor(color);
-                terminal.WriteLine($"  {("#" + rank),-5} {guildName,-22} {memberStr,-9} {leaderDisplay,-16} {g.BankGold,8:N0}g");
+                terminal.WriteLine($"  {Cell("#" + rank, 5)} {Cell(TextWidth.Truncate(guildName, 22, ".."), 22)} {Cell(memberStr, 9)} {Cell(TextWidth.Truncate(leaderDisplay, 16, ".."), 16)} {CellRight(g.BankGold.ToString("N0") + "g", 8)}");
                 rank++;
             }
 

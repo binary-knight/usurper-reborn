@@ -158,7 +158,7 @@ namespace UsurperRemake.UI
             for (int i = 0; i < 14; i++)
             {
                 string line = i < lines.Length ? lines[i] : "";
-                result[i] = line.Length >= 34 ? line.Substring(0, 34) : line.PadRight(34);
+                result[i] = line.Length >= 34 ? line.Substring(0, 34) : TextWidth.PadRight(line, 34);
             }
             return result;
         }
@@ -1359,7 +1359,7 @@ namespace UsurperRemake.UI
         {
             if (text.Length >= width) return text.Substring(0, width);
             int pad = (width - text.Length) / 2;
-            return text.PadLeft(text.Length + pad).PadRight(width);
+            return TextWidth.PadLeft(text, text.Length + pad).PadRight(width);
         }
 
         #endregion

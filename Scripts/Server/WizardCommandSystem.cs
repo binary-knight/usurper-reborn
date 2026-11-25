@@ -1,4 +1,5 @@
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -465,7 +466,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Wizard Commands"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Wizard Commands"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
@@ -574,7 +575,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Wizards Online"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Wizards Online"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
@@ -600,7 +601,7 @@ public static class WizardCommandSystem
                 var locName = loc.HasValue ? BaseLocation.GetLocationName(loc.Value) : "Unknown";
                 terminal.SetColor(WizardConstants.GetColor(wiz.WizardLevel));
                 var line = $"  [{title}] {wiz.Username}{invis} - {locName}";
-                terminal.WriteLine(sr ? line : $"║{line.PadRight(78)}║");
+                terminal.WriteLine(sr ? line : $"║{TextWidth.PadRight(line, 78)}║");
             }
         }
 
@@ -769,7 +770,7 @@ public static class WizardCommandSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { const string t = "Player Locations"; int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { const string t = "Player Locations"; int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
@@ -787,7 +788,7 @@ public static class WizardCommandSystem
             terminal.SetColor(session.WizardLevel > WizardLevel.Mortal
                 ? WizardConstants.GetColor(session.WizardLevel) : "white");
             var line = $"  {session.Username}{wizTag}{invisTag} - {locName} [{session.ConnectionType}]";
-            terminal.WriteLine(sr ? line : $"║{line.PadRight(78)}║");
+            terminal.WriteLine(sr ? line : $"║{TextWidth.PadRight(line, 78)}║");
         }
 
         if (sr)
@@ -2115,7 +2116,7 @@ public static class WizardCommandSystem
                 terminal.SetColor("white");
                 var line = $"  {entry.CreatedAt} {entry.WizardName}: {entry.Action}{target}{details}";
                 if (!sr && line.Length > 78) line = line.Substring(0, 75) + "...";
-                terminal.WriteLine(sr ? line : $"║{line.PadRight(78)}║");
+                terminal.WriteLine(sr ? line : $"║{TextWidth.PadRight(line, 78)}║");
             }
         }
 

@@ -1138,8 +1138,9 @@ public class CharacterCreationSystem
 
         // ── Row 1: Top border with race name ──
         string title = $" {raceName.ToUpper()} ";
-        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
-        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        int titleWidth = TextWidth.Width(title);
+        int leftPad = (TOTAL_W - 2 - titleWidth) / 2;
+        int rightPad = TOTAL_W - 2 - titleWidth - leftPad;
         terminal.Write("╔", "gray");
         terminal.Write(new string('═', leftPad), "gray");
         terminal.Write(title, "bright_yellow");
@@ -1195,7 +1196,7 @@ public class CharacterCreationSystem
         var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
         string prompt = $" {Loc.Get("creation.preview.be_race", raceDesc)}";
         terminal.Write("║", "gray");
-        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.Write(TextWidth.PadRight(prompt, TOTAL_W - 2), "white");
         terminal.WriteLine("║", "gray");
 
         // ── Row 23: Bottom border ──
@@ -1255,8 +1256,7 @@ public class CharacterCreationSystem
         {
             lines.Add(() =>
             {
-                int visLen = Math.Min(text.Length, panelWidth - 1);
-                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+                terminal.Write(" " + TextWidth.PadRight(TextWidth.Truncate(text, panelWidth - 1), panelWidth - 1), color);
             });
         }
 
@@ -1731,8 +1731,9 @@ public class CharacterCreationSystem
 
         // ── Row 1: Top border with class name ──
         string title = $" {className.ToUpper()} ";
-        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
-        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        int titleWidth = TextWidth.Width(title);
+        int leftPad = (TOTAL_W - 2 - titleWidth) / 2;
+        int rightPad = TOTAL_W - 2 - titleWidth - leftPad;
         terminal.Write("╔", "gray");
         terminal.Write(new string('═', leftPad), "gray");
         terminal.Write(title, "bright_yellow");
@@ -1784,7 +1785,7 @@ public class CharacterCreationSystem
         var article = GameConfig.ArticulateForLanguage(className, capitalize: false);
         string prompt = $" {Loc.Get("creation.preview.be_class", article)}";
         terminal.Write("║", "gray");
-        terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
+        terminal.Write(TextWidth.PadRight(prompt, TOTAL_W - 2), "white");
         terminal.WriteLine("║", "gray");
 
         // ── Row 23: Bottom border ──
@@ -1856,8 +1857,7 @@ public class CharacterCreationSystem
         {
             lines.Add(() =>
             {
-                int visLen = Math.Min(text.Length, panelWidth - 1);
-                terminal.Write(" " + text.Substring(0, visLen).PadRight(panelWidth - 1), color);
+                terminal.Write(" " + TextWidth.PadRight(TextWidth.Truncate(text, panelWidth - 1), panelWidth - 1), color);
             });
         }
 
@@ -2279,18 +2279,18 @@ public class CharacterCreationSystem
                 };
                 int prestigeIdx = prestigeStartIndex;
                 // v1.2.5: the name column is as wide as the longest prestige name in the reader's language (14 in English)
-                int prestigeNameWidth = Math.Max(14, allPrestige.Max(p => GameConfig.GetLocalizedClassName(p.Item1).Length));
+                int prestigeNameWidth = Math.Max(14, allPrestige.Max(p => TextWidth.Width(GameConfig.GetLocalizedClassName(p.Item1))));
                 foreach (var (pc, unlockReq) in allPrestige)
                 {
                     bool isUnlocked = unlockedPrestige.Contains(pc);
                     if (isUnlocked)
                     {
                         string head = $"({prestigeIdx}) ";
-                        string namePad = GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth);
+                        string namePad = TextWidth.PadRight(GameConfig.GetLocalizedClassName(pc), prestigeNameWidth);
                         terminal.Write(head, "bright_magenta");
                         terminal.Write(namePad, "bright_white");
                         // v1.2.5: the description wraps under itself so the row fits 79 columns
-                        int used = head.Length + namePad.Length + 1;
+                        int used = TextWidth.Width(head) + TextWidth.Width(namePad) + 1;
                         var descRows = UIHelper.WordWrap(GameConfig.GetLocalizedPrestigeDescription(pc), UIHelper.WrapWidth - used);
                         terminal.WriteLine($" {descRows[0]}", "magenta");
                         foreach (var more in descRows.Skip(1))
@@ -2300,7 +2300,7 @@ public class CharacterCreationSystem
                     else
                     {
                         terminal.Write($"     ", "dark_gray");
-                        terminal.Write(GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth), "dark_gray");
+                        terminal.Write(TextWidth.PadRight(GameConfig.GetLocalizedClassName(pc), prestigeNameWidth), "dark_gray");
                         terminal.WriteLine($" {Loc.Get("creation.prestige_locked", unlockReq)}", "dark_gray");
                     }
                 }
@@ -2554,43 +2554,43 @@ public class CharacterCreationSystem
 
             terminal.WriteLine(Loc.Get("character_creation.rolled_attributes"), "cyan");
             terminal.WriteLine("");
-            terminal.Write($"  {Loc.Get("ui.stat_hp"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_hp"), 15)} ");
             terminal.Write($"{character.HP,3}", GetStatColor(character.HP, 15, 25));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_hp")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_strength"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_strength"), 15)} ");
             terminal.Write($"{character.Strength,3}", GetStatColor(character.Strength, 6, 12));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_str")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_defense"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_defense"), 15)} ");
             terminal.Write($"{character.Defence,3}", GetStatColor(character.Defence, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_def")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_stamina"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_stamina"), 15)} ");
             terminal.Write($"{character.Stamina,3}", GetStatColor(character.Stamina, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_sta")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_agility"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_agility"), 15)} ");
             terminal.Write($"{character.Agility,3}", GetStatColor(character.Agility, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_agi")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_dexterity"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_dexterity"), 15)} ");
             terminal.Write($"{character.Dexterity,3}", GetStatColor(character.Dexterity, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_dex")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_constitution"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_constitution"), 15)} ");
             terminal.Write($"{character.Constitution,3}", GetStatColor(character.Constitution, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_con")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_intelligence"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_intelligence"), 15)} ");
             terminal.Write($"{character.Intelligence,3}", GetStatColor(character.Intelligence, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_int")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_wisdom"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_wisdom"), 15)} ");
             terminal.Write($"{character.Wisdom,3}", GetStatColor(character.Wisdom, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_wis")}", "gray");
 
-            terminal.Write($"  {Loc.Get("ui.stat_charisma"),-15} ");
+            terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_charisma"), 15)} ");
             terminal.Write($"{character.Charisma,3}", GetStatColor(character.Charisma, 5, 10));
             terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_cha")}", "gray");
 
@@ -2603,13 +2603,13 @@ public class CharacterCreationSystem
             }
             if (effectiveMana > 0)
             {
-                terminal.Write($"  {Loc.Get("ui.stat_mana"),-15} ");
+                terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_mana"), 15)} ");
                 terminal.Write($"{effectiveMana,3}/{effectiveMana}", "cyan");
                 terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_mana")}", "gray");
             }
             else if (GetClassManaPerLevel(character.Class) > 0)
             {
-                terminal.Write($"  {Loc.Get("ui.stat_mana"),-15} ");
+                terminal.Write($"  {UIHelper.Cell(Loc.Get("ui.stat_mana"), 15)} ");
                 terminal.Write(Loc.Get("charcreate.mana_per_level_label", GetClassManaPerLevel(character.Class).ToString()), "cyan");
                 terminal.WriteLine($"  - {Loc.Get("character_creation.stat_desc_mana_grows")}", "gray");
             }
@@ -3122,14 +3122,15 @@ public class CharacterCreationSystem
     private static IEnumerable<string> HelpGroupRows(IEnumerable<(string Name, string Text)> entries)
     {
         var list = entries.ToList();
-        int nameWidth = Math.Max(9, list.Max(e => e.Name.Length)) + 1;
+        int nameWidth = Math.Max(9, list.Max(e => TextWidth.Width(e.Name))) + 1;
         foreach (var (name, text) in list)
         {
-            string head = name.PadRight(nameWidth) + "- ";
-            var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - head.Length);
+            string head = TextWidth.PadRight(name, nameWidth) + "- ";
+            int headWidth = TextWidth.Width(head);
+            var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - headWidth);
             yield return head + wrapped[0];
             foreach (var more in wrapped.Skip(1))
-                yield return new string(' ', head.Length) + more;
+                yield return new string(' ', headWidth) + more;
         }
     }
 

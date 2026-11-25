@@ -145,8 +145,8 @@ public class MaintenanceSystem
     /// </summary>
     internal static string HeaderTitleRow(string title)
     {
-        int left = Math.Max(0, (67 - title.Length) / 2);
-        int right = Math.Max(0, 66 - left - title.Length);
+        int left = Math.Max(0, (67 - UsurperRemake.UI.TextWidth.Width(title)) / 2);
+        int right = Math.Max(0, 66 - left - UsurperRemake.UI.TextWidth.Width(title));
         return new string(' ', left) + title + new string(' ', right);
     }
 

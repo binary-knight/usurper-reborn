@@ -211,39 +211,15 @@ namespace UsurperRemake.Systems
         internal static string BoxTop(string label)
         {
             string head = $"\u250c\u2500\u2500\u2500 {label} ";
-            return head + new string('\u2500', Math.Max(0, 77 - head.Length)) + "\u2510";
+            return head + new string('\u2500', Math.Max(0, 77 - UsurperRemake.UI.TextWidth.Width(head))) + "\u2510";
         }
 
         /// <summary>
-        /// Word wrap text to fit within a maximum width
+        /// Word wrap text to fit within a maximum width. The shared wrapper measures display columns
+        /// and can break a line with no spaces in it, which a wide-script hint needs.
         /// </summary>
         internal static List<string> WordWrap(string text, int maxWidth)   // 1.3.9: static, the combat tips wrap with it too
-        {
-            var lines = new List<string>();
-            var words = text.Split(' ');
-            var currentLine = "";
-
-            foreach (var word in words)
-            {
-                if (currentLine.Length + word.Length + 1 <= maxWidth)
-                {
-                    if (currentLine.Length > 0)
-                        currentLine += " ";
-                    currentLine += word;
-                }
-                else
-                {
-                    if (currentLine.Length > 0)
-                        lines.Add(currentLine);
-                    currentLine = word;
-                }
-            }
-
-            if (currentLine.Length > 0)
-                lines.Add(currentLine);
-
-            return lines;
-        }
+            => UsurperRemake.UI.UIHelper.WordWrap(text, maxWidth);
 
         /// <summary>
         /// Definition for a single hint

@@ -2,6 +2,7 @@ using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -59,7 +60,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("anchor_road.header_title"); int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+            { string t = Loc.Get("anchor_road.header_title"); int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -146,7 +147,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write(label1.PadRight(18));
+            terminal.Write(TextWidth.PadRight(label1, 18));
         }
 
         if (!string.IsNullOrEmpty(key2))
@@ -158,7 +159,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor("darkgray");
             terminal.Write("] ");
             terminal.SetColor("white");
-            terminal.Write(label2.PadRight(18));
+            terminal.Write(TextWidth.PadRight(label2, 18));
         }
 
         if (!string.IsNullOrEmpty(key3))
@@ -440,7 +441,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(new string('─', 60));
         }
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("anchor_road.bounty_col_num"),-3} {Loc.Get("anchor_road.bounty_col_name"),-20} {Loc.Get("anchor_road.bounty_col_level"),-6} {Loc.Get("anchor_road.bounty_col_bounty"),-12} {Loc.Get("anchor_road.bounty_col_crime"),-15}");
+        terminal.WriteLine($"{Cell(Loc.Get("anchor_road.bounty_col_num"), 3)} {Cell(Loc.Get("anchor_road.bounty_col_name"), 20)} {Cell(Loc.Get("anchor_road.bounty_col_level"), 6)} {Cell(Loc.Get("anchor_road.bounty_col_bounty"), 12)} {Cell(Loc.Get("anchor_road.bounty_col_crime"), 15)}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -455,7 +456,7 @@ public class AnchorRoadLocation : BaseLocation
                           target.Darkness > 200 ? Loc.Get("anchor_road.crime_assault") : Loc.Get("anchor_road.crime_troublemaker");
 
             terminal.SetColor("white");
-            terminal.WriteLine($"{i + 1,-3} {target.DisplayName,-20} {target.Level,-6} {bounty:N0}g{"",-5} {crime,-15}");
+            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {CellWhole(target.DisplayName, 20)} {Cell(target.Level.ToString(), 6)} {Cell($"{bounty:N0}g", 12)} {Cell(crime, 15)}");
         }
 
         terminal.WriteLine("");
@@ -605,7 +606,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(new string('─', 55));
         }
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("anchor_road.rival_col_num"),-3} {Loc.Get("anchor_road.rival_col_team"),-24} {Loc.Get("anchor_road.rival_col_members"),-8} {Loc.Get("anchor_road.rival_col_power"),-8} {Loc.Get("anchor_road.rival_col_turf"),-5}");
+        terminal.WriteLine($"{Cell(Loc.Get("anchor_road.rival_col_num"), 3)} {Cell(Loc.Get("anchor_road.rival_col_team"), 24)} {Cell(Loc.Get("anchor_road.rival_col_members"), 8)} {Cell(Loc.Get("anchor_road.rival_col_power"), 8)} {Cell(Loc.Get("anchor_road.rival_col_turf"), 5)}");
         if (!IsScreenReader)
         {
             terminal.SetColor("darkgray");
@@ -622,7 +623,7 @@ public class AnchorRoadLocation : BaseLocation
             else
                 terminal.SetColor("white");
 
-            terminal.WriteLine($"{i + 1,-3} {team.TeamName,-24} {team.MemberCount,-8} {team.TotalPower,-8} {turfMark,-5}");
+            terminal.WriteLine($"{Cell((i + 1).ToString(), 3)} {CellWhole(team.TeamName, 24)} {Cell(team.MemberCount.ToString(), 8)} {Cell(team.TotalPower.ToString(), 8)} {Cell(turfMark, 5)}");
         }
 
         terminal.WriteLine("");

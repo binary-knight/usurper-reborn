@@ -3,6 +3,7 @@ using UsurperRemake.Systems;
 using UsurperRemake.Data;
 using UsurperRemake.Locations;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
@@ -1427,8 +1428,11 @@ public partial class GameEngine
             string Fit(string key)
             {
                 var s = Loc.Get(key) ?? "";
-                // Translations drift; never let one blow the border apart.
-                return s.Length > BoxInner ? s.Substring(0, BoxInner) : s.PadRight(BoxInner);
+                // Translations drift; never let one blow the border apart. Measured in columns, so
+                // a Chinese line is cut by display width, not by its UTF-16 length.
+                return TextWidth.Width(s) > BoxInner
+                    ? TextWidth.Truncate(s, BoxInner)
+                    : TextWidth.PadRight(s, BoxInner);
             }
 
             terminal.SetColor("bright_cyan");
@@ -1450,7 +1454,7 @@ public partial class GameEngine
             terminal.WriteLine(" ║");
             terminal.Write("  ║ ");
             terminal.SetColor("bright_cyan");
-            terminal.Write(GameConfig.DiscordInvite.PadRight(BoxInner));
+            terminal.Write(TextWidth.PadRight(GameConfig.DiscordInvite, BoxInner));
             terminal.WriteLine(" ║");
             terminal.WriteLine("  ╚══════════════════════════════════════════════════════════════════════════╝");
         }
@@ -1499,7 +1503,7 @@ public partial class GameEngine
                 terminal.SetColor("cyan");
                 terminal.Write("║");
                 terminal.SetColor("bright_yellow");
-                { string t = Loc.Get("engine.main_title_box"); string s = Loc.Get("engine.main_subtitle_box"); string full = t + s; int pad = 78 - full.Length; int l = pad / 2; int r = pad - l; terminal.Write(new string(' ', l) + t); terminal.SetColor("white"); terminal.Write(s + new string(' ', r)); }
+                { string t = Loc.Get("engine.main_title_box"); string s = Loc.Get("engine.main_subtitle_box"); string full = t + s; int pad = 78 - TextWidth.Width(full); int l = pad / 2; int r = pad - l; terminal.Write(new string(' ', l) + t); terminal.SetColor("white"); terminal.Write(s + new string(' ', r)); }
                 terminal.SetColor("cyan");
                 terminal.WriteLine("║");
                 terminal.SetColor("cyan");
@@ -1557,7 +1561,7 @@ public partial class GameEngine
                 // Visual menu with colored brackets
                 // PLAY section
                 terminal.SetColor("darkgray");
-                { string t = Loc.Get("engine.section_play_visual"); terminal.WriteLine(t + new string('─', 78 - t.Length)); }
+                { string t = Loc.Get("engine.section_play_visual"); terminal.WriteLine(t + new string('─', 78 - TextWidth.Width(t))); }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
                 terminal.SetColor("bright_cyan");
@@ -1603,7 +1607,7 @@ public partial class GameEngine
 
                 // INFO section
                 terminal.SetColor("darkgray");
-                { string t = Loc.Get("engine.section_info_visual"); terminal.WriteLine(t + new string('─', 78 - t.Length)); }
+                { string t = Loc.Get("engine.section_info_visual"); terminal.WriteLine(t + new string('─', 78 - TextWidth.Width(t))); }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
                 terminal.SetColor("bright_cyan");
@@ -1656,7 +1660,7 @@ public partial class GameEngine
 
                 // Accessibility section
                 terminal.SetColor("darkgray");
-                { string t = Loc.Get("engine.section_accessibility_visual"); terminal.WriteLine(t + new string('─', 78 - t.Length)); }
+                { string t = Loc.Get("engine.section_accessibility_visual"); terminal.WriteLine(t + new string('─', 78 - TextWidth.Width(t))); }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
                 terminal.SetColor("bright_cyan");
@@ -2089,7 +2093,7 @@ public partial class GameEngine
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { string t = Loc.Get("engine.spectator_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { string t = Loc.Get("engine.spectator_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_magenta");
             terminal.WriteLine("║");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
@@ -2380,7 +2384,7 @@ public partial class GameEngine
                 terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
                 terminal.Write("║");
                 terminal.SetColor("bright_yellow");
-                { string t = Loc.Get("engine.save_management_title"); int l = (78 - t.Length) / 2, r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+                { string t = Loc.Get("engine.save_management_title"); int l = (78 - TextWidth.Width(t)) / 2, r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("║");
                 terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
@@ -2542,7 +2546,7 @@ public partial class GameEngine
                 terminal.WriteLine($"╔══════════════════════════════════════════════════════════════════════════════╗");
                 terminal.Write("║");
                 terminal.SetColor("bright_yellow");
-                { string label = Loc.Get("engine.save_slots_for", playerName); int l = (78 - label.Length) / 2, r = 78 - label.Length - l; terminal.Write(new string(' ', l) + label + new string(' ', r)); }
+                { string label = Loc.Get("engine.save_slots_for", playerName); int l = (78 - TextWidth.Width(label)) / 2, r = 78 - TextWidth.Width(label) - l; terminal.Write(new string(' ', l) + label + new string(' ', r)); }
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("║");
                 terminal.WriteLine($"╚══════════════════════════════════════════════════════════════════════════════╝");
@@ -4156,7 +4160,7 @@ public partial class GameEngine
                     "castle" => Loc.Get("engine.sleep_castle"),
                     _ => Loc.Get("engine.sleep_dormitory")
                 };
-                { string sleepTitle = Loc.Get("engine.sleep_report_title", locationLabel); int sl = (76 - sleepTitle.Length) / 2; int sr = 76 - sleepTitle.Length - sl; terminal.WriteLine($"\u2551{new string(' ', sl)}{sleepTitle}{new string(' ', sr)}\u2551"); }
+                { string sleepTitle = Loc.Get("engine.sleep_report_title", locationLabel); int sl = (76 - TextWidth.Width(sleepTitle)) / 2; int sr = 76 - TextWidth.Width(sleepTitle) - sl; terminal.WriteLine($"\u2551{new string(' ', sl)}{sleepTitle}{new string(' ', sr)}\u2551"); }
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563");
 
@@ -8334,7 +8338,7 @@ public partial class GameEngine
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_white");
-            { string t = Loc.Get("engine.support_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
+            { string t = Loc.Get("engine.support_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.Write(new string(' ', l) + t + new string(' ', r)); }
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("║");
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
@@ -8401,7 +8405,7 @@ public partial class GameEngine
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("+=============================================================================+");
             terminal.SetColor("bright_white");
-            { string t = Loc.Get("engine.bbs_list_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("|" + new string(' ', l) + t + new string(' ', r) + "|"); }
+            { string t = Loc.Get("engine.bbs_list_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("|" + new string(' ', l) + t + new string(' ', r) + "|"); }
             terminal.SetColor("bright_cyan");
             terminal.WriteLine("+=============================================================================+");
         }
@@ -8582,7 +8586,7 @@ public partial class GameEngine
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("+=============================================================================+");
-            { string t = Loc.Get("engine.credits_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("|" + new string(' ', l) + t + new string(' ', r) + "|"); }
+            { string t = Loc.Get("engine.credits_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("|" + new string(' ', l) + t + new string(' ', r) + "|"); }
             terminal.WriteLine("+=============================================================================+");
         }
         terminal.WriteLine("");
@@ -8679,7 +8683,7 @@ public partial class GameEngine
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("engine.story_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
+            { string t = Loc.Get("engine.story_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -8713,7 +8717,7 @@ public partial class GameEngine
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("engine.story_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
+            { string t = Loc.Get("engine.story_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -8751,7 +8755,7 @@ public partial class GameEngine
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("engine.story_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
+            { string t = Loc.Get("engine.story_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -8792,7 +8796,7 @@ public partial class GameEngine
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
-            { string t = Loc.Get("engine.story_title"); int l = (78 - t.Length) / 2; int r = 78 - t.Length - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
+            { string t = Loc.Get("engine.story_title"); int l = (78 - TextWidth.Width(t)) / 2; int r = 78 - TextWidth.Width(t) - l; terminal.WriteLine("║" + new string(' ', l) + t + new string(' ', r) + "║"); }
             terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         }
         terminal.WriteLine("");
@@ -8832,7 +8836,7 @@ public partial class GameEngine
     internal static string SectionRule(string key)
     {
         string t = Loc.Get(key);
-        return t + new string('─', Math.Max(3, 75 - t.Length));
+        return t + new string('─', Math.Max(3, 75 - TextWidth.Width(t)));
     }
 
     /// <summary>

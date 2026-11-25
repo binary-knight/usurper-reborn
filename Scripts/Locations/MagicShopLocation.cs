@@ -410,7 +410,7 @@ public partial class MagicShopLocation : BaseLocation
     /// inside is cut with "..." so the box keeps its shape.</summary>
     private void WriteShopBox(string title, string color)
     {
-        if (title.Length > BoxInside - 2) title = title.Substring(0, BoxInside - 5) + "...";
+        if (TextWidth.Width(title) > BoxInside - 2) title = TextWidth.Truncate(title, BoxInside - 5) + "...";
         WriteBoxHeader(title, color, BoxInside);
     }
 
@@ -1352,7 +1352,7 @@ public partial class MagicShopLocation : BaseLocation
     internal static string MenuSectionRow(string leftKey, string rightKey)
     {
         string left = $"  ═══ {Loc.Get(leftKey)} ═══";
-        return left.PadRight(40) + $"═══ {Loc.Get(rightKey)} ═══";
+        return TextWidth.PadRight(left, 40) + $"═══ {Loc.Get(rightKey)} ═══";
     }
 
     /// <summary>v1.2.5: "[K]label" from a whole-word label: "[E]nchant Equipment" when the label starts with the
@@ -1584,14 +1584,14 @@ public partial class MagicShopLocation : BaseLocation
     private void WriteTierSection(Character player, int from, int to, bool wide)
     {
         var range = Enumerable.Range(from, to - from).ToList();
-        int nameW = Math.Max(Loc.Get("magic_shop.col_tier").Length, range.Max(i => TierName(i).Length)) + 1;
-        int effW = Math.Max(Loc.Get("magic_shop.col_effect").Length, range.Max(i => TierDescription(i).Length)) + 1;
+        int nameW = Math.Max(TextWidth.Width(Loc.Get("magic_shop.col_tier")), range.Max(i => TextWidth.Width(TierName(i)))) + 1;
+        int effW = Math.Max(TextWidth.Width(Loc.Get("magic_shop.col_effect")), range.Max(i => TextWidth.Width(TierDescription(i)))) + 1;
         int prefix = wide ? 7 : 6;
         int baseWidth = prefix + nameW + effW + 11;
 
         terminal.SetColor("darkgray");
-        terminal.WriteLine("#".PadLeft(prefix - 2) + "  " + Loc.Get("magic_shop.col_tier").PadRight(nameW)
-            + Loc.Get("magic_shop.col_effect").PadRight(effW) + Loc.Get("castle.header_cost").PadLeft(11));
+        terminal.WriteLine("#".PadLeft(prefix - 2) + "  " + TextWidth.PadRight(Loc.Get("magic_shop.col_tier"), nameW)
+            + TextWidth.PadRight(Loc.Get("magic_shop.col_effect"), effW) + TextWidth.PadLeft(Loc.Get("castle.header_cost"), 11));
         WriteDivider(baseWidth);
 
         foreach (int i in range)
@@ -1601,9 +1601,9 @@ public partial class MagicShopLocation : BaseLocation
             bool canAfford = player.Gold >= cost;
             bool meetsLevel = player.Level >= tier.minLevel;
             bool meetsAwakening = i != 5 || (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) >= 2;
-            string name = TierName(i).PadRight(nameW);
-            string effect = TierDescription(i).PadRight(effW);
-            string price = Loc.Get("magic_shop.gold_short", $"{cost:N0}").PadLeft(11);
+            string name = TextWidth.PadRight(TierName(i), nameW);
+            string effect = TextWidth.PadRight(TierDescription(i), effW);
+            string price = TextWidth.PadLeft(Loc.Get("magic_shop.gold_short", $"{cost:N0}"), 11);
 
             terminal.SetColor("gray");
             terminal.Write(wide ? $"  [{i + 1,2}] " : $"  [{i + 1}] ");
@@ -1833,7 +1833,7 @@ public partial class MagicShopLocation : BaseLocation
 
             // Slot label -- the bag label for inventory items, the slot name for equipped.
             terminal.SetColor(idx > equippedCount ? "dark_yellow" : "darkgray");
-            terminal.Write(slotLabel.PadRight(slotWidth));
+            terminal.Write(TextWidth.PadRight(slotLabel, slotWidth));
 
             // Item name with enchant/cursed tags
             string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
@@ -3149,14 +3149,14 @@ public partial class MagicShopLocation : BaseLocation
                         int labelWidth = Math.Max(leftLabel.Length, rightLabel.Length) + 1;
                         if (IsScreenReader)
                         {
-                            terminal.WriteLine($"    L. {leftLabel.PadRight(labelWidth)}{lf.Name}");
-                            terminal.WriteLine($"    R. {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    L. {TextWidth.PadRight(leftLabel, labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    R. {TextWidth.PadRight(rightLabel, labelWidth)}{rf.Name}");
                             terminal.WriteLine($"    C. {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         else
                         {
-                            terminal.WriteLine($"    [L] {leftLabel.PadRight(labelWidth)}{lf.Name}");
-                            terminal.WriteLine($"    [R] {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    [L] {TextWidth.PadRight(leftLabel, labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    [R] {TextWidth.PadRight(rightLabel, labelWidth)}{rf.Name}");
                             terminal.WriteLine($"    [C] {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         var fingerChoice = await terminal.GetInput($"  {Loc.Get("magic_shop.replace_which_ring")}");
@@ -3446,12 +3446,12 @@ public partial class MagicShopLocation : BaseLocation
 
     /// <summary>v1.2.5: the name field of a spell list, the longest name or the label, plus one.</summary>
     internal static int SpellNameWidth(IEnumerable<string> nameKeys) =>
-        Math.Max(Loc.Get("magic_shop.col_spell").Length, nameKeys.Max(k => Loc.Get(k).Length)) + 1;
+        Math.Max(TextWidth.Width(Loc.Get("magic_shop.col_spell")), nameKeys.Max(k => TextWidth.Width(Loc.Get(k)))) + 1;
 
     /// <summary>v1.2.5: the love spell header, two rows like the spells: name, cost and mana, then the effect.</summary>
     internal static string[] LoveHeader(int nameW) => new[]
     {
-        "   #  " + Loc.Get("magic_shop.col_spell").PadRight(nameW) + Loc.Get("castle.header_cost").PadLeft(9) + " " + Loc.Get("ui.stat_mana").PadLeft(6),
+        "   #  " + TextWidth.PadRight(Loc.Get("magic_shop.col_spell"), nameW) + TextWidth.PadLeft(Loc.Get("castle.header_cost"), 9) + " " + TextWidth.PadLeft(Loc.Get("ui.stat_mana"), 6),
         "      " + Loc.Get("magic_shop.col_effect"),
     };
 
@@ -3503,16 +3503,16 @@ public partial class MagicShopLocation : BaseLocation
     }
 
     internal static int PickerClassWidth(IEnumerable<NPC> shown) =>
-        Math.Max(13, Math.Max(Loc.Get("arena.col_class").Length, shown.Select(n => n.ClassName.Length).DefaultIfEmpty(0).Max()) + 1);
+        Math.Max(13, Math.Max(TextWidth.Width(Loc.Get("arena.col_class")), shown.Select(n => TextWidth.Width(n.ClassName)).DefaultIfEmpty(0).Max()) + 1);
 
     /// <summary>v1.2.5: the level field, 4 columns or one more than its label.</summary>
-    internal static int PickerLevelWidth() => Math.Max(4, Loc.Get("main_street.fame_lv").Length + 1);
+    internal static int PickerLevelWidth() => Math.Max(4, TextWidth.Width(Loc.Get("main_street.fame_lv")) + 1);
 
     /// <summary>v1.2.5: the picker's column header: number, name (28), class, level, relationship or status.</summary>
     internal static string PickerHeader(int classW, bool showRelationship, bool showLevel)
     {
-        string h = "    #  " + Loc.Get("arena.col_name").PadRight(28) + Loc.Get("arena.col_class").PadRight(classW);
-        if (showLevel) h += Loc.Get("main_street.fame_lv").PadRight(PickerLevelWidth());
+        string h = "    #  " + TextWidth.PadRight(Loc.Get("arena.col_name"), 28) + TextWidth.PadRight(Loc.Get("arena.col_class"), classW);
+        if (showLevel) h += TextWidth.PadRight(Loc.Get("main_street.fame_lv"), PickerLevelWidth());
         if (showRelationship) h += Loc.Get("magic_shop.col_relationship");
         else if (showLevel) h += Loc.Get("arena.col_status");
         return h.TrimEnd();
@@ -3586,7 +3586,7 @@ public partial class MagicShopLocation : BaseLocation
                     terminal.Write($"{npcName,-28}");
 
                     terminal.SetColor("darkgray");
-                    terminal.Write(npc.ClassName.PadRight(classW));
+                    terminal.Write(TextWidth.PadRight(npc.ClassName, classW));
 
                     if (showLevel)
                     {
@@ -3719,10 +3719,10 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"  [{i + 1}] ");
 
-            string spellName = Loc.Get(spell.name).PadRight(loveNameW);
+            string spellName = TextWidth.PadRight(Loc.Get(spell.name), loveNameW);
             string spellEffect = Loc.Get(spell.effect);
-            string price = Loc.Get("magic_shop.gold_short", $"{cost:N0}").PadLeft(9) + " ";
-            string mana = Loc.Get("base.prompt_mp", spell.manaCost).PadLeft(6);
+            string price = TextWidth.PadLeft(Loc.Get("magic_shop.gold_short", $"{cost:N0}"), 9) + " ";
+            string mana = TextWidth.PadLeft(Loc.Get("base.prompt_mp", spell.manaCost), 6);
             if (!meetsLevel)
             {
                 terminal.SetColor("darkgray");
@@ -3940,14 +3940,14 @@ public partial class MagicShopLocation : BaseLocation
     };
 
     /// <summary>v1.2.5: the chance field of the dark arts list, 4 columns or the label's width.</summary>
-    internal static int DarkChanceWidth() => Math.Max(4, Loc.Get("magic_shop.col_chance").Length);
+    internal static int DarkChanceWidth() => Math.Max(4, TextWidth.Width(Loc.Get("magic_shop.col_chance")));
 
     /// <summary>v1.2.5: the dark arts header, two rows like the spells: name, chance, cost, mana and darkness,
     /// then the effect.</summary>
     internal static string[] DarkHeader(int nameW) => new[]
     {
-        "   #  " + Loc.Get("magic_shop.col_spell").PadRight(nameW) + Loc.Get("magic_shop.col_chance").PadLeft(DarkChanceWidth())
-            + "  " + Loc.Get("castle.header_cost").PadLeft(11) + " " + Loc.Get("ui.stat_mana").PadLeft(6) + "  " + Loc.Get("magic_shop.col_dark"),
+        "   #  " + TextWidth.PadRight(Loc.Get("magic_shop.col_spell"), nameW) + TextWidth.PadLeft(Loc.Get("magic_shop.col_chance"), DarkChanceWidth())
+            + "  " + TextWidth.PadLeft(Loc.Get("castle.header_cost"), 11) + " " + TextWidth.PadLeft(Loc.Get("ui.stat_mana"), 6) + "  " + Loc.Get("magic_shop.col_dark"),
         "      " + Loc.Get("magic_shop.col_effect"),
     };
 
@@ -4005,7 +4005,7 @@ public partial class MagicShopLocation : BaseLocation
             bool meetsLevel = player.Level >= spell.minLevel;
             bool canAfford = player.Gold >= cost && player.Mana >= spell.manaCost;
             int darkShift = isGood ? spell.darkShift * 2 : spell.darkShift;
-            string spellName = Loc.Get(spell.name).PadRight(darkNameW);
+            string spellName = TextWidth.PadRight(Loc.Get(spell.name), darkNameW);
             string spellDesc = Loc.Get(spell.desc);
 
             terminal.SetColor("gray");
@@ -4024,9 +4024,9 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.SetColor(canAfford ? "bright_red" : "red");
                 terminal.Write(spellName);
                 terminal.SetColor(canAfford ? "white" : "darkgray");
-                terminal.Write($"{displaySuccess}%".PadLeft(chanceW) + "  ");
+                terminal.Write(TextWidth.PadLeft($"{displaySuccess}%", chanceW) + "  ");
                 terminal.SetColor(canAfford ? "yellow" : "darkgray");
-                terminal.Write($"{cost:N0}".PadLeft(11));
+                terminal.Write(TextWidth.PadLeft($"{cost:N0}", 11));
                 terminal.SetColor(canAfford ? "cyan" : "darkgray");
                 terminal.Write(" " + Loc.Get("base.prompt_mp", spell.manaCost).PadLeft(6));
                 terminal.SetColor("red");

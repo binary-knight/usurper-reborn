@@ -1694,7 +1694,7 @@ public abstract class BaseLocation
 
             // Append fatigue tier label when Tired or Exhausted
             var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
-            int headerLen = locDisplayName.Length + 4 + timePeriod.Length;
+            int headerLen = TextWidth.Width(locDisplayName) + 4 + TextWidth.Width(timePeriod);
             if (!string.IsNullOrEmpty(fatigueLabel) && currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
             {
                 terminal.SetColor("gray");
@@ -1703,7 +1703,7 @@ public abstract class BaseLocation
                 terminal.Write(fatigueLabel);
                 terminal.SetColor("gray");
                 terminal.Write(")");
-                headerLen += 3 + fatigueLabel.Length; // " (" + label + ")"
+                headerLen += 3 + TextWidth.Width(fatigueLabel); // " (" + label + ")"
             }
             // Mental band tag (both modes; Strained and below)
             if (!string.IsNullOrEmpty(mentalTagLabel))
@@ -1714,7 +1714,7 @@ public abstract class BaseLocation
                 terminal.Write(mentalTagLabel);
                 terminal.SetColor("gray");
                 terminal.Write(")");
-                headerLen += 3 + mentalTagLabel.Length;
+                headerLen += 3 + TextWidth.Width(mentalTagLabel);
             }
             terminal.WriteLine("");
 
@@ -1738,7 +1738,7 @@ public abstract class BaseLocation
                 terminal.Write(fatigueLabel);
                 terminal.SetColor("gray");
                 terminal.Write(")");
-                int headerLen = Name.Length + 3 + fatigueLabel.Length;
+                int headerLen = TextWidth.Width(Name) + 3 + TextWidth.Width(fatigueLabel);
                 // Mental band tag (both modes; Strained and below)
                 if (!string.IsNullOrEmpty(mentalTagLabel))
                 {
@@ -1748,7 +1748,7 @@ public abstract class BaseLocation
                     terminal.Write(mentalTagLabel);
                     terminal.SetColor("gray");
                     terminal.Write(")");
-                    headerLen += 3 + mentalTagLabel.Length;
+                    headerLen += 3 + TextWidth.Width(mentalTagLabel);
                 }
                 terminal.WriteLine("");
                 if (!IsScreenReader)
@@ -1763,7 +1763,7 @@ public abstract class BaseLocation
                 // the Dungeons header keeps its raw Name because it carries the floor number.
                 string hdrName = LocationId == GameLocation.Dungeons ? Name : GetLocationName(LocationId);
                 terminal.Write(hdrName);
-                int headerLen = hdrName.Length;
+                int headerLen = TextWidth.Width(hdrName);
                 // Mental band tag (both modes; Strained and below): this leaf is reached in
                 // online mode (dungeon and non-dungeon) and in single-player dungeon without
                 // fatigue, so it is the one place the online header actually gets a tag.
@@ -1775,7 +1775,7 @@ public abstract class BaseLocation
                     terminal.Write(mentalTagLabel);
                     terminal.SetColor("gray");
                     terminal.Write(")");
-                    headerLen += 3 + mentalTagLabel.Length;
+                    headerLen += 3 + TextWidth.Width(mentalTagLabel);
                 }
                 terminal.WriteLine("");
                 if (!IsScreenReader)
@@ -2677,9 +2677,9 @@ public abstract class BaseLocation
             terminal.WriteLine(title);
             return;
         }
-        int padLen = Math.Max(0, (76 - title.Length) / 2);
+        int padLen = Math.Max(0, (76 - TextWidth.Width(title)) / 2);
         string padL = new string('═', padLen);
-        string padR = new string('═', 76 - title.Length - padLen);
+        string padR = new string('═', 76 - TextWidth.Width(title) - padLen);
         terminal.SetColor("bright_blue");
         terminal.Write("╔" + padL + " ");
         terminal.SetColor("bright_white");
@@ -3265,7 +3265,7 @@ public abstract class BaseLocation
         // leadChars is the width written by writeLead (the command part); a row that fits is unchanged.
         void WriteCmdRow(Action writeLead, int leadChars, string desc)
         {
-            var parts = leadChars + 1 + desc.Length <= 78
+            var parts = leadChars + 1 + TextWidth.Width(desc) <= 78
                 ? new List<string> { desc }
                 : UsurperRemake.UI.UIHelper.WordWrap(desc, 78 - leadChars - 1);
             for (int i = 0; i < parts.Count; i++)
@@ -3277,7 +3277,7 @@ public abstract class BaseLocation
                     if (first) writeLead(); else terminal.Write(new string(' ', leadChars));
                     terminal.SetColor("white");
                     terminal.Write($" {part}");
-                }, leadChars + 1 + part.Length);
+                }, leadChars + 1 + TextWidth.Width(part));
             }
         }
 
@@ -3285,12 +3285,12 @@ public abstract class BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
         var helpTitle = Loc.Get("base.quick_commands");
-        int helpTitlePad = (78 - helpTitle.Length) / 2;
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(new string(' ', helpTitlePad) + helpTitle); }, helpTitlePad + helpTitle.Length);
+        int helpTitlePad = (78 - TextWidth.Width(helpTitle)) / 2;
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(new string(' ', helpTitlePad) + helpTitle); }, helpTitlePad + TextWidth.Width(helpTitle));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
         var helpSubtitle = "  " + Loc.Get("base.help_commands_work");
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(helpSubtitle); }, helpSubtitle.Length);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(helpSubtitle); }, TextWidth.Width(helpSubtitle));
         WriteBoxLine(() => { }, 0);
 
         // Slash commands with aliases; v1.2.5: the word between them is base.or, the commands stay as typed
@@ -3302,11 +3302,11 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
-                terminal.Write(cmd.PadRight(10));
+                terminal.Write(TextWidth.PadRight(cmd, 10));
                 terminal.SetColor("gray");
                 terminal.Write($" {or} ");
                 terminal.SetColor("cyan");
-                terminal.Write(alias.PadRight(4));
+                terminal.Write(TextWidth.PadRight(alias, 4));
             }, 1 + Math.Max(10, cmd.Length) + or.Length + 2 + Math.Max(4, alias.Length), desc);
         }
 
@@ -3317,7 +3317,7 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("cyan");
-                terminal.Write(cmd.PadRight(18));
+                terminal.Write(TextWidth.PadRight(cmd, 18));
             }, 1 + Math.Max(18, cmd.Length), desc);
         }
 
@@ -3354,7 +3354,7 @@ public abstract class BaseLocation
 
         WriteBoxLine(() => { }, 0);
         var quickKeysLabel = "  " + Loc.Get("base.help_quick_keys");
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(quickKeysLabel); }, quickKeysLabel.Length);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(quickKeysLabel); }, TextWidth.Width(quickKeysLabel));
 
         void WriteQuickKey(string key, string desc)
         {
@@ -3362,10 +3362,10 @@ public abstract class BaseLocation
             {
                 terminal.Write(" ");
                 terminal.SetColor("bright_yellow");
-                terminal.Write(key.PadRight(2));
+                terminal.Write(TextWidth.PadRight(key, 2));
                 terminal.SetColor("white");
                 terminal.Write($" {desc}");
-            }, 2 + 1 + desc.Length + 1);
+            }, 2 + 1 + TextWidth.Width(desc) + 1);
         }
 
         WriteQuickKey("*", Loc.Get("base.help_key_inventory"));
@@ -3379,7 +3379,7 @@ public abstract class BaseLocation
         {
             WriteBoxLine(() => { }, 0);
             var onlineCmdsLabel = "  " + Loc.Get("base.help_online_commands");
-            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(onlineCmdsLabel); }, onlineCmdsLabel.Length);
+            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(onlineCmdsLabel); }, TextWidth.Width(onlineCmdsLabel));
 
             void WriteOnlineCmd(string cmd, string desc)
             {
@@ -3387,7 +3387,7 @@ public abstract class BaseLocation
                 {
                     terminal.Write(" ");
                     terminal.SetColor("bright_green");
-                    terminal.Write(cmd.PadRight(20));
+                    terminal.Write(TextWidth.PadRight(cmd, 20));
                 }, 1 + Math.Max(20, cmd.Length), desc);
             }
 
@@ -3413,7 +3413,7 @@ public abstract class BaseLocation
 
             WriteBoxLine(() => { }, 0);
             var groupCmdsLabel = "  " + Loc.Get("base.help_group_commands");
-            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(groupCmdsLabel); }, groupCmdsLabel.Length);
+            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(groupCmdsLabel); }, TextWidth.Width(groupCmdsLabel));
 
             WriteOnlineCmd($"/group {HelpArg("player")}", Loc.Get("base.help_group"));
             WriteOnlineCmd("/leave", Loc.Get("base.help_leave"));
@@ -3793,7 +3793,7 @@ public abstract class BaseLocation
                 var matRows = UIHelper.WrapAfterPrefix(matPrefix, matDef.LocDescription);
                 terminal.WriteLine($"  -- {matRows[0]}");
                 foreach (var more in matRows.Skip(1))
-                    terminal.WriteLine(new string(' ', matPrefix.Length) + more);
+                    terminal.WriteLine(new string(' ', TextWidth.Width(matPrefix)) + more);
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");
@@ -5367,8 +5367,9 @@ public abstract class BaseLocation
         }
         terminal.SetColor(color);
         terminal.WriteLine($"╔{new string('═', width)}╗");
-        int l = (width - title.Length) / 2;
-        int r = width - title.Length - l;
+        int titleWidth = TextWidth.Width(title);
+        int l = (width - titleWidth) / 2;
+        int r = width - titleWidth - l;
         terminal.WriteLine($"║{new string(' ', l)}{title}{new string(' ', r)}║");
         terminal.WriteLine($"╚{new string('═', width)}╝");
     }
@@ -6877,7 +6878,7 @@ public abstract class BaseLocation
     /// one wraps at spaces, each later row indented under the text after its leading "  - ".</summary>
     internal static List<string> BuffRows(string row)
     {
-        if (row.Length <= 79) return new List<string> { row };
+        if (TextWidth.Width(row) <= 79) return new List<string> { row };
         string trimmed = row.TrimStart();
         int lead = row.Length - trimmed.Length + (trimmed.StartsWith("- ") ? 2 : 0);
         string indent = new string(' ', lead);
@@ -9337,14 +9338,26 @@ public abstract class BaseLocation
     internal static string MailboxHeader() =>
         $"{"#",-4} {Cell(Loc.Get("base.from_label"), 16)} {Cell(Loc.Get("base.col_date"), 12)} {Cell(Loc.Get("base.col_message"), 36)}";
 
-    /// <summary>v1.2.5: a column label padded to its field, and clipped to it so the columns stay aligned.</summary>
-    internal static string Cell(string text, int width) => (text.Length > width ? text.Substring(0, width) : text).PadRight(width);
+    /// <summary>v1.2.5: a column label padded to its field, and clipped to it so the columns stay aligned.
+    /// v1.3.8: measured in display columns, so a Chinese label stays in its field.</summary>
+    internal static string Cell(string text, int width) =>
+        TextWidth.PadRight(TextWidth.Truncate(text, width), width);
 
-    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.</summary>
+    /// <summary>A right-aligned column cell, measured in display columns.</summary>
+    internal static string CellRight(string text, int width) =>
+        TextWidth.PadLeft(TextWidth.Truncate(text, width), width);
+
+    /// <summary>A cell that pads but keeps a longer value whole, for a name with a caller fallback.</summary>
+    internal static string CellWhole(string text, int width) => TextWidth.PadRight(text, width);
+
+    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.
+    /// v1.3.8: every field is padded by display columns, not characters.</summary>
     internal static string MailboxRow(string unreadMark, int number, string from, string date, string preview)
     {
-        string sender = from.Length > 16 ? from.Substring(0, 16) : from;
-        return $"{unreadMark}{number,-3} {sender,-16} {date,-12} {preview,-36}";
+        string sender = TextWidth.Truncate(from, 16);
+        return $"{unreadMark}{number,-3} {TextWidth.PadRight(sender, 16)} " +
+               $"{TextWidth.PadRight(TextWidth.Truncate(date, 12), 12)} " +
+               $"{TextWidth.PadRight(TextWidth.Truncate(preview, 36), 36)}";
     }
 
     private async Task ReadMail(SqlSaveBackend backend, PlayerMessage msg)
@@ -9930,10 +9943,10 @@ public abstract class BaseLocation
 
     /// <summary>v1.2.5: a bounty board amount, "N gold" in the player's language, in the 15-column Bounty field
     /// (wider for an amount that needs it) and one space. The names beside it are clipped to their 20-column fields.</summary>
-    internal static string BountyAmountCell(long amount) => Loc.Get("anchor_road.gold_amount", amount.ToString("N0")).PadRight(15) + " ";
+    internal static string BountyAmountCell(long amount) => TextWidth.PadRight(Loc.Get("anchor_road.gold_amount", amount.ToString("N0")), 15) + " ";
 
     /// <summary>v1.2.5: the Posted By field, 20 columns, less when a very large amount leaves less room in 79.</summary>
-    internal static int BountyPlacedByWidth(string amountCell) => Math.Min(20, MaxRowWidth - (2 + 5 + 21) - amountCell.Length);
+    internal static int BountyPlacedByWidth(string amountCell) => Math.Min(20, MaxRowWidth - (2 + 5 + 21) - TextWidth.Width(amountCell));
 
     private const int MaxRowWidth = 79;
 
@@ -10437,14 +10450,14 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{Truncate(l.ItemName, AuctionItemWidth - 1),-22} ");   // v1.2.5: 22 + one gap, so the row fits 79
+            terminal.Write(TextWidth.PadRight(Truncate(l.ItemName, AuctionItemWidth - 1), AuctionItemWidth) + " ");   // v1.2.5: 22 + one gap, so the row fits 79
             terminal.SetColor("cyan");
-            terminal.Write($"{stats,-16} ");
+            terminal.Write(TextWidth.PadRight(stats, 16) + " ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write(" ");
             terminal.SetColor(isMine ? "cyan" : "gray");
-            terminal.Write($"{Truncate(l.Seller, AuctionSellerWidth - 1),-13} ");
+            terminal.Write(TextWidth.PadRight(Truncate(l.Seller, AuctionSellerWidth - 1), AuctionSellerWidth) + " ");
             terminal.SetColor("darkgray");
             terminal.WriteLine(expires);
         }
@@ -10465,8 +10478,8 @@ public abstract class BaseLocation
 
     private static string Truncate(string s, int maxLen)
     {
-        if (s.Length <= maxLen) return s;
-        return s.Substring(0, maxLen - 3) + "...";
+        if (TextWidth.Width(s) <= maxLen) return s;
+        return TextWidth.Truncate(s, Math.Max(0, maxLen - 3)) + "...";
     }
 
     private static string GetItemStatsCompact(Item? item)
@@ -10924,9 +10937,9 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {i + 1,-4} ");
             terminal.SetColor("white");
-            terminal.Write($"{Truncate(l.ItemName, 23),-24} ");
+            terminal.Write(TextWidth.PadRight(Truncate(l.ItemName, 23), 24) + " ");
             terminal.SetColor("bright_green");
-            terminal.Write($"{l.Price:N0}g".PadLeft(10));
+            terminal.Write(TextWidth.PadLeft($"{l.Price:N0}g", 10));
             terminal.Write("  ");
             terminal.SetColor(statusColor);
             terminal.WriteLine($"[{statusText}]");
@@ -11251,7 +11264,7 @@ public abstract class BaseLocation
         // v1.2.2: the columns are sized from the longest slot name in the player's language and the
         // item names are cut to fit, so a row stays within 80 columns in every language (Spanish and
         // French slot names run to 16 letters; English keeps its 12-wide labels and 20-wide left names).
-        var (labelWidth, leftNameWidth, rightNameWidth) = SlotPickerColumns(slots.Max(s => s.label.Length));
+        var (labelWidth, leftNameWidth, rightNameWidth) = SlotPickerColumns(slots.Max(s => TextWidth.Width(s.label)));
 
         // Two-column layout: 1-7 left, 8-14 right
         for (int row = 0; row < 7; row++)
@@ -11263,11 +11276,11 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {li + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write(lLabel.PadRight(labelWidth));
+            terminal.Write(TextWidth.PadRight(lLabel, labelWidth));
             if (lItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(lItem.IsIdentified ? ItemNames.Display(lItem) : "???", leftNameWidth - 1).PadRight(leftNameWidth));
+                terminal.Write(TextWidth.PadRight(Truncate(lItem.IsIdentified ? ItemNames.Display(lItem) : "???", leftNameWidth - 1), leftNameWidth));
             }
             else
             {
@@ -11282,11 +11295,11 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($" {ri + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write(rLabel.PadRight(labelWidth));
+            terminal.Write(TextWidth.PadRight(rLabel, labelWidth));
             if (rItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(rItem.IsIdentified ? ItemNames.Display(rItem) : "???", rightNameWidth));
+                terminal.Write(TextWidth.PadRight(Truncate(rItem.IsIdentified ? ItemNames.Display(rItem) : "???", rightNameWidth), rightNameWidth));
             }
             else
             {

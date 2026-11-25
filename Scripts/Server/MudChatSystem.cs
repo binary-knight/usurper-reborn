@@ -859,8 +859,9 @@ public static class MudChatSystem
         }
         else
         {
-            int padLeft = Math.Max(1, (whoWidth - whoHeader.Length - 2) / 2);
-            int padRight = Math.Max(1, whoWidth - whoHeader.Length - 2 - padLeft);
+            int headerWidth = UsurperRemake.UI.TextWidth.Width(whoHeader);
+            int padLeft = Math.Max(1, (whoWidth - headerWidth - 2) / 2);
+            int padRight = Math.Max(1, whoWidth - headerWidth - 2 - padLeft);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine($"{new string('━', padLeft)} {whoHeader} {new string('━', padRight)}");
         }

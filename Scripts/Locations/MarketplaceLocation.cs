@@ -1,5 +1,6 @@
 using UsurperRemake.BBS;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using GlobalItem = global::Item;
 using System;
 using System.Collections.Generic;
@@ -373,7 +374,7 @@ public class MarketplaceLocation : BaseLocation
         {
             // Column headers
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("marketplace.col_num"),-4} {Loc.Get("marketplace.col_item"),-30} {Loc.Get("marketplace.col_price"),-16} {Loc.Get("marketplace.col_seller"),-18} {Loc.Get("marketplace.col_age")}");
+            terminal.WriteLine($"  {Cell(Loc.Get("marketplace.col_num"), 4)} {Cell(Loc.Get("marketplace.col_item"), 30)} {Cell(Loc.Get("marketplace.col_price"), 16)} {Cell(Loc.Get("marketplace.col_seller"), 18)} {Loc.Get("marketplace.col_age")}");
             if (!IsScreenReader)
             {
                 terminal.SetColor("darkgray");
@@ -393,20 +394,18 @@ public class MarketplaceLocation : BaseLocation
 
                 // Item name - color by rarity/type
                 terminal.SetColor("white");
-                string itemName = listing.Item.GetDisplayName();
-                if (itemName.Length > 28) itemName = itemName[..28] + "..";
-                terminal.Write($" {itemName,-30}");
+                string itemName = TextWidth.Truncate(listing.Item.GetDisplayName(), 29, "..");
+                terminal.Write(" " + Cell(itemName, 29) + " ");
 
                 // Price
                 terminal.SetColor("bright_yellow");
                 // v1.2.5: the coin abbreviation in the player's language, in the same 14 columns
                 string priceCell = $"{listing.Price,12:N0} {Loc.Get("marketplace.gc")}";
-                terminal.Write($" {priceCell,-14} ");
+                terminal.Write(" " + CellWhole(priceCell, 15) + " ");
 
                 // Seller
                 terminal.SetColor(listing.IsNPCSeller ? "bright_cyan" : "bright_green");
-                if (sellerDisplay.Length > 18) sellerDisplay = sellerDisplay[..18];
-                terminal.Write($" {sellerDisplay,-18}");
+                terminal.Write(" " + Cell(TextWidth.Truncate(sellerDisplay, 18), 18));
 
                 // Age
                 terminal.SetColor("gray");

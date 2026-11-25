@@ -1,4 +1,5 @@
 using System;
+using UsurperRemake.UI;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -336,7 +337,7 @@ namespace UsurperRemake.Systems
         {
             int limit = Math.Max(width, stored?.Length ?? 0);
             if (shown.Length > limit) shown = shown.Substring(0, limit - 1).TrimEnd() + ".";
-            return shown.PadRight(width);
+            return TextWidth.PadRight(shown, width);
         }
 
         private static ((string Stored, string Key, bool Template)? Prefix, string Base) StripPrefix(string name)

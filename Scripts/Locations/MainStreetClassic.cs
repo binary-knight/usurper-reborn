@@ -2,6 +2,7 @@ using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -127,7 +128,7 @@ public partial class MainStreetLocation
             terminal.SetColor("darkgray"); terminal.Write("[");
             terminal.SetColor("bright_yellow"); terminal.Write(key);
             terminal.SetColor("darkgray"); terminal.Write("]");
-            terminal.SetColor(color); terminal.Write(label.PadRight(col - 3));
+            terminal.SetColor(color); terminal.Write(TextWidth.PadRight(label, col - 3));
         }
         // Last item in a row (no padding)
         void ML(string key, string label, string color)

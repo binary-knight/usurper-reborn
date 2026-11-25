@@ -239,7 +239,7 @@ public class DormitoryLocation : BaseLocation
         if (!IsScreenReader)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(new string('═', npc.Name2.Length));
+            terminal.WriteLine(new string('═', UsurperRemake.UI.TextWidth.Width(npc.Name2)));
         }
         terminal.SetColor("white");
         terminal.WriteLine(npc.GetDisplayInfo());

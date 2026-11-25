@@ -5,6 +5,7 @@ using UsurperRemake.Data;
 using UsurperRemake.BBS;
 using UsurperRemake.Server;
 using System;
+using UsurperRemake.UI;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -489,8 +490,8 @@ public class DungeonLocation : BaseLocation
         {
             term.WriteLine("╔══════════════════════════════════════════════════════════╗", "bright_yellow");
             string wtitle = Loc.Get("dungeon.tut.welcome_title");
-            int pad = Math.Max(0, (56 - wtitle.Length) / 2);
-            term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - wtitle.Length)) + " ║", "bright_yellow");
+            int pad = Math.Max(0, (56 - TextWidth.Width(wtitle)) / 2);
+            term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - TextWidth.Width(wtitle))) + " ║", "bright_yellow");
             term.WriteLine("╚══════════════════════════════════════════════════════════╝", "bright_yellow");
         }
         term.WriteLine("");
@@ -524,8 +525,8 @@ public class DungeonLocation : BaseLocation
             }
             else
             {
-                string bar = new string('─', Math.Min(title.Length + 4, 60));
-                term.WriteLine($"┌─ {title} ─" + new string('─', Math.Max(0, 56 - title.Length)) + "┐", titleColor);
+                string bar = new string('─', Math.Min(TextWidth.Width(title) + 4, 60));
+                term.WriteLine($"┌─ {title} ─" + new string('─', Math.Max(0, 56 - TextWidth.Width(title))) + "┐", titleColor);
             }
             term.WriteLine("");
             foreach (var (text, color) in lines)
@@ -1898,7 +1899,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             term.WriteLine($"╔{'═'.ToString().PadRight(58, '═')}╗");
-            term.WriteLine($"║  {title.PadRight(55)} ║");
+            term.WriteLine($"║  {TextWidth.PadRight(title, 55)} ║");
             term.WriteLine($"╚{'═'.ToString().PadRight(58, '═')}╝");
         }
         term.WriteLine("");
@@ -2208,7 +2209,7 @@ public class DungeonLocation : BaseLocation
         void WriteRows(string text, string color)
         {
             string indent = new string(' ', text.Length - text.TrimStart(' ').Length);
-            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text.TrimStart(' '), 79 - indent.Length))
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text.TrimStart(' '), 79 - TextWidth.Width(indent)))
                 term.WriteLine(indent + row, color);
         }
 
@@ -2752,7 +2753,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             terminal.WriteLine($"╔{new string('═', 55)}╗");
-            terminal.WriteLine($"║  {room.Name.PadRight(52)} ║");
+            terminal.WriteLine($"║  {TextWidth.PadRight(room.Name, 52)} ║");
             terminal.WriteLine($"╚{new string('═', 55)}╝");
         }
 
@@ -11578,7 +11579,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     internal static List<string> StanceDescriptionRows(string key, string name, string desc)
     {
-        int lead = $"  [{key}] {name}  ".Length;
+        int lead = UsurperRemake.UI.TextWidth.Width($"  [{key}] {name}  ");
         return CombatEngine.WrapQuickbarText(desc, UsurperRemake.UI.UIHelper.WrapWidth - lead);
     }
 
@@ -11587,7 +11588,7 @@ public class DungeonLocation : BaseLocation
     {
         string name = Loc.Get(TeammateStances.NameKey(stance));
         var parts = StanceDescriptionRows(key, name, Loc.Get(TeammateStances.NameKey(stance) + ".desc"));
-        string pad = new string(' ', $"  [{key}] {name}  ".Length);
+        string pad = new string(' ', UsurperRemake.UI.TextWidth.Width($"  [{key}] {name}  "));
         terminal.SetColor("bright_yellow"); terminal.Write($"  [{key}] ");
         terminal.SetColor("white"); terminal.Write(name);
         terminal.SetColor("gray"); terminal.WriteLine($"  {parts[0]}");
@@ -12284,7 +12285,7 @@ public class DungeonLocation : BaseLocation
             // Slot 0 — Player
             terminal.SetColor("bright_white");
             string youLabel = "  " + Loc.Get("dungeon.xp_label_you", player.ClassName, player.Level);
-            terminal.Write(youLabel.PadRight(40));
+            terminal.Write(TextWidth.PadRight(youLabel, 40));
             terminal.SetColor("bright_green");
             terminal.WriteLine($": {shown[0],3}%");
 
@@ -12301,7 +12302,7 @@ public class DungeonLocation : BaseLocation
                         ? "  " + Loc.Get("dungeon.xp_label_companion", slotIndex, tm.DisplayName, tm.Level)
                         : "  " + Loc.Get("dungeon.xp_label_npc", slotIndex, tm.DisplayName, tm.Level, tm.ClassName);
                     terminal.SetColor("cyan");
-                    terminal.Write(tmLabel.PadRight(40));
+                    terminal.Write(TextWidth.PadRight(tmLabel, 40));
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($": {pct,3}%");
                 }
@@ -12309,7 +12310,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("gray");
                     string emptyLabel = "  " + Loc.Get("dungeon.xp_label_empty", slotIndex);
-                    terminal.Write(emptyLabel.PadRight(40));
+                    terminal.Write(TextWidth.PadRight(emptyLabel, 40));
                     terminal.WriteLine($": {pct,3}%");
                 }
             }
@@ -15837,12 +15838,12 @@ public class DungeonLocation : BaseLocation
 
             // Generate trade items based on floor level
             var items = GetSettlementTradeItems(settlement);
-            int nameWidth = items.Count > 0 ? Math.Max(25, items.Max(it => it.name.Length)) : 25;   // 1.3.11 (K8): names that state their effect run longer; the prices stay in one column
+            int nameWidth = items.Count > 0 ? Math.Max(25, items.Max(it => TextWidth.Width(it.name))) : 25;   // 1.3.11 (K8): names that state their effect run longer; the prices stay in one column
 
             for (int i = 0; i < items.Count; i++)
             {
                 terminal.SetColor("white");
-                terminal.WriteLine($"  [{i + 1}] {items[i].name.PadRight(nameWidth)} {items[i].cost:N0}g");
+                terminal.WriteLine($"  [{i + 1}] {TextWidth.PadRight(items[i].name, nameWidth)} {items[i].cost:N0}g");
             }
 
             terminal.WriteLine("");
@@ -19749,7 +19750,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var (slot, name, equip) in equippedList)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {name.PadRight(slotWidth)}");
+                    term.Write($"    {TextWidth.PadRight(name, slotWidth)}");
                     term.SetColor("yellow");
                     term.WriteLine(FitRow(ItemNames.Display(equip), 4 + slotWidth));
                 }
