@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.11; sources: Scripts/Systems/TelemetryStore.cs, Scripts/Systems/TelemetryUploader.cs, Scripts/Systems/TelemetryRow.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/VersionChecker.cs, Scripts/Systems/BugReportSystem.cs, Scripts/Systems/UserDataPaths.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudChatSystem.cs, Scripts/BBS, web/ssh-proxy.js -->
+<!-- doc: checked 1.3.15; sources: Scripts/Systems/TelemetryStore.cs, Scripts/Systems/TelemetryUploader.cs, Scripts/Systems/TelemetryRow.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/VersionChecker.cs, Scripts/Systems/BugReportSystem.cs, Scripts/Systems/UserDataPaths.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudChatSystem.cs, Scripts/BBS, web/ssh-proxy.js -->
 # Privacy Policy
 
 **Usurper Reborn** - Last updated: November 2026

@@ -1,8 +1,9 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.3.13
+checked: 1.3.15
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimService.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Systems/WeeklyGodSystem.cs
+history: 1.3.15 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
 history: 1.3.11 | The Healer no longer shows alignment or world event price lines it never applied, and the Bandit Lord Rises event, which never started, is removed from the event list.

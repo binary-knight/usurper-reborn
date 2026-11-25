@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Systems/TeamHQBonus.cs, Scripts/Server/GroupSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Server/MudChatSystem.cs
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

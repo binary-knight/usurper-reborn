@@ -1,8 +1,9 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Core/Child.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/MainStreetClassic.cs
+history: 1.3.15 | A child's last name can be changed from C at Home, for one child or every child at home; a child keeps its last name when a game loads, and a rename that would give a child the full name of another child, a townsperson or a player is refused.
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none
@@ -62,7 +63,7 @@ A living spouse adds combat experience and can join your dungeon party. The part
 
 ## Children
 
-A child can be conceived with a spouse or a lover, up to {{balance:MaxPlayerChildren}} living children; the chance is set by your Bed (see above). You name a child when it is born and can rename it from C at Home. A name with < > & or a double quote is refused: a newborn keeps the name the game gave it, and a renamed child keeps its old name.
+A child can be conceived with a spouse or a lover, up to {{balance:MaxPlayerChildren}} living children; the chance is set by your Bed (see above). You name a child when it is born. From C at Home, N gives a child a new first name and L a new last name, for that child or for every child at home, and a child keeps its last name when a game loads. A name with < > & or a double quote is refused: a newborn keeps the name the game gave it, and a renamed child keeps its old name. A rename that would give a child the full name of another child, a townsperson or a player is refused the same way.
 
 ### When does my child grow up
 

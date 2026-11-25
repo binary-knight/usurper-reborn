@@ -23013,6 +23013,7 @@
   "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Collaboratore della comunità",
   "engine.credits_coosh": "    Coosh                    - Collaboratore della comunità",
   "engine.credits_testingbytes": "    TestingBytes             - Contributi al codice",
+  "engine.credits_billkinggithub": "    billkinggithub           - Contributi al codice",
   "combat.ability_execute_critical": "  ESECUZIONE! {0} è ferito gravemente -- {1} danni bonus!",
   "combat.ability_execute_finishing": "  Colpo finale! {0} subisce {1} danni bonus!",
   "combat.ability_execute_too_healthy": "  {0} è troppo in salute per un colpo finale.",

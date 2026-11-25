@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.3.14
+checked: 1.3.15
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/ArenaLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DormitoryLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.15 | none
 history: 1.3.14 | none
 history: 1.3.13 | none
 history: 1.3.12 | none

@@ -23329,6 +23329,7 @@
   "engine.credits_lowleveljavacoder": "    LowLevelJavaCoder        - Közösségi kódhozzájáruló",
   "engine.credits_coosh": "    Coosh                    - Közösségi kódhozzájáruló",
   "engine.credits_testingbytes": "    TestingBytes             - Kód hozzájárulások",
+  "engine.credits_billkinggithub": "    billkinggithub           - Kód hozzájárulások",
   "combat.ability_execute_critical": "  KIVÉGZÉS! {0} kritikusan megsérült -- {1} bónusz sebzés!",
   "combat.ability_execute_finishing": "  Befejező csapás! {0} {1} bónusz sebzést kap!",
   "combat.ability_execute_too_healthy": "  {0} túl egészséges a befejező csapáshoz.",

@@ -24316,9 +24316,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// v0.60.0 beta: when a player exceeds the playthrough death cap
-    /// (GameConfig.MaxPlaythroughDeaths, default 5), the character is
-    /// permadeleted instead of getting the normal Veil-of-Death menu.
+    /// v0.60.0 beta: online with OnlinePermadeathEnabled on, a death with no Resurrections left
+    /// erases the character instead of reviving it (1.3.15: the playthrough death count plays no
+    /// part; it erases no one).
     /// Plays a short cinematic naming the cap, then archives + hard-deletes
     /// the account row. Archive lets the player /restore within 7 days
     /// (per v0.57.22 deleted_characters table) so a single bad afternoon

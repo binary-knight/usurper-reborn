@@ -1,8 +1,9 @@
 ---
 title: World and locations
 path: /wiki/en/world/
-checked: 1.3.10
+checked: 1.3.15
 sources: Scripts/Locations/MainStreetDistricts.cs
+history: 1.3.15 | none
 history: 1.3.10 | none
 history: 1.3.9 | none
 ---

@@ -2688,11 +2688,9 @@ public class Character
     public byte FileType { get; set; }              // file type (1=player, 2=npc)
     public int Resurrections { get; set; }          // resurrections left
 
-    // v0.60.0 beta: total deaths this playthrough (resets on NG+). Beta gates
-    // characters to GameConfig.MaxPlaythroughDeaths (5). Death #6 triggers
-    // permadeath via DeleteAccountForExcessiveDeaths. This is "five strikes
-    // and you're erased" -- harsh by design to make late-game decisions
-    // matter and to discourage hit-and-run cheese against bosses.
+    // v0.60.0 beta: total deaths this playthrough (resets on NG+), kept for stats and shown on the
+    // death menu. 1.3.15: it erases no one; the only erase on death is online with
+    // OnlinePermadeathEnabled on and no Resurrections left (CombatEngine, HandleExcessiveDeathsPermadeath).
     public int PlaythroughDeaths { get; set; }
     // v1.2 (design item F): days this player experienced a daily reset while logged in. Absence
     // adds nothing, so neglect is measured in time the player could have spent.
