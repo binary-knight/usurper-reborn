@@ -1881,8 +1881,8 @@ public class MudServer
     internal static List<string> AuthBoxRows(string title, IEnumerable<(string Color, string Hotkey, string Label)> entries)
     {
         const int inner = 77;
-        if (title.Length > inner) title = title.Substring(0, inner);
-        int tpad = inner - title.Length;
+        title = UsurperRemake.UI.TextWidth.Truncate(title, inner);
+        int tpad = inner - UsurperRemake.UI.TextWidth.Width(title);
         int tleft = tpad / 2;
         string box = $"\u001b[{AuthBoxColor}m";
         var rows = new List<string>

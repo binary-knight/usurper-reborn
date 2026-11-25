@@ -410,7 +410,7 @@ public partial class MagicShopLocation : BaseLocation
     /// inside is cut with "..." so the box keeps its shape.</summary>
     private void WriteShopBox(string title, string color)
     {
-        if (title.Length > BoxInside - 2) title = title.Substring(0, BoxInside - 5) + "...";
+        if (TextWidth.Width(title) > BoxInside - 2) title = TextWidth.Truncate(title, BoxInside - 5) + "...";
         WriteBoxHeader(title, color, BoxInside);
     }
 

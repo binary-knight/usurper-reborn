@@ -491,7 +491,7 @@ public class DungeonLocation : BaseLocation
             term.WriteLine("╔══════════════════════════════════════════════════════════╗", "bright_yellow");
             string wtitle = Loc.Get("dungeon.tut.welcome_title");
             int pad = Math.Max(0, (56 - TextWidth.Width(wtitle)) / 2);
-            term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - wtitle.Length)) + " ║", "bright_yellow");
+            term.WriteLine("║ " + new string(' ', pad) + wtitle + new string(' ', Math.Max(0, 56 - pad - TextWidth.Width(wtitle))) + " ║", "bright_yellow");
             term.WriteLine("╚══════════════════════════════════════════════════════════╝", "bright_yellow");
         }
         term.WriteLine("");
@@ -525,7 +525,7 @@ public class DungeonLocation : BaseLocation
             }
             else
             {
-                string bar = new string('─', Math.Min(title.Length + 4, 60));
+                string bar = new string('─', Math.Min(TextWidth.Width(title) + 4, 60));
                 term.WriteLine($"┌─ {title} ─" + new string('─', Math.Max(0, 56 - TextWidth.Width(title))) + "┐", titleColor);
             }
             term.WriteLine("");
@@ -11579,7 +11579,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     internal static List<string> StanceDescriptionRows(string key, string name, string desc)
     {
-        int lead = $"  [{key}] {name}  ".Length;
+        int lead = UsurperRemake.UI.TextWidth.Width($"  [{key}] {name}  ");
         return CombatEngine.WrapQuickbarText(desc, UsurperRemake.UI.UIHelper.WrapWidth - lead);
     }
 
@@ -11588,7 +11588,7 @@ public class DungeonLocation : BaseLocation
     {
         string name = Loc.Get(TeammateStances.NameKey(stance));
         var parts = StanceDescriptionRows(key, name, Loc.Get(TeammateStances.NameKey(stance) + ".desc"));
-        string pad = new string(' ', $"  [{key}] {name}  ".Length);
+        string pad = new string(' ', UsurperRemake.UI.TextWidth.Width($"  [{key}] {name}  "));
         terminal.SetColor("bright_yellow"); terminal.Write($"  [{key}] ");
         terminal.SetColor("white"); terminal.Write(name);
         terminal.SetColor("gray"); terminal.WriteLine($"  {parts[0]}");

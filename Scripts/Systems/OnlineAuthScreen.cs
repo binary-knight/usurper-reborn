@@ -103,8 +103,9 @@ namespace UsurperRemake.Systems
 
             string titleText = Loc.Get("auth.title");
             const int innerWidth = 78;
-            int leftPad  = (innerWidth - titleText.Length) / 2;
-            int rightPad = innerWidth - titleText.Length - leftPad;
+            int titleWidth = UsurperRemake.UI.TextWidth.Width(titleText);
+            int leftPad  = (innerWidth - titleWidth) / 2;
+            int rightPad = innerWidth - titleWidth - leftPad;
 
             if (GameConfig.ScreenReaderMode)
             {

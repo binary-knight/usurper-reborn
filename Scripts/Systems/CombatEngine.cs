@@ -31824,7 +31824,7 @@ public partial class CombatEngine
             }
             else
             {
-                terminal.Write(new string(' ', keyText.Length));
+                terminal.Write(new string(' ', TextWidth.Width(keyText)));
             }
             terminal.SetColor(color);
             terminal.Write(parts[i].PadRight(width));
@@ -34798,13 +34798,13 @@ public partial class CombatEngine
     /// <summary>v1.2.2: a title centred in the 58 wide combat status box, between its side bars.</summary>
     internal static string BoxTitleLine(string title, int inner = 58)
     {
-        int left = Math.Max(0, (inner - title.Length) / 2);
-        return "║" + (new string(' ', left) + title).PadRight(inner) + "║";
+        int left = Math.Max(0, (inner - TextWidth.Width(title)) / 2);
+        return "║" + TextWidth.PadRight(new string(' ', left) + title, inner) + "║";
     }
 
     /// <summary>v1.2.2: the top edge of the first battle tip box, 78 wide, with the label set in it.</summary>
     internal static string TipBoxTop(string label)
-        => "┌─── " + label + " " + new string('─', Math.Max(3, 78 - 6 - label.Length - 1)) + "┐";
+        => "┌─── " + label + " " + new string('─', Math.Max(3, 78 - 6 - TextWidth.Width(label) - 1)) + "┐";
 
     /// <summary>
     /// v1.2.2: BroadcastGroupCombatEvent with each group member reading the message in their own language.

@@ -3265,7 +3265,7 @@ public abstract class BaseLocation
         // leadChars is the width written by writeLead (the command part); a row that fits is unchanged.
         void WriteCmdRow(Action writeLead, int leadChars, string desc)
         {
-            var parts = leadChars + 1 + desc.Length <= 78
+            var parts = leadChars + 1 + TextWidth.Width(desc) <= 78
                 ? new List<string> { desc }
                 : UsurperRemake.UI.UIHelper.WordWrap(desc, 78 - leadChars - 1);
             for (int i = 0; i < parts.Count; i++)
@@ -3277,7 +3277,7 @@ public abstract class BaseLocation
                     if (first) writeLead(); else terminal.Write(new string(' ', leadChars));
                     terminal.SetColor("white");
                     terminal.Write($" {part}");
-                }, leadChars + 1 + part.Length);
+                }, leadChars + 1 + TextWidth.Width(part));
             }
         }
 
@@ -3286,11 +3286,11 @@ public abstract class BaseLocation
         terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
         var helpTitle = Loc.Get("base.quick_commands");
         int helpTitlePad = (78 - TextWidth.Width(helpTitle)) / 2;
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(new string(' ', helpTitlePad) + helpTitle); }, helpTitlePad + helpTitle.Length);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(new string(' ', helpTitlePad) + helpTitle); }, helpTitlePad + TextWidth.Width(helpTitle));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("╠══════════════════════════════════════════════════════════════════════════════╣");
         var helpSubtitle = "  " + Loc.Get("base.help_commands_work");
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(helpSubtitle); }, helpSubtitle.Length);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(helpSubtitle); }, TextWidth.Width(helpSubtitle));
         WriteBoxLine(() => { }, 0);
 
         // Slash commands with aliases; v1.2.5: the word between them is base.or, the commands stay as typed
@@ -3354,7 +3354,7 @@ public abstract class BaseLocation
 
         WriteBoxLine(() => { }, 0);
         var quickKeysLabel = "  " + Loc.Get("base.help_quick_keys");
-        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(quickKeysLabel); }, quickKeysLabel.Length);
+        WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(quickKeysLabel); }, TextWidth.Width(quickKeysLabel));
 
         void WriteQuickKey(string key, string desc)
         {
@@ -3365,7 +3365,7 @@ public abstract class BaseLocation
                 terminal.Write(TextWidth.PadRight(key, 2));
                 terminal.SetColor("white");
                 terminal.Write($" {desc}");
-            }, 2 + 1 + desc.Length + 1);
+            }, 2 + 1 + TextWidth.Width(desc) + 1);
         }
 
         WriteQuickKey("*", Loc.Get("base.help_key_inventory"));
@@ -3379,7 +3379,7 @@ public abstract class BaseLocation
         {
             WriteBoxLine(() => { }, 0);
             var onlineCmdsLabel = "  " + Loc.Get("base.help_online_commands");
-            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(onlineCmdsLabel); }, onlineCmdsLabel.Length);
+            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(onlineCmdsLabel); }, TextWidth.Width(onlineCmdsLabel));
 
             void WriteOnlineCmd(string cmd, string desc)
             {
@@ -3413,7 +3413,7 @@ public abstract class BaseLocation
 
             WriteBoxLine(() => { }, 0);
             var groupCmdsLabel = "  " + Loc.Get("base.help_group_commands");
-            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(groupCmdsLabel); }, groupCmdsLabel.Length);
+            WriteBoxLine(() => { terminal.SetColor("white"); terminal.Write(groupCmdsLabel); }, TextWidth.Width(groupCmdsLabel));
 
             WriteOnlineCmd($"/group {HelpArg("player")}", Loc.Get("base.help_group"));
             WriteOnlineCmd("/leave", Loc.Get("base.help_leave"));
@@ -3793,7 +3793,7 @@ public abstract class BaseLocation
                 var matRows = UIHelper.WrapAfterPrefix(matPrefix, matDef.LocDescription);
                 terminal.WriteLine($"  -- {matRows[0]}");
                 foreach (var more in matRows.Skip(1))
-                    terminal.WriteLine(new string(' ', matPrefix.Length) + more);
+                    terminal.WriteLine(new string(' ', TextWidth.Width(matPrefix)) + more);
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");
@@ -5367,8 +5367,9 @@ public abstract class BaseLocation
         }
         terminal.SetColor(color);
         terminal.WriteLine($"╔{new string('═', width)}╗");
-        int l = (width - title.Length) / 2;
-        int r = width - title.Length - l;
+        int titleWidth = TextWidth.Width(title);
+        int l = (width - titleWidth) / 2;
+        int r = width - titleWidth - l;
         terminal.WriteLine($"║{new string(' ', l)}{title}{new string(' ', r)}║");
         terminal.WriteLine($"╚{new string('═', width)}╝");
     }

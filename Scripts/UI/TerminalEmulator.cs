@@ -1537,9 +1537,10 @@ public partial class TerminalEmulator
     internal static string TitleBoxRow(string text, int left)
     {
         const int inner = 77;
-        if (text.Length > inner) text = text.Substring(0, inner);
-        if (left + text.Length > inner) left = (inner - text.Length) / 2;
-        return "║" + new string(' ', left) + text + new string(' ', inner - left - text.Length) + "║";
+        text = UsurperRemake.UI.TextWidth.Truncate(text, inner);
+        int width = UsurperRemake.UI.TextWidth.Width(text);
+        if (left + width > inner) left = Math.Max(0, (inner - width) / 2);
+        return "║" + new string(' ', left) + text + new string(' ', inner - left - width) + "║";
     }
 
     private void DisplayANSI(string ansiContent)

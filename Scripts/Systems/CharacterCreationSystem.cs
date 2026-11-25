@@ -1138,8 +1138,9 @@ public class CharacterCreationSystem
 
         // ── Row 1: Top border with race name ──
         string title = $" {raceName.ToUpper()} ";
-        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
-        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        int titleWidth = TextWidth.Width(title);
+        int leftPad = (TOTAL_W - 2 - titleWidth) / 2;
+        int rightPad = TOTAL_W - 2 - titleWidth - leftPad;
         terminal.Write("╔", "gray");
         terminal.Write(new string('═', leftPad), "gray");
         terminal.Write(title, "bright_yellow");
@@ -1731,8 +1732,9 @@ public class CharacterCreationSystem
 
         // ── Row 1: Top border with class name ──
         string title = $" {className.ToUpper()} ";
-        int leftPad = (TOTAL_W - 2 - title.Length) / 2;
-        int rightPad = TOTAL_W - 2 - title.Length - leftPad;
+        int titleWidth = TextWidth.Width(title);
+        int leftPad = (TOTAL_W - 2 - titleWidth) / 2;
+        int rightPad = TOTAL_W - 2 - titleWidth - leftPad;
         terminal.Write("╔", "gray");
         terminal.Write(new string('═', leftPad), "gray");
         terminal.Write(title, "bright_yellow");

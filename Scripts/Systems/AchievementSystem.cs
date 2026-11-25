@@ -1633,7 +1633,7 @@ public static class AchievementSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             string headerText = Loc.Get("achievement.unlocked_many", achievements.Count);
             int pad = (58 - UsurperRemake.UI.TextWidth.Width(headerText)) / 2;
-            string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - headerText.Length);
+            string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - UsurperRemake.UI.TextWidth.Width(headerText));
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
             terminal.Write(centeredHeader);
