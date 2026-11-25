@@ -26966,6 +26966,7 @@
   "home.child_action_surname": "Change last name",
   "home.child_new_surname_prompt": "New last name (Enter to keep): ",
   "home.child_surname_all_prompt": "Give all {0} of your children the last name {1}? (Y/N) ",
+  "home.child_surname_taken": "  Someone already bears the name {0}; {1} keeps the old name.",
   "equip.moved_to_inventory": "Moved {0} to inventory.",
   "equip.moved_to_offhand": "Moved {0} to off-hand.",
   "equip.equipped_in_slot": "Equipped {0} in {1}",

@@ -26469,6 +26469,7 @@
   "home.child_action_surname": "Changer le nom de famille",
   "home.child_new_surname_prompt": "Nouveau nom de famille (Entrée pour conserver) : ",
   "home.child_surname_all_prompt": "Donner le nom de famille {1} à vos {0} enfants ? (Y/N) ",
+  "home.child_surname_taken": "  Quelqu'un porte déjà le nom {0} ; {1} garde son ancien nom.",
   "equip.moved_to_inventory": "{0} déplacé(e) dans l'inventaire.",
   "equip.moved_to_offhand": "{0} déplacé(e) en main gauche.",
   "equip.equipped_in_slot": "{0} équipé(e) en {1}",

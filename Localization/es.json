@@ -26480,6 +26480,7 @@
   "home.child_action_surname": "Cambiar apellido",
   "home.child_new_surname_prompt": "Nuevo apellido (Enter para mantener): ",
   "home.child_surname_all_prompt": "¿Dar a tus {0} hijos el apellido {1}? (S/N) ",
+  "home.child_surname_taken": "  Alguien ya lleva el nombre {0}; {1} conserva su nombre.",
   "equip.moved_to_inventory": "Has movido {0} al inventario.",
   "equip.moved_to_offhand": "Has movido {0} a la mano secundaria.",
   "equip.equipped_in_slot": "Has equipado {0} en {1}",
